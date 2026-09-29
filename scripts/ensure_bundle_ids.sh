@@ -41,7 +41,28 @@ for pair in "$BUNDLE_ID|Splits8" "$BUNDLE_ID.watchkitapp|Splits8 Watch"; do
     if app-store-connect bundle-ids capabilities "$RID" --json 2>/dev/null | grep -qi "APPLE_ID_AUTH"; then
       echo "   (이미 켜져 있음)"
     else
-      app-store-connect bundle-ids enable-capabilities "$RID" --capability "Sign In with Apple"
+      # Sign in with Apple 은 설정(기본 앱)을 함께 보내야 해서 API 를 직접 부른다
+      BUNDLE_RID="$RID" python3 - <<'PY'
+import os, time, json, urllib.request, urllib.error
+import jwt
+key = os.environ["APP_STORE_CONNECT_PRIVATE_KEY"]
+now = int(time.time())
+tok = jwt.encode({"iss": os.environ["APP_STORE_CONNECT_ISSUER_ID"], "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"},
+                 key, algorithm="ES256", headers={"kid": os.environ["APP_STORE_CONNECT_KEY_IDENTIFIER"], "typ": "JWT"})
+body = {"data": {"type": "bundleIdCapabilities",
+                 "attributes": {"capabilityType": "APPLE_ID_AUTH",
+                                "settings": [{"key": "APPLE_ID_AUTH_APP_CONSENT", "options": [{"key": "PRIMARY_APP_CONSENT"}]}]},
+                 "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": os.environ["BUNDLE_RID"]}}}}}
+req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/bundleIdCapabilities",
+                             data=json.dumps(body).encode(), method="POST",
+                             headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"})
+try:
+    urllib.request.urlopen(req)
+    print("   Sign in with Apple 켜짐")
+except urllib.error.HTTPError as e:
+    print("   실패:", e.code, e.read().decode()[:400])
+    raise SystemExit(1)
+PY
     fi
   fi
 done

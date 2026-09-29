@@ -61,6 +61,123 @@ jobs:
             2>&1 | tee build/xcodebuild.log | grep -E "error:|warning: unused|Test Case|\*\* TEST|BUILD" || true
           ls -la shots || true
 
+      - name: 애플워치 화면 캡처
+        continue-on-error: true
+        run: |
+          set +e
+          WUDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          d=json.load(sys.stdin)["devices"]
+          best=None
+          for rt,devs in d.items():
+            if "watchOS" not in rt: continue
+            for x in devs:
+              if "Apple Watch" in x["name"] and "Ultra" not in x["name"] and (best is None or (rt,x["name"])>(best[0],best[2])):
+                best=(rt,x["udid"],x["name"])
+          print(best[1] if best else "")')
+          echo "watch sim: $WUDID"
+          xcrun simctl list devices available | grep -i watch || true
+          if [ -z "$WUDID" ]; then echo "가상 워치 없음"; exit 0; fi
+          xcrun simctl boot "$WUDID"
+          xcrun simctl bootstatus "$WUDID" -b
+          xcodebuild build \
+            -project Splits8.xcodeproj -scheme Splits8Watch \
+            -destination "id=$WUDID" -derivedDataPath build/watch \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee build/watch-build.log | grep -E "error:|BUILD" || true
+          APP=$(find build/watch -name "Splits8Watch.app" -maxdepth 6 | head -1)
+          echo "app: $APP"
+          xcrun simctl install "$WUDID" "$APP"
+          BID=com.exorenal.splits8.watchkitapp
+          for name in home programs quick confirm_training confirm_race live controls segments end summary; do
+            xcrun simctl terminate "$WUDID" $BID >/dev/null 2>&1
+            xcrun simctl launch "$WUDID" $BID --shot $name
+            sleep 5
+            xcrun simctl io "$WUDID" screenshot "shots/W_$name.png"
+          done
+          ls -la shots | grep W_ || true
+
+      - name: 캡처 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: |
+            shots/*.png
+            build/xcodebuild.log
+            build/watch-build.log
+          if-no-files-found: warn
+
+      - name: 자세한 결과(xcresult) 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: build/shots.xcresult
+          if-no-files-found: ignore
+# 애플 개발자 등록 없이: 가상 아이폰에서 앱을 켜고 화면을 캡처합니다.
+# Actions 탭 → "0. 화면 확인 (스크린샷)" → Run workflow → 끝나면 아래 "Artifacts"의 screenshots 내려받기
+name: 0. 화면 확인 (스크린샷)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  shots:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 최신 Xcode 선택
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 도구 설치
+        run: |
+          brew install xcodegen
+          xcodebuild -version
+          if ! xcodebuild -showsdks | grep -q watchsimulator; then
+            xcodebuild -downloadPlatform watchOS
+          fi
+
+      - name: Xcode 프로젝트 만들기
+        run: xcodegen generate
+
+      - name: 가상 아이폰 고르기
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          d=json.load(sys.stdin)["devices"]
+          best=None
+          for rt,devs in d.items():
+            if "iOS" not in rt: continue
+            for x in devs:
+              if x["name"] in ("iPhone 16 Pro","iPhone 16","iPhone 15 Pro","iPhone 15") and (best is None or rt>best[0]):
+                best=(rt,x["udid"],x["name"])
+          print(best[1] if best else "")')
+          echo "udid=$UDID" >> $GITHUB_OUTPUT
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance dark || true
+
+      - name: 앱 빌드 + 화면 캡처
+        env:
+          TEST_RUNNER_SHOT_DIR: ${{ github.workspace }}/shots
+        run: |
+          mkdir -p shots build
+          set -o pipefail
+          xcodebuild test \
+            -project Splits8.xcodeproj \
+            -scheme Screenshots \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath build/shots.xcresult \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee build/xcodebuild.log | grep -E "error:|warning: unused|Test Case|\*\* TEST|BUILD" || true
+          ls -la shots || true
+
       - name: 캡처 결과 올리기
         if: always()
         uses: actions/upload-artifact@v4

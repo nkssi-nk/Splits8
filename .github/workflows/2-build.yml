@@ -1,0 +1,79 @@
+# 코드를 올리면(push) 자동으로 빌드해서 TestFlight에 올립니다.
+# 손으로 돌리려면 Actions 탭 → "2. 빌드 + TestFlight 업로드" → Run workflow
+name: 2. 빌드 + TestFlight 업로드
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+concurrency:
+  group: build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 최신 Xcode 선택
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 도구 설치
+        run: |
+          brew install xcodegen
+          pipx install codemagic-cli-tools
+          xcodebuild -version
+          # 워치 SDK가 없으면 내려받기
+          if ! xcodebuild -showsdks | grep -q watchos; then
+            xcodebuild -downloadPlatform watchOS
+          fi
+          xcodebuild -showsdks | grep -E "iphoneos|watchos"
+
+      - name: 번들 ID / HealthKit 확인
+        run: bash ./scripts/ensure_bundle_ids.sh
+
+      - name: 빌드 번호 올리기
+        run: |
+          BUILD=$(( ${{ github.run_number }} + 1 ))
+          sed -i '' -E "s/CURRENT_PROJECT_VERSION: \"[0-9]+\"/CURRENT_PROJECT_VERSION: \"$BUILD\"/" project.yml
+          echo "빌드 번호: $BUILD"
+
+      - name: Xcode 프로젝트 만들기
+        run: xcodegen generate
+
+      - name: 서명 준비 (인증서·프로파일 자동)
+        run: |
+          BUNDLE_ID=$(grep -E '^[[:space:]]+APP_BUNDLE_ID:' project.yml | awk '{print $2}')
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: 빌드 (ipa 만들기)
+        run: |
+          xcode-project build-ipa --project Splits8.xcodeproj --scheme Splits8
+
+      - name: 빌드 결과 보관
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            build/ios/ipa/*.ipa
+            /tmp/xcodebuild_logs/*.log
+          if-no-files-found: ignore
+
+      - name: TestFlight 업로드
+        run: |
+          app-store-connect publish --path build/ios/ipa/*.ipa

@@ -1,0 +1,19 @@
+# 처음 한 번만 실행: 애플 개발자 사이트에 번들 ID를 만들고 HealthKit을 켭니다.
+name: 1. 처음 설정 (번들 ID 만들기)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 도구 설치
+        run: pip install codemagic-cli-tools
+      - name: 번들 ID 만들기 + HealthKit 켜기
+        run: bash ./scripts/ensure_bundle_ids.sh

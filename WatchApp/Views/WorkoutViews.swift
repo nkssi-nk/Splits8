@@ -5,8 +5,8 @@ import WatchKit
 /// Live 에서 왼쪽 스와이프·더블탭 = 다음 구간, 오른쪽 스와이프 = Controls, Controls 에서 왼쪽 스와이프 = Live
 struct WWorkoutPager: View {
     let engine = WorkoutEngine.shared
-    @State private var page = 0
-    @State private var endSheet = false
+    @State private var page = WatchDemo.page
+    @State private var endSheet = WatchDemo.shot == "end"
 
     var body: some View {
         ZStack {

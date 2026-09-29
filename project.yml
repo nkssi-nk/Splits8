@@ -115,6 +115,12 @@ schemes:
         Splits8Watch: all
     archive:
       config: Release
+  Splits8Watch:
+    build:
+      targets:
+        Splits8Watch: all
+    archive:
+      config: Release
   Screenshots:
     build:
       targets:

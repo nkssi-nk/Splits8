@@ -143,6 +143,17 @@ struct PhoneRoot: View {
             screen
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
+            // 상태바 뒤 검은 그라데이션 (시안: linear-gradient(#000 60%, transparent))
+            if r.scr != .splash {
+                GeometryReader { g in
+                    LinearGradient(stops: [.init(color: .black, location: 0.6), .init(color: .black.opacity(0), location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: g.safeAreaInsets.top + 8)
+                        .ignoresSafeArea(edges: .top)
+                        .allowsHitTesting(false)
+                }
+            }
+
             if r.scr.showsTabs {
                 TabBar8()
                     .frame(maxHeight: .infinity, alignment: .bottom)

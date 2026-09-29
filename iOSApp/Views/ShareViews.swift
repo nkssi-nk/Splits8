@@ -107,6 +107,8 @@ struct ShareCard: View {
                         Text("탭해서 사진 고르기").font(F.t(13, .medium))
                     }
                     .foregroundStyle(C.text2)
+                    .frame(maxHeight: .infinity, alignment: .center)
+                    .padding(.bottom, variant == "poster" ? (post ? 90 : 120) : 0)
                 }
             }
         }

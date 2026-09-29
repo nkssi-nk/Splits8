@@ -20,7 +20,7 @@ struct SplashView: View {
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
             VStack(alignment: .leading, spacing: 14) {
-                Text("8 RUNS · 8 STATIONS").font(F.t(11, .bold)).tracking(3.08).foregroundStyle(C.accent)
+                Text("8 RUNS · 8 STATIONS").font(F.t(16, .bold)).tracking(4.48).foregroundStyle(C.accent)
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text("SPLITS").foregroundStyle(.white)
                     Text("8").foregroundStyle(C.accent).padding(.leading, 8)

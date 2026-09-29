@@ -70,7 +70,7 @@ final class Supabase {
         var req = URLRequest(url: URL(string: base + path)!)
         req.httpMethod = method
         req.setValue(Config.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        req.setValue("Bearer " + (auth ? (session?.accessToken ?? Config.supabaseAnonKey) : Config.supabaseAnonKey), forHTTPHeaderField: "Authorization")
+        if auth, let t = session?.accessToken { req.setValue("Bearer " + t, forHTTPHeaderField: "Authorization") }
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         if let raw { req.httpBody = raw; req.setValue(headers["Content-Type"] ?? "application/octet-stream", forHTTPHeaderField: "Content-Type") }

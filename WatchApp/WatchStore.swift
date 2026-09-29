@@ -30,6 +30,9 @@ final class WatchStore: NSObject, WCSessionDelegate {
         return quickSaved.filter { !ids.contains($0.id) } + ctx.programs
     }
 
+    /// 화면 캡처용 샘플 (--shot)
+    func demoLoad(_ c: WatchContext) { ctx = c }
+
     func activate() {
         guard WCSession.isSupported() else { return }
         WCSession.default.delegate = self

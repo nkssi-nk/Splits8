@@ -157,7 +157,7 @@ final class WorkoutEngine: NSObject {
         if cur.kind == .run, segDists.indices.contains(idx) { segDists[idx] = segDist }
     }
 
-    private func finish(_ now: Date) {
+    private func makeRecord() -> Record {
         let bpms = hrSamples.map(\.b)
         var results: [SegResult] = []
         for (i, t) in splits.enumerated() where seq.indices.contains(i) {
@@ -169,11 +169,15 @@ final class WorkoutEngine: NSObject {
         }
         let total = splits.reduce(0, +)
         let tg = seq.prefix(splits.count).map(\.target).reduce(0, +)
-        let r = Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: hrSamples,
-                       kcal: Int(kcal.rounded()), avgHR: bpms.isEmpty ? 0 : bpms.reduce(0, +) / bpms.count,
-                       maxHR: bpms.max() ?? 0, division: settings.div.name,
-                       goal: mode == .race ? settings.goalTime : nil,
-                       vsWord: deltaWord, vsTarget: tg)
+        return Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: hrSamples,
+                      kcal: Int(kcal.rounded()), avgHR: bpms.isEmpty ? 0 : bpms.reduce(0, +) / bpms.count,
+                      maxHR: bpms.max() ?? 0, division: settings.div.name,
+                      goal: mode == .race ? settings.goalTime : nil,
+                      vsWord: deltaWord, vsTarget: tg)
+    }
+
+    private func finish(_ now: Date) {
+        let r = makeRecord()
         lastRecord = r
         finished = true
         WatchStore.shared.send(r)
@@ -182,6 +186,34 @@ final class WorkoutEngine: NSObject {
         session?.end()
         let b = builder
         b?.endCollection(withEnd: now) { _, _ in b?.finishWorkout { _, _ in } }
+    }
+
+    /// 화면 캡처용: 건강 앱·타이머 없이 운동 중 / 요약 상태를 만든다 (--shot)
+    func demoRun(mode: Mode, title: String, seq: [Seg], idx: Int, elapsed: Int, hr: Double, done: Bool) {
+        self.mode = mode; self.title = title; sets = 1; self.seq = seq
+        running = true; finished = false; lastRecord = nil
+        self.hr = hr; kcal = 214; distance = 380
+        segHR = Array(repeating: [], count: seq.count)
+        segDists = Array(repeating: nil, count: seq.count)
+        segDistStart = 0; segPaused = 0; pauseAt = nil
+        let now = Date()
+        if done {
+            splits = seq.enumerated().map { i, sg in max(20, Int(Double(sg.target) * (i % 2 == 0 ? 1.04 : 0.97))) }
+            self.idx = max(0, seq.count - 1)
+            for i in seq.indices { segHR[i] = [Double(150 + (i * 7) % 24)]; if seq[i].kind == .run { segDists[i] = 1000 } }
+            hrSamples = (0..<40).map { HRPoint(t: $0 * 45, b: 120 + Int(45 * min(1, Double($0) / 8)) + ($0 % 5) * 3) }
+            kcal = 612
+            startDate = now.addingTimeInterval(-Double(splits.reduce(0, +)))
+            lastRecord = makeRecord()
+            finished = true
+        } else {
+            self.idx = idx
+            splits = seq.prefix(idx).map { max(20, Int(Double($0.target) * 1.03)) }
+            hrSamples = []
+            startDate = now.addingTimeInterval(-Double(splits.reduce(0, +) + elapsed))
+            segStart = now.addingTimeInterval(-Double(elapsed))
+        }
+        active = true
     }
 
     /// VS GOAL / VS JIHO / VS BEST

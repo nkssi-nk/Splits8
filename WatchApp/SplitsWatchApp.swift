@@ -4,6 +4,7 @@ import Observation
 @main
 struct Splits8WatchApp: App {
     init() {
+        if WatchDemo.enabled { WatchDemo.apply(); return }
         WatchStore.shared.activate()
         WorkoutEngine.shared.settings = WatchStore.shared.settings
         WorkoutEngine.shared.requestAuthorization()

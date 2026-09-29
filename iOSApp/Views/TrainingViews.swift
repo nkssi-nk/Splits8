@@ -19,7 +19,7 @@ struct TrainingView: View {
                 }
                 .foregroundStyle(.black)
                 .padding(.vertical, 16).padding(.horizontal, 18)
-                .background(C.accent, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .yellowFill(20)
             }
             .buttonStyle(Press())
 
@@ -292,7 +292,7 @@ struct SaveSheet: View {
                 Button { save() } label: {
                     Text("Save").font(F.t(16, .semibold)).foregroundStyle(ok ? .black : C.text3)
                         .frame(maxWidth: .infinity).frame(height: 52)
-                        .background(ok ? C.accent : C.control, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .yellowFill(14, on: ok)
                 }
                 .buttonStyle(Press())
                 .disabled(!ok)

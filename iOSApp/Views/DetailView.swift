@@ -132,7 +132,7 @@ struct DetailView: View {
                 }
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity).frame(height: 52)
-                .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .yellowFill(14)
             }
             .buttonStyle(Press(scale: 0.97))
 

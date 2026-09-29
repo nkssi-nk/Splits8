@@ -97,9 +97,24 @@ struct YellowButton<L: View>: View {
             label
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity).frame(height: height)
-                .background(C.accent, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .yellowFill(radius)
         }
         .buttonStyle(Press())
+    }
+}
+
+/// 노란 큰 버튼 바탕 — iOS 26+: 노란 유리(Liquid Glass), 그 이전: 노란 면
+extension View {
+    @ViewBuilder
+    func yellowFill(_ radius: CGFloat, on: Bool = true, off: Color = C.control) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        if !on {
+            self.background(off, in: shape)
+        } else if #available(iOS 26.0, *) {
+            self.glassEffect(.regular.tint(C.accent).interactive(), in: shape)
+        } else {
+            self.background(C.accent, in: shape)
+        }
     }
 }
 

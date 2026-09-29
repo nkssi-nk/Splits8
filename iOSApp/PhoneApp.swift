@@ -249,7 +249,7 @@ struct TabBar8: View {
         if #available(iOS 26.0, *) {
             // iOS 26+: 애플 Liquid Glass (뒤 화면이 굴절돼 비침)
             row
-                .glassEffect(.regular.tint(Color.black.opacity(0.25)).interactive(), in: Capsule())
+                .glassEffect(.regular.tint(Color.black.opacity(0.6)).interactive(), in: Capsule())
                 .shadow(color: .black.opacity(0.35), radius: 12, y: 8)
         } else {
             // iOS 17–18: 시안 그대로 (반투명 어두운 캡슐)

@@ -36,7 +36,7 @@ private struct CTA: View {
                 if busy { ProgressView().tint(.black) }
             }
             .frame(maxWidth: .infinity).frame(height: 54)
-            .background(on ? C.accent : Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .yellowFill(16, on: on, off: Color.white.opacity(0.12))
         }
         .buttonStyle(Press())
     }

@@ -420,7 +420,7 @@ struct ShareView: View {
                 Button { instagram() } label: {
                     Text("Instagram").font(F.t(15, .semibold)).foregroundStyle(.black)
                         .frame(maxWidth: .infinity).frame(height: 50)
-                        .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .yellowFill(14)
                 }
                 .buttonStyle(Press())
                 Button { save() } label: {

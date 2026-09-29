@@ -312,7 +312,7 @@ struct RaceView: View {
                     Button { r.toAuth(from: .race) } label: {
                         Text("Sign up · 30초").font(F.t(15, .semibold)).foregroundStyle(.black)
                             .frame(maxWidth: .infinity).frame(height: 46)
-                            .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .yellowFill(14)
                     }
                     .buttonStyle(Press())
                 }

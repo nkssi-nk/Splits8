@@ -198,19 +198,42 @@ final class WorkoutEngine: NSObject {
         segDistStart = 0; segPaused = 0; pauseAt = nil
         let now = Date()
         if done {
-            splits = seq.enumerated().map { i, sg in max(20, Int(Double(sg.target) * (i % 2 == 0 ? 1.04 : 0.97))) }
+            var sp: [Int] = []
+            for i in seq.indices {
+                let f: Double = i % 2 == 0 ? 1.04 : 0.97
+                let t: Int = Int(Double(seq[i].target) * f)
+                sp.append(max(20, t))
+            }
+            splits = sp
             self.idx = max(0, seq.count - 1)
-            for i in seq.indices { segHR[i] = [Double(150 + (i * 7) % 24)]; if seq[i].kind == .run { segDists[i] = 1000 } }
-            hrSamples = (0..<40).map { HRPoint(t: $0 * 45, b: 120 + Int(45 * min(1, Double($0) / 8)) + ($0 % 5) * 3) }
+            for i in seq.indices {
+                let b: Int = 150 + (i * 7) % 24
+                segHR[i] = [Double(b)]
+                if seq[i].kind == .run { segDists[i] = 1000 }
+            }
+            var hs: [HRPoint] = []
+            for k in 0..<40 {
+                let ramp: Double = min(1, Double(k) / 8)
+                let b: Int = 120 + Int(45 * ramp) + (k % 5) * 3
+                hs.append(HRPoint(t: k * 45, b: b))
+            }
+            hrSamples = hs
             kcal = 612
-            startDate = now.addingTimeInterval(-Double(splits.reduce(0, +)))
+            let passed: Int = splits.reduce(0, +)
+            startDate = now.addingTimeInterval(-Double(passed))
             lastRecord = makeRecord()
             finished = true
         } else {
             self.idx = idx
-            splits = seq.prefix(idx).map { max(20, Int(Double($0.target) * 1.03)) }
+            var sp: [Int] = []
+            for sg in seq.prefix(idx) {
+                let t: Int = Int(Double(sg.target) * 1.03)
+                sp.append(max(20, t))
+            }
+            splits = sp
             hrSamples = []
-            startDate = now.addingTimeInterval(-Double(splits.reduce(0, +) + elapsed))
+            let passed: Int = splits.reduce(0, +) + elapsed
+            startDate = now.addingTimeInterval(-Double(passed))
             segStart = now.addingTimeInterval(-Double(elapsed))
         }
         active = true

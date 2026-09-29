@@ -49,7 +49,14 @@ final class Router {
     var draftSets = 1
     var saveOpen = false
 
-    func go(_ s: Scr) { withAnimation(.easeInOut(duration: 0.25)) { scr = s } }
+    /// 지금 화면의 "뒤로" 동작 (‹ 버튼이 화면에 뜰 때 등록) — 왼쪽 끝에서 밀어 뒤로 가기에 씀
+    var backAction: (() -> Void)?
+
+    func go(_ s: Scr) {
+        guard s != scr else { return }
+        backAction = nil
+        withAnimation(.easeInOut(duration: 0.25)) { scr = s }
+    }
 
     func newTraining() {
         editId = nil; draftName = ""; draftSets = 1
@@ -129,6 +136,7 @@ extension Scr {
 
 struct PhoneRoot: View {
     let r = Router.shared
+    @State private var edgeDrag: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -142,6 +150,29 @@ struct PhoneRoot: View {
 
             screen
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .offset(x: edgeDrag)
+
+            // 아이폰처럼 화면 왼쪽 끝에서 오른쪽으로 밀면 뒤로
+            if r.backAction != nil && !r.saveOpen {
+                Color.clear
+                    .frame(width: 22)
+                    .contentShape(Rectangle())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .ignoresSafeArea()
+                    .gesture(
+                        DragGesture(minimumDistance: 8)
+                            .onChanged { v in edgeDrag = max(0, v.translation.width) * 0.6 }
+                            .onEnded { v in
+                                let go = v.translation.width > 80 || v.predictedEndTranslation.width > 200
+                                if go, let back = r.backAction {
+                                    edgeDrag = 0
+                                    back()
+                                } else {
+                                    withAnimation(.snappy(duration: 0.25)) { edgeDrag = 0 }
+                                }
+                            }
+                    )
+            }
 
             // 상태바 뒤 검은 그라데이션 (시안: linear-gradient(#000 60%, transparent))
             if r.scr != .splash {
@@ -249,7 +280,9 @@ struct TabBar8: View {
         if #available(iOS 26.0, *) {
             // iOS 26+: 애플 Liquid Glass (뒤 화면이 굴절돼 비침)
             row
-                .glassEffect(.regular.tint(Color.black.opacity(0.6)).interactive(), in: Capsule())
+                // 색을 너무 진하게 입히면 유리 느낌(비침·반사)이 사라져서 옅게
+                .glassEffect(.regular.tint(Color.black.opacity(0.25)), in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.35), radius: 12, y: 8)
         } else {
             // iOS 17–18: 시안 그대로 (반투명 어두운 캡슐)

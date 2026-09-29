@@ -116,9 +116,6 @@ struct WHome: View {
                     HStack {
                         Wordmark(size: 12)
                         Spacer()
-                        TimelineView(.everyMinute) { ctx in
-                            Text(Fm.clock.string(from: ctx.date)).font(F.round(13))
-                        }
                     }
                     .padding(.horizontal, 8).padding(.top, 2).padding(.bottom, 8)
 
@@ -229,6 +226,7 @@ struct WQuick: View {
     let store = WatchStore.shared
     let nav = WNav.shared
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 5), count: 4)
+    private let stCols = Array(repeating: GridItem(.flexible(), spacing: 5), count: 3)
 
     var body: some View {
         ZStack {
@@ -248,23 +246,26 @@ struct WQuick: View {
                         LazyVGrid(columns: cols, spacing: 5) {
                             ForEach(Defaults.runs, id: \.self) { r in
                                 Button { nav.quick.append(ProgItem(icon: "run", run: r)) } label: {
-                                    Text(r).font(F.t(10, .semibold))
-                                        .frame(maxWidth: .infinity).frame(height: 30)
+                                    Text(r).font(F.t(12, .semibold))
+                                        .frame(maxWidth: .infinity).frame(height: 34)
                                         .wCard(9)
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
-                        LazyVGrid(columns: cols, spacing: 5) {
-                            ForEach(Station.all, id: \.key) { s in
+                        LazyVGrid(columns: stCols, spacing: 5) {
+                                ForEach(Station.all, id: \.key) { s in
                                 Button { nav.quick.append(ProgItem(icon: s.key)) } label: {
-                                    VStack(spacing: 2) {
-                                        Icon8(s.key, 15, tint: .yellow)
+                                    VStack(spacing: 3) {
+                                        Icon8(s.key, 28, tint: .yellow)
                                         Text(s.name.replacingOccurrences(of: "Farmers Carry", with: "Farmers")
-                                                .replacingOccurrences(of: "Wall Balls", with: "Wall Ball"))
-                                            .font(F.t(6.5, .semibold)).foregroundStyle(C.text2).lineLimit(1)
+                                                .replacingOccurrences(of: "Wall Balls", with: "Wall Ball")
+                                                .replacingOccurrences(of: "Sandbag Lunges", with: "Lunges")
+                                                .replacingOccurrences(of: "Burpee Broad Jump", with: "Burpee"))
+                                            .font(F.t(9, .semibold)).foregroundStyle(C.text2).lineLimit(1)
+                                            .minimumScaleFactor(0.8)
                                     }
-                                    .frame(maxWidth: .infinity).frame(height: 40)
+                                    .frame(maxWidth: .infinity).frame(height: 58)
                                     .wCard(9)
                                 }
                                 .buttonStyle(.plain)
@@ -277,14 +278,14 @@ struct WQuick: View {
                                 }
                                 ForEach(Array(nav.quick.enumerated()), id: \.offset) { _, q in
                                     HStack(spacing: 2) {
-                                        Icon8(q.icon, 9, tint: q.icon == "run" ? .white : .yellow)
-                                        Text(chipLabel(q)).font(F.t(8, .semibold)).lineLimit(1)
+                                        Icon8(q.icon, 14, tint: q.icon == "run" ? .white : .yellow)
+                                        Text(chipLabel(q)).font(F.t(10, .semibold)).lineLimit(1)
                                     }
                                     .padding(.vertical, 2).padding(.horizontal, 5)
                                     .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 6))
                                 }
                             }
-                            .frame(minHeight: 22)
+                            .frame(minHeight: 26)
                             .padding(.vertical, 2)
                         }
                     }

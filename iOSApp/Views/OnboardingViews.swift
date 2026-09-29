@@ -87,6 +87,11 @@ struct ObFrame<Content: View>: View {
                 .padding(.bottom, 14)
         }
         .padding(.horizontal, 24)
+        .onAppear {
+            // 왼쪽 끝에서 밀면 이전 단계로
+            let prev: Scr = step == 1 ? .splash : step == 2 ? .ob1 : .ob2
+            Router.shared.backAction = { Router.shared.go(prev) }
+        }
     }
 }
 

@@ -57,6 +57,7 @@ struct BackLink: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("back")
+        .onAppear { Router.shared.backAction = action }
     }
 }
 
@@ -69,6 +70,8 @@ struct NavBar3: View {
     var leftColor: Color = C.text2
     let onLeft: () -> Void
     var onRight: () -> Void = {}
+    /// 시트 안에서 쓸 때는 false (시트는 아래로 내려 닫음)
+    var edgeBack = true
     var body: some View {
         ZStack {
             Text(title).font(F.t(17, .semibold))
@@ -83,6 +86,7 @@ struct NavBar3: View {
         .buttonStyle(.plain)
         .frame(height: 44)
         .padding(.horizontal, 4)
+        .onAppear { if edgeBack { Router.shared.backAction = onLeft } }
     }
 }
 
@@ -108,12 +112,13 @@ extension View {
     @ViewBuilder
     func yellowFill(_ radius: CGFloat, on: Bool = true, off: Color = C.control) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        // contentShape: 버튼 전체(글자 밖 노란 면까지)를 눌러도 되게
         if !on {
-            self.background(off, in: shape)
+            self.background(off, in: shape).contentShape(shape)
         } else if #available(iOS 26.0, *) {
-            self.glassEffect(.regular.tint(C.accent).interactive(), in: shape)
+            self.glassEffect(.regular.tint(C.accent), in: shape).contentShape(shape)
         } else {
-            self.background(C.accent, in: shape)
+            self.background(C.accent, in: shape).contentShape(shape)
         }
     }
 }

@@ -76,8 +76,9 @@ final class Store: NSObject, WCSessionDelegate {
 
     func delete(_ r: Record) {
         records.removeAll { $0.id == r.id }
-        JSONStore.save(records, "records.json")
+        if !Demo.enabled { JSONStore.save(records, "records.json") }
         pushToWatch()
+        if signedIn { Task { try? await sb.deleteRecord(r.id) } }
     }
 
     /// 최고 Full Simulation

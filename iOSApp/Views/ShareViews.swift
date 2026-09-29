@@ -364,6 +364,7 @@ struct ShareView: View {
                 Text("Share").font(F.t(17, .semibold))
                 HStack {
                     Button("Close") { r.go(.detail) }.font(F.t(17)).foregroundStyle(C.text2).accessibilityIdentifier("nav.left")
+                        .onAppear { r.backAction = { r.go(.detail) } }
                     Spacer()
                     Color.clear.frame(width: 40)
                 }

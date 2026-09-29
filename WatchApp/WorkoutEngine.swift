@@ -122,7 +122,8 @@ final class WorkoutEngine: NSObject {
             idx = splits.count
             segStart = now; segPaused = 0
             segDistStart = distance
-            WKInterfaceDevice.current().play(.click)
+            // 다음 구간 알림: .click 은 너무 약해서 운동 중에는 느껴지지 않음
+            WKInterfaceDevice.current().play(.notification)
         }
     }
 

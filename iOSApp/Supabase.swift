@@ -203,6 +203,11 @@ final class Supabase {
                               headers: ["Prefer": "resolution=merge-duplicates,return=minimal"])
     }
 
+    func deleteRecord(_ id: UUID) async throws {
+        _ = try await request("/rest/v1/records?id=eq." + id.uuidString.lowercased(), method: "DELETE",
+                              headers: ["Prefer": "return=minimal"])
+    }
+
     // MARK: 대회
 
     func events() async throws -> [EventItem] {

@@ -169,6 +169,11 @@ struct Icon8: View {
     init(_ name: String, _ size: CGFloat, tint: IconTint) {
         self.name = name; self.size = size; self.color = tint.color
     }
+    /// 그림마다 여백이 달라 크기가 들쭉날쭉해 보이는 것을 맞추는 배율 (보이는 면적 기준)
+    static let optical: [String: CGFloat] = [
+        "run": 0.85, "roxzone": 1.04, "skiErg": 1.09, "sledPush": 1.03, "sledPull": 0.89,
+        "burpeeBroadJump": 0.81, "row": 0.92, "farmersCarry": 1.06, "sandbagLunges": 1.06, "wallBalls": 1.03,
+    ]
     var body: some View {
         Image(name)
             .renderingMode(.template)
@@ -176,6 +181,7 @@ struct Icon8: View {
             .interpolation(.high)
             .scaledToFit()
             .frame(width: size, height: size)
+            .scaleEffect(Icon8.optical[name] ?? 1)
             .foregroundStyle(color)
     }
 }

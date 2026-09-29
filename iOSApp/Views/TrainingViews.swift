@@ -50,7 +50,8 @@ struct TrainingView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
                         HistoryRow(title: "\(rec.title) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date),
-                                   time: Fm.t(rec.total), last: i == recs.count - 1) { r.open(rec, from: .training) }
+                                   time: Fm.t(rec.total), last: i == recs.count - 1,
+                                   onDelete: { store.delete(rec) }) { r.open(rec, from: .training) }
                     }
                 }
                 .card8()
@@ -74,8 +75,9 @@ struct ProgramCard: View {
                         Text(p.name).font(F.t(22, .semibold)).tracking(-0.44).lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Icon8("play", 14, .black)
-                        .frame(width: 40, height: 40)
+                    Icon8("play", 26, .black)
+                        .offset(x: 2)
+                        .frame(width: 52, height: 52)
                         .background(C.accent, in: Circle())
                 }
                 Flow(spacing: 6) {
@@ -99,35 +101,102 @@ struct ProgramCard: View {
     }
 }
 
-/// 기록 줄 (이름·날짜·시간)
+/// 기록 줄 (이름·날짜·시간) — 왼쪽으로 밀면 삭제
 struct HistoryRow: View {
     let title: String
     let sub: String
-    var subColor: Color = C.text2
+    var subColor: Color
     let time: String
-    var delta: String? = nil
-    var deltaColor: Color = C.good
-    var last = false
+    var delta: String?
+    var deltaColor: Color
+    var last: Bool
+    var onDelete: (() -> Void)?
     let action: () -> Void
 
+    @State private var offset: CGFloat = 0
+    @State private var settled: CGFloat = 0
+    @State private var ask = false
+    private let reveal: CGFloat = 84
+
+    init(title: String, sub: String, subColor: Color = C.text2, time: String, delta: String? = nil,
+         deltaColor: Color = C.good, last: Bool = false, onDelete: (() -> Void)? = nil, action: @escaping () -> Void) {
+        self.title = title; self.sub = sub; self.subColor = subColor; self.time = time
+        self.delta = delta; self.deltaColor = deltaColor; self.last = last
+        self.onDelete = onDelete; self.action = action
+    }
+
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(F.t(16, .medium)).lineLimit(1)
-                    Text(sub).font(F.t(12)).tracking(0.24).monospacedDigit().foregroundStyle(subColor)
+        ZStack(alignment: .trailing) {
+            if onDelete != nil && offset < 0 {
+                Button { ask = true } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: "trash").font(.system(size: 17, weight: .semibold))
+                        Text("삭제").font(F.t(12, .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: max(reveal, -offset))
+                    .frame(maxHeight: .infinity)
+                    .background(C.bad)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(time).font(F.num(20)).tracking(-0.4)
-                    if let delta { Text(delta).font(F.num(12)).foregroundStyle(deltaColor) }
+                .buttonStyle(.plain)
+            }
+            Button {
+                if settled != 0 { close() } else { action() }
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title).font(F.t(16, .medium)).lineLimit(1)
+                        Text(sub).font(F.t(12)).tracking(0.24).monospacedDigit().foregroundStyle(subColor)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text(time).font(F.num(20)).tracking(-0.4)
+                        if let delta { Text(delta).font(F.num(12)).foregroundStyle(deltaColor) }
+                    }
+                }
+                .padding(.vertical, 14).padding(.horizontal, 18)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .offset(x: offset)
+        }
+        .clipped()
+        .rowLine(!last)
+        .simultaneousGesture(onDelete == nil ? nil : swipe)
+        .alert("기록을 삭제할까요?", isPresented: $ask) {
+            Button("삭제", role: .destructive) {
+                close()
+                onDelete?()
+            }
+            Button("취소", role: .cancel) { close() }
+        } message: {
+            Text("삭제한 기록은 다시 볼 수 없어요.")
+        }
+    }
+
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 20)
+            .onChanged { v in
+                guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                offset = min(0, settled + v.translation.width)
+            }
+            .onEnded { v in
+                let horizontal = abs(v.translation.width) > abs(v.translation.height)
+                let x = horizontal ? settled + v.translation.width : settled
+                withAnimation(.snappy(duration: 0.25)) {
+                    if x < -200 {
+                        offset = -reveal; settled = -reveal; ask = true
+                    } else if x < -reveal / 2 {
+                        offset = -reveal; settled = -reveal
+                    } else {
+                        offset = 0; settled = 0
+                    }
                 }
             }
-            .padding(.vertical, 14).padding(.horizontal, 18)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .rowLine(!last)
+    }
+
+    private func close() {
+        withAnimation(.snappy(duration: 0.25)) { offset = 0; settled = 0 }
     }
 }
 
@@ -166,14 +235,14 @@ struct BuilderView: View {
                 LazyVGrid(columns: cols, spacing: 8) {
                     ForEach(Station.all, id: \.key) { s in
                         Button { add(ProgItem(icon: s.key)) } label: {
-                            VStack(spacing: 8) {
-                                Icon8(s.key, 32, tint: .yellow)
+                            VStack(spacing: 5) {
+                                Icon8(s.key, 40, tint: .yellow)
                                 Text(s.name).font(F.t(10, .semibold)).tracking(0.1).multilineTextAlignment(.center)
-                                    .foregroundStyle(.white).lineLimit(2)
+                                    .foregroundStyle(.white).lineLimit(2, reservesSpace: true)
+                                    .minimumScaleFactor(0.85)
                             }
-                            .padding(6)
+                            .padding(.horizontal, 4).padding(.vertical, 8)
                             .frame(maxWidth: .infinity)
-                            .aspectRatio(1 / 1.08, contentMode: .fit)
                             .card8(16)
                         }
                         .buttonStyle(Press(scale: 0.95))
@@ -232,7 +301,7 @@ struct BuilderView: View {
     private func seqRow(_ i: Int, _ it: ProgItem) -> some View {
         HStack(spacing: 12) {
             Text("\(i + 1)").font(F.num(13, .regular)).foregroundStyle(C.text3).frame(width: 18, alignment: .leading)
-            Icon8(it.icon, 24, tint: .yellow)
+            Icon8(it.icon, 28, tint: .yellow)
             VStack(alignment: .leading, spacing: 1) {
                 Text(it.name()).font(F.t(16))
                 Text(it.detail(store.div)).font(F.t(11, .semibold)).tracking(0.66).foregroundStyle(C.text2)

@@ -176,7 +176,8 @@ struct SimView: View {
                         HistoryRow(title: Fm.wdm.string(from: rec.date),
                                    sub: isBest ? "Personal best" : d.map { ($0 <= 0 ? "↓ " : "↑ ") + Fm.t(abs($0)) + " vs last" } ?? " ",
                                    subColor: isBest ? C.accent : (d ?? 0) <= 0 ? C.good : C.bad,
-                                   time: Fm.t(rec.total), last: i == recs.count - 1) { r.open(rec, from: .sim) }
+                                   time: Fm.t(rec.total), last: i == recs.count - 1,
+                                   onDelete: { store.delete(rec) }) { r.open(rec, from: .sim) }
                     }
                 }
                 .card8()
@@ -327,7 +328,8 @@ struct RaceView: View {
                         let d = rec.total - (rec.goal ?? s.goalTime)
                         HistoryRow(title: rec.title, sub: Fm.wdmy.string(from: rec.date), time: Fm.t(rec.total),
                                    delta: Fm.d(d) + " vs goal", deltaColor: d < 0 ? C.good : C.bad,
-                                   last: i == recs.count - 1) { r.open(rec, from: .race) }
+                                   last: i == recs.count - 1,
+                                   onDelete: { store.delete(rec) }) { r.open(rec, from: .race) }
                     }
                 }
                 .card8()
@@ -384,7 +386,7 @@ struct GoalTimeSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            NavBar3(left: "Cancel", title: "Goal time", right: "Save", onLeft: { dismiss() }, onRight: save)
+            NavBar3(left: "Cancel", title: "Goal time", right: "Save", onLeft: { dismiss() }, onRight: save, edgeBack: false)
             HStack(spacing: 0) {
                 picker($h, 0..<3, "h"); picker($m, 0..<60, "m"); picker($s, 0..<60, "s")
             }

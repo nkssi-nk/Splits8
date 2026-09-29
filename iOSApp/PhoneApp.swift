@@ -210,12 +210,14 @@ struct Scroll8<Content: View>: View {
 
 struct TabBar8: View {
     let r = Router.shared
+    @Namespace private var ns
     struct Tab: Identifiable { let scr: Scr; let label: String; let icon: String; var id: String { label } }
     private let tabs: [Tab] = [
         Tab(scr: .training, label: "Training", icon: "modeTraining"), Tab(scr: .sim, label: "Simulation", icon: "modeSim"),
         Tab(scr: .race, label: "Race", icon: "modeRace"), Tab(scr: .settings, label: "Settings", icon: "gearTab"),
     ]
-    var body: some View {
+
+    private var row: some View {
         HStack(spacing: 0) {
             ForEach(tabs) { t in
                 let on = r.scr.tab == t.scr
@@ -226,7 +228,12 @@ struct TabBar8: View {
                     }
                     .foregroundStyle(on ? C.accent : C.text2)
                     .frame(maxWidth: .infinity).frame(height: 54)
-                    .background(on ? Color.white.opacity(0.08) : Color.clear, in: Capsule())
+                    .background {
+                        if on {
+                            Capsule().fill(Color.white.opacity(0.08))
+                                .matchedGeometryEffect(id: "pill", in: ns)
+                        }
+                    }
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -235,9 +242,22 @@ struct TabBar8: View {
         }
         .padding(4)
         .frame(height: 62)
-        .background(.ultraThinMaterial, in: Capsule())
-        .background(Color(hex: 0x161616, alpha: 0.8), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: r.scr.tab)
+    }
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            // iOS 26+: 애플 Liquid Glass (뒤 화면이 굴절돼 비침)
+            row
+                .glassEffect(.regular.tint(Color.black.opacity(0.25)).interactive(), in: Capsule())
+                .shadow(color: .black.opacity(0.35), radius: 12, y: 8)
+        } else {
+            // iOS 17–18: 시안 그대로 (반투명 어두운 캡슐)
+            row
+                .background(.ultraThinMaterial, in: Capsule())
+                .background(Color(hex: 0x161616, alpha: 0.8), in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
+        }
     }
 }

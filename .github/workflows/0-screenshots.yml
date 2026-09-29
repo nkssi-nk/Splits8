@@ -88,7 +88,7 @@ jobs:
           APP=$(find build/watch -name "Splits8Watch.app" -maxdepth 6 | head -1)
           echo "app: $APP"
           xcrun simctl install "$WUDID" "$APP"
-          BID=com.exorenal.splits8.watchkitapp
+          BID=com.nkssi.splits8.watchkitapp
           for name in home programs quick confirm_training confirm_race live controls segments end summary; do
             xcrun simctl terminate "$WUDID" $BID >/dev/null 2>&1
             xcrun simctl launch "$WUDID" $BID --shot $name

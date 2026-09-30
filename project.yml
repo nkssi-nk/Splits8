@@ -40,7 +40,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBg
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         NSHealthShareUsageDescription: 운동 기록과 심박수를 확인하기 위해 건강 데이터를 읽습니다.

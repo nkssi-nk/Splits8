@@ -55,6 +55,16 @@ final class ScreenshotTests: XCTestCase {
 
     private func swipeBack() { app.swipeDown() }
 
+    // MARK: 0. 앱 켤 때 가운데 로고
+    func test0_launchLogo() {
+        app = XCUIApplication()
+        app.launchArguments = ["--demo", "--onboarded", "--launch"]
+        app.launch()
+        let s = XCUIScreen.main.screenshot()
+        try? s.pngRepresentation.write(to: dir.appendingPathComponent("00_launch_logo.png"))
+        let a = XCTAttachment(screenshot: s); a.name = "launch_logo"; a.lifetime = .keepAlways; add(a)
+    }
+
     // MARK: 1. 처음 실행 (시작 · 가입 · 온보딩)  — 시안 I0, I0s, I0a, I0b, I0c
 
     func test1_onboarding() {

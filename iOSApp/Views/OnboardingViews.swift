@@ -97,6 +97,33 @@ struct SplashView: View {
     }
 }
 
+// MARK: - 앱 켤 때 로고 (시작 화면 사진 + 가운데 SPLITS8, 버튼 없음)
+
+struct LaunchLogoView: View {
+    @State private var appear = false
+    var body: some View {
+        ZStack {
+            Color.black
+            GeometryReader { g in
+                Image("splash").resizable().scaledToFill()
+                    .frame(width: g.size.width, height: g.size.height, alignment: Alignment(horizontal: .center, vertical: .splashFocus))
+                    .clipped()
+            }
+            Color.black.opacity(0.5)
+            LinearGradient(stops: [.init(color: .black.opacity(0.4), location: 0), .init(color: .clear, location: 0.35),
+                                   .init(color: .clear, location: 0.6), .init(color: .black.opacity(0.85), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+            Wordmark(size: 56, tracking: -0.03)
+                .scaleEffect(appear ? 1 : 0.94)
+                .opacity(appear ? 1 : 0)
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("launch.logo")
+        .onAppear { withAnimation(.easeOut(duration: 0.35)) { appear = true } }
+    }
+}
+
 /// 사진 초점 (CSS background-position center 30%)
 private extension VerticalAlignment {
     enum SplashFocus: AlignmentID {

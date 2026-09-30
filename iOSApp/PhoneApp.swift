@@ -6,9 +6,33 @@ struct Splits8App: App {
     init() { Store.shared.activate() }
     var body: some Scene {
         WindowGroup {
-            PhoneRoot()
-                .preferredColorScheme(.dark)
-                .tint(C.accent)
+            LaunchGate {
+                PhoneRoot()
+            }
+            .preferredColorScheme(.dark)
+            .tint(C.accent)
+        }
+    }
+}
+
+/// 앱을 새로 켤 때마다(백그라운드에서 돌아올 때는 제외) 가운데 로고를 잠깐 보여 줍니다.
+struct LaunchGate<Content: View>: View {
+    @ViewBuilder var content: Content
+    @State private var show = !CommandLine.arguments.contains("--demo") || CommandLine.arguments.contains("--launch")
+
+    var body: some View {
+        ZStack {
+            content
+            if show {
+                LaunchLogoView()
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
+        .task {
+            guard show else { return }
+            try? await Task.sleep(nanoseconds: 1_300_000_000)
+            withAnimation(.easeOut(duration: 0.4)) { show = false }
         }
     }
 }

@@ -241,6 +241,12 @@ struct BuilderView: View {
     /// 한 세트 최대 구간 수
     static let maxSeq = 8
 
+    // 순서 바꾸기 (손잡이를 잡고 위아래로 끌면 다른 칸이 실시간으로 밀려남)
+    @State private var dragFrom: Int? = nil
+    @State private var dragY: CGFloat = 0
+    @State private var dragTo: Int = 0
+    @State private var rowH: CGFloat = 58
+
     var body: some View {
         VStack(spacing: 22) {
             NavBar3(left: "Cancel", title: r.editId == nil ? "New training" : "Edit training", right: "Save",
@@ -351,17 +357,31 @@ struct BuilderView: View {
                         .font(F.t(13)).foregroundStyle(C.text3).multilineTextAlignment(.center).lineSpacing(3)
                         .frame(maxWidth: .infinity).padding(.vertical, 22).padding(.horizontal, 16)
                 }
-                ForEach(Array(r.draftSeq.enumerated()), id: \.offset) { i, it in
-                    seqRow(i, it)
+                ForEach(previewOrder, id: \.self) { i in
+                    if r.draftSeq.indices.contains(i) {
+                        seqRow(i, r.draftSeq[i])
+                    }
                 }
             }
             .card8()
         }
     }
 
+    /// 끄는 중이면 놓일 자리 기준으로 미리 정렬한 순서 (원래 번호 목록)
+    private var previewOrder: [Int] {
+        var o = Array(r.draftSeq.indices)
+        if let f = dragFrom, o.indices.contains(f) {
+            let x = o.remove(at: f)
+            o.insert(x, at: min(max(dragTo, 0), o.count))
+        }
+        return o
+    }
+
     private func seqRow(_ i: Int, _ it: ProgItem) -> some View {
-        HStack(spacing: 12) {
-            Text("\(i + 1)").font(F.num(13, .regular)).foregroundStyle(C.text3).frame(width: 18, alignment: .leading)
+        let dragging: Bool = dragFrom == i
+        let slot: Int = previewOrder.firstIndex(of: i) ?? i
+        return HStack(spacing: 12) {
+            Text("\(slot + 1)").font(F.num(13, .regular)).foregroundStyle(C.text3).frame(width: 18, alignment: .leading)
             Icon8(it.icon, 24, tint: .yellow)
             VStack(alignment: .leading, spacing: 1) {
                 Text(it.name()).font(F.t(17)).lineLimit(1)
@@ -372,18 +392,53 @@ struct BuilderView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("builder.remove.\(i)")
             dragHandle
+                .highPriorityGesture(reorderGesture(i))
+                .accessibilityIdentifier("builder.handle.\(i)")
         }
         .padding(.vertical, 11).padding(.horizontal, 16)
-        .background(Color.black.opacity(0.001))
-        .rowLine(i < r.draftSeq.count - 1)
-        .draggable(String(i))
-        .dropDestination(for: String.self) { items, _ in
-            guard let s = items.first, let from = Int(s), from != i, r.draftSeq.indices.contains(from) else { return false }
-            withAnimation {
-                let x = r.draftSeq.remove(at: from)
-                r.draftSeq.insert(x, at: i)
+        .background(GeometryReader { g in
+            Color.clear.onAppear { if g.size.height > 20 { rowH = g.size.height } }
+        })
+        .background(dragging ? Color(hex: 0x2C2C2E) : Color.black.opacity(0.001))
+        .rowLine(!dragging && slot < r.draftSeq.count - 1)
+        .clipShape(RoundedRectangle(cornerRadius: dragging ? 14 : 0, style: .continuous))
+        .scaleEffect(dragging ? 1.03 : 1)
+        .shadow(color: .black.opacity(dragging ? 0.5 : 0), radius: 12, y: 6)
+        .offset(y: dragging ? dragY - CGFloat(slot - i) * rowH : 0)
+        .zIndex(dragging ? 1 : 0)
+        .animation(.easeOut(duration: 0.15), value: dragging)
+    }
+
+    private func reorderGesture(_ i: Int) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { v in
+                if dragFrom == nil {
+                    dragFrom = i; dragTo = i; dragY = 0
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+                guard dragFrom == i else { return }
+                dragY = v.translation.height
+                let steps: Int = Int((dragY / max(rowH, 1)).rounded())
+                let t: Int = min(max(i + steps, 0), r.draftSeq.count - 1)
+                if t != dragTo {
+                    // 다른 칸이 부드럽게 밀려나도록 (끄는 칸은 자리 이동과 offset 보정이 같이 움직여 손가락에 붙어 있음)
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) { dragTo = t }
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
             }
-            return true
+            .onEnded { _ in finishDrag() }
+    }
+
+    private func finishDrag() {
+        guard let f = dragFrom else { return }
+        let t: Int = min(max(dragTo, 0), r.draftSeq.count - 1)
+        var tx = Transaction(); tx.disablesAnimations = true
+        withTransaction(tx) {
+            if f != t, r.draftSeq.indices.contains(f) {
+                let x = r.draftSeq.remove(at: f)
+                r.draftSeq.insert(x, at: t)
+            }
+            dragFrom = nil; dragY = 0; dragTo = 0
         }
     }
 
@@ -404,6 +459,10 @@ struct BuilderView: View {
             Capsule().fill(C.g3A).frame(width: 12, height: 1.5)
         }
         .frame(width: 18, height: 18)
+        .frame(width: 40, height: 40)
+        .contentShape(Rectangle())
+        .padding(.vertical, -11)
+        .padding(.trailing, -11)
     }
 
     // MARK: Sets

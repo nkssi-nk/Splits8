@@ -55,38 +55,42 @@ final class ScreenshotTests: XCTestCase {
 
     private func swipeBack() { app.swipeDown() }
 
-    // MARK: 1. 처음 실행 (시작 · 온보딩 · 가입)
+    // MARK: 1. 처음 실행 (시작 · 가입 · 온보딩)  — 시안 I0, I0s, I0a, I0b, I0c
 
     func test1_onboarding() {
         launch(onboarded: false)
         shot("I0_launch")
-        tap("Sign in")
+        id("splash.signin")
         shot("I0s_signin")
         back()
-        tap("Get started")
+        id("splash.start")
         shot("I0a_division")
-        tap("Continue")
+        id("ob.next")
         shot("I0b_heart_rate")
-        tap("Continue")
+        id("ob.next")
         shot("I0c_connect_watch")
     }
 
-    // MARK: 2. 탭 4개 + 하위 화면
+    // MARK: 2. 탭 5개 + 하위 화면  — 시안 I1h, I1, I2, I3, I4, I4b, I4e, I5, I5a, I5c, I5b, I5f
 
     func test2_tabs() {
         launch(onboarded: true)
+        shot("I1h_home")
+        app.swipeUp()
+        shot("I1h_home_bottom")
+
+        tab("Training")
         shot("I1_training")
         tapContaining("Sled Intervals")
         shot("I2_edit_training")
         id("nav.left")
-        tap("New training")
+        id("training.new")
         shot("I2_new_training")
-        id("nav.right")
-        shot("I2_save_sheet")
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()   // 시트 닫기
+        app.swipeUp()
+        shot("I2_new_training_bottom")
         id("nav.left")
 
-        tab("Simulation")
+        tab("Full Sim")
         shot("I3_full_simulation")
         tap("WALL BALLS")
         shot("I3_wall_balls")
@@ -117,28 +121,28 @@ final class ScreenshotTests: XCTestCase {
         shot("I5_settings")
         id("settings.profile")
         shot("I5a_profile")
-        tap("Sign up")
+        id("profile.signup")
         shot("I0s_create_account")
         back()
-        tapContaining("Division")
-        shot("I5_division")
+        id("profile.division")
+        shot("I5a_division")
         back()
-        tapContaining("Age · Max")
+        id("profile.hr")
         shot("I5c_max_heart_rate")
         back()
         back()
-        tapContaining("Running")
+        id("settings.running")
         shot("I5_running")
         back()
-        tapContaining("Split goals")
+        id("settings.goals")
         shot("I5b_split_goals")
         back()
-        tapContaining("Friends")
+        id("settings.friends")
         shot("I5f_friends")
         back()
     }
 
-    // MARK: 3. 기록 상세 · 공유
+    // MARK: 3. 기록 상세 · 공유  — 시안 I6, I7, S1–S6
 
     func test3_detail_share() {
         launch(onboarded: true)
@@ -150,7 +154,9 @@ final class ScreenshotTests: XCTestCase {
         shot("I6_detail_charts")
         app.swipeUp()
         shot("I6_detail_splits")
-        app.swipeDown(); app.swipeDown(); app.swipeDown()
+        app.swipeUp()
+        shot("I6_detail_bottom")
+        app.swipeDown(); app.swipeDown(); app.swipeDown(); app.swipeDown()
         tap("Share with photo")
         shot("I7_share_poster_story")
         tap("Post 4:5")

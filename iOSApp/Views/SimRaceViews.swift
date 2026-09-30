@@ -1,62 +1,75 @@
 import SwiftUI
 
-// MARK: - I3 Full Simulation
+// MARK: - I3 Full Simulation (위 고정 바가 제목을 맡음)
 
 struct SimView: View {
     let store = Store.shared
     let r = Router.shared
     @State private var metric = "total"
 
-    private struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
-    private let metrics: [Metric] = [
-        Metric(key: "total", label: "TOTAL", caption: "Total time · latest", st: nil),
-        Metric(key: "run", label: "RUN AVG", caption: "Avg 1KM run · latest", st: nil),
-        Metric(key: "rox", label: "ROXZONE", caption: "Roxzone total · latest", st: nil),
-    ] + [("skiErg", "SKIERG", "SkiErg"), ("sledPush", "SLED PUSH", "Sled Push"), ("sledPull", "SLED PULL", "Sled Pull"),
-         ("burpeeBroadJump", "BBJ", "BBJ"), ("row", "ROW", "Row"), ("farmersCarry", "FARMERS", "Farmers Carry"),
-         ("sandbagLunges", "LUNGES", "Lunges"), ("wallBalls", "WALL BALLS", "Wall Balls")].enumerated().map { i, m in
-        Metric(key: m.0, label: m.1, caption: m.2 + " · latest", st: i)
-    }
+    fileprivate struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
+    private static let stationMetrics: [(String, String, String)] = [
+        ("skiErg", "SKIERG", "SkiErg"), ("sledPush", "SLED PUSH", "Sled Push"), ("sledPull", "SLED PULL", "Sled Pull"),
+        ("burpeeBroadJump", "BBJ", "BBJ"), ("row", "ROW", "Row"), ("farmersCarry", "FARMERS", "Farmers Carry"),
+        ("sandbagLunges", "LUNGES", "Lunges"), ("wallBalls", "WALL BALLS", "Wall Balls"),
+    ]
+    private static let metrics: [Metric] = {
+        var o: [Metric] = [
+            Metric(key: "total", label: "TOTAL", caption: "Total time · latest", st: nil),
+            Metric(key: "run", label: "RUN AVG", caption: "Avg 1KM run · latest", st: nil),
+            Metric(key: "rox", label: "ROXZONE", caption: "Roxzone total · latest", st: nil),
+        ]
+        for (i, m) in stationMetrics.enumerated() {
+            o.append(Metric(key: m.0, label: m.1, caption: m.2 + " · latest", st: i))
+        }
+        return o
+    }()
+
+    private var current: Metric { Self.metrics.first { $0.key == metric } ?? Self.metrics[0] }
+    private var stIndex: Int? { current.st }
 
     private func value(_ rec: Record, _ m: String) -> Int? {
         switch m {
         case "total": return rec.total
         case "run":
-            let runs = rec.runs.map(\.time)
+            let runs: [Int] = rec.runs.map(\.time)
             return runs.isEmpty ? nil : Int((Double(runs.reduce(0, +)) / Double(runs.count)).rounded())
         case "rox": return rec.roxTotal
         default: return rec.segs.last { $0.icon == m }?.time
         }
     }
 
+    private func runAvg(_ a: [Int]) -> Int {
+        guard a.count >= 16 else { return 0 }
+        let runs: [Int] = stride(from: 0, to: 16, by: 2).map { a[$0] }
+        return Int((Double(runs.reduce(0, +)) / 8).rounded())
+    }
+
     /// 비교 기준 (Goal / Last / 친구)
     private func ref(prev: Int?) -> Int? {
-        let g = store.settings.goals
-        let gsum = g.reduce(0, +)
+        let g: [Int] = store.settings.goals
         let goalOf: Int
         switch metric {
-        case "total": goalOf = gsum + 8 * Defaults.roxTarget
-        case "run": goalOf = Int((Double(stride(from: 0, to: 16, by: 2).map { g[$0] }.reduce(0, +)) / 8).rounded())
+        case "total": goalOf = g.reduce(0, +) + 8 * Defaults.roxTarget
+        case "run": goalOf = runAvg(g)
         case "rox": goalOf = 8 * Defaults.roxTarget
-        default: goalOf = g[(stIndex ?? 7) * 2 + 1]
+        default:
+            let k = (stIndex ?? 7) * 2 + 1
+            goalOf = g.indices.contains(k) ? g[k] : 0
         }
         switch store.settings.simCmp {
         case "goal": return goalOf
         case "friend":
-            if let f = store.friend {
-                switch metric {
-                case "total": return f.total
-                case "run": return Int((Double(stride(from: 0, to: 16, by: 2).map { f.splits[$0] }.reduce(0, +)) / 8).rounded())
-                case "rox": return 8 * Defaults.roxTarget
-                default: return f.hasSplits ? f.splits[(stIndex ?? 7) * 2 + 1] : nil
-                }
+            guard let f = store.friend else { return prev }
+            switch metric {
+            case "total": return f.total
+            case "run": return f.hasSplits ? runAvg(f.splits) : nil
+            case "rox": return 8 * Defaults.roxTarget
+            default: return f.hasSplits ? f.splits[(stIndex ?? 7) * 2 + 1] : nil
             }
-            return prev
         default: return prev
         }
     }
-
-    private var stIndex: Int? { metrics.first { $0.key == metric }?.st }
 
     private var cmpLabel: String {
         switch store.settings.simCmp {
@@ -66,166 +79,241 @@ struct SimView: View {
         }
     }
 
+    private var points: [(Date, Int)] {
+        let series: [Record] = Array(store.records(.sim).prefix(6).reversed())
+        var o: [(Date, Int)] = []
+        for rec in series {
+            if let v = value(rec, metric) { o.append((rec.date, v)) }
+        }
+        return o
+    }
+
     var body: some View {
-        let recs = store.records(.sim)
-        let series = Array(recs.prefix(6).reversed())
-        let pts = series.compactMap { rec in value(rec, metric).map { (rec.date, $0) } }
-        let m = metrics.first { $0.key == metric } ?? metrics[0]
-        let last = pts.last?.1
-        let prev = pts.count >= 2 ? pts[pts.count - 2].1 : nil
-        let rf = ref(prev: prev)
-
         VStack(spacing: 10) {
-            LargeTitle(text: "Full Simulation")
-
-            VStack(alignment: .leading, spacing: 18) {
-                Flow(spacing: 6) {
-                    ForEach(metrics, id: \.key) { c in
-                        Button { withAnimation(.easeOut(duration: 0.2)) { metric = c.key } } label: {
-                            Text(c.label).font(F.t(11, .semibold)).tracking(0.88)
-                                .foregroundStyle(metric == c.key ? Color.black : C.aeb)
-                                .padding(.horizontal, 12).frame(height: 30)
-                                .background(metric == c.key ? C.accent : C.btn1A, in: RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                HStack(alignment: .bottom) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(m.caption).font(F.t(13)).foregroundStyle(C.text2)
-                        Text(last.map { Fm.t($0) } ?? "--:--").font(F.num(44)).tracking(-1.76)
-                    }
-                    Spacer()
-                    if let last, let rf {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text((last <= rf ? "−" : "+") + Fm.t(abs(last - rf)))
-                                .font(F.num(20)).foregroundStyle(last <= rf ? C.good : C.bad)
-                            Text(cmpLabel).font(F.t(11, .semibold)).tracking(0.88).foregroundStyle(C.text2)
-                        }
-                    }
-                }
-
-                if pts.count >= 2 {
-                    TrendChart(values: pts.map(\.1))
-                        .frame(height: 150)
-                        .padding(.horizontal, 8).padding(.top, 6)
-                    HStack {
-                        ForEach(Array(pts.enumerated()), id: \.offset) { i, p in
-                            Text(Fm.axis(p.0)).font(F.num(11, .regular)).foregroundStyle(C.text3)
-                            if i < pts.count - 1 { Spacer(minLength: 0) }
-                        }
-                    }
-                    .padding(.horizontal, -2)
-                }
-            }
-            .padding(18)
-            .card8()
-
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label8("BEST")
-                    Text(store.simBest.map { Fm.ddmy.string(from: $0.date) } ?? "아직 없어요").font(F.t(13)).foregroundStyle(C.text3)
-                }
-                Spacer()
-                Text(store.simBest.map { Fm.t($0.total) } ?? "--:--")
-                    .font(F.num(28)).tracking(-0.84).foregroundStyle(C.accent).lineLimit(1)
-            }
-            .padding(.vertical, 16).padding(.horizontal, 18)
-            .card8()
-
-            VStack(spacing: 0) {
-                Button { r.sub(.setDiv, from: .sim) } label: {
-                    HStack(spacing: 12) {
-                        Text("Division").font(F.t(16))
-                        Spacer()
-                        HStack(spacing: 8) {
-                            Text(store.div.name).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
-                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(C.chev)
-                        }
-                    }
-                    .frame(minHeight: 52).padding(.horizontal, 18).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .rowLine(true)
-                HStack(spacing: 12) {
-                    Text("Compare with").font(F.t(16))
-                    Spacer()
-                    Seg8(items: [("goal", "Goal"), ("last", "Last")] + (store.friend.map { [("friend", $0.first)] } ?? []),
-                         selected: store.settings.simCmp, height: 28, radius: 9, fontSize: 13, minWidth: 56) { store.settings.simCmp = $0 }
-                }
-                .frame(minHeight: 52).padding(.horizontal, 18)
-                .rowLine(true)
-                HStack(spacing: 12) {
-                    Text("Auto Roxzone").font(F.t(16))
-                    Spacer()
-                    Toggle8(on: Binding(get: { store.settings.roxAuto }, set: { store.settings.roxAuto = $0 }), w: 51, h: 31)
-                }
-                .frame(minHeight: 52).padding(.horizontal, 18)
-            }
-            .card8()
-
-            if !recs.isEmpty {
-                SectionLabel(text: "HISTORY")
-                VStack(spacing: 0) {
-                    ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                        let older = i + 1 < recs.count ? recs[i + 1] : nil
-                        let isBest = rec.id == store.simBest?.id
-                        let d = older.map { rec.total - $0.total }
-                        HistoryRow(title: Fm.wdm.string(from: rec.date),
-                                   sub: isBest ? "Personal best" : d.map { ($0 <= 0 ? "↓ " : "↑ ") + Fm.t(abs($0)) + " vs last" } ?? " ",
-                                   subColor: isBest ? C.accent : (d ?? 0) <= 0 ? C.good : C.bad,
-                                   time: Fm.t(rec.total), last: i == recs.count - 1,
-                                   onDelete: { store.delete(rec) }) { r.open(rec, from: .sim) }
-                    }
-                }
-                .card8()
-            }
+            graphCard
+            bestCard
+            settingsCard
+            history
         }
         .padding(.horizontal, 16)
     }
-}
 
-/// 변화 그래프: 노란 선 + 점 + 값
-struct TrendChart: View {
-    let values: [Int]
-    var body: some View {
-        GeometryReader { g in
-            let w = g.size.width
-            let mn = values.min() ?? 0, mx = values.max() ?? 1
-            let n = values.count
-            let xs = (0..<n).map { w * (0.04 + CGFloat($0) * 0.92 / CGFloat(max(1, n - 1))) }
-            let ys = values.map { v -> CGFloat in 30 + CGFloat(v - mn) / CGFloat(max(1, mx - mn)) * 90 }
-            ZStack(alignment: .topLeading) {
-                ForEach([30.0, 75.0, 120.0], id: \.self) { y in
-                    Rectangle().fill(Color(hex: 0x1C1C1C)).frame(width: w, height: 1).offset(y: y)
+    // MARK: 그래프 카드 (padding 18, gap 18)
+
+    private var graphCard: some View {
+        let pts = points
+        return VStack(alignment: .leading, spacing: 18) {
+            metricChips
+            headline(pts)
+            if pts.count >= 2 {
+                TrendChart(values: pts.map(\.1))
+                    .frame(height: 150)
+                    .padding(.horizontal, 8).padding(.top, 6)
+                dateAxis(pts.map(\.0))
+            }
+        }
+        .padding(18)
+        .card8()
+    }
+
+    private var metricChips: some View {
+        Flow(spacing: 6) {
+            ForEach(Self.metrics, id: \.key) { c in
+                let on = metric == c.key
+                Button { withAnimation(.easeOut(duration: 0.2)) { metric = c.key } } label: {
+                    Text(c.label).font(F.t(11, .semibold)).tracking(0.88)
+                        .foregroundStyle(on ? Color.black : C.aeb)
+                        .padding(.horizontal, 12).frame(height: 30)
+                        .background(on ? C.accent : C.btn1A, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
-                Path { p in
-                    for i in 0..<n { i == 0 ? p.move(to: CGPoint(x: xs[i], y: ys[i])) : p.addLine(to: CGPoint(x: xs[i], y: ys[i])) }
-                }
-                .stroke(C.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                ForEach(0..<n, id: \.self) { i in
-                    let lastDot = i == n - 1
-                    let dotSize: CGFloat = lastDot ? 10 : 6
-                    let labelGap: CGFloat = lastDot ? 7 : 6
-                    ZStack {
-                        Circle().fill(lastDot ? C.accent : Color.black)
-                            .overlay(Circle().stroke(C.accent, lineWidth: 2))
-                            .frame(width: dotSize, height: dotSize)
-                        Text(Fm.t(values[i])).font(F.num(lastDot ? 13 : 10))
-                            .foregroundStyle(lastDot ? Color.white : C.text3)
-                            .fixedSize()
-                            .offset(y: -(dotSize / 2 + 12 + labelGap))
-                    }
-                    .position(x: xs[i], y: ys[i])
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("sim.metric." + c.key)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func headline(_ pts: [(Date, Int)]) -> some View {
+        let last: Int? = pts.last?.1
+        let prev: Int? = pts.count >= 2 ? pts[pts.count - 2].1 : nil
+        let rf: Int? = ref(prev: prev)
+        return HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(current.caption).font(F.t(13)).foregroundStyle(C.text2)
+                Text(last.map { Fm.t($0) } ?? "--:--").font(F.num(44)).tracking(-1.76).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if let last, let rf {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text((last <= rf ? "−" : "+") + Fm.t(abs(last - rf)))
+                        .font(F.num(20)).foregroundStyle(last <= rf ? C.good : C.bad).lineLimit(1)
+                    Text(cmpLabel).font(F.t(11, .semibold)).tracking(0.88).foregroundStyle(C.text2).lineLimit(1)
                 }
             }
         }
     }
+
+    private func dateAxis(_ dates: [Date]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(dates.enumerated()), id: \.offset) { i, d in
+                Text(Fm.axis(d)).font(F.num(11, .regular)).foregroundStyle(C.text3).lineLimit(1)
+                if i < dates.count - 1 { Spacer(minLength: 0) }
+            }
+        }
+        .padding(.horizontal, -2)
+    }
+
+    // MARK: BEST
+
+    private var bestCard: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label8("BEST")
+                Text(store.simBest.map { Fm.ddmy.string(from: $0.date) } ?? "아직 없어요").font(F.t(13)).foregroundStyle(C.text3)
+            }
+            Spacer()
+            Text(store.simBest.map { Fm.t($0.total) } ?? "--:--")
+                .font(F.num(28)).tracking(-0.84).foregroundStyle(C.accent).lineLimit(1)
+        }
+        .padding(.vertical, 16).padding(.horizontal, 18)
+        .card8()
+    }
+
+    // MARK: 설정 카드 (줄 높이 52)
+
+    private var cmpItems: [(String, String)] {
+        var o: [(String, String)] = [("goal", "Goal"), ("last", "Last")]
+        if let f = store.friend { o.append(("friend", f.first)) }
+        return o
+    }
+
+    private var settingsCard: some View {
+        VStack(spacing: 0) {
+            Button { r.sub(.setDiv, from: .sim) } label: {
+                HStack(spacing: 12) {
+                    Text("Division").font(F.t(17))
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Text(store.div.name).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
+                        Chevron8()
+                    }
+                }
+                .frame(minHeight: 52).padding(.horizontal, 18).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sim.division")
+            .rowLine(true)
+            HStack(spacing: 12) {
+                Text("Compare with").font(F.t(17))
+                Spacer()
+                Seg8(items: cmpItems, selected: store.settings.simCmp, height: 28, radius: 9, fontSize: 13, minWidth: 56) {
+                    store.settings.simCmp = $0
+                }
+                .fixedSize()
+            }
+            .frame(minHeight: 52).padding(.horizontal, 18)
+            .rowLine(true)
+            HStack(spacing: 12) {
+                Text("Auto Roxzone").font(F.t(17))
+                Spacer()
+                Toggle8(on: Binding(get: { store.settings.roxAuto }, set: { store.settings.roxAuto = $0 }))
+            }
+            .frame(minHeight: 52).padding(.horizontal, 18)
+        }
+        .card8()
+    }
+
+    // MARK: HISTORY
+
+    @ViewBuilder
+    private var history: some View {
+        let recs: [Record] = store.records(.sim)
+        if !recs.isEmpty {
+            SectionLabel(text: "HISTORY", top: 20)
+            VStack(spacing: 0) {
+                ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
+                    simRow(recs, i, rec)
+                }
+            }
+            .card8()
+        }
+    }
+
+    private func simRow(_ recs: [Record], _ i: Int, _ rec: Record) -> some View {
+        let older: Record? = i + 1 < recs.count ? recs[i + 1] : nil
+        let isBest: Bool = rec.id == store.simBest?.id
+        let d: Int? = older.map { rec.total - $0.total }
+        let sub: String
+        if isBest { sub = "Personal best" }
+        else if let d { sub = (d <= 0 ? "↓ " : "↑ ") + Fm.t(abs(d)) + " vs last" }
+        else { sub = " " }
+        let color: Color = isBest ? C.accent : ((d ?? 0) <= 0 ? C.good : C.bad)
+        return HistoryRow(title: Fm.wdm.string(from: rec.date), sub: sub, subColor: color,
+                          time: Fm.t(rec.total), last: i == recs.count - 1,
+                          onDelete: { store.delete(rec) }) { r.open(rec, from: .sim) }
+    }
 }
 
-// MARK: - I4 Race
+/// 변화 그래프 (높이 150): 격자 y 30/75/120 #1C1C1C · 노란 2pt 선 · 점 6(검정+노란 테) · 마지막 10 노랑 · 값 라벨
+struct TrendChart: View {
+    let values: [Int]
+
+    var body: some View {
+        GeometryReader { g in
+            chart(width: g.size.width)
+        }
+    }
+
+    private func xs(_ w: CGFloat) -> [CGFloat] {
+        let n = values.count
+        return (0..<n).map { i in w * (0.04 + CGFloat(i) * 0.92 / CGFloat(max(1, n - 1))) }
+    }
+
+    private var ys: [CGFloat] {
+        let mn = values.min() ?? 0, mx = values.max() ?? 1
+        let span = CGFloat(max(1, mx - mn))
+        return values.map { v in 30 + CGFloat(v - mn) / span * 90 }
+    }
+
+    private func chart(width w: CGFloat) -> some View {
+        let x = xs(w), y = ys
+        let n = values.count
+        return ZStack(alignment: .topLeading) {
+            ForEach([30.0, 75.0, 120.0], id: \.self) { gy in
+                Rectangle().fill(Color(hex: 0x1C1C1C)).frame(width: w, height: 1).offset(y: gy - 0.5)
+            }
+            Path { p in
+                for i in 0..<n {
+                    let pt = CGPoint(x: x[i], y: y[i])
+                    if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                }
+            }
+            .stroke(C.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            ForEach(0..<n, id: \.self) { i in
+                dot(i, last: i == n - 1).position(x: x[i], y: y[i])
+            }
+        }
+        .frame(width: w, height: 150, alignment: .topLeading)
+    }
+
+    private func dot(_ i: Int, last: Bool) -> some View {
+        let size: CGFloat = last ? 10 : 6
+        let fs: CGFloat = last ? 13 : 10
+        // 라벨 아래 끝이 점 상자 아래에서 12 위 (bottom:12px)
+        let lift: CGFloat = (12 - size / 2) + fs * 0.6
+        return ZStack {
+            Circle().fill(last ? C.accent : Color.black)
+                .frame(width: size, height: size)
+                .overlay(Circle().stroke(C.accent, lineWidth: 2).frame(width: size + 2, height: size + 2))
+            Text(Fm.t(values[i])).font(F.num(fs))
+                .foregroundStyle(last ? Color.white : C.text3)
+                .fixedSize()
+                .offset(y: -lift)
+        }
+    }
+}
+
+// MARK: - I4 Race (위 고정 바가 제목을 맡음)
 
 struct RaceView: View {
     let store = Store.shared
@@ -233,110 +321,51 @@ struct RaceView: View {
     @State private var goalSheet = false
 
     var body: some View {
-        let s = store.settings
-        let best = store.raceBest?.total
-        let recs = store.records(.race)
-
         VStack(spacing: 10) {
-            LargeTitle(text: "Race")
-
-            // 목표 카드 (유리)
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label8("GOAL")
-                        Text(Fm.t(s.goalTime)).font(F.num(52)).tracking(-2.34).lineLimit(1).minimumScaleFactor(0.7)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(best.map { Fm.d(s.goalTime - $0) } ?? "--:--")
-                            .font(F.num(14)).foregroundStyle(C.accent)
-                            .padding(.horizontal, 10).frame(height: 26)
-                            .background(C.accent.opacity(0.14), in: Capsule())
-                        Text("vs best").font(F.t(11)).foregroundStyle(C.text3)
-                    }
-                    .padding(.top, 2)
-                }
-                VStack(spacing: 10) {
-                    bar("Goal", frac: best.map { min(1, Double(s.goalTime) / Double($0)) } ?? 1, fill: C.accent,
-                        value: Fm.t(s.goalTime), valueColor: .white)
-                    bar("Best", frac: best.map { min(1, Double($0) / Double(max($0, s.goalTime))) } ?? 0, fill: Color.white.opacity(0.35),
-                        value: best.map { Fm.t($0) } ?? "--:--", valueColor: C.text2)
-                }
-                Text(goalLine(best: best, goal: s.goalTime)).font(F.t(12)).foregroundStyle(C.text3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 12)
-                    .overlay(alignment: .top) { Rectangle().fill(C.line).frame(height: 1) }
-            }
-            .padding(.top, 20).padding(.horizontal, 18).padding(.bottom, 18)
-            .card8()
-
-            VStack(spacing: 0) {
-                row("Event", value: s.event.isSet ? "\(s.event.name) · \(Fm.wdmy.string(from: s.event.date)) ›" : "Not set ›") { r.go(.setEvent) }
-                row("Division", value: "\(store.div.name) ›") { r.sub(.setDiv, from: .race) }
-                row("Goal time", value: Fm.t(s.goalTime) + " ›", numeric: true) { goalSheet = true }
-                VStack(spacing: 12) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Split targets").font(F.t(16))
-                        Spacer()
-                        Text(s.tgtSrc == "friend" ? (store.friend?.first ?? "Auto") : "Auto")
-                            .font(F.t(12, .semibold)).foregroundStyle(C.accent)
-                    }
-                    HStack(alignment: .bottom, spacing: 3) {
-                        ForEach(Array(s.goals.enumerated()), id: \.offset) { i, t in
-                            Rectangle().fill(i % 2 == 0 ? C.control : C.accent)
-                                .frame(height: 40 * min(1, CGFloat(t) / 335))
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .frame(height: 40, alignment: .bottom)
-                }
-                .padding(.top, 14).padding(.horizontal, 18).padding(.bottom, 16)
-            }
-            .card8()
-
-            SectionLabel(text: "FRIENDS")
-            if store.signedIn { Leaderboard() } else {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: -8) {
-                        ForEach(Array([("J", C.accent), ("M", C.good), ("T", Color(hex: 0x0A84FF))].enumerated()), id: \.offset) { _, g in
-                            Text(g.0).font(F.t(13, .bold)).foregroundStyle(.black)
-                                .frame(width: 34, height: 34).background(g.1, in: Circle())
-                                .overlay(Circle().stroke(Color(hex: 0x0A0A0A), lineWidth: 2))
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("친구와 순위를 비교해 보세요").font(F.t(17, .semibold))
-                        Text("닉네임으로 친구를 추가하면 Full Sim·대회·스테이션별 순위를 볼 수 있어요.")
-                            .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(5)
-                    }
-                    Button { r.toAuth(from: .race) } label: {
-                        Text("Sign up · 30초").font(F.t(15, .semibold)).foregroundStyle(.black)
-                            .frame(maxWidth: .infinity).frame(height: 46)
-                            .yellowFill(14)
-                    }
-                    .buttonStyle(Press())
-                }
-                .padding(.vertical, 20).padding(.horizontal, 18)
-                .card8()
-            }
-
-            if !recs.isEmpty {
-                SectionLabel(text: "HISTORY")
-                VStack(spacing: 0) {
-                    ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                        let d = rec.total - (rec.goal ?? s.goalTime)
-                        HistoryRow(title: rec.title, sub: Fm.wdmy.string(from: rec.date), time: Fm.t(rec.total),
-                                   delta: Fm.d(d) + " vs goal", deltaColor: d < 0 ? C.good : C.bad,
-                                   last: i == recs.count - 1,
-                                   onDelete: { store.delete(rec) }) { r.open(rec, from: .race) }
-                    }
-                }
-                .card8()
-            }
+            goalCard
+            rowsCard
+            SectionLabel(text: "FRIENDS", top: 20)
+            if store.signedIn { RaceLeaderboard() } else { signUpCard }
+            history
         }
         .padding(.horizontal, 16)
         .sheet(isPresented: $goalSheet) { GoalTimeSheet().presentationDetents([.height(340)]) }
+    }
+
+    // MARK: GOAL 카드 (padding 20/18/18, gap 18)
+
+    private var goalCard: some View {
+        let goal: Int = store.settings.goalTime
+        let best: Int? = store.raceBest?.total
+        return VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label8("GOAL")
+                    Text(Fm.t(goal)).font(F.num(52)).tracking(-2.34).lineLimit(1).minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 0)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(best.map { Fm.d(goal - $0) } ?? "--:--")
+                        .font(F.num(15)).foregroundStyle(C.accent).lineLimit(1)
+                        .padding(.horizontal, 10).frame(height: 26)
+                        .background(Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.14), in: Capsule())
+                    Text("vs best").font(F.t(11)).foregroundStyle(C.text3)
+                }
+                .padding(.top, 2)
+            }
+            VStack(spacing: 10) {
+                bar("Goal", frac: best.map { min(1, Double(goal) / Double(max(1, $0))) } ?? 1, fill: C.accent,
+                    value: Fm.t(goal), valueColor: .white)
+                bar("Best", frac: best == nil ? 0 : 1, fill: Color.white.opacity(0.35),
+                    value: best.map { Fm.t($0) } ?? "--:--", valueColor: C.text2)
+            }
+            Text(goalLine(best: best, goal: goal)).font(F.t(13)).foregroundStyle(C.text3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 12)
+                .overlay(alignment: .top) { Rectangle().fill(C.line).frame(height: 1) }
+        }
+        .padding(.top, 20).padding(.horizontal, 18).padding(.bottom, 18)
+        .card8()
     }
 
     private func goalLine(best: Int?, goal: Int) -> String {
@@ -346,26 +375,46 @@ struct RaceView: View {
         return "최고 기록과 같은 목표예요"
     }
 
+    /// 44 | 막대 | 64, gap 10 · 막대 4 높이 radius 2
     private func bar(_ t: String, frac: Double, fill: Color, value: String, valueColor: Color) -> some View {
         HStack(spacing: 10) {
-            Text(t).font(F.t(12, .medium)).foregroundStyle(C.text2).frame(width: 44, alignment: .leading)
+            Text(t).font(F.t(13, .medium)).foregroundStyle(C.text2).frame(width: 44, alignment: .leading)
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.08))
-                    Capsule().fill(fill).frame(width: g.size.width * CGFloat(max(0, min(1, frac))))
+                    RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 2).fill(fill)
+                        .frame(width: g.size.width * CGFloat(max(0, min(1, frac))))
                 }
             }
             .frame(height: 4)
-            Text(value).font(F.num(14)).foregroundStyle(valueColor).frame(width: 64, alignment: .trailing).lineLimit(1)
+            Text(value).font(F.num(15)).foregroundStyle(valueColor)
+                .frame(width: 64, alignment: .trailing).lineLimit(1).minimumScaleFactor(0.8)
         }
+    }
+
+    // MARK: 설정 줄 카드
+
+    private var eventValue: String {
+        let e = store.settings.event
+        return e.isSet ? "\(e.name) · \(Fm.wdmy.string(from: e.date)) ›" : "Not set ›"
+    }
+
+    private var rowsCard: some View {
+        VStack(spacing: 0) {
+            row("Event", value: eventValue) { r.go(.setEvent) }
+            row("Division", value: "\(store.div.name) ›") { r.sub(.setDiv, from: .race) }
+            row("Goal time", value: Fm.t(store.settings.goalTime) + " ›", numeric: true) { goalSheet = true }
+            splitTargets
+        }
+        .card8()
     }
 
     private func row(_ t: String, value: String, numeric: Bool = false, _ a: @escaping () -> Void) -> some View {
         Button(action: a) {
-            HStack {
-                Text(t).font(F.t(16))
-                Spacer()
-                Text(value).font(numeric ? F.num(16, .regular) : F.t(16)).foregroundStyle(C.text2).lineLimit(1)
+            HStack(spacing: 12) {
+                Text(t).font(F.t(17))
+                Spacer(minLength: 8)
+                Text(value).font(numeric ? F.num(17, .regular) : F.t(17)).foregroundStyle(C.text2).lineLimit(1)
             }
             .padding(.vertical, 14).padding(.horizontal, 18)
             .contentShape(Rectangle())
@@ -374,9 +423,258 @@ struct RaceView: View {
         .accessibilityIdentifier("race." + t)
         .rowLine(true)
     }
+
+    private var targetSource: String {
+        store.settings.tgtSrc == "friend" ? (store.friend?.first ?? "Auto") : "Auto"
+    }
+
+    /// 16 막대 (40 높이, gap 3) · 러닝 #2C2C2E · 스테이션 노랑 · 높이 = 목표/335
+    private var splitTargets: some View {
+        let goals: [Int] = store.settings.goals
+        return VStack(spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Split targets").font(F.t(17))
+                Spacer()
+                Text(targetSource).font(F.t(13, .semibold)).foregroundStyle(C.accent)
+            }
+            HStack(alignment: .bottom, spacing: 3) {
+                ForEach(Array(goals.enumerated()), id: \.offset) { i, t in
+                    Rectangle().fill(i % 2 == 0 ? C.control : C.accent)
+                        .frame(height: 40 * min(1, max(0, CGFloat(t) / 335)))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 40, alignment: .bottom)
+        }
+        .padding(.top, 14).padding(.horizontal, 18).padding(.bottom, 16)
+    }
+
+    // MARK: FRIENDS (가입 전)
+
+    private static let ghosts: [(String, Color)] = [("J", C.accent), ("M", C.good), ("T", Color(hex: 0x0A84FF))]
+
+    private var signUpCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: -12) {
+                ForEach(Array(Self.ghosts.enumerated()), id: \.offset) { _, g in
+                    Text(g.0).font(F.t(13, .semibold)).foregroundStyle(.black)
+                        .frame(width: 34, height: 34).background(g.1, in: Circle())
+                        .padding(2).background(Color(hex: 0x0A0A0A), in: Circle())
+                }
+            }
+            .padding(-2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("친구와 순위를 비교해 보세요").font(F.t(17, .semibold))
+                Text("닉네임으로 친구를 추가하면 Full Sim·대회·스테이션별 순위를 볼 수 있어요.")
+                    .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button { r.toAuth(from: .race) } label: {
+                Text("Sign up · 30초").font(F.t(15, .semibold)).foregroundStyle(.black)
+                    .frame(maxWidth: .infinity).frame(height: 46)
+                    .yellowFill(14)
+            }
+            .buttonStyle(Press())
+            .accessibilityIdentifier("race.signup")
+        }
+        .padding(.vertical, 20).padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card8()
+    }
+
+    // MARK: HISTORY
+
+    @ViewBuilder
+    private var history: some View {
+        let recs: [Record] = store.records(.race)
+        if !recs.isEmpty {
+            SectionLabel(text: "HISTORY", top: 20)
+            VStack(spacing: 0) {
+                ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
+                    raceRow(recs, i, rec)
+                }
+            }
+            .card8()
+        }
+    }
+
+    private func raceRow(_ recs: [Record], _ i: Int, _ rec: Record) -> some View {
+        let d: Int = rec.total - (rec.goal ?? store.settings.goalTime)
+        return HistoryRow(title: rec.title, sub: Fm.wdmy.string(from: rec.date), time: Fm.t(rec.total),
+                          delta: Fm.d(d) + " vs goal", deltaColor: d < 0 ? C.good : C.bad,
+                          last: i == recs.count - 1,
+                          onDelete: { store.delete(rec) }) { r.open(rec, from: .race) }
+    }
 }
 
-/// Goal time 고르기 → 구간 목표를 같은 비율로 나눔
+// MARK: - Race › FRIENDS 순위표 (가입 후)
+
+struct RaceLeaderboard: View {
+    let store = Store.shared
+    let r = Router.shared
+
+    private static let stations: [(String, String)] = [
+        ("skiErg", "SkiErg"), ("sledPush", "Sled Push"), ("sledPull", "Sled Pull"), ("burpeeBroadJump", "BBJ"),
+        ("row", "Row"), ("farmersCarry", "Farmers"), ("sandbagLunges", "Lunges"), ("wallBalls", "Wall Balls"),
+    ]
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Seg8(items: [("sim", "Full Sim"), ("race", "Race"), ("stations", "Stations")], selected: store.settings.lbTab) {
+                store.settings.lbTab = $0
+                Task { await store.refreshLeaderboard() }
+            }
+            if store.settings.lbTab == "stations" { stationChips }
+            captionRow
+            rowsCard
+            Button { r.go(.friends) } label: {
+                Text("+ Add friends").font(F.t(15, .semibold)).foregroundStyle(C.accent)
+                    .frame(maxWidth: .infinity).padding(6).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("race.addFriends")
+        }
+        .task { await store.refreshLeaderboard() }
+    }
+
+    private var stationChips: some View {
+        Flow(spacing: 6) {
+            ForEach(Self.stations.indices, id: \.self) { i in
+                let st = Self.stations[i]
+                let on = store.settings.lbStation == st.0
+                Button {
+                    store.settings.lbStation = st.0
+                    Task { await store.refreshLeaderboard() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Icon8(st.0, 14, on ? Color.black : C.accent)
+                        Text(st.1).font(F.t(13, .semibold))
+                    }
+                    .foregroundStyle(on ? Color.black : Color.white)
+                    .padding(.horizontal, 12).frame(height: 34)
+                    .background(on ? C.accent : Color.white.opacity(0.08), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("lb.st." + st.0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var captionRow: some View {
+        HStack {
+            Text(caption).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+            Spacer()
+            Button {
+                store.settings.lbAllDivisions.toggle()
+                Task { await store.refreshLeaderboard() }
+            } label: {
+                Text(store.settings.lbAllDivisions ? "All divisions" : store.div.name)
+                    .font(F.t(13, .semibold)).foregroundStyle(C.accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("lb.division")
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var caption: String {
+        switch store.settings.lbTab {
+        case "sim": return "Best Full Simulation · All time"
+        case "race": return "Best race time · All events"
+        default:
+            let n = Self.stations.first { $0.0 == store.settings.lbStation }?.1 ?? ""
+            return "Best \(n) split · All time"
+        }
+    }
+
+    private var rowsCard: some View {
+        let rows: [LBRow] = store.leaderboard
+        let meT: Int? = rows.first { $0.user_id == store.sb.userId }?.t
+        return VStack(spacing: 0) {
+            if rows.isEmpty {
+                Text("아직 기록이 없어요. Full Simulation을 한 번 완료하면 여기에 나와요.")
+                    .font(F.t(13)).foregroundStyle(C.text2).multilineTextAlignment(.center).lineSpacing(3)
+                    .frame(maxWidth: .infinity).padding(.vertical, 22).padding(.horizontal, 18)
+            }
+            ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
+                lbRow(i, row, meT: meT, last: i == rows.count - 1)
+            }
+        }
+        .card8()
+    }
+
+    private func lbRow(_ i: Int, _ row: LBRow, meT: Int?, last: Bool) -> some View {
+        let me: Bool = row.user_id == store.sb.userId
+        return Button { open(row) } label: {
+            HStack(spacing: 12) {
+                Text("\(i + 1)").font(F.num(17)).foregroundStyle(i == 0 ? C.accent : Color.white)
+                    .frame(width: 22, alignment: .leading)
+                RaceLbAvatar(me: me, photo: me ? store.photo : nil, url: me ? nil : row.avatar_url,
+                             initial: String(row.nickname.prefix(1)).uppercased())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(me ? "@\(row.nickname) (you)" : "@\(row.nickname)")
+                        .font(F.t(15, me ? .semibold : .medium)).foregroundStyle(me ? C.accent : Color.white).lineLimit(1)
+                    Text(row.division).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(Fm.t(row.t)).font(F.num(17)).tracking(-0.34).lineLimit(1)
+                    if !me, let meT {
+                        Text(Fm.d(row.t - meT)).font(F.num(13)).foregroundStyle(row.t < meT ? C.bad : C.good).lineLimit(1)
+                    }
+                }
+                .fixedSize()
+            }
+            .padding(.vertical, 12).padding(.horizontal, 18)
+            .background(me ? Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.08) : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .rowLine(!last)
+    }
+
+    /// 친구를 누르면 Full Simulation 에서 그 친구와 비교
+    private func open(_ row: LBRow) {
+        guard row.user_id != store.sb.userId else { return }
+        guard let f = store.friends.first(where: { $0.id == row.user_id }) else { return }
+        var s = store.settings
+        s.friendId = f.id
+        s.simCmp = "friend"
+        store.settings = s
+        r.go(.sim)
+    }
+}
+
+/// 순위표 동그라미 (34): 나 = 사진 또는 노랑+검정 글자, 친구 = 사진 URL 또는 #2C2C2E
+private struct RaceLbAvatar: View {
+    let me: Bool
+    let photo: UIImage?
+    let url: String?
+    let initial: String
+
+    var body: some View {
+        if let s = url, let u = URL(string: s) {
+            AsyncImage(url: u) { img in
+                img.resizable().scaledToFill()
+            } placeholder: {
+                fallback
+            }
+            .frame(width: 34, height: 34)
+            .clipShape(Circle())
+        } else {
+            fallback
+        }
+    }
+
+    private var fallback: some View {
+        Avatar8(size: 34, photo: photo, initial: initial,
+                bg: me ? C.accent : C.control, fg: me ? Color.black : Color.white, fontSize: 15)
+    }
+}
+
+// MARK: - Goal time 고르기 → 구간 목표를 같은 비율로 나눔
+
 struct GoalTimeSheet: View {
     let store = Store.shared
     @Environment(\.dismiss) private var dismiss
@@ -391,7 +689,7 @@ struct GoalTimeSheet: View {
                 picker($h, 0..<3, "h"); picker($m, 0..<60, "m"); picker($s, 0..<60, "s")
             }
             .frame(height: 180)
-            Text("구간 목표가 이 시간에 맞게 같은 비율로 나뉩니다.").font(F.t(12)).foregroundStyle(C.text3)
+            Text("구간 목표가 이 시간에 맞게 같은 비율로 나뉩니다.").font(F.t(13)).foregroundStyle(C.text3)
         }
         .padding(.horizontal, 16).padding(.top, 8)
         .background(Color(hex: 0x141414).ignoresSafeArea())
@@ -421,4 +719,3 @@ struct GoalTimeSheet: View {
         dismiss()
     }
 }
-

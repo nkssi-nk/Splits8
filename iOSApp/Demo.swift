@@ -12,7 +12,7 @@ enum Demo {
         s.age = 32
         s.goalTime = 4320
         s.goals = Defaults.goals
-        s.event = RaceEvent(name: "Incheon", loc: "Songdo Convensia", date: Fm.ymd.date(from: "2026-09-13") ?? Date(), time: "09:00")
+        s.event = RaceEvent()      // 시안 I1h · I4 처럼 "대회 없음" 상태
     }
 
     static func records() -> [Record] {
@@ -21,7 +21,10 @@ enum Demo {
         let stT = [252, 198, 281, 255, 268, 112, 276, 335]
         let div = Division.of("openM")
 
-        func full(_ mode: Mode, _ title: String, _ date: String, scale: Double, goal: Int? = nil) -> Record {
+        // 시안 예시값과 같은 총 시간이 나오도록 비율을 맞춤 (15×Roxzone 18초 포함)
+        let base = runs.reduce(0, +) + stT.reduce(0, +)
+        func full(_ mode: Mode, _ title: String, _ date: String, total want: Int, goal: Int? = nil) -> Record {
+            let scale = Double(want - 15 * 18) / Double(base)
             var segs: [SegResult] = []
             for i in 0..<8 {
                 let r = Int(Double(runs[i]) * scale), s = Int(Double(stT[i]) * scale)
@@ -31,6 +34,8 @@ enum Demo {
                 segs.append(SegResult(icon: st.key, name: st.name, detail: st.detail(div), kind: .st, time: s, target: Defaults.stationGoals[i], hr: 165 + (i % 4) * 4, dist: nil))
                 if i < 7 { segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, time: 18, target: 30, hr: 150, dist: nil)) }
             }
+            let fix = want - segs.map(\.time).reduce(0, +)
+            if let li = segs.lastIndex(where: { $0.kind == .st }) { segs[li].time += fix }
             let total = segs.map(\.time).reduce(0, +)
             var hr: [HRPoint] = []
             var t = 0
@@ -46,12 +51,12 @@ enum Demo {
                           kcal: 1042, avgHR: 164, maxHR: 183, division: "openM", goal: goal, vsWord: mode == .race ? "VS GOAL" : "VS LAST", vsTarget: goal)
         }
         // Race
-        out.append(full(.race, "Incheon", "2026-09-13", scale: 1.0, goal: 4530))
-        out.append(full(.race, "Seoul", "2026-05-23", scale: 1.046, goal: 4580))
-        out.append(full(.race, "Busan", "2026-03-08", scale: 1.088, goal: 4680))
-        // Full Simulation (6회, 점점 빨라짐)
-        for (d, sc) in [("2026-06-14", 1.121), ("2026-07-05", 1.099), ("2026-07-26", 1.079), ("2026-08-16", 1.063), ("2026-09-06", 1.036), ("2026-09-20", 1.013)] {
-            out.append(full(.sim, "Full Simulation", d, scale: sc))
+        out.append(full(.race, "Incheon", "2026-09-13", total: 4503, goal: 4530))
+        out.append(full(.race, "Seoul", "2026-05-23", total: 4711, goal: 4580))
+        out.append(full(.race, "Busan", "2026-03-08", total: 4902, goal: 4680))
+        // Full Simulation (6회, 시안 그래프 값)
+        for (d, t) in [("2026-06-14", 5050), ("2026-07-05", 4951), ("2026-07-26", 4862), ("2026-08-16", 4787), ("2026-09-06", 4667), ("2026-09-20", 4565)] {
+            out.append(full(.sim, "Full Simulation", d, total: t))
         }
         // Training
         func training(_ title: String, _ date: String, _ total: Int) -> Record {

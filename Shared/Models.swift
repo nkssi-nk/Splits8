@@ -31,11 +31,11 @@ struct Station {
     let target: Int          // 기본 목표(초) — 워치 ST
     func detail(_ d: Division) -> String {
         switch key {
-        case "skiErg": return "1000M"
+        case "skiErg": return "1K"
         case "sledPush": return "50M · \(d.push)KG"
         case "sledPull": return "50M · \(d.pull)KG"
         case "burpeeBroadJump": return "80M"
-        case "row": return "1000M"
+        case "row": return "1K"
         case "farmersCarry": return "200M · 2×\(d.fc)KG"
         case "sandbagLunges": return "100M · \(d.sb)KG"
         case "wallBalls": return "\(d.wbReps) REPS · \(d.wb)KG\(d.wbNote)"

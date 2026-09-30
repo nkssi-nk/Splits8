@@ -94,15 +94,14 @@ struct ProgramCard: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(p.cardMeta).font(F.t(13)).foregroundStyle(C.text2)
                 Text(p.name).font(F.t(20, .semibold)).tracking(-0.4).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Glyph("i_play", 14, .black)
-                .frame(width: 40, height: 40)
-                .yellowCapsule()
+            // 폰에서는 카드를 누르면 편집 → 시작 버튼처럼 보이지 않게 작은 회색 ›
+            Chevron8()
         }
     }
 

@@ -31,8 +31,9 @@ struct PhotoViewer: View {
     var body: some View {
         GeometryReader { g in
             let side: CGFloat = max(0, g.size.width - 32)
+            let fade: Double = Double(min(CGFloat(1), drag / CGFloat(400)))
             ZStack {
-                Color.black.opacity(0.94 * (1 - min(1, drag / 400)))
+                Color.black.opacity(0.94 * (1.0 - fade))
                     .ignoresSafeArea()
                     .onTapGesture { close() }
                 VStack(spacing: 14) {

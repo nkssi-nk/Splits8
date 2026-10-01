@@ -51,3 +51,15 @@
 "AVG" = "평균";
 "MAX" = "최대";
 "Done" = "완료";
+
+/* 빌드 15 */
+"Intervals" = "인터벌";
+"Free run" = "자유 러닝";
+"Run 3K" = "러닝 3K";
+"Run 5K" = "러닝 5K";
+"Run 10K" = "러닝 10K";
+"Run 21K" = "러닝 21K";
+"Intervals · heart rate · calories" = "인터벌 · 심박 · 칼로리";
+"Indoor · 1 km splits" = "실내 · 1km 스플릿";
+"Outdoor · 1 km splits" = "실외 · 1km 스플릿";
+"Everything so far will be saved." = "지금까지 기록이 모두 저장돼요.";

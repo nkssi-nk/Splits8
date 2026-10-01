@@ -36,6 +36,21 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored private var settings = Settings()
     @ObservationIgnored private var friend: Friend?
 
+    // HIIT · 러닝 카드
+    private(set) var kind: String? = nil
+    @ObservationIgnored private var runKm = 0
+    var isHIIT: Bool { kind == "hiit" }
+    var isRunKind: Bool { kind == "run" }
+    /// 끝 없이 늘어나는 운동 (HIIT · 자유 러닝)
+    var growsOpen: Bool { isHIIT || (isRunKind && runKm == 0) }
+    /// GPS 러닝이 총거리를 다 뛰어서 저절로 끝났을 때 (화면이 받아서 저장)
+    private(set) var autoDone: Record? = nil
+    // 동네 이름 · 경로
+    @ObservationIgnored private var place: String?
+    @ObservationIgnored private var placeLookup: PlaceLookup?
+    @ObservationIgnored private var routePts: [RoutePt] = []
+    @ObservationIgnored private var lastRouteLoc: CLLocation?
+
     // MARK: 값
 
     var cur: Seg {
@@ -112,9 +127,38 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         let now = Date()
         startDate = now; segStart = now
         active = true
+        kind = req.mode == .training ? req.program?.kind : nil
+        runKm = req.program?.runKm ?? 0
+        autoDone = nil; place = nil; routePts = []; lastRouteLoc = nil
 
-        useGPS = req.mode != .race && settings.runMode == "outdoor"
-        if useGPS { startGPS() }
+        if isRunKind {
+            useGPS = !(req.program?.indoor ?? true)
+        } else {
+            useGPS = req.mode != .race && settings.runMode == "outdoor"
+        }
+        if useGPS {
+            startGPS()
+        } else {
+            let p = PlaceLookup()
+            placeLookup = p
+            p.fetch { [weak self] name in self?.place = name; self?.placeLookup = nil }
+        }
+    }
+
+    /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
+    private func growSeq() {
+        let n: Int = seq.count + 1
+        seq.append(isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n))
+        segDists.append(nil)
+    }
+
+    /// 다음 구간 (HIIT·자유 러닝은 아직 순서에 없는 다음 라운드/km)
+    var nextSeg: Seg? {
+        if growsOpen && !hasNext {
+            let n: Int = seq.count + 1
+            return isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n)
+        }
+        return next
     }
 
     // MARK: 진행
@@ -122,8 +166,10 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     /// 다음 구간. 마지막 구간이면 끝내고 기록을 돌려줌
     func advance() -> Record? {
         guard active, !finished, running else { return nil }
+        if isRunKind && useGPS { return nil }            // GPS 러닝은 1km마다 저절로 넘어감
         let now = Date()
         closeSeg(now)
+        if growsOpen && splits.count >= seq.count { growSeq() }
         if splits.count >= seq.count {
             return finish(complete: true)
         }
@@ -149,7 +195,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         guard active, !finished else { return nil }
         if !running { togglePause() }
         closeSeg(Date())
-        return finish(complete: splits.count >= seq.count)
+        return finish(complete: growsOpen || splits.count >= seq.count)
     }
 
     /// End → Discard
@@ -182,10 +228,15 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         }
         let total: Int = splits.reduce(0, +)
         let tg: Int = seq.prefix(splits.count).map(\.target).reduce(0, +)
-        return Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: [],
-                      kcal: 0, avgHR: 0, maxHR: 0, division: settings.div.name,
-                      goal: mode == .race ? settings.goalTime : nil,
-                      vsWord: deltaWord, vsTarget: tg, complete: complete)
+        var r = Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: [],
+                       kcal: 0, avgHR: 0, maxHR: 0, division: settings.div.name,
+                       goal: mode == .race ? settings.goalTime : nil,
+                       vsWord: deltaWord, vsTarget: kind == nil ? tg : nil, complete: complete)
+        r.endDate = startDate.addingTimeInterval(Double(total))
+        r.place = place
+        r.kind = kind
+        if isRunKind && useGPS && routePts.count >= 2 { r.route = routePts }
+        return r
     }
 
     /// VS GOAL / VS JIHO / VS BEST (워치와 같음)
@@ -236,12 +287,40 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     private func gotLocation(_ loc: CLLocation) {
         guard active, !finished else { return }
         guard loc.horizontalAccuracy > 0, loc.horizontalAccuracy <= 30 else { return }
+        if place == nil, placeLookup == nil {
+            let p = PlaceLookup()
+            placeLookup = p
+            p.name(for: loc) { [weak self] name in self?.place = name; self?.placeLookup = nil }
+        }
         guard running, cur.kind == .run else { lastLoc = nil; return }
         if let prev = lastLoc {
             let d: Double = loc.distance(from: prev)
             if d < 100 { segDist += d }       // 튀는 값은 버림
         }
         lastLoc = loc
+        if isRunKind {
+            if lastRouteLoc == nil || loc.distance(from: lastRouteLoc!) >= 8 {
+                lastRouteLoc = loc
+                routePts.append(RoutePt(a: loc.coordinate.latitude, o: loc.coordinate.longitude))
+            }
+            autoSplitIfNeeded()
+        }
+    }
+
+    /// GPS 러닝: 1km 넘으면 저절로 다음 km (총거리 다 뛰면 끝 → autoDone)
+    private func autoSplitIfNeeded() {
+        guard isRunKind, useGPS, active, !finished, running, segDist >= 1000 else { return }
+        let now = Date()
+        closeSeg(now)
+        if runKm == 0 && splits.count >= seq.count { growSeq() }
+        if splits.count >= seq.count {
+            autoDone = finish(complete: true)
+            return
+        }
+        idx = splits.count
+        segStart = now; segPaused = 0
+        segDist = 0
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
     }
 }
 
@@ -294,6 +373,12 @@ struct PhoneLiveView: View {
         }
         .onAppear(perform: begin)
         .onDisappear(perform: leave)
+        .onChange(of: eng.autoDone) { _, rec in
+            if let rec {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                done(rec)
+            }
+        }
         .alert("End workout?", isPresented: $askEnd) {
             Button("Save") { save() }
             Button("Discard", role: .destructive) { discard() }
@@ -389,7 +474,7 @@ struct PhoneLiveView: View {
                 .padding(.bottom, 14 * m.k)
             HStack(spacing: 10) {
                 Text("NEXT").font(F.t(13)).tracking(0.1 * 13).foregroundStyle(C.text2)
-                if let nx = eng.next {
+                if let nx = eng.nextSeg {
                     Icon8(nx.icon, m.nextIcon, tint: nx.kind == .rox ? .mute : .yellow)
                     Text(nx.name).font(F.t(m.nextFont, .semibold)).lineLimit(1)
                 } else {
@@ -402,9 +487,10 @@ struct PhoneLiveView: View {
     // MARK: 아래 버튼
 
     private func nextButton(_ m: PhoneLiveMetrics) -> some View {
-        YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: eng.running, action: { next() }) {
+        YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: eng.running && !(eng.isRunKind && eng.useGPS),
+                     action: { next() }) {
             HStack(spacing: 10) {
-                Text(eng.hasNext ? "Next" : "Finish")
+                Text((eng.isRunKind && eng.useGPS ? "Auto split every 1 km" : ((eng.hasNext || eng.growsOpen) ? "Next" : "Finish")).l10n)
                 Text("›")
             }
             .font(F.t(m.buttonFont, .semibold))
@@ -500,6 +586,8 @@ struct PhoneLiveView: View {
 struct StartOnPhoneButton: View {
     let mode: Mode
     var program: Program? = nil
+    /// 시작 직전에 할 일 (예: 시트 닫기). 있으면 닫힌 뒤 조금 있다가 시작
+    var before: (() -> Void)? = nil
     @State private var confirm = false
 
     var body: some View {
@@ -518,7 +606,14 @@ struct StartOnPhoneButton: View {
         .accessibilityIdentifier("startOnPhone." + mode.rawValue)
         // 시작 전 확인: 아이폰 기록은 워치 기능(심박 등)을 못 씀
         .alert("Start on iPhone?", isPresented: $confirm) {
-            Button("Start") { Router.shared.startOnPhone(mode, program: program) }
+            Button("Start") {
+                if let before {
+                    before()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { Router.shared.startOnPhone(mode, program: program) }
+                } else {
+                    Router.shared.startOnPhone(mode, program: program)
+                }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Recording on iPhone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs).")

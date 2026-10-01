@@ -100,10 +100,20 @@ struct NavBar3: View {
         ZStack {
             Text(title.l10n).font(F.t(17, .semibold))
             HStack {
-                Button(left.l10n, action: onLeft).font(F.t(17)).foregroundStyle(leftColor).accessibilityIdentifier("nav.left")
+                Button(action: onLeft) {
+                    Text(left.l10n).font(F.t(17)).foregroundStyle(leftColor)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("nav.left")
                 Spacer()
                 if let right {
-                    Button(right.l10n, action: onRight).font(F.t(17, .semibold)).foregroundStyle(rightColor).accessibilityIdentifier("nav.right")
+                    Button(action: onRight) {
+                        Text(right.l10n).font(F.t(17, .semibold)).foregroundStyle(rightColor)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityIdentifier("nav.right")
                 } else {
                     Color.clear.frame(width: 40, height: 1)
                 }
@@ -457,11 +467,12 @@ struct Note8: View {
 
 // MARK: - 왼쪽으로 밀어 삭제 (기록 줄 · 트레이닝 카드 공통)
 
-/// 왼쪽으로 밀면 오른쪽에 빨간 Delete. 많이 밀면 바로 확인창. 길게 누르면 Delete 메뉴.
-/// corner: 카드처럼 둥근 모서리면 그 값 (빨간 영역도 같이 잘림). press: 누를 때 살짝 작아지는 효과(카드용)
+/// 왼쪽으로 밀면 오른쪽에 빨간 Delete (Delete 를 눌러야 확인창). 밀기 시작한 손동작은 "누름"으로 치지 않음.
+/// corner: 카드처럼 둥근 모서리면 그 값. press: 누를 때 살짝 작아지는 효과(카드용). menu: 길게 눌러 Delete 메뉴(기록 줄용)
 struct SwipeDelete<Content: View>: View {
     var corner: CGFloat = 0
     var press: Bool = false
+    var menu: Bool = true
     let alertTitle: LocalizedStringKey
     var alertMessage: LocalizedStringKey = "This can't be undone."
     let onTap: () -> Void
@@ -471,6 +482,8 @@ struct SwipeDelete<Content: View>: View {
     @State private var offset: CGFloat = 0
     @State private var settled: CGFloat = 0
     @State private var ask = false
+    /// 이번 손동작에서 옆으로 밀었는지 (그러면 손을 떼도 누름 무시)
+    @State private var dragged = false
     private let reveal: CGFloat = 84
 
     var body: some View {
@@ -487,14 +500,13 @@ struct SwipeDelete<Content: View>: View {
                     .background(C.bad)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("swipe.delete")
             }
             tapArea.offset(x: offset)
         }
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         .simultaneousGesture(swipe)
-        .contextMenu {
-            Button(role: .destructive) { ask = true } label: { Label("Delete", systemImage: "trash") }
-        }
+        .modifier(DeleteMenu(on: menu, ask: $ask))
         .alert(alertTitle, isPresented: $ask) {
             Button("Delete", role: .destructive) {
                 close()
@@ -503,6 +515,10 @@ struct SwipeDelete<Content: View>: View {
             Button("Cancel", role: .cancel) { close() }
         } message: {
             Text(alertMessage)
+        }
+        .onDisappear {
+            // 화면이 바뀌면 열린 확인창·밀린 상태를 정리 (보이지 않는 확인창이 터치를 막지 않게)
+            ask = false; offset = 0; settled = 0; dragged = false
         }
     }
 
@@ -516,31 +532,48 @@ struct SwipeDelete<Content: View>: View {
     }
 
     private func tap() {
+        if dragged { return }                 // 밀다가 손을 뗀 것 → 누름 아님
         if settled != 0 { close() } else { onTap() }
     }
 
     private var swipe: some Gesture {
-        DragGesture(minimumDistance: 20)
+        DragGesture(minimumDistance: 6)
             .onChanged { v in
                 guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                dragged = true
                 offset = min(0, settled + v.translation.width)
             }
             .onEnded { v in
                 let horizontal = abs(v.translation.width) > abs(v.translation.height)
                 let x = horizontal ? settled + v.translation.width : settled
                 withAnimation(.snappy(duration: 0.25)) {
-                    if x < -200 {
-                        offset = -reveal; settled = -reveal; ask = true
-                    } else if x < -reveal / 2 {
-                        offset = -reveal; settled = -reveal
+                    if x < -reveal / 2 {
+                        offset = -reveal; settled = -reveal      // 많이 밀어도 확인창은 Delete 를 눌러야
                     } else {
                         offset = 0; settled = 0
                     }
                 }
+                // 버튼의 누름 판정이 끝난 뒤에 풀어 줌
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { dragged = false }
             }
     }
 
     private func close() {
         withAnimation(.snappy(duration: 0.25)) { offset = 0; settled = 0 }
+    }
+}
+
+/// 길게 눌러 Delete 메뉴 (기록 줄만)
+private struct DeleteMenu: ViewModifier {
+    let on: Bool
+    @Binding var ask: Bool
+    func body(content: Content) -> some View {
+        if on {
+            content.contextMenu {
+                Button(role: .destructive) { ask = true } label: { Label("Delete", systemImage: "trash") }
+            }
+        } else {
+            content
+        }
     }
 }

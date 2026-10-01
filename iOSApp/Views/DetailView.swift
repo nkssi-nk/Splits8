@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 // MARK: - 기록 계산 (상세 · 공유 같이 씀)
 
@@ -93,6 +94,11 @@ struct DetailView: View {
         VStack(spacing: 10) {
             BackLink(label: backLabel) { r.go(r.detailFrom) }
             header(rec)
+            if let route = rec.route, route.count >= 2 {
+                RouteMap(route: route)
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
             tilesGrid(rec)
             if showsPartner(rec) {
                 SectionLabel(text: "PARTNER", top: 20)
@@ -203,6 +209,14 @@ struct DetailView: View {
         }
     }
 
+    /// "오전 7:02 – 8:21 · 성수동, 서울" (동네 이름은 있을 때만)
+    private func timePlace(_ rec: Record) -> String {
+        let f: DateFormatter = Fm.time12
+        var s: String = f.string(from: rec.date) + " – " + f.string(from: rec.end)
+        if let p = rec.place, !p.isEmpty { s += " · " + p }
+        return s
+    }
+
     // MARK: 머리 (배지 · 날짜 · 큰 제목), padding 0 4 8
 
     private func header(_ rec: Record) -> some View {
@@ -216,6 +230,11 @@ struct DetailView: View {
             }
             LargeTitle(text: rec.title, top: 10)
                 .fixedSize(horizontal: false, vertical: true)
+            // 오전 7:02 – 8:21 · 성수동, 서울
+            Text(timePlace(rec))
+                .font(F.t(F.sub)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
+                .padding(.top, 6)
+                .accessibilityIdentifier("detail.timePlace")
             if let f = rec.flag {
                 Text(f == .incomplete ? LocalizedStringKey("Ended early, so it doesn't count toward your PB.")
                                       : LocalizedStringKey("Faster than seems possible, so it doesn't count toward your PB. A tap may have been missed."))
@@ -752,5 +771,70 @@ struct PartnerSheet: View {
         guard typing, !t.isEmpty else { return }
         onSave(t)
         dismiss()
+    }
+}
+
+
+// MARK: - 실외 러닝 경로 지도 (기록 화면)
+
+struct RouteMap: View {
+    let route: [RoutePt]
+    private var coords: [CLLocationCoordinate2D] { route.map { CLLocationCoordinate2D(latitude: $0.a, longitude: $0.o) } }
+
+    var body: some View {
+        Map(initialPosition: .rect(RouteMap.rect(coords)), interactionModes: [.zoom, .pan]) {
+            MapPolyline(coordinates: coords)
+                .stroke(C.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+            if let a = coords.first {
+                Annotation("", coordinate: a) { Circle().fill(Color.white).frame(width: 10, height: 10) }
+            }
+            if let b = coords.last {
+                Annotation("", coordinate: b) { Circle().fill(C.accent).frame(width: 12, height: 12) }
+            }
+        }
+        .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
+        .environment(\.colorScheme, .dark)
+        .accessibilityIdentifier("detail.route")
+    }
+
+    /// 경로가 다 보이게 (가장자리 여유 20%)
+    static func rect(_ cs: [CLLocationCoordinate2D]) -> MKMapRect {
+        var r: MKMapRect = .null
+        for c in cs {
+            let p = MKMapPoint(c)
+            r = r.union(MKMapRect(x: p.x, y: p.y, width: 0, height: 0))
+        }
+        let pad: Double = max(r.size.width, r.size.height) * 0.2 + 400
+        return r.insetBy(dx: -pad, dy: -pad)
+    }
+}
+
+// MARK: - 공유 이미지용 경로 지도 그림
+
+enum RouteSnapshot {
+    /// 어두운 지도 위에 노란 경로 (공유 이미지 배경)
+    static func make(_ route: [RoutePt], size: CGSize) async -> UIImage? {
+        let cs: [CLLocationCoordinate2D] = route.map { CLLocationCoordinate2D(latitude: $0.a, longitude: $0.o) }
+        guard cs.count >= 2 else { return nil }
+        let opt = MKMapSnapshotter.Options()
+        opt.mapRect = RouteMap.rect(cs)
+        opt.size = size
+        opt.traitCollection = UITraitCollection(userInterfaceStyle: .dark)
+        opt.pointOfInterestFilter = .excludingAll
+        guard let snap = try? await MKMapSnapshotter(options: opt).start() else { return nil }
+        let r = UIGraphicsImageRenderer(size: size)
+        return r.image { ctx in
+            snap.image.draw(at: .zero)
+            let path = UIBezierPath()
+            for (i, c) in cs.enumerated() {
+                let p: CGPoint = snap.point(for: c)
+                if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
+            }
+            path.lineWidth = max(6, size.width / 120)
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            UIColor(red: 1, green: 230 / 255, blue: 0, alpha: 1).setStroke()
+            path.stroke()
+        }
     }
 }

@@ -121,6 +121,29 @@ struct Program: Codable, Hashable, Identifiable {
     var seq: [ProgItem]
     var meta: String? = nil        // 기본 프로그램 설명 (예: 1 set · about 12 min)
     var quick: Bool = false        // 워치에서 만든 Quick training
+    /// nil = 하이록스 트레이닝 / "hiit" = 고강도 인터벌 / "run" = 러닝 (예전 파일엔 없음)
+    var kind: String? = nil
+    var runKm: Int? = nil          // 러닝 총거리 km (0 = 자유)
+    var indoor: Bool? = nil        // 러닝: 실내(러닝머신)
+
+    var isHIIT: Bool { kind == "hiit" }
+    var isRun: Bool { kind == "run" }
+    var isOpen: Bool { isHIIT || isRun }
+
+    static let runChoices: [Int] = [3, 5, 10, 21, 0]
+    /// "Run 5K" / "Free run" (번역 키)
+    static func runName(_ km: Int) -> String { km > 0 ? "Run \(km)K" : "Free run" }
+
+    static func hiit() -> Program {
+        Program(id: "hiit." + UUID().uuidString.prefix(6), name: "HIIT", sets: 1, seq: [ProgItem(icon: "hiit")],
+                meta: "Intervals · heart rate · calories", kind: "hiit")
+    }
+    static func run(km: Int, indoor: Bool, id: String? = nil) -> Program {
+        Program(id: id ?? ("run." + UUID().uuidString.prefix(6)), name: runName(km), sets: 1,
+                seq: [ProgItem(icon: "run", run: "1KM")],
+                meta: indoor ? "Indoor · 1 km splits" : "Outdoor · 1 km splits",
+                kind: "run", runKm: km, indoor: indoor)
+    }
 
     static func presets() -> [Program] {
         return [
@@ -137,7 +160,7 @@ struct Program: Codable, Hashable, Identifiable {
     /// 아이폰 카드 설명
     var cardMeta: String { meta.map { $0.l10n } ?? watchMeta }
     /// 워치 목록 설명
-    var watchMeta: String { Self.setsText(sets, seq.count) }
+    var watchMeta: String { isOpen ? (meta ?? "").l10n : Self.setsText(sets, seq.count) }
     /// 1 set · 8 segments (번역됨)
     static func setsText(_ sets: Int, _ segs: Int) -> String {
         if sets == 1 { return String(localized: "1 set · \(segs) segments") }
@@ -225,6 +248,12 @@ struct SegResult: Codable, Hashable {
     var dist: Double?          // 러닝 거리(m)
 }
 
+/// 경로 한 점 (위도·경도)
+struct RoutePt: Codable, Hashable {
+    var a: Double   // latitude
+    var o: Double   // longitude
+}
+
 struct HRPoint: Codable, Hashable {
     var t: Int                 // 시작부터 초
     var b: Int                 // bpm
@@ -249,6 +278,15 @@ struct Record: Codable, Hashable, Identifiable {
     var partner: String? = nil // 더블 파트너 닉네임 (@ 없이). 예전 기록엔 없음
     var source: String? = nil  // "phone" = 워치 없이 아이폰으로 기록. nil = 워치
     var complete: Bool? = nil  // 끝까지 다 했는지 (End 로 중간에 끝내면 false). 예전 기록엔 없음 → 구간 수로 판단
+    var endDate: Date? = nil   // 끝난 시각 (예전 기록엔 없음 → date + total)
+    var place: String? = nil   // 동네 이름 "성수동, 서울" (폰에만 저장, 서버로 안 보냄)
+    var route: [RoutePt]? = nil // 실외 러닝 경로 (폰에만)
+    var kind: String? = nil    // "hiit" / "run" (트레이닝 중 HIIT·러닝 카드로 한 것)
+
+    /// 시작–끝
+    var end: Date { endDate ?? date.addingTimeInterval(Double(total)) }
+    var isHIIT: Bool { kind == "hiit" }
+    var isRunKind: Bool { kind == "run" }
 
     /// 러닝·스테이션 16개 (Roxzone 제외)
     var splits16: [Int]? {
@@ -348,11 +386,25 @@ enum SeqBuilder {
         return o
     }
 
+    /// HIIT 라운드 (끝 없이 늘어남, 목표 없음)
+    static func hiitRound(_ n: Int) -> Seg {
+        Seg(icon: "hiit", name: "Round \(n)", detail: "INTERVAL", kind: .st, target: 0)
+    }
+    /// 러닝 1km 구간
+    static func runKm(_ n: Int, target: Int = 0) -> Seg {
+        Seg(icon: "run", name: "KM \(n)", detail: "1KM", kind: .run, target: target)
+    }
+
     /// 기본(워치 ST) 목표 16개
     static var defaultTargets16: [Int] { (0..<8).flatMap { [270, Station.all[$0].target] } }
 
     /// 트레이닝: 순서 × 세트, Roxzone 없음
     static func training(_ p: Program, div: Division, bests: [String: Int]) -> [Seg] {
+        if p.isHIIT { return [hiitRound(1)] }
+        if p.isRun {
+            let n: Int = max(1, p.runKm ?? 0)
+            return (1...n).map { runKm($0, target: bests[SegKey.of(icon: "run", detail: "1KM")] ?? 0) }
+        }
         var o: [Seg] = []
         for _ in 0..<max(1, p.sets) {
             for it in p.seq {

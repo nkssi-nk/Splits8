@@ -381,3 +381,28 @@
 "Check" = "확인 필요";
 "Ended early, so it doesn't count toward your PB." = "중간에 끝낸 기록이라 PB에 넣지 않아요.";
 "Faster than seems possible, so it doesn't count toward your PB. A tap may have been missed." = "가능한 기록보다 너무 빨라서 PB에 넣지 않아요. 구간 넘기기를 잘못 눌렀을 수 있어요.";
+
+/* 빌드 15 */
+"Intervals" = "인터벌";
+"Free run" = "자유 러닝";
+"Run 3K" = "러닝 3K";
+"Run 5K" = "러닝 5K";
+"Run 10K" = "러닝 10K";
+"Run 21K" = "러닝 21K";
+"Intervals · heart rate · calories" = "인터벌 · 심박 · 칼로리";
+"Indoor · 1 km splits" = "실내 · 1km 스플릿";
+"Outdoor · 1 km splits" = "실외 · 1km 스플릿";
+"Indoor" = "실내";
+"High-intensity intervals" = "고강도 인터벌";
+"Distance · 1 km splits" = "총거리 · 1km 스플릿";
+"Save (add to watch list)" = "저장 (워치 목록에 추가)";
+"When a round ends, swipe left or double-tap on the watch → next interval." = "라운드가 끝나면 워치를 왼쪽으로 밀거나 두 번 톡톡 → 다음 인터벌";
+"Saved: time per round · average heart rate · calories" = "저장: 라운드별 시간 · 평균 심박 · 칼로리";
+"DISTANCE" = "총거리";
+"PLACE" = "장소";
+"Outdoor (GPS)" = "실외 (GPS)";
+"Indoor (treadmill)" = "실내 (러닝머신)";
+"Saved: 1 km splits · pace · heart rate · route map outdoors" = "저장: 1km 스플릿 · 페이스 · 심박 · 실외는 지도 경로";
+"Free" = "자유";
+"Auto split every 1 km" = "1km마다 자동으로 넘어가요";
+"Route map" = "경로 지도";

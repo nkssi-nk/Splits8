@@ -235,29 +235,44 @@ struct HistoryCalendar: View {
 
     private var legendModes: [Mode] { mode.map { [$0] } ?? Mode.allCases }
 
+    /// 한 줄에 들어가면 한 줄, 안 들어가면 두 줄 (모드들 / Planned · Race day) — 영어에서 넘치지 않게
     private var legend: some View {
-        HStack(spacing: 12) {
-            ForEach(legendModes) { m in
-                HStack(spacing: 5) {
-                    Circle().fill(Color(hex: m.calendarHex)).frame(width: 7, height: 7)
-                    Text(Self.label(for: m).l10n)
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                legendModeItems
+                legendExtraItems
             }
-            if mode != .race {
-                HStack(spacing: 5) {
-                    Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
-                    Text("Planned")
-                }
-            }
-            if mode == nil || mode == .race {
-                HStack(spacing: 4) {
-                    Glyph("i_race", 10, Self.raceColor)
-                    Text("Race day")
-                }
+            VStack(spacing: 6) {
+                HStack(spacing: 12) { legendModeItems }
+                HStack(spacing: 12) { legendExtraItems }
             }
         }
         .font(F.t(13)).foregroundStyle(C.text2)
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder private var legendModeItems: some View {
+        ForEach(legendModes) { m in
+            HStack(spacing: 5) {
+                Circle().fill(Color(hex: m.calendarHex)).frame(width: 7, height: 7)
+                Text(Self.label(for: m).l10n).lineLimit(1).fixedSize()
+            }
+        }
+    }
+
+    @ViewBuilder private var legendExtraItems: some View {
+        if mode != .race {
+            HStack(spacing: 5) {
+                Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
+                Text("Planned").lineLimit(1).fixedSize()
+            }
+        }
+        if mode == nil || mode == .race {
+            HStack(spacing: 4) {
+                Glyph("i_race", 10, Self.raceColor)
+                Text("Race day").lineLimit(1).fixedSize()
+            }
+        }
     }
 
     // MARK: 데이터
@@ -295,7 +310,7 @@ struct HistoryCalendar: View {
     }
 
     private func recordRow(_ rec: Record, last: Bool) -> some View {
-        let title: String = rec.mode == .training ? "\(rec.title.l10n) × \(rec.sets)" : (rec.mode == .sim ? "Full Simulation" : rec.title.l10n)
+        let title: String = rec.mode == .training ? (rec.kind != nil ? rec.title.l10n : "\(rec.title.l10n) × \(rec.sets)") : (rec.mode == .sim ? "Full Simulation" : rec.title.l10n)
         let sub: String = Fm.wdm.string(from: rec.date) + " · " + Self.timeFmt.string(from: rec.date)
         let from: Scr = backScreen(rec)
         return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec), flag: rec.flag,

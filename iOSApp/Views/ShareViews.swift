@@ -620,6 +620,7 @@ struct ShareView: View {
     @State private var pick: PhotosPickerItem?
     @State private var photo: UIImage?
     @State private var saved = false
+    @State private var mapOn = false           // 실외 러닝: 경로 지도를 배경으로
 
     private var data: ShareData { r.detail.map { ShareData($0, store: store) } ?? ShareData() }
     private var post: Bool { ratio == "post" }
@@ -663,6 +664,19 @@ struct ShareView: View {
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("share.photo")
+        .onChange(of: mapOn) { _, on in
+            if on, let rt = routeOf {
+                Task {
+                    let size = CGSize(width: 1080, height: post ? 1350 : 1920)
+                    if let img = await RouteSnapshot.make(rt, size: size) {
+                        photo = img
+                        mono = false
+                    }
+                }
+            } else if !on {
+                photo = nil
+            }
+        }
         .onChange(of: pick) { _, item in
             Task {
                 if let item, let raw = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: raw) {
@@ -697,8 +711,20 @@ struct ShareView: View {
     }
 
     // 옵션 카드 (radius 14, 줄 최소 48 높이, padding 0 16, 15pt, 줄 사이 1px rgba 255 0.08, 토글 50×30)
+    private var routeOf: [RoutePt]? {
+        guard let rt = r.detail?.route, rt.count >= 2 else { return nil }
+        return rt
+    }
+
     private var optionsCard: some View {
         VStack(spacing: 0) {
+            if routeOf != nil {
+                optionRow(last: false) {
+                    Text("Route map").font(F.t(15))
+                } trailing: {
+                    Toggle8(on: $mapOn, w: 50, h: 30).accessibilityIdentifier("share.map")
+                }
+            }
             optionRow(last: false) {
                 Text("Text color").font(F.t(15))
             } trailing: {

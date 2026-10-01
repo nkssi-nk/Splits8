@@ -13,6 +13,21 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var session: HKWorkoutSession?
     @ObservationIgnored private var builder: HKLiveWorkoutBuilder?
     @ObservationIgnored private let location = CLLocationManager()
+    // HIIT · 러닝 카드 (nil = 하이록스 운동)
+    private(set) var kind: String? = nil
+    @ObservationIgnored private var runKm = 0              // 0 = 자유 러닝
+    @ObservationIgnored private var outdoorRun = false
+    var isHIIT: Bool { kind == "hiit" }
+    var isRunKind: Bool { kind == "run" }
+    /// 끝 없이 늘어나는 운동 (HIIT · 자유 러닝)
+    var growsOpen: Bool { isHIIT || (isRunKind && runKm == 0) }
+    // 동네 이름 · 경로
+    @ObservationIgnored private var place: String?
+    @ObservationIgnored private var placeLookup: PlaceLookup?
+    @ObservationIgnored private var routeLoc: CLLocationManager?
+    @ObservationIgnored private var routeBuilder: HKWorkoutRouteBuilder?
+    @ObservationIgnored private var routePts: [RoutePt] = []
+    @ObservationIgnored private var lastRouteLoc: CLLocation?
 
     var settings = Settings()
 
@@ -53,7 +68,7 @@ final class WorkoutEngine: NSObject {
     // MARK: 권한
 
     func requestAuthorization() {
-        let share: Set<HKSampleType> = [HKObjectType.workoutType()]
+        let share: Set<HKSampleType> = [HKObjectType.workoutType(), HKSeriesType.workoutRoute()]
         let read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned),
                                        HKQuantityType(.distanceWalkingRunning), HKObjectType.workoutType()]
         health.requestAuthorization(toShare: share, read: read) { _, _ in }
@@ -86,8 +101,12 @@ final class WorkoutEngine: NSObject {
 
     // MARK: 시작
 
-    func start(mode: Mode, title: String, sets: Int = 1, seq: [Seg]) {
+    func start(mode: Mode, title: String, sets: Int = 1, seq: [Seg], program: Program? = nil) {
         guard !active else { return }
+        kind = mode == .training ? program?.kind : nil
+        runKm = program?.runKm ?? 0
+        outdoorRun = isRunKind && !(program?.indoor ?? true)
+        place = nil; routePts = []; lastRouteLoc = nil
         self.mode = mode
         self.title = title
         self.sets = sets
@@ -104,9 +123,17 @@ final class WorkoutEngine: NSObject {
         startTick()
 
         let cfg = HKWorkoutConfiguration()
-        cfg.activityType = .running
-        let outdoor = mode != .race && settings.runMode == "outdoor"
-        cfg.locationType = outdoor ? .outdoor : .indoor
+        if isHIIT {
+            cfg.activityType = .highIntensityIntervalTraining
+            cfg.locationType = .indoor
+        } else if isRunKind {
+            cfg.activityType = .running
+            cfg.locationType = outdoorRun ? .outdoor : .indoor
+        } else {
+            cfg.activityType = .running
+            let outdoor = mode != .race && settings.runMode == "outdoor"
+            cfg.locationType = outdoor ? .outdoor : .indoor
+        }
         if let s = try? HKWorkoutSession(healthStore: health, configuration: cfg) {
             let b = s.associatedWorkoutBuilder()
             b.dataSource = HKLiveWorkoutDataSource(healthStore: health, workoutConfiguration: cfg)
@@ -117,6 +144,54 @@ final class WorkoutEngine: NSObject {
             b.beginCollection(withStart: now) { _, _ in }
         }
         WKInterfaceDevice.current().play(.start)
+        startPlaceAndRoute()
+    }
+
+    // MARK: 동네 이름 · 경로 (실외 러닝)
+
+    private func startPlaceAndRoute() {
+        if outdoorRun {
+            routeBuilder = HKWorkoutRouteBuilder(healthStore: health, device: nil)
+            let m = CLLocationManager()
+            m.delegate = self
+            m.desiredAccuracy = kCLLocationAccuracyBest
+            m.activityType = .fitness
+            m.distanceFilter = 5
+            m.startUpdatingLocation()
+            routeLoc = m
+        } else {
+            let p = PlaceLookup()
+            placeLookup = p
+            p.fetch { [weak self] name in self?.place = name; self?.placeLookup = nil }
+        }
+    }
+
+    private func stopRoute(workout: HKWorkout?) {
+        routeLoc?.stopUpdatingLocation()
+        routeLoc?.delegate = nil
+        routeLoc = nil
+        if let w = workout, let rb = routeBuilder, !routePts.isEmpty {
+            rb.finishRoute(with: w, metadata: nil) { _, _ in }
+        }
+        routeBuilder = nil
+    }
+
+    fileprivate func gotLocations(_ locs: [CLLocation]) {
+        guard active, !finished else { return }
+        let good: [CLLocation] = locs.filter { $0.horizontalAccuracy > 0 && $0.horizontalAccuracy <= 30 }
+        guard !good.isEmpty else { return }
+        if running { routeBuilder?.insertRouteData(good) { _, _ in } }
+        if place == nil, placeLookup == nil, let first = good.first {
+            let p = PlaceLookup()
+            placeLookup = p
+            p.name(for: first) { [weak self] name in self?.place = name; self?.placeLookup = nil }
+        }
+        guard running else { return }
+        for l in good {
+            if let prev = lastRouteLoc, l.distance(from: prev) < 8 { continue }
+            lastRouteLoc = l
+            routePts.append(RoutePt(a: l.coordinate.latitude, o: l.coordinate.longitude))
+        }
     }
 
     // MARK: 진행
@@ -124,8 +199,16 @@ final class WorkoutEngine: NSObject {
     /// 다음 구간 (왼쪽 스와이프 · 더블탭 · Next)
     func advance() {
         guard active, !finished, running else { return }
+        if isRunKind && !outdoorRun && distance <= 0 {
+            // 실내 러닝인데 워치 거리값이 없으면 손으로 1km 넘김
+        } else if isRunKind {
+            return                                    // 러닝은 1km마다 자동으로 넘어감
+        }
         let now = Date()
         closeSeg(now)
+        if splits.count >= seq.count && (isHIIT || (isRunKind && runKm == 0)) {
+            growSeq()
+        }
         if splits.count >= seq.count {
             finish(now, complete: true)
         } else {
@@ -134,6 +217,31 @@ final class WorkoutEngine: NSObject {
             segDistStart = distance
             advanceCount += 1
             // 다음 구간 알림: .click 은 너무 약해서 운동 중에는 느껴지지 않음
+            WKInterfaceDevice.current().play(.notification)
+        }
+    }
+
+    /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
+    private func growSeq() {
+        let n: Int = seq.count + 1
+        seq.append(isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n))
+        segHR.append([])
+        segDists.append(nil)
+    }
+
+    /// 러닝: 1km 넘으면 자동으로 다음 km (총거리 다 뛰면 끝)
+    private func autoSplitIfNeeded() {
+        guard isRunKind, active, !finished, running, segDist >= 1000 else { return }
+        let now = Date()
+        closeSeg(now)
+        if runKm == 0 && splits.count >= seq.count { growSeq() }
+        if splits.count >= seq.count {
+            finish(now, complete: true)
+        } else {
+            idx = splits.count
+            segStart = now; segPaused = 0
+            segDistStart = distance
+            advanceCount += 1
             WKInterfaceDevice.current().play(.notification)
         }
     }
@@ -156,7 +264,9 @@ final class WorkoutEngine: NSObject {
         if !running { togglePause() }
         let now = Date()
         closeSeg(now)
-        finish(now, complete: splits.count >= seq.count)   // 마지막 구간에서 End 눌러도 다 한 것
+        // HIIT·자유 러닝은 끝이 없으니 End 가 정상 종료. 그 외는 마지막 구간에서 End 눌러도 다 한 것
+        let open: Bool = isHIIT || (isRunKind && runKm == 0)
+        finish(now, complete: open || splits.count >= seq.count)
     }
 
     func reset() {
@@ -220,11 +330,16 @@ final class WorkoutEngine: NSObject {
         }
         let total = splits.reduce(0, +)
         let tg = seq.prefix(splits.count).map(\.target).reduce(0, +)
-        return Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: hrSamples,
-                      kcal: Int(kcal.rounded()), avgHR: bpms.isEmpty ? 0 : bpms.reduce(0, +) / bpms.count,
-                      maxHR: bpms.max() ?? 0, division: settings.div.name,
-                      goal: mode == .race ? settings.goalTime : nil,
-                      vsWord: deltaWord, vsTarget: tg, complete: complete)
+        var r = Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: hrSamples,
+                       kcal: Int(kcal.rounded()), avgHR: bpms.isEmpty ? 0 : bpms.reduce(0, +) / bpms.count,
+                       maxHR: bpms.max() ?? 0, division: settings.div.name,
+                       goal: mode == .race ? settings.goalTime : nil,
+                       vsWord: deltaWord, vsTarget: kind == nil ? tg : nil, complete: complete)
+        r.endDate = startDate.addingTimeInterval(Double(total))
+        r.place = place
+        r.kind = kind
+        if outdoorRun && routePts.count >= 2 { r.route = routePts }
+        return r
     }
 
     private func finish(_ now: Date, complete: Bool) {
@@ -237,7 +352,12 @@ final class WorkoutEngine: NSObject {
 
         session?.end()
         let b = builder
-        b?.endCollection(withEnd: now) { _, _ in b?.finishWorkout { _, _ in } }
+        b?.endCollection(withEnd: now) { _, _ in
+            b?.finishWorkout { w, _ in
+                DispatchQueue.main.async { self.stopRoute(workout: w) }
+            }
+        }
+        if b == nil { stopRoute(workout: nil) }
     }
 
     /// 화면 캡처용: 건강 앱·타이머 없이 운동 중 / 요약 상태를 만든다 (--shot)
@@ -308,7 +428,17 @@ final class WorkoutEngine: NSObject {
         hrSamples.append(HRPoint(t: t, b: Int(v.rounded())))
     }
     fileprivate func gotEnergy(_ v: Double) { kcal = v }
-    fileprivate func gotDistance(_ v: Double) { distance = v }
+    fileprivate func gotDistance(_ v: Double) {
+        distance = v
+        autoSplitIfNeeded()
+    }
+}
+
+extension WorkoutEngine: CLLocationManagerDelegate {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        DispatchQueue.main.async { self.gotLocations(locations) }
+    }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
 }
 
 extension WorkoutEngine: HKWorkoutSessionDelegate {

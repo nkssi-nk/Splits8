@@ -175,7 +175,7 @@ struct WLive: View {
     private func totalBlock(now: Date) -> some View {
         VStack(spacing: 4) {
             Text("TOTAL")
-                .font(F.t(9, .semibold)).tracking(1.08)
+                .font(F.t(12, .semibold)).tracking(1.08)
                 .foregroundStyle(C.text2)
             Text(Fm.t(engine.total(now)))
                 .font(F.num(m.totalFont)).tracking(-0.02 * m.totalFont)
@@ -218,15 +218,15 @@ struct WLive: View {
             }
             .frame(height: m.icon)
             Text(cur.name)
-                .font(F.t(14, .semibold))
+                .font(F.t(16, .semibold))
                 .foregroundStyle(fg)
-                .lineLimit(1)
+                .lineLimit(1).minimumScaleFactor(0.85)
                 .padding(.top, m.nameTop)
             Text(detailLine(cur: cur, el: el))
-                .font(cur.icon == "run" ? F.num(11, .medium) : F.t(11, .medium))
+                .font(cur.icon == "run" ? F.num(13, .medium) : F.t(13, .medium))
                 .foregroundStyle(C.text2)
                 .lineLimit(1).minimumScaleFactor(0.8)
-                .frame(height: 15)
+                .frame(height: 18)
                 .padding(.top, 3)
         }
         .frame(maxWidth: .infinity)
@@ -249,24 +249,33 @@ struct WLive: View {
         return "\(total / 60):" + String(format: "%02d", total % 60)
     }
 
-    private var isLast: Bool { engine.idx >= engine.seq.count - 1 }
+    private var isLast: Bool { engine.idx >= engine.seq.count - 1 && !engine.growsOpen }
+
+    /// 다음 구간 (HIIT·자유 러닝은 아직 순서에 없는 다음 라운드/km)
+    private var nextSeg: Seg {
+        if engine.growsOpen && engine.idx >= engine.seq.count - 1 {
+            let n: Int = engine.seq.count + 1
+            return engine.isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n)
+        }
+        return engine.next
+    }
 
     /// NEXT + 다음 아이콘 22 + 이름 14 (탭 = 다음 구간)
     private var nextRow: some View {
-        let nx: Seg = engine.next
+        let nx: Seg = nextSeg
         return Button(action: next) {
             HStack(spacing: 8) {
                 Text("NEXT")
-                    .font(F.t(10, .semibold)).tracking(0.8)
+                    .font(F.t(13, .semibold)).tracking(0.8)
                     .foregroundStyle(C.text3)
                 if isLast {
                     Icon8("i_check", 22, C.d1)
                     Text("Finish")
-                        .font(F.t(14, .semibold)).foregroundStyle(C.d1).lineLimit(1)
+                        .font(F.t(16, .semibold)).foregroundStyle(C.d1).lineLimit(1).minimumScaleFactor(0.85)
                 } else {
                     Icon8(nx.icon, 22, tint: nx.kind == .rox ? .mute : .yellow)
                     Text(nx.name)
-                        .font(F.t(14, .semibold)).foregroundStyle(C.d1).lineLimit(1)
+                        .font(F.t(16, .semibold)).foregroundStyle(C.d1).lineLimit(1).minimumScaleFactor(0.85)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -321,7 +330,7 @@ struct WControls: View {
                 .padding(.vertical, 10)
                 .frame(maxHeight: .infinity)
                 Text("‹ Swipe left to go back")
-                    .font(F.t(10)).foregroundStyle(C.text3)
+                    .font(F.t(13)).foregroundStyle(C.text3)
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
             .padding(.top, 24).padding(.horizontal, 18).padding(.bottom, 16)
@@ -334,9 +343,9 @@ struct WControls: View {
 
     private func header(now: Date) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(engine.mode.name.l10n).font(F.t(11, .semibold)).foregroundStyle(C.accent).lineLimit(1)
+            Text(engine.mode.name.l10n).font(F.t(13, .semibold)).foregroundStyle(C.accent).lineLimit(1).minimumScaleFactor(0.85)
             Spacer(minLength: 4)
-            Text(Fm.t(engine.total(now))).font(F.num(13)).lineLimit(1)
+            Text(Fm.t(engine.total(now))).font(F.num(15)).lineLimit(1).minimumScaleFactor(0.85)
         }
         .padding(.horizontal, 2)
     }
@@ -363,7 +372,7 @@ struct WControls: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Icon8(glyph, glyphSize, fg)
-                Text(label.l10n).font(F.t(15, .semibold)).foregroundStyle(fg).lineLimit(1)
+                Text(label.l10n).font(F.t(16, .semibold)).foregroundStyle(fg).lineLimit(1).minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(bg, in: Capsule())
@@ -405,10 +414,10 @@ struct WSegmentList: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("SEGMENTS").font(F.t(10, .semibold)).tracking(1).foregroundStyle(C.accent)
+            Text("SEGMENTS").font(F.t(13, .semibold)).tracking(1).foregroundStyle(C.accent)
             Spacer(minLength: 0)
             Text("\(min(engine.idx + 1, engine.seq.count))/\(engine.seq.count)")
-                .font(F.num(10, .regular)).foregroundStyle(C.text2)
+                .font(F.num(13, .regular)).foregroundStyle(C.text2)
         }
         .padding(.horizontal, 8).padding(.bottom, 6)
     }
@@ -416,7 +425,7 @@ struct WSegmentList: View {
     private func rowTime(_ i: Int, _ s: Seg, now: Date) -> String {
         if i < engine.idx { return Fm.t(engine.splits.indices.contains(i) ? engine.splits[i] : 0) }
         if i == engine.idx { return Fm.t(engine.segEl(now)) }
-        return Fm.t(s.target)
+        return s.target > 0 ? Fm.t(s.target) : "–"
     }
 
     private func row(_ i: Int, _ s: Seg, now: Date) -> some View {
@@ -428,14 +437,14 @@ struct WSegmentList: View {
         let timeColor: Color = c ? Color.black : d ? Color.white : C.text3
         return HStack(spacing: 7) {
             Icon8(s.icon, 13, tint: tint)
-            Text(s.name).font(F.t(11, c ? .semibold : .regular))
-                .foregroundStyle(nameColor).lineLimit(1)
+            Text(s.name).font(F.t(13, c ? .semibold : .regular))
+                .foregroundStyle(nameColor).lineLimit(1).minimumScaleFactor(0.85)
             Spacer(minLength: 0)
             if d {
                 Icon8("i_check", 10, C.good)
             }
-            Text(rowTime(i, s, now: now)).font(F.num(11, .medium))
-                .foregroundStyle(timeColor).lineLimit(1)
+            Text(rowTime(i, s, now: now)).font(F.num(13, .medium))
+                .foregroundStyle(timeColor).lineLimit(1).minimumScaleFactor(0.85)
         }
         .padding(.vertical, 6).padding(.horizontal, 8)
         .background(c ? C.accent : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -451,9 +460,10 @@ struct WEndSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("End workout?").font(F.t(15, .semibold))
-            Text("\(engine.idx)/\(engine.seq.count) segments done. The rest won't be recorded.")
-                .font(F.t(11)).foregroundStyle(C.text2).lineSpacing(3)
+            Text("End workout?").font(F.t(16, .semibold))
+            Text(engine.growsOpen ? String(localized: "Everything so far will be saved.")
+                                  : String(localized: "\(engine.idx)/\(engine.seq.count) segments done. The rest won't be recorded."))
+                .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             sheetButton("End", fg: .black, bg: C.bad, action: onEnd)
@@ -469,7 +479,7 @@ struct WEndSheet: View {
 
     private func sheetButton(_ t: String, fg: Color, bg: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(t.l10n).font(F.t(12, .semibold)).foregroundStyle(fg)
+            Text(t.l10n).font(F.t(14, .semibold)).foregroundStyle(fg)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
@@ -502,17 +512,20 @@ struct WSummary: View {
 
     private func head(_ r: Record) -> some View {
         let tg: Int = r.vsTarget ?? r.total
+        let showVs: Bool = r.vsTarget != nil
         return VStack(spacing: 0) {
-            Text(String(localized: "\(r.mode.name.l10n) complete")).font(F.t(11, .semibold)).foregroundStyle(C.accent).lineLimit(1)
+            Text(String(localized: "\(r.mode.name.l10n) complete")).font(F.t(13, .semibold)).foregroundStyle(C.accent).lineLimit(1).minimumScaleFactor(0.85)
             Text(Fm.t(r.total)).font(F.num(32)).tracking(-0.96)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .padding(.top, 4)
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(Fm.d(r.total - tg)).font(F.num(13))
-                    .foregroundStyle(r.total > tg ? C.bad : C.good)
-                Text(r.vsWord.l10n).font(F.t(8, .semibold)).tracking(0.8).foregroundStyle(C.text2)
+            if showVs {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(Fm.d(r.total - tg)).font(F.num(15))
+                        .foregroundStyle(r.total > tg ? C.bad : C.good)
+                    Text(r.vsWord.l10n).font(F.t(12, .semibold)).tracking(0.8).foregroundStyle(C.text2)
+                }
+                .padding(.top, 2)
             }
-            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)
@@ -533,9 +546,9 @@ struct WSummary: View {
             ForEach(Array(r.segs.filter { $0.kind != .rox }.enumerated()), id: \.offset) { _, s in
                 HStack(spacing: 7) {
                     Icon8(s.icon, 12, tint: .yellow)
-                    Text(s.name).font(F.t(11)).lineLimit(1)
+                    Text(s.name).font(F.t(13)).lineLimit(1).minimumScaleFactor(0.85)
                     Spacer(minLength: 0)
-                    Text(Fm.t(s.time)).font(F.num(11, .medium)).lineLimit(1)
+                    Text(Fm.t(s.time)).font(F.num(13, .medium)).lineLimit(1).minimumScaleFactor(0.85)
                 }
                 .padding(.vertical, 4).padding(.horizontal, 10)
             }
@@ -549,7 +562,7 @@ struct WSummary: View {
             engine.reset()
             WNav.shared.screen = .home
         } label: {
-            Text("Done").font(F.t(12, .semibold)).foregroundStyle(.black)
+            Text("Done").font(F.t(14, .semibold)).foregroundStyle(.black)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(C.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
@@ -559,8 +572,8 @@ struct WSummary: View {
 
     private func stat(_ l: String, _ v: String, _ c: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(l.l10n).font(F.t(8, .semibold)).tracking(0.64).foregroundStyle(C.text2)
-            Text(v).font(F.num(13)).foregroundStyle(c).lineLimit(1)
+            Text(l.l10n).font(F.t(12, .semibold)).tracking(0.64).foregroundStyle(C.text2)
+            Text(v).font(F.num(15)).foregroundStyle(c).lineLimit(1).minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

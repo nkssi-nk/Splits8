@@ -11,9 +11,9 @@ struct TrainingView: View {
             newButton
             if let f = store.friend { friendCard(f) }
             ForEach(store.programs) { p in
-                SwipeDelete(corner: 20, press: true, alertTitle: "Delete this training?",
+                SwipeDelete(corner: 20, press: true, menu: false, alertTitle: "Delete this training?",
                             alertMessage: "Records you've done with it stay in History.",
-                            onTap: { r.edit(p) },
+                            onTap: { if p.isOpen { r.bonus = BonusRequest(kind: p.kind ?? "run", existing: p) } else { r.edit(p) } },
                             onDelete: { store.deleteProgram(p.id) }) {
                     ProgramCard(p: p)
                 }
@@ -63,7 +63,7 @@ struct TrainingView: View {
         if !recs.isEmpty {
             VStack(spacing: 0) {
                 ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                    HistoryRow(title: "\(rec.title.l10n) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
+                    HistoryRow(title: rec.kind != nil ? rec.title.l10n : "\(rec.title.l10n) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
                                time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
                                onDelete: { store.delete(rec) }) { r.open(rec, from: .training) }
                 }
@@ -85,9 +85,19 @@ struct ProgramCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
-            LazyVGrid(columns: cols, spacing: 6) {
-                ForEach(Array(p.seq.enumerated()), id: \.offset) { _, it in
-                    chip(it)
+            if p.isOpen {
+                // HIIT · 러닝: 칩 대신 아이콘 하나
+                HStack(spacing: 8) {
+                    Icon8(p.isHIIT ? "hiit" : "run", 18, tint: .yellow)
+                    Text(openLine).font(F.t(13, .semibold)).foregroundStyle(C.d1).lineLimit(1)
+                }
+                .padding(.horizontal, 10).frame(height: 34)
+                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+                LazyVGrid(columns: cols, spacing: 6) {
+                    ForEach(Array(p.seq.enumerated()), id: \.offset) { _, it in
+                        chip(it)
+                    }
                 }
             }
         }
@@ -95,6 +105,14 @@ struct ProgramCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .card8()
         .contentShape(Rectangle())
+    }
+
+    /// HIIT: "Intervals" / 러닝: "5 KM · Outdoor"
+    private var openLine: String {
+        if p.isHIIT { return "Intervals".l10n }
+        let km: Int = p.runKm ?? 0
+        let d: String = km > 0 ? "\(km) KM" : "Free run".l10n
+        return d + " · " + ((p.indoor ?? false) ? "Indoor" : "Outdoor").l10n
     }
 
     private var header: some View {
@@ -204,6 +222,8 @@ struct BuilderView: View {
     @State private var dragY: CGFloat = 0
     @State private var dragTo: Int = 0
     @State private var rowH: CGFloat = 58
+    /// 방금 누른 버튼 (노란 테두리 반짝)
+    @State private var flashKey: String? = nil
 
     var body: some View {
         VStack(spacing: 22) {
@@ -227,6 +247,10 @@ struct BuilderView: View {
             sequenceSection
             setsCard
 
+            if r.editId == nil {
+                bonusCards
+            }
+
             if let id = r.editId {
                 Button {
                     store.deleteProgram(id)
@@ -243,6 +267,36 @@ struct BuilderView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: HIIT · 러닝 카드 (새로 만들 때만, 맨 아래)
+
+    private var bonusCards: some View {
+        HStack(spacing: 10) {
+            bonusCard(kind: "hiit", icon: "hiit", title: "HIIT", sub: "High-intensity intervals")
+            bonusCard(kind: "run", icon: "run", title: "Running", sub: "Distance · 1 km splits")
+        }
+        .padding(.top, 8)
+    }
+
+    private func bonusCard(kind: String, icon: String, title: String, sub: String) -> some View {
+        Button { r.bonus = BonusRequest(kind: kind) } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    Icon8(icon, 28, tint: .yellow)
+                    Spacer(minLength: 0)
+                    Chevron8()
+                }
+                Text(title.l10n).font(F.t(17, .semibold)).lineLimit(1).padding(.top, 12)
+                Text(sub.l10n).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 3)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card8()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(Press())
+        .accessibilityIdentifier("builder.bonus." + kind)
+    }
+
     // MARK: RUN
 
     private var runSection: some View {
@@ -250,12 +304,13 @@ struct BuilderView: View {
             Label8("RUN").padding(.horizontal, 4)
             LazyVGrid(columns: cols, spacing: 8) {
                 ForEach(Defaults.runs, id: \.self) { d in
-                    Button { add(ProgItem(icon: "run", run: d)) } label: {
+                    Button { add(ProgItem(icon: "run", run: d), key: "run|" + d) } label: {
                         Text(d).font(F.num(15)).foregroundStyle(.white)
                             .frame(maxWidth: .infinity).frame(height: 46)
                             .card8(12)
+                            .modifier(TapMark(count: count(run: d), flash: flashKey == "run|" + d, radius: 12))
                     }
-                    .buttonStyle(Press(scale: 0.95))
+                    .buttonStyle(TileTap(radius: 12))
                     .accessibilityIdentifier("builder.run." + d)
                 }
             }
@@ -269,8 +324,11 @@ struct BuilderView: View {
             Label8("STATIONS").padding(.horizontal, 4)
             LazyVGrid(columns: cols, spacing: 8) {
                 ForEach(Station.all, id: \.key) { s in
-                    Button { add(ProgItem(icon: s.key)) } label: { stationTile(s) }
-                        .buttonStyle(Press(scale: 0.95))
+                    Button { add(ProgItem(icon: s.key), key: s.key) } label: {
+                        stationTile(s)
+                            .modifier(TapMark(count: count(station: s.key), flash: flashKey == s.key, radius: 16))
+                    }
+                        .buttonStyle(TileTap(radius: 16))
                         .accessibilityIdentifier("builder.st." + s.key)
                 }
             }
@@ -443,10 +501,23 @@ struct BuilderView: View {
 
     // MARK: 동작
 
-    private func add(_ it: ProgItem) {
-        guard r.draftSeq.count < Self.maxSeq else { return }
+    /// 버튼 눌러 추가: 가벼운 진동 + 노란 테두리 0.3초. 16구간 꽉 차면 추가 안 하고 다른 진동
+    private func add(_ it: ProgItem, key: String) {
+        guard r.draftSeq.count < Self.maxSeq else {
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            return
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         withAnimation(.easeOut(duration: 0.15)) { r.draftSeq.append(it) }
+        flashKey = key
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if flashKey == key { withAnimation(.easeOut(duration: 0.25)) { flashKey = nil } }
+        }
     }
+
+    /// 순서에 몇 번 들어갔는지 (버튼 오른쪽 위 숫자)
+    private func count(run d: String) -> Int { r.draftSeq.filter { $0.icon == "run" && ($0.run ?? "1KM") == d }.count }
+    private func count(station k: String) -> Int { r.draftSeq.filter { $0.icon == k }.count }
 
     private func remove(_ i: Int) {
         guard r.draftSeq.indices.contains(i) else { return }
@@ -520,5 +591,51 @@ struct EmptyHistory: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22).padding(.horizontal, 18)
         .card8()
+    }
+}
+
+
+// MARK: - 트레이닝 만들기 버튼 눌림 표시
+
+/// 누르는 동안: 살짝 작아지고 배경이 조금 밝아짐
+struct TileTap: ButtonStyle {
+    var radius: CGFloat
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.07 : 0))
+                    .allowsHitTesting(false)
+            }
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
+/// 추가 직후 노란 테두리 + 오른쪽 위 숫자 (순서에 들어간 횟수)
+struct TapMark: ViewModifier {
+    let count: Int
+    let flash: Bool
+    let radius: CGFloat
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(C.accent, lineWidth: 1.5)
+                    .opacity(flash ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
+            .overlay(alignment: .topTrailing) {
+                if count > 0 {
+                    Text("\(count)").font(F.num(12, .bold)).foregroundStyle(.black)
+                        .padding(.horizontal, 5)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(C.accent, in: Capsule())
+                        .padding(5)
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: count)
     }
 }

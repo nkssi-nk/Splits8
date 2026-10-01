@@ -210,7 +210,7 @@ final class Store: NSObject, WCSessionDelegate {
     /// ★ PB: 같은 종류(트레이닝은 같은 이름·세트 수, Full Sim·Race는 각각 전체) 중 가장 빠른 기록.
     /// 비교할 기록이 2개 이상일 때만 표시 (하나뿐이면 PB 표시 없음). 저장·삭제하면 자동으로 다시 계산됨.
     func isPB(_ r: Record) -> Bool {
-        guard r.counts else { return false }
+        guard r.counts, !r.isHIIT else { return false }      // HIIT 는 PB 없음
         let same: [Record] = pbGroup(r)
         guard same.count >= 2, let best = same.min(by: { $0.total < $1.total }) else { return false }
         return best.id == r.id

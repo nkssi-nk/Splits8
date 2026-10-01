@@ -55,6 +55,13 @@ struct PlanRequest: Equatable {
 }
 
 /// 아이폰으로 기록 시작 요청
+/// HIIT · 러닝 설정 시트 (새로 만들기 / 저장된 것 편집)
+struct BonusRequest: Identifiable, Equatable {
+    let id = UUID()
+    var kind: String            // "hiit" / "run"
+    var existing: Program? = nil
+}
+
 struct PhoneRunRequest: Equatable {
     var mode: Mode
     var program: Program? = nil        // 트레이닝이면 프로그램
@@ -90,6 +97,9 @@ final class Router {
 
     // 사진 크게 보기 (nil 이면 닫힘)
     var photoView: PhotoItem? = nil
+
+    // HIIT · 러닝 설정 시트 (nil 이면 닫힘)
+    var bonus: BonusRequest? = nil
 
     // 아이폰으로 기록
     var phoneRun: PhoneRunRequest? = nil
@@ -302,6 +312,12 @@ struct PhoneRoot: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: r.photoView)
+        .sheet(item: Binding(get: { r.bonus }, set: { r.bonus = $0 })) { req in
+            BonusSheet(req: req)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Color(hex: 0x1C1C1E))
+                .preferredColorScheme(.dark)
+        }
         .sheet(isPresented: Binding(get: { r.planRequest != nil }, set: { if !$0 { r.planRequest = nil } })) {
             if let req = r.planRequest {
                 PlanSheet(request: req)

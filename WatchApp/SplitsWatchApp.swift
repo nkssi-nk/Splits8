@@ -79,8 +79,8 @@ struct WBackHeader<Trailing: View>: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("w.back")
             Text(title.l10n)
-                .font(F.t(14, .semibold))
-                .lineLimit(1)
+                .font(F.t(16, .semibold))
+                .lineLimit(1).minimumScaleFactor(0.85)
             Spacer(minLength: 0)
             trailing
         }
@@ -201,9 +201,9 @@ struct WHome: View {
             WModeIcon(mode: m)
             VStack(alignment: .leading, spacing: 2) {
                 // v4: 12pt 한 줄, 말줄임 없음 (좁은 41mm/40mm 에서는 글자를 살짝 줄여서 다 보이게)
-                Text(m.name.l10n).font(F.t(12, .semibold)).tracking(-0.24)
-                    .lineLimit(1).allowsTightening(true).minimumScaleFactor(0.6)
-                Text(desc(m)).font(F.t(10, .medium)).foregroundStyle(C.text2).lineLimit(1)
+                Text(m.name.l10n).font(F.t(14, .semibold)).tracking(-0.24)
+                    .lineLimit(1).minimumScaleFactor(0.85).allowsTightening(true).minimumScaleFactor(0.6)
+                Text(desc(m)).font(F.t(13, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
             }
             .layoutPriority(1)
             Spacer(minLength: 0)
@@ -241,7 +241,7 @@ struct WPrograms: View {
                                 .buttonStyle(.plain)
                         }
                         Text("Edit names on iPhone")
-                            .font(F.t(9)).foregroundStyle(C.text3)
+                            .font(F.t(12)).foregroundStyle(C.text3)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 4)
                     }
@@ -256,7 +256,7 @@ struct WPrograms: View {
     private var quickCard: some View {
         Button { nav.quick = []; nav.screen = .quick } label: {
             HStack {
-                Text("Quick training").font(F.t(13, .semibold))
+                Text("Quick training").font(F.t(15, .semibold))
                 Spacer(minLength: 0)
                 Icon8("i_plus", 14, .black)
             }
@@ -270,8 +270,8 @@ struct WPrograms: View {
 
     private func programCard(_ p: Program) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(p.name.l10n).font(F.t(13, .semibold)).lineLimit(1)
-            Text(p.watchMeta).font(F.t(10)).foregroundStyle(C.text2).lineLimit(1)
+            Text(p.name.l10n).font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.85)
+            Text(p.watchMeta).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 10).padding(.horizontal, 12)
@@ -312,7 +312,7 @@ struct WQuick: View {
             if !nav.quick.isEmpty {
                 Button("Clear") { nav.quick = [] }
                     .buttonStyle(.plain)
-                    .font(F.t(10, .semibold)).foregroundStyle(C.bad)
+                    .font(F.t(13, .semibold)).foregroundStyle(C.bad)
             }
         }
         .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 6)
@@ -327,7 +327,7 @@ struct WQuick: View {
         LazyVGrid(columns: cols, spacing: 5) {
             ForEach(Defaults.runs, id: \.self) { r in
                 Button { add(ProgItem(icon: "run", run: r)) } label: {
-                    Text(r).font(F.t(10, .semibold)).lineLimit(1)
+                    Text(r).font(F.t(13, .semibold)).lineLimit(1).minimumScaleFactor(0.85)
                         .frame(maxWidth: .infinity).frame(height: 30)
                         .wCard(9)
                 }
@@ -350,7 +350,7 @@ struct WQuick: View {
         VStack(spacing: 2) {
             Icon8(s.key, 20, tint: .yellow)
             Text(shortName(s.name))
-                .font(F.t(8, .semibold)).foregroundStyle(C.text2)
+                .font(F.t(12, .semibold)).foregroundStyle(C.text2)
                 .lineLimit(1).minimumScaleFactor(0.75)
                 .padding(.horizontal, 1)
         }
@@ -366,7 +366,7 @@ struct WQuick: View {
     private var sequence: some View {
         WFlow(spacing: 3) {
             if nav.quick.isEmpty {
-                Text("Tap to add").font(F.t(9)).foregroundStyle(C.text3)
+                Text("Tap to add").font(F.t(12)).foregroundStyle(C.text3)
             }
             ForEach(Array(nav.quick.enumerated()), id: \.offset) { _, q in
                 chip(q)
@@ -379,7 +379,7 @@ struct WQuick: View {
     private func chip(_ q: ProgItem) -> some View {
         HStack(spacing: 2) {
             Icon8(q.icon, 9, tint: q.icon == "run" ? .white : .yellow)
-            Text(chipLabel(q)).font(F.t(8, .semibold)).lineLimit(1)
+            Text(chipLabel(q)).font(F.t(12, .semibold)).lineLimit(1).minimumScaleFactor(0.85)
         }
         .padding(.vertical, 2).padding(.horizontal, 5)
         .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -391,7 +391,7 @@ struct WQuick: View {
             nav.program = p; nav.quick = []; nav.screen = .confirm
         } label: {
             Text("Start · \(nav.quick.count)/\(maxSegs) segments")
-                .font(F.t(14, .semibold)).foregroundStyle(.black)
+                .font(F.t(16, .semibold)).foregroundStyle(.black)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(C.accent, in: Capsule())
@@ -432,7 +432,9 @@ struct WConfirm: View {
                 })
                 .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 2)
 
-                if mode == .training {
+                if mode == .training && program.isOpen {
+                    openInfo
+                } else if mode == .training {
                     trainingList
                 } else if noEvent {
                     emptyRace
@@ -450,7 +452,7 @@ struct WConfirm: View {
     private var trainingList: some View {
         VStack(spacing: 0) {
             Text(String(localized: "\(seq.count) segments") + " · " + setsLabel)
-                .font(F.t(10, .medium)).foregroundStyle(C.text2)
+                .font(F.t(13, .medium)).foregroundStyle(C.text2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20).padding(.bottom, 8)
             ScrollView {
@@ -473,19 +475,31 @@ struct WConfirm: View {
     private func previewRow(_ s: Seg) -> some View {
         HStack(spacing: 8) {
             Icon8(s.icon, 14, tint: .yellow)
-            Text(s.name).font(F.t(12)).lineLimit(1)
+            Text(s.name).font(F.t(14)).lineLimit(1).minimumScaleFactor(0.85)
             Spacer(minLength: 0)
-            Text(Fm.t(s.target)).font(F.num(12, .medium)).foregroundStyle(C.text2).lineLimit(1)
+            Text(Fm.t(s.target)).font(F.num(14, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
         }
         .padding(.vertical, 5).padding(.horizontal, 4)
         .overlay(alignment: .bottom) { Rectangle().fill(Color(hex: 0x161616)).frame(height: 1) }
     }
 
+    /// HIIT · 러닝: 이름 + 한 줄 설명
+    private var openInfo: some View {
+        VStack(spacing: 6) {
+            Icon8(program.isHIIT ? "hiit" : "run", 30, tint: .yellow)
+            Text(program.name.l10n).font(F.t(18, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+            Text((program.meta ?? "").l10n).font(F.t(15)).foregroundStyle(C.text2)
+                .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85)
+        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var emptyRace: some View {
         VStack(spacing: 6) {
-            Text("No race set up").font(F.t(14, .semibold)).tracking(-0.14)
+            Text("No race set up").font(F.t(16, .semibold)).tracking(-0.14)
             Text("Add a race in the Race tab of the iPhone app and it will show up here.")
-                .font(F.t(10)).foregroundStyle(C.text2).lineSpacing(4)
+                .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(4)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 24)
@@ -497,9 +511,9 @@ struct WConfirm: View {
             Text(mode == .race ? ev.name : "Full Simulation".l10n)
                 .font(F.t(18, .semibold)).tracking(-0.36)
                 .multilineTextAlignment(.center).lineLimit(2)
-            Text(small).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
-            Text(goal).font(F.num(30)).tracking(-0.6).lineLimit(1).padding(.top, 8)
-            Text(mode == .race ? "GOAL" : "BEST").font(F.t(9, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+            Text(small).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+            Text(goal).font(F.num(30)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 8)
+            Text(mode == .race ? "GOAL" : "BEST").font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -507,7 +521,7 @@ struct WConfirm: View {
 
     private var startButton: some View {
         Button { start() } label: {
-            Text("Start").font(F.t(12, .semibold)).foregroundStyle(.black)
+            Text("Start").font(F.t(14, .semibold)).foregroundStyle(.black)
                 .frame(maxWidth: .infinity).frame(height: mode == .training ? 36 : 44)
                 .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
@@ -537,6 +551,7 @@ struct WConfirm: View {
         case .race: title = ev.name
         }
         engine.settings = store.settings
-        engine.start(mode: mode, title: title, sets: mode == .training ? program.sets : 1, seq: seq)
+        engine.start(mode: mode, title: title, sets: mode == .training ? program.sets : 1, seq: seq,
+                     program: mode == .training ? program : nil)
     }
 }

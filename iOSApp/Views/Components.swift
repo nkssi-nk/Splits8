@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // 시안 v3 (design_handoff_splits8/design/SplitsPhone.dc.html) 공통 부품.
 // 글자 크기는 11 · 13 · 15 · 17 · 20 · 28 · 44 만 씁니다 (예외: 큰 제목 34, 레이스 52). 굵기는 400/500/600, 워드마크만 800.
@@ -505,7 +506,7 @@ struct SwipeDelete<Content: View>: View {
             tapArea.offset(x: offset)
         }
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-        .simultaneousGesture(swipe)
+        .modifier(SwipeGesture(onChanged: dragChanged, onEnded: dragEnded))
         .modifier(DeleteMenu(on: menu, ask: $ask))
         .alert(alertTitle, isPresented: $ask) {
             Button("Delete", role: .destructive) {
@@ -536,26 +537,23 @@ struct SwipeDelete<Content: View>: View {
         if settled != 0 { close() } else { onTap() }
     }
 
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 6)
-            .onChanged { v in
-                guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                dragged = true
-                offset = min(0, settled + v.translation.width)
+    /// 옆으로 미는 중 (dx: 손가락이 옆으로 움직인 거리)
+    private func dragChanged(_ dx: CGFloat) {
+        dragged = true
+        offset = min(0, settled + dx)
+    }
+
+    private func dragEnded(_ dx: CGFloat) {
+        let x = settled + dx
+        withAnimation(.snappy(duration: 0.25)) {
+            if x < -reveal / 2 {
+                offset = -reveal; settled = -reveal      // 많이 밀어도 확인창은 Delete 를 눌러야
+            } else {
+                offset = 0; settled = 0
             }
-            .onEnded { v in
-                let horizontal = abs(v.translation.width) > abs(v.translation.height)
-                let x = horizontal ? settled + v.translation.width : settled
-                withAnimation(.snappy(duration: 0.25)) {
-                    if x < -reveal / 2 {
-                        offset = -reveal; settled = -reveal      // 많이 밀어도 확인창은 Delete 를 눌러야
-                    } else {
-                        offset = 0; settled = 0
-                    }
-                }
-                // 버튼의 누름 판정이 끝난 뒤에 풀어 줌
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { dragged = false }
-            }
+        }
+        // 버튼의 누름 판정이 끝난 뒤에 풀어 줌
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { dragged = false }
     }
 
     private func close() {
@@ -574,6 +572,66 @@ private struct DeleteMenu: ViewModifier {
             }
         } else {
             content
+        }
+    }
+}
+
+
+// MARK: - 옆으로만 밀기 (스크롤을 막지 않게)
+
+/// iOS 18+: UIKit 밀기 — 시작할 때 가로 움직임이 세로보다 클 때만 잡음. 세로로 밀면 처음부터 스크롤이 가져감.
+/// iOS 17: SwiftUI DragGesture (20pt 이상, 가로일 때만)
+struct SwipeGesture: ViewModifier {
+    let onChanged: (CGFloat) -> Void
+    let onEnded: (CGFloat) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.gesture(HorizontalPan(onChanged: onChanged, onEnded: onEnded))
+        } else {
+            content.simultaneousGesture(
+                DragGesture(minimumDistance: 20)
+                    .onChanged { v in
+                        guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                        onChanged(v.translation.width)
+                    }
+                    .onEnded { v in
+                        let horizontal = abs(v.translation.width) > abs(v.translation.height)
+                        onEnded(horizontal ? v.translation.width : 0)
+                    }
+            )
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+struct HorizontalPan: UIGestureRecognizerRepresentable {
+    let onChanged: (CGFloat) -> Void
+    let onEnded: (CGFloat) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let g = UIPanGestureRecognizer()
+        g.delegate = context.coordinator
+        return g
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        let dx: CGFloat = recognizer.translation(in: recognizer.view).x
+        switch recognizer.state {
+        case .began, .changed: onChanged(dx)
+        case .ended, .cancelled, .failed: onEnded(dx)
+        default: break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        /// 가로로 밀 때만 시작 (세로는 스크롤에 양보)
+        func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+            guard let p = g as? UIPanGestureRecognizer else { return false }
+            let v: CGPoint = p.velocity(in: p.view)
+            return abs(v.x) > abs(v.y) * 1.2
         }
     }
 }

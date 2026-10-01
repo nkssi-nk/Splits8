@@ -14,9 +14,8 @@ struct HistoryHeader: View {
 /// 홈 달력: 채운 점 = 기록, 빈 링 = 예약, 깃발 = 대회 날. 날짜를 누르면 아래에 그날 기록·예약.
 /// 위쪽 필터(All · Training · Full Sim · Race)로 모드별로 볼 수 있음. All 이면 점 색으로 구분
 struct HistoryCalendar: View {
-    /// 필터: "all" / "training" / "sim" / "race" (마지막 선택 기억)
-    @AppStorage("homeCalFilter") private var filterRaw: String = "all"
-    private var mode: Mode? { Mode(rawValue: filterRaw) }
+    /// 모드 필터는 뺌 (밑의 MODES 와 헷갈려서) → 항상 전체
+    private var mode: Mode? { nil }
     let store = Store.shared
     let r = Router.shared
 
@@ -56,7 +55,6 @@ struct HistoryCalendar: View {
         let plans: [PlannedWorkout] = plansOn(selected)
         let race: Bool = isRaceDay(selected)
         return VStack(spacing: 10) {
-            filterBar
             calendarCard
             SectionLabel(text: Fm.wdm.string(from: selected).uppercased(), top: 10)
             if !recs.isEmpty { recordsCard(recs) }
@@ -70,16 +68,6 @@ struct HistoryCalendar: View {
             }
             if !isPast { planButton }
         }
-    }
-
-    // MARK: 모드 필터
-
-    private var filterBar: some View {
-        Seg8(items: [("all", "All"), ("training", "Training"), ("sim", "Full Sim"), ("race", "Race")],
-             selected: mode == nil ? "all" : filterRaw, height: 32, radius: 10, fontSize: 13) { v in
-            withAnimation(.easeOut(duration: 0.2)) { filterRaw = v }
-        }
-        .accessibilityIdentifier("cal.filter")
     }
 
     // MARK: 달력 카드

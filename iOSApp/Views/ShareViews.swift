@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Photos
 
 // MARK: - 공유 카드에 들어갈 값
 
@@ -621,6 +622,7 @@ struct ShareView: View {
     @State private var photo: UIImage?
     @State private var saved = false
     @State private var mapOn = false           // 실외 러닝: 경로 지도를 배경으로
+    @State private var saveFail: String? = nil  // 저장 실패 안내
 
     private var data: ShareData { r.detail.map { ShareData($0, store: store) } ?? ShareData() }
     private var post: Bool { ratio == "post" }
@@ -647,6 +649,14 @@ struct ShareView: View {
             actionButtons
         }
         .padding(.horizontal, 16)
+        .alert("Couldn't save", isPresented: Binding(get: { saveFail != nil }, set: { if !$0 { saveFail = nil } })) {
+            Button("Open Settings") {
+                if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
+            }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveFail ?? "")
+        }
     }
 
     // 미리보기: Story 0.72 → 259×461, Post 0.86 → 310×387, radius 14, 바깥 1px #262626
@@ -841,6 +851,8 @@ struct ShareView: View {
     @MainActor private func image() -> UIImage? {
         let rr = ImageRenderer(content: card(placeholder: false))
         rr.scale = 3
+        if let img = rr.uiImage { return img }
+        rr.scale = 2                      // 메모리 부족 등으로 실패하면 한 번 더 작게
         return rr.uiImage
     }
 
@@ -858,12 +870,34 @@ struct ShareView: View {
         }
     }
 
+    /// 사진 앱에 저장: 권한 확인 → 저장 → 성공일 때만 "Saved", 실패면 이유 안내
     private func save() {
-        guard let img = image() else { return }
-        UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        saved = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { saved = false }
+        guard let img = image(), let data = img.pngData() else {
+            saveFail = String(localized: "Couldn't create the image. Please try again.")
+            return
+        }
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                DispatchQueue.main.async {
+                    saveFail = String(localized: "Allow Splits8 to add photos: Settings > Splits8 > Photos > Add Photos Only.")
+                }
+                return
+            }
+            PHPhotoLibrary.shared().performChanges({
+                let req = PHAssetCreationRequest.forAsset()
+                req.addResource(with: .photo, data: data, options: nil)
+            }) { ok, _ in
+                DispatchQueue.main.async {
+                    if ok {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        saved = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { saved = false }
+                    } else {
+                        saveFail = String(localized: "Couldn't save to Photos. Please try again.")
+                    }
+                }
+            }
+        }
     }
 }
 

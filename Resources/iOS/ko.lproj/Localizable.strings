@@ -406,3 +406,10 @@
 "Free" = "자유";
 "Auto split every 1 km" = "1km마다 자동으로 넘어가요";
 "Route map" = "경로 지도";
+
+/* 빌드 16 */
+"Couldn't save" = "저장하지 못했어요";
+"Couldn't create the image. Please try again." = "이미지를 만들지 못했어요. 다시 시도해 주세요.";
+"Allow Splits8 to add photos: Settings > Splits8 > Photos > Add Photos Only." = "사진 저장을 허용해 주세요: 설정 > Splits8 > 사진 > 사진 추가만 허용";
+"Couldn't save to Photos. Please try again." = "사진 앱에 저장하지 못했어요. 다시 시도해 주세요.";
+"Open Settings" = "설정 열기";

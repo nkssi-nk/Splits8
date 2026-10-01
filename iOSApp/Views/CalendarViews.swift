@@ -33,7 +33,7 @@ struct HistoryCalendar: View {
     @State private var month: Date = HistoryCalendar.monthStart(Date())
     @State private var selected: Date = Calendar.current.startOfDay(for: Date())
 
-    private enum DayMark { case empty, filled([Color]), ring(Color) }
+    private enum DayMark { case empty, filled([Color]), ring(Color), race }
 
     private static var monthFmt: DateFormatter { Fm.monthYear }
     private static var timeFmt: DateFormatter { Fm.time12 }
@@ -45,6 +45,7 @@ struct HistoryCalendar: View {
     }
 
     private var cal: Calendar { Calendar.current }
+    private static let raceColor: Color = Color(hex: Mode.race.calendarHex)
     private var tint: Color { mode.map { Color(hex: $0.calendarHex) } ?? C.text2 }
 
     private var isPast: Bool { selected < cal.startOfDay(for: Date()) }
@@ -185,6 +186,7 @@ struct HistoryCalendar: View {
         let isSel: Bool = cal.isDate(d, inSameDayAs: selected)
         let isToday: Bool = cal.isDateInToday(d)
         let m: DayMark = mark(for: d)
+        let raceDay: Bool = isRaceDay(d)
         return Button {
             withAnimation(.easeOut(duration: 0.15)) { selected = cal.startOfDay(for: d) }
         } label: {
@@ -192,9 +194,10 @@ struct HistoryCalendar: View {
                 Text("\(day)").font(F.t(15, isSel ? .semibold : .regular)).monospacedDigit()
                     .foregroundStyle(isSel ? Color.black : Color.white)
                     .frame(width: 32, height: 32)
-                    .background(Circle().fill(isSel ? C.accent : Color.clear))
+                    .background(Circle().fill(isSel ? C.accent : (raceDay ? Self.raceColor.opacity(0.22) : Color.clear)))
                     .overlay {
-                        if isToday && !isSel { Circle().strokeBorder(C.accent, lineWidth: 1) }
+                        if raceDay && !isSel { Circle().strokeBorder(Self.raceColor, lineWidth: 1.5) }
+                        else if isToday && !isSel { Circle().strokeBorder(C.accent, lineWidth: 1) }
                     }
                 markView(m)
             }
@@ -212,8 +215,8 @@ struct HistoryCalendar: View {
             let modes: [Mode] = Mode.allCases.filter { m in recs.contains { $0.mode == m } }
             return .filled(modes.map { Color(hex: $0.calendarHex) })
         }
+        if isRaceDay(d) { return .race }      // 대회 날은 깃발 표시 (가장 우선)
         if let p = plansOn(d).first { return .ring(Color(hex: p.mode.calendarHex)) }
-        if isRaceDay(d) { return .ring(Color(hex: Mode.race.calendarHex)) }
         return .empty
     }
 
@@ -231,6 +234,8 @@ struct HistoryCalendar: View {
             .frame(height: 7)
         case .ring(let c):
             Circle().strokeBorder(c, lineWidth: 1.5).frame(width: 7, height: 7)
+        case .race:
+            Glyph("i_race", 9, Self.raceColor).frame(width: 9, height: 7)
         }
     }
 
@@ -244,9 +249,17 @@ struct HistoryCalendar: View {
                     Text(Self.label(for: m).l10n)
                 }
             }
-            HStack(spacing: 5) {
-                Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
-                Text(mode == .race ? "Race day" : "Planned")
+            if mode != .race {
+                HStack(spacing: 5) {
+                    Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
+                    Text("Planned")
+                }
+            }
+            if mode == nil || mode == .race {
+                HStack(spacing: 4) {
+                    Glyph("i_race", 10, Self.raceColor)
+                    Text("Race day")
+                }
             }
         }
         .font(F.t(13)).foregroundStyle(C.text2)
@@ -335,7 +348,7 @@ struct HistoryCalendar: View {
         let ev: RaceEvent = store.settings.event
         return Button { r.go(.setEvent) } label: {
             HStack(spacing: 12) {
-                Circle().strokeBorder(Color(hex: Mode.race.calendarHex), lineWidth: 1.5).frame(width: 8, height: 8)
+                Glyph("i_race", 14, Self.raceColor)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ev.name).font(F.t(15, .semibold)).lineLimit(1)
                     Text("Race day · \(ev.time)").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)

@@ -74,6 +74,14 @@ struct HomeView: View {
                 Text(sim != nil ? "Full Sim" : "Race").font(F.t(11)).foregroundStyle(C.text2)
             }
             .fixedSize()
+        } else {
+            // 기록이 아직 없으면 목표 시간
+            VStack(alignment: .trailing, spacing: 1) {
+                Text("GOAL").font(F.t(11, .semibold)).tracking(0.22).foregroundStyle(C.text2)
+                Text(Fm.t(store.settings.goalTime)).font(F.num(22)).tracking(-0.44).lineLimit(1)
+                Text("Race goal").font(F.t(11)).foregroundStyle(C.text2)
+            }
+            .fixedSize()
         }
     }
 

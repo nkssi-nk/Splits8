@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 75
     env:
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
@@ -75,6 +75,12 @@ jobs:
             /tmp/xcodebuild_logs/*.log
           if-no-files-found: ignore
 
-      - name: TestFlight 업로드
+      - name: TestFlight 업로드 + 친구(Friends) 그룹 자동 배포
+        env:
+          WHATS_NEW: ${{ github.event.head_commit.message }}
         run: |
-          app-store-connect publish --path build/ios/ipa/*.ipa
+          NOTE="${WHATS_NEW:-새 베타 버전입니다. 써 보시고 불편한 점을 알려 주세요.}"
+          app-store-connect publish --path build/ios/ipa/*.ipa \
+            --testflight --beta-group "Friends" \
+            --locale ko --whats-new "$NOTE" \
+            --max-build-processing-wait 40

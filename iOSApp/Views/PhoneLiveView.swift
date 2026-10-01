@@ -125,7 +125,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         let now = Date()
         closeSeg(now)
         if splits.count >= seq.count {
-            return finish()
+            return finish(complete: true)
         }
         idx = splits.count
         segStart = now; segPaused = 0
@@ -149,7 +149,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         guard active, !finished else { return nil }
         if !running { togglePause() }
         closeSeg(Date())
-        return finish()
+        return finish(complete: splits.count >= seq.count)
     }
 
     /// End → Discard
@@ -165,14 +165,14 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    private func finish() -> Record {
+    private func finish(complete: Bool) -> Record {
         stopGPS()
         finished = true
-        return makeRecord()
+        return makeRecord(complete: complete)
     }
 
     /// 워치 WorkoutEngine.makeRecord 와 같은 모양 (심박·칼로리 없음)
-    private func makeRecord() -> Record {
+    private func makeRecord(complete: Bool) -> Record {
         var results: [SegResult] = []
         for (i, t) in splits.enumerated() where seq.indices.contains(i) {
             let s: Seg = seq[i]
@@ -185,7 +185,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         return Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: [],
                       kcal: 0, avgHR: 0, maxHR: 0, division: settings.div.name,
                       goal: mode == .race ? settings.goalTime : nil,
-                      vsWord: deltaWord, vsTarget: tg)
+                      vsWord: deltaWord, vsTarget: tg, complete: complete)
     }
 
     /// VS GOAL / VS JIHO / VS BEST (워치와 같음)

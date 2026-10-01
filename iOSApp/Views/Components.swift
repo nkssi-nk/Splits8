@@ -454,3 +454,93 @@ struct Note8: View {
             .padding(.horizontal, 4)
     }
 }
+
+// MARK: - 왼쪽으로 밀어 삭제 (기록 줄 · 트레이닝 카드 공통)
+
+/// 왼쪽으로 밀면 오른쪽에 빨간 Delete. 많이 밀면 바로 확인창. 길게 누르면 Delete 메뉴.
+/// corner: 카드처럼 둥근 모서리면 그 값 (빨간 영역도 같이 잘림). press: 누를 때 살짝 작아지는 효과(카드용)
+struct SwipeDelete<Content: View>: View {
+    var corner: CGFloat = 0
+    var press: Bool = false
+    let alertTitle: LocalizedStringKey
+    var alertMessage: LocalizedStringKey = "This can't be undone."
+    let onTap: () -> Void
+    let onDelete: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @State private var offset: CGFloat = 0
+    @State private var settled: CGFloat = 0
+    @State private var ask = false
+    private let reveal: CGFloat = 84
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            if offset < 0 {
+                Button { ask = true } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: "trash").font(.system(size: 17, weight: .semibold))
+                        Text("Delete").font(F.t(12, .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: max(reveal, -offset))
+                    .frame(maxHeight: .infinity)
+                    .background(C.bad)
+                }
+                .buttonStyle(.plain)
+            }
+            tapArea.offset(x: offset)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+        .simultaneousGesture(swipe)
+        .contextMenu {
+            Button(role: .destructive) { ask = true } label: { Label("Delete", systemImage: "trash") }
+        }
+        .alert(alertTitle, isPresented: $ask) {
+            Button("Delete", role: .destructive) {
+                close()
+                withAnimation(.easeOut(duration: 0.25)) { onDelete() }
+            }
+            Button("Cancel", role: .cancel) { close() }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+
+    @ViewBuilder
+    private var tapArea: some View {
+        if press {
+            Button { tap() } label: { content() }.buttonStyle(Press())
+        } else {
+            Button { tap() } label: { content() }.buttonStyle(.plain)
+        }
+    }
+
+    private func tap() {
+        if settled != 0 { close() } else { onTap() }
+    }
+
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 20)
+            .onChanged { v in
+                guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                offset = min(0, settled + v.translation.width)
+            }
+            .onEnded { v in
+                let horizontal = abs(v.translation.width) > abs(v.translation.height)
+                let x = horizontal ? settled + v.translation.width : settled
+                withAnimation(.snappy(duration: 0.25)) {
+                    if x < -200 {
+                        offset = -reveal; settled = -reveal; ask = true
+                    } else if x < -reveal / 2 {
+                        offset = -reveal; settled = -reveal
+                    } else {
+                        offset = 0; settled = 0
+                    }
+                }
+            }
+    }
+
+    private func close() {
+        withAnimation(.snappy(duration: 0.25)) { offset = 0; settled = 0 }
+    }
+}

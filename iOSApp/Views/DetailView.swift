@@ -212,9 +212,17 @@ struct DetailView: View {
                     .padding(.vertical, 3).padding(.horizontal, 8)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Label8(Fm.wdmy.string(from: rec.date))
+                if let f = rec.flag { FlagPill(flag: f) }
             }
             LargeTitle(text: rec.title, top: 10)
                 .fixedSize(horizontal: false, vertical: true)
+            if let f = rec.flag {
+                Text(f == .incomplete ? LocalizedStringKey("Ended early, so it doesn't count toward your PB.")
+                                      : LocalizedStringKey("Faster than seems possible, so it doesn't count toward your PB. A tap may have been missed."))
+                    .font(F.t(13)).foregroundStyle(C.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+            }
             if let nick = partnerNick(rec) {
                 partnerChip(rec, nick: nick)
             }
@@ -307,7 +315,7 @@ struct DetailView: View {
             HStack(alignment: .firstTextBaseline) {
                 Label8("VS \(up)")
                 Spacer(minLength: 8)
-                Text("\(f.div) · \(f.date)").font(F.t(11)).foregroundStyle(C.text3).lineLimit(1)
+                Text("\(f.div) · \(f.date)").font(F.t(F.foot)).foregroundStyle(C.text3).lineLimit(1).minimumScaleFactor(0.85)
             }
             friendTable(rec, f: f, up: up, fr: fr)
                 .padding(.top, 14)
@@ -379,7 +387,7 @@ struct DetailView: View {
             Spacer(minLength: 0)
             Text("Run 1 → Wall Balls").lineLimit(1)
         }
-        .font(F.t(11)).foregroundStyle(C.text3)
+        .font(F.t(F.foot)).foregroundStyle(C.text3)
     }
 
     // MARK: 심박 그래프 (140 높이, 존 띠 5개, 점선 구간 경계, 빨간 1.6 선)
@@ -415,7 +423,7 @@ struct DetailView: View {
             HStack(alignment: .firstTextBaseline) {
                 Label8("HEART RATE")
                 Spacer(minLength: 8)
-                Text("Dotted lines = split boundaries").font(F.t(11)).foregroundStyle(C.text3).lineLimit(1)
+                Text("Dotted lines = split boundaries").font(F.t(F.cap1)).foregroundStyle(C.text3).lineLimit(1)
             }
             hrChart(rec)
                 .frame(height: 140)

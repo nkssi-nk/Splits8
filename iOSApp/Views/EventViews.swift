@@ -262,7 +262,7 @@ struct FindEventView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("ev.manual")
-            Text("From hyrox.com Find My Race · checked 29 Sep 2026").font(F.t(11)).foregroundStyle(C.chev)
+            Text("From hyrox.com Find My Race · checked 29 Sep 2026").font(F.t(F.foot)).foregroundStyle(C.chev)
                 .multilineTextAlignment(.center).frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 16)
@@ -319,7 +319,7 @@ struct FindEventView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("D-\(days)").font(F.t(13, .semibold)).foregroundStyle(days <= 60 ? C.accent : C.text2)
-                    Text(range(st, en)).font(F.t(11)).foregroundStyle(C.text3)
+                    Text(range(st, en)).font(F.t(F.foot)).foregroundStyle(C.text3)
                 }
                 .fixedSize()
             }

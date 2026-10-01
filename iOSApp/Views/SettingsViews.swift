@@ -290,10 +290,10 @@ struct SetGoalsView: View {
         VStack(spacing: 10) {
             HStack(spacing: 0) {
                 Spacer()
-                Text("TOTAL ").font(F.t(11, .semibold)).foregroundStyle(C.text2)
-                Text(Fm.t(g.reduce(0, +))).font(F.num(11)).foregroundStyle(C.accent)
+                Text("TOTAL ").font(F.t(F.foot, .semibold)).foregroundStyle(C.text2)
+                Text(Fm.t(g.reduce(0, +))).font(F.num(F.foot)).foregroundStyle(C.accent)
             }
-            .tracking(0.06 * 11)
+            .tracking(0.06 * 13)
             .lineLimit(1)
             .padding(.horizontal, 4).padding(.bottom, 6)
             VStack(spacing: 0) {

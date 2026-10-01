@@ -56,6 +56,7 @@ struct FriendsView: View {
         let req = store.requested.contains(h.id) || store.friends.contains { $0.id == h.id }
         return HStack(spacing: 12) {
             FriendAvatar(url: h.avatar_url, ini: String(n.prefix(1)).uppercased(), size: 34)
+                .photoTap(h.avatar_url.map { PhotoItem(url: $0, title: "@" + n, sub: h.division ?? "") })
             VStack(alignment: .leading, spacing: 0) {
                 Text("@\(n)").font(F.t(15, .semibold)).lineLimit(1)
                 Text(h.division ?? "").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
@@ -84,6 +85,7 @@ struct FriendsView: View {
         return Button { if f.hasSplits { store.toggleFriend(f) } } label: {
             HStack(spacing: 14) {
                 FriendAvatar(url: f.avatarUrl, ini: f.ini, size: 40)
+                    .photoTap(f.avatarUrl.map { PhotoItem(url: $0, title: "@" + f.name, sub: f.div) })
                 VStack(alignment: .leading, spacing: 2) {
                     Text(f.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white).lineLimit(1)
                     Text(friendSub(f))

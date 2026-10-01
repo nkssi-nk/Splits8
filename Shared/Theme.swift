@@ -51,6 +51,18 @@ enum C {
 enum F {
     /// SF Pro (Text/Display 자동). tracking 은 em 단위 → pt 로 바꿔서 .tracking()
     static func t(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight) }
+
+    // 아이폰 기본 글자 크기 단계 (Apple 기본 Text Style 과 같은 pt). 새 화면은 이 단계만 씀
+    static let largeTitle: CGFloat = 34   // 큰 제목
+    static let title1: CGFloat = 28
+    static let title2: CGFloat = 22
+    static let title3: CGFloat = 20       // 카드 제목
+    static let body: CGFloat = 17         // 본문 · 목록 이름
+    static let callout: CGFloat = 16
+    static let sub: CGFloat = 15          // 카드 안 설명 글
+    static let foot: CGFloat = 13         // 소제목 · 날짜 · 작은 메모
+    static let cap1: CGFloat = 12
+    static let cap2: CGFloat = 11         // 가장 작게 (PB 뱃지 · 그래프 눈금 · 요일)
     /// 숫자 (SF Pro Display Semibold, 고정폭)
     static func num(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
         .system(size: size, weight: weight).monospacedDigit()
@@ -69,15 +81,17 @@ extension View {
 /// 대문자 라벨 (11pt semibold, 자간 0.1em, 회색)
 struct Label8: View {
     let text: String
-    var size: CGFloat = 11
+    var size: CGFloat = F.foot
     var color: Color = C.text2
-    var spacing: CGFloat = 0.1
+    var spacing: CGFloat = 0.06
     var weight: Font.Weight = .semibold
-    init(_ text: String, size: CGFloat = 11, color: Color = C.text2, spacing: CGFloat = 0.1, weight: Font.Weight = .semibold) {
+    /// 소제목 (HISTORY · PERSONAL BESTS …) — 아이폰 설정 앱 소제목처럼 13pt
+    init(_ text: String, size: CGFloat = F.foot, color: Color = C.text2, spacing: CGFloat = 0.06, weight: Font.Weight = .semibold) {
         self.text = text; self.size = size; self.color = color; self.spacing = spacing; self.weight = weight
     }
     var body: some View {
         Text(text.l10n).font(F.t(size, weight)).tracking(spacing * size).foregroundStyle(color).lineLimit(1)
+            .minimumScaleFactor(0.85)
     }
 }
 

@@ -79,9 +79,6 @@
 "%lld sets · %lld segments" = "%lld세트 · %lld구간";
 "1 set · about 12 min" = "1세트 · 약 12분";
 "1 set · about 14 min" = "1세트 · 약 14분";
-"1 set · 8 segments · about 34 min" = "1세트 · 8구간 · 약 34분";
-"First half" = "전반부";
-"Second half" = "후반부";
 
 /* calendar */
 "HISTORY" = "기록";
@@ -260,13 +257,12 @@
 "RUN FATIGUE" = "러닝 피로도";
 "Average of your last %lld Full Sims" = "최근 풀 시뮬 %lld회 평균";
 "%lld segments" = "%lld구간";
-"PRESETS" = "프리셋";
 "BEST" = "최고 기록";
 "None yet" = "아직 없어요";
 "Goal" = "목표";
 "Last" = "지난 기록";
 "Compare with" = "비교 대상";
-"Auto Roxzone" = "Roxzone 자동 감지";
+"Add Roxzone" = "Roxzone 추가";
 "Personal best" = "개인 최고 기록";
 "vs last" = "지난 기록 대비";
 "GOAL" = "목표";
@@ -377,3 +373,11 @@
 "Follows your iPhone language unless you pick one here." = "여기서 고르지 않으면 iPhone 언어를 따라요.";
 "Restart the app to apply the language." = "앱을 다시 시작하면 언어가 바뀌어요.";
 "OK" = "확인";
+
+/* 빌드 13 */
+"Delete this training?" = "이 트레이닝을 삭제할까요?";
+"Records you've done with it stay in History." = "이 트레이닝으로 한 기록은 기록 목록에 그대로 남아요.";
+"Incomplete" = "미완료";
+"Check" = "확인 필요";
+"Ended early, so it doesn't count toward your PB." = "중간에 끝낸 기록이라 PB에 넣지 않아요.";
+"Faster than seems possible, so it doesn't count toward your PB. A tap may have been missed." = "가능한 기록보다 너무 빨라서 PB에 넣지 않아요. 구간 넘기기를 잘못 눌렀을 수 있어요.";

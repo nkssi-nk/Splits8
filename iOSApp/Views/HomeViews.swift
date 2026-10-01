@@ -16,7 +16,7 @@ struct HomeView: View {
                 SectionLabel(text: "NEXT RACE")
                 nextRace
                 SectionLabel(text: "CALENDAR")
-                HistoryCalendar(mode: nil)
+                HistoryCalendar()
                 summaryHeader
                 summaryCard
             }
@@ -47,6 +47,8 @@ struct HomeView: View {
         return HStack(spacing: 14) {
             Avatar8(size: 52, photo: store.photo, initial: signed ? String(nick.prefix(1)).uppercased() : "?",
                     bg: signed ? C.accent : C.control, fg: signed ? .black : C.text2, fontSize: 20)
+                .photoTap(store.photo.map { PhotoItem(image: $0, title: signed ? "@" + nick : "My profile".l10n, sub: store.div.name) })
+                .accessibilityIdentifier("home.photo")
             VStack(alignment: .leading, spacing: 2) {
                 Text(signed ? "@" + nick : "My profile".l10n).font(F.t(17, .semibold)).tracking(-0.17).lineLimit(1)
                 Text(store.div.name).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
@@ -71,7 +73,7 @@ struct HomeView: View {
                 }
                 .foregroundStyle(C.accent)
                 Text(Fm.t(b.total)).font(F.num(22)).tracking(-0.44).lineLimit(1)
-                Text(sim != nil ? "Full Sim" : "Race").font(F.t(11)).foregroundStyle(C.text2)
+                Text(sim != nil ? "Full Sim" : "Race").font(F.t(F.foot)).foregroundStyle(C.text2)
             }
             .fixedSize()
         } else {
@@ -79,7 +81,7 @@ struct HomeView: View {
             VStack(alignment: .trailing, spacing: 1) {
                 Text("GOAL").font(F.t(11, .semibold)).tracking(0.22).foregroundStyle(C.text2)
                 Text(Fm.t(store.settings.goalTime)).font(F.num(22)).tracking(-0.44).lineLimit(1)
-                Text("Race goal").font(F.t(11)).foregroundStyle(C.text2)
+                Text("Race goal").font(F.t(F.foot)).foregroundStyle(C.text2)
             }
             .fixedSize()
         }
@@ -98,7 +100,7 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     VStack(alignment: .trailing, spacing: 4) {
                         Text(dday(ev.date)).font(F.num(28)).tracking(-0.84).foregroundStyle(C.accent).lineLimit(1)
-                        Text(store.div.name).font(F.t(11)).foregroundStyle(C.text2)
+                        Text(store.div.name).font(F.t(F.foot)).foregroundStyle(C.text2)
                     }
                     .fixedSize()
                 }
@@ -145,7 +147,7 @@ struct HomeView: View {
     // 최고 기록: 3칸
     private var bests: some View {
         let sim = store.simBest, race = store.raceBest
-        let pace = (store.records(.sim) + store.records(.race)).compactMap(\.runPace).min()
+        let pace = (store.records(.sim) + store.records(.race)).filter(\.counts).compactMap(\.runPace).min()
         return HStack(spacing: 8) {
             bestTile("FULL SIM", sim.map { Fm.t($0.total) } ?? "--", sim.map { Fm.dm.string(from: $0.date) } ?? "No record")
             bestTile("RACE", race.map { Fm.t($0.total) } ?? "--", race?.title ?? "No record")
@@ -156,7 +158,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             Label8(label, spacing: 0.08)
             Text(value).font(F.num(20)).tracking(-0.4).lineLimit(1).minimumScaleFactor(0.8).padding(.top, 6)
-            Text(sub.l10n).font(F.t(11)).foregroundStyle(C.text3).lineLimit(1).padding(.top, 2)
+            Text(sub.l10n).font(F.t(F.foot)).foregroundStyle(C.text3).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 14).padding(.horizontal, 12)
@@ -172,7 +174,10 @@ struct HomeView: View {
         return Button { r.go(x.mode == .training ? .training : x.mode == .sim ? .sim : .race) } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(F.t(15, .semibold)).lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text(title).font(F.t(15, .semibold)).lineLimit(1)
+                        if let f = x.flag { FlagPill(flag: f) }
+                    }
                     Text(sub).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -359,7 +364,7 @@ struct HomeView: View {
                 VStack(spacing: 4) {
                     barShape(b, height: b.secs > 0 ? max(6, maxH * CGFloat(b.secs) / mx) : 2)
                         .frame(height: maxH, alignment: .bottom)
-                    Text(b.label).font(F.t(10, .medium)).foregroundStyle(C.text3).lineLimit(1)
+                    Text(b.label).font(F.t(F.cap2, .medium)).foregroundStyle(C.text3).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity)
             }

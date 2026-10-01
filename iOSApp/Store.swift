@@ -40,16 +40,13 @@ final class Store: NSObject, WCSessionDelegate {
         records = JSONStore.load([Record].self, "records.json") ?? []
         friends = JSONStore.load([Friend].self, "friends.json") ?? []
         plans = JSONStore.load([PlannedWorkout].self, "plans.json") ?? []
-        // 기존 사용자에게도 새 기본 프리셋(전반전·후반전)을 한 번만 넣어 줌 (지운 건 다시 안 넣음)
-        let seedKey = "seeded.halfPresets.v1"
-        if !UserDefaults.standard.bool(forKey: seedKey) {
-            let have: Set<String> = Set(programs.map(\.id))
-            let missing: [Program] = Program.presets().filter { $0.id.hasPrefix("preset.") && !have.contains($0.id) }
-            if !missing.isEmpty {
-                programs.append(contentsOf: missing)
-                JSONStore.save(programs, "programs.json")
-            }
-            UserDefaults.standard.set(true, forKey: seedKey)
+        // 빌드 10~12 에서 넣었던 부분 시뮬 프리셋(전반부·후반부)을 한 번만 지움
+        let cleanKey = "removed.halfPresets.v1"
+        if !UserDefaults.standard.bool(forKey: cleanKey) {
+            let before: Int = programs.count
+            programs.removeAll { $0.id.hasPrefix("preset.") }
+            if programs.count != before { JSONStore.save(programs, "programs.json") }
+            UserDefaults.standard.set(true, forKey: cleanKey)
         }
         if let d = try? Data(contentsOf: JSONStore.url("avatar.jpg")) { photo = UIImage(data: d) }
         if Demo.enabled {           // 화면 확인용 예시 데이터
@@ -206,28 +203,30 @@ final class Store: NSObject, WCSessionDelegate {
     }
 
     /// 최고 Full Simulation
-    var simBest: Record? { records(.sim).filter { $0.splits16 != nil }.min { $0.total < $1.total } }
-    var raceBest: Record? { records(.race).min { $0.total < $1.total } }
+    /// (미완료·확인 필요 기록은 빼고)
+    var simBest: Record? { records(.sim).filter { $0.counts && $0.splits16 != nil }.min { $0.total < $1.total } }
+    var raceBest: Record? { records(.race).filter(\.counts).min { $0.total < $1.total } }
 
     /// ★ PB: 같은 종류(트레이닝은 같은 이름·세트 수, Full Sim·Race는 각각 전체) 중 가장 빠른 기록.
     /// 비교할 기록이 2개 이상일 때만 표시 (하나뿐이면 PB 표시 없음). 저장·삭제하면 자동으로 다시 계산됨.
     func isPB(_ r: Record) -> Bool {
+        guard r.counts else { return false }
         let same: [Record] = pbGroup(r)
         guard same.count >= 2, let best = same.min(by: { $0.total < $1.total }) else { return false }
         return best.id == r.id
     }
     private func pbGroup(_ r: Record) -> [Record] {
         switch r.mode {
-        case .training: return records(.training).filter { $0.title == r.title && $0.sets == r.sets }
-        case .sim: return records(.sim).filter { $0.splits16 != nil }
-        case .race: return records(.race)
+        case .training: return records(.training).filter { $0.counts && $0.title == r.title && $0.sets == r.sets }
+        case .sim: return records(.sim).filter { $0.counts && $0.splits16 != nil }
+        case .race: return records(.race).filter(\.counts)
         }
     }
 
     /// 트레이닝 구간별 최고
     var segBests: [String: Int] {
         var b: [String: Int] = [:]
-        for r in records where r.mode == .training {
+        for r in records where r.mode == .training && r.counts {
             for s in r.segs {
                 let k = SegKey.of(icon: s.icon, detail: s.detail)
                 b[k] = min(b[k] ?? .max, s.time)
@@ -238,11 +237,11 @@ final class Store: NSObject, WCSessionDelegate {
 
     /// 같은 프로그램 이전 최고 (VS BEST)
     func previousBest(for r: Record) -> Int? {
-        records.filter { $0.mode == r.mode && $0.title == r.title && $0.id != r.id && $0.date < r.date }.map(\.total).min()
+        records.filter { $0.mode == r.mode && $0.title == r.title && $0.id != r.id && $0.date < r.date && $0.counts }.map(\.total).min()
     }
     /// 바로 이전 기록 (VS LAST)
     func previous(for r: Record) -> Record? {
-        records.filter { $0.mode == r.mode && $0.date < r.date }.max { $0.date < $1.date }
+        records.filter { $0.mode == r.mode && $0.date < r.date && $0.counts }.max { $0.date < $1.date }
     }
 
     // MARK: 프로그램
@@ -279,12 +278,14 @@ final class Store: NSObject, WCSessionDelegate {
     }
 
     /// 가운데 정사각형으로 잘라 320px
-    static func square320(_ img: UIImage) -> UIImage {
+    /// 가운데 정사각형으로 잘라 720px 로 (눌러서 크게 봐도 선명, 용량은 작게)
+    static func squarePhoto(_ img: UIImage) -> UIImage {
+        let side: CGFloat = 720
         let s = min(img.size.width, img.size.height)
         let o = CGPoint(x: (img.size.width - s) / 2, y: (img.size.height - s) / 2)
-        let r = UIGraphicsImageRenderer(size: CGSize(width: 320, height: 320), format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }())
+        let r = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }())
         return r.image { _ in
-            img.draw(in: CGRect(x: -o.x * 320 / s, y: -o.y * 320 / s, width: img.size.width * 320 / s, height: img.size.height * 320 / s))
+            img.draw(in: CGRect(x: -o.x * side / s, y: -o.y * side / s, width: img.size.width * side / s, height: img.size.height * side / s))
         }
     }
 

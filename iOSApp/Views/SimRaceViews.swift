@@ -6,8 +6,6 @@ struct SimView: View {
     let store = Store.shared
     let r = Router.shared
     @State private var metric = "total"
-    @AppStorage("histView.sim") private var histView: String = "list"
-
     fileprivate struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
     private static let stationMetrics: [(String, String, String)] = [
         ("skiErg", "SKIERG", "SkiErg"), ("sledPush", "SLED PUSH", "Sled Push"), ("sledPull", "SLED PULL", "Sled Pull"),
@@ -81,7 +79,7 @@ struct SimView: View {
     }
 
     private var points: [(Date, Int)] {
-        let series: [Record] = Array(store.records(.sim).prefix(6).reversed())
+        let series: [Record] = Array(store.records(.sim).filter(\.counts).prefix(6).reversed())
         var o: [(Date, Int)] = []
         for rec in series {
             if let v = value(rec, metric) { o.append((rec.date, v)) }
@@ -96,58 +94,13 @@ struct SimView: View {
             settingsCard
             StartOnPhoneButton(mode: .sim)          // 워치 없이 아이폰으로 기록
                 .frame(maxWidth: .infinity, alignment: .trailing)
-            if let f = Fatigue.analyze(store.records(.sim)) {
+            if let f = Fatigue.analyze(store.records(.sim).filter(\.counts)) {
                 SectionLabel(text: "RUN FATIGUE", top: 20)
                 RunFatigueCard(result: f, footnote: String(localized: "Average of your last \(f.count) Full Sims"))
             }
-            presets
             history
         }
         .padding(.horizontal, 16)
-    }
-
-    // MARK: PRESETS (부분 시뮬 · Training 탭의 기본 트레이닝)
-
-    private var presetPrograms: [Program] {
-        store.programs.filter { $0.id == "preset.firstHalf" || $0.id == "preset.secondHalf" }
-    }
-
-    private func presetSub(_ p: Program) -> String {
-        let first: String = p.seq.count > 1 ? "Run + " + p.seq[1].name() : ""
-        let lastName: String = p.seq.last?.name() ?? ""
-        return "\(first) … Run + \(lastName) · " + String(localized: "\(p.seq.count) segments")
-    }
-
-    @ViewBuilder
-    private var presets: some View {
-        let ps: [Program] = presetPrograms
-        if !ps.isEmpty {
-            SectionLabel(text: "PRESETS", top: 20)
-            VStack(spacing: 0) {
-                ForEach(Array(ps.enumerated()), id: \.element.id) { i, p in
-                    presetRow(p, last: i == ps.count - 1)
-                }
-            }
-            .card8()
-        }
-    }
-
-    private func presetRow(_ p: Program, last: Bool) -> some View {
-        Button { r.edit(p) } label: {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(p.name.l10n).font(F.t(15, .semibold)).lineLimit(1)
-                    Text(presetSub(p)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Chevron8()
-            }
-            .padding(.vertical, 14).padding(.horizontal, 18)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .rowLine(!last)
-        .accessibilityIdentifier("sim.preset." + p.id)
     }
 
     // MARK: 그래프 카드 (padding 18, gap 18)
@@ -266,7 +219,7 @@ struct SimView: View {
             .frame(minHeight: 52).padding(.horizontal, 18)
             .rowLine(true)
             HStack(spacing: 12) {
-                Text("Auto Roxzone").font(F.t(17))
+                Text("Add Roxzone").font(F.t(17))
                 Spacer()
                 Toggle8(on: Binding(get: { store.settings.roxAuto }, set: { store.settings.roxAuto = $0 }))
             }
@@ -280,10 +233,8 @@ struct SimView: View {
     @ViewBuilder
     private var history: some View {
         let recs: [Record] = store.records(.sim)
-        HistoryHeader(view: $histView)
-        if histView == "calendar" {
-            HistoryCalendar(mode: .sim)
-        } else if !recs.isEmpty {
+        HistoryHeader()
+        if !recs.isEmpty {
             VStack(spacing: 0) {
                 ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
                     simRow(recs, i, rec)
@@ -308,7 +259,7 @@ struct SimView: View {
         else { sub = " " }
         let color: Color = isBest ? C.accent : ((d ?? 0) <= 0 ? C.good : C.bad)
         return HistoryRow(title: Fm.wdm.string(from: rec.date), sub: sub, subColor: color,
-                          time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), partner: rec.partner,
+                          time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: .sim) }
     }
 }
@@ -378,8 +329,6 @@ struct RaceView: View {
     let store = Store.shared
     let r = Router.shared
     @State private var goalSheet = false
-    @AppStorage("histView.race") private var histView: String = "list"
-
     var body: some View {
         VStack(spacing: 10) {
             goalCard
@@ -411,7 +360,7 @@ struct RaceView: View {
                         .font(F.num(15)).foregroundStyle(C.accent).lineLimit(1)
                         .padding(.horizontal, 10).frame(height: 26)
                         .background(Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.14), in: Capsule())
-                    Text("vs best").font(F.t(11)).foregroundStyle(C.text3)
+                    Text("vs best").font(F.t(F.foot)).foregroundStyle(C.text3)
                 }
                 .padding(.top, 2)
             }
@@ -421,7 +370,7 @@ struct RaceView: View {
                 bar("Best", frac: best == nil ? 0 : 1, fill: Color.white.opacity(0.35),
                     value: best.map { Fm.t($0) } ?? "--:--", valueColor: C.text2)
             }
-            Text(goalLine(best: best, goal: goal)).font(F.t(13)).foregroundStyle(C.text3)
+            Text(goalLine(best: best, goal: goal)).font(F.t(F.sub)).foregroundStyle(C.text3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 12)
                 .overlay(alignment: .top) { Rectangle().fill(C.line).frame(height: 1) }
@@ -550,10 +499,8 @@ struct RaceView: View {
     @ViewBuilder
     private var history: some View {
         let recs: [Record] = store.records(.race)
-        HistoryHeader(view: $histView)
-        if histView == "calendar" {
-            HistoryCalendar(mode: .race)
-        } else if !recs.isEmpty {
+        HistoryHeader()
+        if !recs.isEmpty {
             VStack(spacing: 0) {
                 ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
                     raceRow(recs, i, rec)
@@ -569,7 +516,7 @@ struct RaceView: View {
         let d: Int = rec.total - (rec.goal ?? store.settings.goalTime)
         return HistoryRow(title: rec.title, sub: Fm.wdmy.string(from: rec.date), time: Fm.t(rec.total),
                           delta: Fm.d(d) + " " + "vs goal".l10n, deltaColor: d < 0 ? C.good : C.bad,
-                          last: i == recs.count - 1, pb: store.isPB(rec), partner: rec.partner,
+                          last: i == recs.count - 1, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: .race) }
     }
 }
@@ -798,7 +745,7 @@ struct RunFatigueCard: View {
         let worst: Int? = result.worst
         return VStack(alignment: .leading, spacing: 0) {
             Text("How much slower the 1 km after each station is, against your average run of \(Fm.t(result.avgRun)) /km")
-                .font(F.t(13)).foregroundStyle(C.text2)
+                .font(F.t(F.sub)).foregroundStyle(C.text2)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 9) {
                 ForEach(0..<result.names.count, id: \.self) { i in
@@ -808,7 +755,7 @@ struct RunFatigueCard: View {
             .padding(.top, 14)
             tip(worst)
                 .padding(.top, 14)
-            Text(footnote.l10n).font(F.t(11)).foregroundStyle(C.text2)
+            Text(footnote.l10n).font(F.t(F.foot)).foregroundStyle(C.text2)
                 .padding(.top, 10)
         }
         .padding(.vertical, 16).padding(.horizontal, 18)
@@ -830,8 +777,8 @@ struct RunFatigueCard: View {
         let d: Int? = result.deltas[i]
         let f: CGFloat = frac(d)
         return HStack(spacing: 10) {
-            Text(result.names[i]).font(F.t(13)).lineLimit(1)
-                .frame(width: 86, alignment: .leading)
+            Text(result.names[i]).font(F.t(F.sub)).lineLimit(1).minimumScaleFactor(0.85)
+                .frame(width: 104, alignment: .leading)
             GeometryReader { g in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.08))
@@ -840,9 +787,9 @@ struct RunFatigueCard: View {
                 }
             }
             .frame(height: 10)
-            Text(valueText(d)).font(F.num(13)).foregroundStyle(top ? C.accent : Color.white)
+            Text(valueText(d)).font(F.num(F.sub)).foregroundStyle(top ? C.accent : Color.white)
                 .lineLimit(1)
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: 56, alignment: .trailing)
         }
     }
 
@@ -854,7 +801,7 @@ struct RunFatigueCard: View {
             let head: Text = Text("The run after \(name)").foregroundColor(C.accent).fontWeight(.semibold)
             let rest: Text = Text(" is your slowest (\(delta)). Practice compromised running straight off \(name).")
             (head + rest)
-                .font(F.t(13)).lineSpacing(3)
+                .font(F.t(F.sub)).lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 10).padding(.horizontal, 12)
@@ -862,7 +809,7 @@ struct RunFatigueCard: View {
                             in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         } else {
             Text("You're holding your average pace on the runs after stations too.")
-                .font(F.t(13))
+                .font(F.t(F.sub))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 10).padding(.horizontal, 12)
                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))

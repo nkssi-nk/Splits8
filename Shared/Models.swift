@@ -123,11 +123,6 @@ struct Program: Codable, Hashable, Identifiable {
     var quick: Bool = false        // 워치에서 만든 Quick training
 
     static func presets() -> [Program] {
-        // 부분 시뮬 (HYROX 앞 4구간 / 뒤 4구간: Run 1KM + 스테이션 × 4 = 8 segments). id 는 "preset." 으로 시작
-        let firstKeys: [String] = ["skiErg", "sledPush", "sledPull", "burpeeBroadJump"]
-        let secondKeys: [String] = ["row", "farmersCarry", "sandbagLunges", "wallBalls"]
-        let firstHalf: [ProgItem] = firstKeys.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0)] }
-        let secondHalf: [ProgItem] = secondKeys.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0)] }
         return [
             Program(id: "p1", name: "Sled Intervals", sets: 1,
                     seq: [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: "sledPush"),
@@ -136,10 +131,6 @@ struct Program: Codable, Hashable, Identifiable {
             Program(id: "p2", name: "Wall Ball Run", sets: 1,
                     seq: [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: "wallBalls"), ProgItem(icon: "sandbagLunges")],
                     meta: "1 set · about 14 min"),
-            Program(id: "preset.firstHalf", name: "First half", sets: 1, seq: firstHalf,
-                    meta: "1 set · 8 segments · about 34 min"),
-            Program(id: "preset.secondHalf", name: "Second half", sets: 1, seq: secondHalf,
-                    meta: "1 set · 8 segments · about 34 min"),
         ]
     }
 
@@ -257,6 +248,7 @@ struct Record: Codable, Hashable, Identifiable {
     var vsTarget: Int?         // 비교 기준 총 시간
     var partner: String? = nil // 더블 파트너 닉네임 (@ 없이). 예전 기록엔 없음
     var source: String? = nil  // "phone" = 워치 없이 아이폰으로 기록. nil = 워치
+    var complete: Bool? = nil  // 끝까지 다 했는지 (End 로 중간에 끝내면 false). 예전 기록엔 없음 → 구간 수로 판단
 
     /// 러닝·스테이션 16개 (Roxzone 제외)
     var splits16: [Int]? {
@@ -452,4 +444,46 @@ extension Mode {
         case .race: return 0xFF9F0A
         }
     }
+}
+
+
+// MARK: - 이상한 기록 (미완료 · 확인 필요) — PB·최고 기록에서 뺌
+
+enum RecordFlag: String {
+    case incomplete     // 끝까지 안 하고 End
+    case check          // 말이 안 되게 빠름 (세계기록보다 훨씬 빠르거나 탭 실수)
+
+    var label: String { self == .incomplete ? "Incomplete" : "Check" }
+}
+
+extension Record {
+    /// 개인 50분, 더블 45분보다 빠르면 확인 필요 (세계기록: Pro 남 51:59, 더블 Pro 남 47:41 — 2026)
+    static let minSolo: Int = 50 * 60
+    static let minDoubles: Int = 45 * 60
+    /// 1km 런 2:30, 스테이션 30초보다 빠르면 확인 필요
+    static let minRun: Int = 150
+    static let minStation: Int = 30
+
+    var isDoubles: Bool { division.lowercased().hasPrefix("doubles") || division.hasPrefix("dbl") }
+
+    /// 끝까지 했는지 (예전 기록: Full Sim·Race 는 16구간이 다 있으면 끝까지 한 것으로 봄)
+    var isComplete: Bool {
+        if let complete { return complete }
+        return mode == .training ? true : splits16 != nil
+    }
+
+    /// nil = 정상
+    var flag: RecordFlag? {
+        if !isComplete { return .incomplete }
+        guard mode != .training else { return nil }
+        if total < (isDoubles ? Self.minDoubles : Self.minSolo) { return .check }
+        for s in segs {
+            if s.kind == .run && s.time < Self.minRun { return .check }
+            if s.kind == .st && s.time < Self.minStation { return .check }
+        }
+        return nil
+    }
+
+    /// PB·최고 기록·비교 기준에 넣어도 되는 기록인지
+    var counts: Bool { flag == nil }
 }

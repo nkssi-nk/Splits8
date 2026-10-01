@@ -193,8 +193,10 @@ final class Supabase {
 
     // MARK: 기록 (요약만 올림 — 심박 원본은 기기에만)
 
+    /// 미완료·확인 필요 기록은 서버(친구 비교·순위표)에 안 올림
     func upload(_ r: Record) async throws {
         guard let id = userId else { throw SBError.noSession }
+        guard r.counts else { return }
         var b: [String: Any] = ["id": r.id.uuidString.lowercased(), "user_id": id, "mode": r.mode.rawValue,
                                 "date": Fm.ymd.string(from: r.date), "total_s": r.total, "rox_s": r.roxTotal,
                                 "division": r.division]

@@ -6,14 +6,18 @@ import UniformTypeIdentifiers
 struct TrainingView: View {
     let store = Store.shared
     let r = Router.shared
-    @AppStorage("histView.training") private var histView: String = "list"
-
     var body: some View {
         VStack(spacing: 10) {
             newButton
             if let f = store.friend { friendCard(f) }
             ForEach(store.programs) { p in
-                ProgramCard(p: p) { r.edit(p) }
+                SwipeDelete(corner: 20, press: true, alertTitle: "Delete this training?",
+                            alertMessage: "Records you've done with it stay in History.",
+                            onTap: { r.edit(p) },
+                            onDelete: { store.deleteProgram(p.id) }) {
+                    ProgramCard(p: p)
+                }
+                .accessibilityIdentifier("training.card")
             }
             history
         }
@@ -55,14 +59,12 @@ struct TrainingView: View {
     @ViewBuilder
     private var history: some View {
         let recs: [Record] = store.records(.training)
-        HistoryHeader(view: $histView)
-        if histView == "calendar" {
-            HistoryCalendar(mode: .training)
-        } else if !recs.isEmpty {
+        HistoryHeader()
+        if !recs.isEmpty {
             VStack(spacing: 0) {
                 ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
                     HistoryRow(title: "\(rec.title.l10n) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
-                               time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), partner: rec.partner,
+                               time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
                                onDelete: { store.delete(rec) }) { r.open(rec, from: .training) }
                 }
             }
@@ -77,25 +79,22 @@ struct TrainingView: View {
 struct ProgramCard: View {
     let store = Store.shared
     let p: Program
-    let action: () -> Void
     private let cols: [GridItem] = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4)
 
+    /// 누르기·밀어서 삭제는 바깥 SwipeDelete 가 맡음
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                LazyVGrid(columns: cols, spacing: 6) {
-                    ForEach(Array(p.seq.enumerated()), id: \.offset) { _, it in
-                        chip(it)
-                    }
+        VStack(alignment: .leading, spacing: 16) {
+            header
+            LazyVGrid(columns: cols, spacing: 6) {
+                ForEach(Array(p.seq.enumerated()), id: \.offset) { _, it in
+                    chip(it)
                 }
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .card8()
-            .contentShape(Rectangle())
         }
-        .buttonStyle(Press())
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card8()
+        .contentShape(Rectangle())
     }
 
     private var header: some View {
@@ -139,64 +138,30 @@ struct HistoryRow: View {
     var deltaColor: Color
     var last: Bool
     var pb: Bool
+    var flag: RecordFlag?
     var onDelete: (() -> Void)?
     let action: () -> Void
 
-    @State private var offset: CGFloat = 0
-    @State private var settled: CGFloat = 0
-    @State private var ask = false
-    private let reveal: CGFloat = 84
-
     /// partner: 더블 파트너 닉네임 (@ 없이) — 있으면 아래 줄 끝에 " · with @닉네임"
     init(title: String, sub: String, subColor: Color = C.text2, subTracking: CGFloat = 0, time: String, delta: String? = nil,
-         deltaColor: Color = C.good, last: Bool = false, pb: Bool = false, partner: String? = nil,
+         deltaColor: Color = C.good, last: Bool = false, pb: Bool = false, flag: RecordFlag? = nil, partner: String? = nil,
          onDelete: (() -> Void)? = nil, action: @escaping () -> Void) {
         let nick: String = (partner ?? "").trimmingCharacters(in: .whitespaces)
         self.title = title; self.sub = nick.isEmpty ? sub : sub + " · " + String(localized: "with @\(nick)")
         self.subColor = subColor; self.subTracking = subTracking; self.time = time
-        self.delta = delta; self.deltaColor = deltaColor; self.last = last; self.pb = pb
+        self.delta = delta; self.deltaColor = deltaColor; self.last = last; self.pb = pb; self.flag = flag
         self.onDelete = onDelete; self.action = action
     }
 
+    @ViewBuilder
     var body: some View {
-        ZStack(alignment: .trailing) {
-            if onDelete != nil && offset < 0 {
-                Button { ask = true } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: "trash").font(.system(size: 17, weight: .semibold))
-                        Text("Delete").font(F.t(11, .semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(width: max(reveal, -offset))
-                    .frame(maxHeight: .infinity)
-                    .background(C.bad)
-                }
+        if let onDelete {
+            SwipeDelete(alertTitle: "Delete this record?", onTap: action, onDelete: onDelete) { rowContent }
+                .rowLine(!last)
+        } else {
+            Button(action: action) { rowContent }
                 .buttonStyle(.plain)
-            }
-            Button {
-                if settled != 0 { close() } else { action() }
-            } label: {
-                rowContent
-            }
-            .buttonStyle(.plain)
-            .offset(x: offset)
-        }
-        .clipped()
-        .rowLine(!last)
-        .simultaneousGesture(onDelete == nil ? nil : swipe)
-        .contextMenu {
-            if onDelete != nil {
-                Button(role: .destructive) { ask = true } label: { Label("Delete", systemImage: "trash") }
-            }
-        }
-        .alert("Delete this record?", isPresented: $ask) {
-            Button("Delete", role: .destructive) {
-                close()
-                withAnimation(.easeOut(duration: 0.25)) { onDelete?() }
-            }
-            Button("Cancel", role: .cancel) { close() }
-        } message: {
-            Text("This can't be undone.")
+                .rowLine(!last)
         }
     }
 
@@ -206,6 +171,7 @@ struct HistoryRow: View {
                 HStack(spacing: 8) {
                     Text(title).font(F.t(17, .medium)).lineLimit(1)
                     if pb { PBPill() }
+                    if let flag { FlagPill(flag: flag) }
                 }
                 Text(sub).font(F.t(13)).tracking(subTracking).monospacedDigit().foregroundStyle(subColor).lineLimit(1)
             }
@@ -221,31 +187,6 @@ struct HistoryRow: View {
         .padding(.vertical, 14).padding(.horizontal, 18)
         .background(Color.black.opacity(0.001))
         .contentShape(Rectangle())
-    }
-
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 20)
-            .onChanged { v in
-                guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                offset = min(0, settled + v.translation.width)
-            }
-            .onEnded { v in
-                let horizontal = abs(v.translation.width) > abs(v.translation.height)
-                let x = horizontal ? settled + v.translation.width : settled
-                withAnimation(.snappy(duration: 0.25)) {
-                    if x < -200 {
-                        offset = -reveal; settled = -reveal; ask = true
-                    } else if x < -reveal / 2 {
-                        offset = -reveal; settled = -reveal
-                    } else {
-                        offset = 0; settled = 0
-                    }
-                }
-            }
-    }
-
-    private func close() {
-        withAnimation(.snappy(duration: 0.25)) { offset = 0; settled = 0 }
     }
 }
 
@@ -552,6 +493,19 @@ struct PBPill: View {
         .frame(height: 20)
         .background(Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .fixedSize()
+    }
+}
+
+/// 미완료 / 확인 필요 회색 꼬리표 (이런 기록은 PB·최고 기록에서 빠짐)
+struct FlagPill: View {
+    let flag: RecordFlag
+    var body: some View {
+        Text(flag.label.l10n).font(F.t(11, .semibold)).tracking(0.22)
+            .foregroundStyle(C.text2)
+            .padding(.horizontal, 7)
+            .frame(height: 20)
+            .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .fixedSize()
     }
 }
 

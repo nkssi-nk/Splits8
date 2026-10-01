@@ -1,32 +1,22 @@
 import SwiftUI
 
-// MARK: - HISTORY 머리줄 (라벨 + List | Calendar 전환)
+// MARK: - HISTORY 머리줄
 
-/// HISTORY 라벨 줄. 오른쪽 작은 세그먼트로 목록 ↔ 달력 (값: "list" / "calendar")
+/// HISTORY 라벨 줄 (모드 화면 기록은 목록만. 달력은 홈 한 곳에서 모드 필터로 확인)
 struct HistoryHeader: View {
-    @Binding var view: String
-
     var body: some View {
-        HStack(spacing: 8) {
-            Label8("HISTORY")
-            Spacer(minLength: 8)
-            Seg8(items: [("list", "List"), ("calendar", "Calendar")], selected: view,
-                 height: 28, radius: 9, fontSize: 13) { v in
-                withAnimation(.easeOut(duration: 0.2)) { view = v }
-            }
-            .frame(width: 150)
-            .accessibilityIdentifier("history.viewToggle")
-        }
-        .padding(.top, 20).padding(.horizontal, 4)
+        SectionLabel(text: "HISTORY", top: 20)
     }
 }
 
 // MARK: - 기록 달력 (모드별)
 
-/// 달력: 채운 점 = 그 모드 기록, 빈 링 = 예약 (레이스는 등록한 대회 날짜). 날짜를 누르면 아래에 그날 기록·예약.
-/// mode == nil 이면 홈용 전체 달력 (트레이닝·풀시뮬·레이스 모두, 점 색으로 구분)
+/// 홈 달력: 채운 점 = 기록, 빈 링 = 예약, 깃발 = 대회 날. 날짜를 누르면 아래에 그날 기록·예약.
+/// 위쪽 필터(All · Training · Full Sim · Race)로 모드별로 볼 수 있음. All 이면 점 색으로 구분
 struct HistoryCalendar: View {
-    let mode: Mode?
+    /// 필터: "all" / "training" / "sim" / "race" (마지막 선택 기억)
+    @AppStorage("homeCalFilter") private var filterRaw: String = "all"
+    private var mode: Mode? { Mode(rawValue: filterRaw) }
     let store = Store.shared
     let r = Router.shared
 
@@ -50,15 +40,8 @@ struct HistoryCalendar: View {
 
     private var isPast: Bool { selected < cal.startOfDay(for: Date()) }
 
-    private static func screen(for m: Mode) -> Scr {
-        switch m {
-        case .training: return .training
-        case .sim: return .sim
-        case .race: return .race
-        }
-    }
-    /// 기록을 연 화면 (홈 달력이면 홈으로 돌아옴)
-    private func backScreen(_ rec: Record) -> Scr { mode == nil ? .home : Self.screen(for: rec.mode) }
+    /// 기록을 연 화면 (홈 달력 → 홈으로 돌아옴)
+    private func backScreen(_ rec: Record) -> Scr { .home }
 
     private static func label(for m: Mode) -> String {
         switch m {
@@ -73,6 +56,7 @@ struct HistoryCalendar: View {
         let plans: [PlannedWorkout] = plansOn(selected)
         let race: Bool = isRaceDay(selected)
         return VStack(spacing: 10) {
+            filterBar
             calendarCard
             SectionLabel(text: Fm.wdm.string(from: selected).uppercased(), top: 10)
             if !recs.isEmpty { recordsCard(recs) }
@@ -86,6 +70,16 @@ struct HistoryCalendar: View {
             }
             if !isPast { planButton }
         }
+    }
+
+    // MARK: 모드 필터
+
+    private var filterBar: some View {
+        Seg8(items: [("all", "All"), ("training", "Training"), ("sim", "Full Sim"), ("race", "Race")],
+             selected: mode == nil ? "all" : filterRaw, height: 32, radius: 10, fontSize: 13) { v in
+            withAnimation(.easeOut(duration: 0.2)) { filterRaw = v }
+        }
+        .accessibilityIdentifier("cal.filter")
     }
 
     // MARK: 달력 카드
@@ -304,7 +298,7 @@ struct HistoryCalendar: View {
         let title: String = rec.mode == .training ? "\(rec.title.l10n) × \(rec.sets)" : (rec.mode == .sim ? "Full Simulation" : rec.title.l10n)
         let sub: String = Fm.wdm.string(from: rec.date) + " · " + Self.timeFmt.string(from: rec.date)
         let from: Scr = backScreen(rec)
-        return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec),
+        return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec), flag: rec.flag,
                           partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: from) }
     }

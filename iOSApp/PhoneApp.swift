@@ -88,6 +88,9 @@ final class Router {
         planRequest = PlanRequest(date: date, mode: mode, existing: existing)
     }
 
+    // 사진 크게 보기 (nil 이면 닫힘)
+    var photoView: PhotoItem? = nil
+
     // 아이폰으로 기록
     var phoneRun: PhoneRunRequest? = nil
     func startOnPhone(_ mode: Mode, program: Program? = nil) {
@@ -267,7 +270,7 @@ struct PhoneRoot: View {
             // SwiftUI 제스처는 스크롤 화면이 터치를 먼저 가져가서 안 먹었음 → UIKit 화면 가장자리 제스처로 교체
             // (다른 스크롤 제스처들이 이 제스처가 실패할 때까지 기다리게 해서 가장자리 밀기가 항상 우선)
             EdgeSwipeBack(
-                enabled: edgeBack != nil && !r.saveOpen,
+                enabled: edgeBack != nil && !r.saveOpen && r.photoView == nil,
                 onChanged: { dx in edgeDrag = max(0, dx) * 0.6 },
                 onEnded: { dx, vx in
                     let go: Bool = dx > 80 || (dx > 30 && vx > 500)
@@ -291,7 +294,14 @@ struct PhoneRoot: View {
             }
 
             if r.saveOpen { SaveSheet() }
+
+            if let p = r.photoView {
+                PhotoViewer(item: p)
+                    .transition(.opacity)
+                    .zIndex(10)
+            }
         }
+        .animation(.easeOut(duration: 0.2), value: r.photoView)
         .sheet(isPresented: Binding(get: { r.planRequest != nil }, set: { if !$0 { r.planRequest = nil } })) {
             if let req = r.planRequest {
                 PlanSheet(request: req)

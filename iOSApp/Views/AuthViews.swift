@@ -407,7 +407,7 @@ struct AccountView: View {
         .onChange(of: pick) { _, item in
             Task {
                 if let item, let d = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: d) {
-                    store.setPhoto(Store.square320(img))
+                    store.setPhoto(Store.squarePhoto(img))
                 }
                 pick = nil
             }

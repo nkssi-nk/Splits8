@@ -127,7 +127,7 @@ final class WorkoutEngine: NSObject {
         let now = Date()
         closeSeg(now)
         if splits.count >= seq.count {
-            finish(now)
+            finish(now, complete: true)
         } else {
             idx = splits.count
             segStart = now; segPaused = 0
@@ -156,7 +156,7 @@ final class WorkoutEngine: NSObject {
         if !running { togglePause() }
         let now = Date()
         closeSeg(now)
-        finish(now)
+        finish(now, complete: splits.count >= seq.count)   // 마지막 구간에서 End 눌러도 다 한 것
     }
 
     func reset() {
@@ -208,7 +208,7 @@ final class WorkoutEngine: NSObject {
         if cur.kind == .run, segDists.indices.contains(idx) { segDists[idx] = segDist }
     }
 
-    private func makeRecord() -> Record {
+    private func makeRecord(complete: Bool) -> Record {
         let bpms = hrSamples.map(\.b)
         var results: [SegResult] = []
         for (i, t) in splits.enumerated() where seq.indices.contains(i) {
@@ -224,12 +224,12 @@ final class WorkoutEngine: NSObject {
                       kcal: Int(kcal.rounded()), avgHR: bpms.isEmpty ? 0 : bpms.reduce(0, +) / bpms.count,
                       maxHR: bpms.max() ?? 0, division: settings.div.name,
                       goal: mode == .race ? settings.goalTime : nil,
-                      vsWord: deltaWord, vsTarget: tg)
+                      vsWord: deltaWord, vsTarget: tg, complete: complete)
     }
 
-    private func finish(_ now: Date) {
+    private func finish(_ now: Date, complete: Bool) {
         stopTick()
-        let r = makeRecord()
+        let r = makeRecord(complete: complete)
         lastRecord = r
         finished = true
         WatchStore.shared.send(r)
@@ -273,7 +273,7 @@ final class WorkoutEngine: NSObject {
             kcal = 612
             let passed: Int = splits.reduce(0, +)
             startDate = now.addingTimeInterval(-Double(passed))
-            lastRecord = makeRecord()
+            lastRecord = makeRecord(complete: true)
             finished = true
         } else {
             self.idx = idx

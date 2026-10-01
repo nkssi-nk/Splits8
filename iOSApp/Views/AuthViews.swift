@@ -401,7 +401,6 @@ struct AccountView: View {
             photoBlock
             SectionLabel(text: "ATHLETE", top: 14)
             athleteCard
-            Note8(text: "Division sets station weights, and heart rate is used for zones. Friends only see your photo, nickname and division.")
             if store.signedIn { accountBlock } else { signUpCard }
         }
         .padding(.horizontal, 16)

@@ -83,6 +83,7 @@ struct DetailView: View {
         switch r.detailFrom {
         case .training: return "Training"
         case .sim: return "Full Simulation"
+        case .home: return "Home"
         default: return "Race"
         }
     }

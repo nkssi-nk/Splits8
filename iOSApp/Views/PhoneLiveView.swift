@@ -500,9 +500,10 @@ struct PhoneLiveView: View {
 struct StartOnPhoneButton: View {
     let mode: Mode
     var program: Program? = nil
+    @State private var confirm = false
 
     var body: some View {
-        Button { Router.shared.startOnPhone(mode, program: program) } label: {
+        Button { confirm = true } label: {
             HStack(spacing: 6) {
                 Image(systemName: "iphone").font(.system(size: 14, weight: .semibold))
                 Text("Start on iPhone").font(F.t(14, .semibold)).lineLimit(1)
@@ -515,5 +516,12 @@ struct StartOnPhoneButton: View {
         .buttonStyle(Press(scale: 0.96))
         .fixedSize()
         .accessibilityIdentifier("startOnPhone." + mode.rawValue)
+        // 시작 전 확인: 아이폰 기록은 워치 기능(심박 등)을 못 씀
+        .alert("Start on iPhone?", isPresented: $confirm) {
+            Button("Start") { Router.shared.startOnPhone(mode, program: program) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Recording on iPhone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs).")
+        }
     }
 }

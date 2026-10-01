@@ -144,7 +144,7 @@ final class Store: NSObject, WCSessionDelegate {
 
     static func reminderBody(_ p: PlannedWorkout) -> String {
         let f = DateFormatter()
-        f.locale = Locale.current
+        f.locale = Fm.isKorean ? Locale(identifier: "ko_KR") : Fm.gb
         f.setLocalizedDateFormatFromTemplate("EEEMMMdjmm")
         return f.string(from: p.date)
     }

@@ -212,6 +212,7 @@ enum Fm {
     static let gb = Locale(identifier: "en_GB")
     static let posix = Locale(identifier: "en_US_POSIX")
     /// 앱 화면 언어가 한국어인지 (Localizable.strings 기준)
+    /// 앱 언어가 한국어인지 (iPhone 언어 또는 설정 → Language 선택을 따름)
     static var isKorean: Bool { (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("ko") }
     /// 화면용 날짜: 영어는 시안 그대로(en_GB 고정 형식), 한국어는 template 으로 현지 형식
     private static func df(_ f: String, ko template: String, en: Locale = Fm.gb) -> DateFormatter {

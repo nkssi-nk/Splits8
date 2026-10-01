@@ -34,10 +34,41 @@ struct SettingsView: View {
             .card8()
             Note8(text: "Apple Watch alerts you with a vibration during workouts.")
 
+            languageSection
+
             SectionLabel(text: "DEVICE", top: 14)
             deviceCard
         }
         .padding(.horizontal, 16)
+    }
+
+    // MARK: 언어 (기본: iPhone 언어를 따름. 고르면 이 앱만 그 언어로 — 앱을 다시 시작하면 적용)
+
+    @AppStorage("appLanguage") private var appLanguage: String = "system"   // system / ko / en
+    @State private var askRestart = false
+
+    private var languageSection: some View {
+        VStack(spacing: 10) {
+            SectionLabel(text: "LANGUAGE", top: 14)
+            Seg8(items: [("system", "System"), ("ko", "한국어"), ("en", "English")], selected: appLanguage,
+                 height: 34, radius: 11, fontSize: 14) { k in setLanguage(k) }
+                .accessibilityIdentifier("settings.language")
+            Note8(text: "Follows your iPhone language unless you pick one here.")
+        }
+        .alert("Restart the app to apply the language.", isPresented: $askRestart) {
+            Button("OK", role: .cancel) {}
+        }
+    }
+
+    private func setLanguage(_ k: String) {
+        guard k != appLanguage else { return }
+        appLanguage = k
+        if k == "system" {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")   // iPhone 언어 따르기
+        } else {
+            UserDefaults.standard.set([k], forKey: "AppleLanguages")
+        }
+        askRestart = true
     }
 
     private var zoneBinding: Binding<Bool> {

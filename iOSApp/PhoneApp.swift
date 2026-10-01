@@ -108,6 +108,7 @@ final class Router {
     func go(_ s: Scr) {
         guard s != scr else { return }
         backAction = nil
+        TabBarScroll.shared.reset()
         withAnimation(.easeInOut(duration: 0.25)) { scr = s }
     }
 
@@ -340,8 +341,44 @@ struct Scroll8<Content: View>: View {
             content
                 .padding(.top, Router.shared.scr.showsBar ? 52 : 4)
                 .padding(.bottom, bottom)
+                .background(alignment: .top) {
+                    GeometryReader { g in
+                        Color.clear.preference(key: ScrollY8.self, value: -g.frame(in: .named("s8scroll")).minY)
+                    }
+                    .frame(height: 0)
+                }
         }
+        .coordinateSpace(name: "s8scroll")
+        .onPreferenceChange(ScrollY8.self) { y in TabBarScroll.shared.update(y) }
         .scrollDismissesKeyboard(.interactively)
+    }
+}
+
+/// 스크롤 위치 (위로 얼마나 올라갔는지, pt)
+struct ScrollY8: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// 아래 탭 바 접기/펴기: 내용을 아래로 읽어 내려가면(손가락을 위로) 아이콘만, 다시 위로 올리면(손가락을 아래로) 글자까지 펼침
+@Observable
+final class TabBarScroll {
+    static let shared = TabBarScroll()
+    var compact = false
+    @ObservationIgnored private var last: CGFloat = 0
+
+    func update(_ y: CGFloat) {
+        if y < 24 {                       // 맨 위 근처에서는 항상 펼침
+            set(false); last = y; return
+        }
+        let d: CGFloat = y - last
+        if d > 8 { set(true); last = y }       // 아래로 읽어 내려감 → 접기
+        else if d < -8 { set(false); last = y } // 위로 되돌아감 → 펼치기
+    }
+    func reset() { last = 0; set(false) }
+    private func set(_ v: Bool) {
+        guard v != compact else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { compact = v }
     }
 }
 
@@ -394,6 +431,7 @@ struct TopBar8: View {
 /// 그림자 0 8 24 rgba(0,0,0,0.5). 버튼 54 높이, 선택 rgba(255,255,255,0.08). 아이콘 26 · 글자 11/600
 struct TabBar8: View {
     let r = Router.shared
+    let scroll = TabBarScroll.shared
     @Namespace private var ns
     struct Tab: Identifiable { let scr: Scr; let label: String; let icon: String; var id: String { label } }
     private let tabs: [Tab] = [
@@ -410,10 +448,13 @@ struct TabBar8: View {
                 Button { r.go(t.scr) } label: {
                     VStack(spacing: 2) {
                         if t.icon == "modeTraining" { Icon8(t.icon, 26, c) } else { Glyph(t.icon, 25, c) }
-                        Text(t.label.l10n).font(F.t(11, .semibold)).lineLimit(1).fixedSize()
+                        if !scroll.compact {   // 아래로 읽어 내려갈 땐 아이콘만, 위로 올리면 글자까지
+                            Text(t.label.l10n).font(F.t(11, .semibold)).lineLimit(1).fixedSize()
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
                     .foregroundStyle(c)
-                    .frame(maxWidth: .infinity).frame(height: 54)
+                    .frame(maxWidth: .infinity).frame(height: scroll.compact ? 40 : 54)
                     .background {
                         if on {
                             Capsule().fill(Color.white.opacity(0.08))
@@ -427,8 +468,9 @@ struct TabBar8: View {
             }
         }
         .padding(4)
-        .frame(height: 62)
+        .frame(height: scroll.compact ? 48 : 62)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: r.scr.tab)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: scroll.compact)
     }
 
     var body: some View {

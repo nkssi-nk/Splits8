@@ -10,14 +10,16 @@ struct HomeView: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            // 대표님 요청 순서: 프로필 → 대회 일정 → 기록 달력(예약·기록 확인) → 주/월 요약 (예정된 운동 목록은 달력으로 대체)
             Group {
                 profileCard
+                SectionLabel(text: "NEXT RACE")
+                nextRace
+                SectionLabel(text: "CALENDAR")
+                HistoryCalendar(mode: nil)
                 summaryHeader
                 summaryCard
-                upcoming
             }
-            SectionLabel(text: "NEXT RACE")
-            nextRace
             SectionLabel(text: "MODES")
             startTiles
             SectionLabel(text: "PERSONAL BESTS")
@@ -39,7 +41,7 @@ struct HomeView: View {
         .padding(.horizontal, 16)
     }
 
-    // 프로필: 52 원, @nick 17/600, 체급 13 회색, Edit 알약
+    // 프로필: 52 원, @nick 17/600, 체급 13 회색 · 오른쪽에 내 최고 기록 (편집은 설정 → 프로필에서만)
     private var profileCard: some View {
         let signed = store.signedIn, nick = store.settings.nickname ?? ""
         return HStack(spacing: 14) {
@@ -50,11 +52,29 @@ struct HomeView: View {
                 Text(store.div.name).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            GrayPill(title: "Edit", icon: "i_pencil") { r.go(.account) }
-                .accessibilityIdentifier("home.edit")
+            profileBest
         }
         .padding(.vertical, 14).padding(.horizontal, 16)
         .card8()
+        .accessibilityIdentifier("home.profile")
+    }
+
+    /// 내 최고 기록: Full Sim 최고 (없으면 Race 최고). 둘 다 없으면 표시 안 함
+    @ViewBuilder private var profileBest: some View {
+        let sim: Record? = store.simBest
+        let best: Record? = sim ?? store.raceBest
+        if let b = best {
+            VStack(alignment: .trailing, spacing: 1) {
+                HStack(spacing: 3) {
+                    Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold))
+                    Text("PB").font(F.t(11, .semibold)).tracking(0.22)
+                }
+                .foregroundStyle(C.accent)
+                Text(Fm.t(b.total)).font(F.num(22)).tracking(-0.44).lineLimit(1)
+                Text(sim != nil ? "Full Sim" : "Race").font(F.t(11)).foregroundStyle(C.text2)
+            }
+            .fixedSize()
+        }
     }
 
     // 다음 대회: 이름 20/600 · 장소·날짜·시간 13 · D-day 28/600 노랑 · 체급 11
@@ -398,7 +418,8 @@ struct HomeView: View {
         }
         let ev = store.settings.event
         let cal = Calendar.current
-        if ev.isSet && cal.startOfDay(for: ev.date) >= cal.startOfDay(for: Date()) {
+        // 대회는 바로 위 NEXT RACE 카드에 있으므로 UPCOMING에는 예약한 운동만 (중복 방지)
+        if false && ev.isSet && cal.startOfDay(for: ev.date) >= cal.startOfDay(for: Date()) {
             let parts: [String] = [Fm.wdm.string(from: ev.date), dday(ev.date), "🔔 " + PlanReminder.weekBefore.short.l10n]
             out.append(UpItem(id: "race", date: Self.eventStart(ev), title: ev.name, sub: parts.joined(separator: " · "),
                               color: Color(hex: Mode.race.calendarHex), plan: nil))

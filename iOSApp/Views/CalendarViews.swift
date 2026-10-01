@@ -24,15 +24,16 @@ struct HistoryHeader: View {
 // MARK: - 기록 달력 (모드별)
 
 /// 달력: 채운 점 = 그 모드 기록, 빈 링 = 예약 (레이스는 등록한 대회 날짜). 날짜를 누르면 아래에 그날 기록·예약.
+/// mode == nil 이면 홈용 전체 달력 (트레이닝·풀시뮬·레이스 모두, 점 색으로 구분)
 struct HistoryCalendar: View {
-    let mode: Mode
+    let mode: Mode?
     let store = Store.shared
     let r = Router.shared
 
     @State private var month: Date = HistoryCalendar.monthStart(Date())
     @State private var selected: Date = Calendar.current.startOfDay(for: Date())
 
-    private enum DayMark { case empty, filled, ring }
+    private enum DayMark { case empty, filled([Color]), ring(Color) }
 
     private static var monthFmt: DateFormatter { Fm.monthYear }
     private static var timeFmt: DateFormatter { Fm.time12 }
@@ -44,20 +45,22 @@ struct HistoryCalendar: View {
     }
 
     private var cal: Calendar { Calendar.current }
-    private var tint: Color { Color(hex: mode.calendarHex) }
+    private var tint: Color { mode.map { Color(hex: $0.calendarHex) } ?? C.text2 }
 
     private var isPast: Bool { selected < cal.startOfDay(for: Date()) }
 
-    private var screen: Scr {
-        switch mode {
+    private static func screen(for m: Mode) -> Scr {
+        switch m {
         case .training: return .training
         case .sim: return .sim
         case .race: return .race
         }
     }
+    /// 기록을 연 화면 (홈 달력이면 홈으로 돌아옴)
+    private func backScreen(_ rec: Record) -> Scr { mode == nil ? .home : Self.screen(for: rec.mode) }
 
-    private var modeLabel: String {
-        switch mode {
+    private static func label(for m: Mode) -> String {
+        switch m {
         case .training: return "Training"
         case .sim: return "Full Sim"
         case .race: return "Race"
@@ -203,9 +206,14 @@ struct HistoryCalendar: View {
     }
 
     private func mark(for d: Date) -> DayMark {
-        if !store.records(on: d, mode: mode).isEmpty { return .filled }
-        if !plansOn(d).isEmpty { return .ring }
-        if isRaceDay(d) { return .ring }
+        let recs: [Record] = store.records(on: d, mode: mode)
+        if !recs.isEmpty {
+            // 그날 한 운동 종류별 점 (최대 3개, 트레이닝 → 풀시뮬 → 레이스 순)
+            let modes: [Mode] = Mode.allCases.filter { m in recs.contains { $0.mode == m } }
+            return .filled(modes.map { Color(hex: $0.calendarHex) })
+        }
+        if let p = plansOn(d).first { return .ring(Color(hex: p.mode.calendarHex)) }
+        if isRaceDay(d) { return .ring(Color(hex: Mode.race.calendarHex)) }
         return .empty
     }
 
@@ -214,18 +222,27 @@ struct HistoryCalendar: View {
         switch m {
         case .empty:
             Color.clear.frame(width: 7, height: 7)
-        case .filled:
-            Circle().fill(tint).frame(width: 7, height: 7)
-        case .ring:
-            Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
+        case .filled(let colors):
+            HStack(spacing: 2) {
+                ForEach(Array(colors.enumerated()), id: \.offset) { _, c in
+                    Circle().fill(c).frame(width: 6, height: 6)
+                }
+            }
+            .frame(height: 7)
+        case .ring(let c):
+            Circle().strokeBorder(c, lineWidth: 1.5).frame(width: 7, height: 7)
         }
     }
 
+    private var legendModes: [Mode] { mode.map { [$0] } ?? Mode.allCases }
+
     private var legend: some View {
-        HStack(spacing: 14) {
-            HStack(spacing: 5) {
-                Circle().fill(tint).frame(width: 7, height: 7)
-                Text(modeLabel.l10n)
+        HStack(spacing: 12) {
+            ForEach(legendModes) { m in
+                HStack(spacing: 5) {
+                    Circle().fill(Color(hex: m.calendarHex)).frame(width: 7, height: 7)
+                    Text(Self.label(for: m).l10n)
+                }
             }
             HStack(spacing: 5) {
                 Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
@@ -239,11 +256,11 @@ struct HistoryCalendar: View {
     // MARK: 데이터
 
     private func plansOn(_ d: Date) -> [PlannedWorkout] {
-        store.plans(on: d).filter { $0.mode == mode }
+        store.plans(on: d).filter { mode == nil || $0.mode == mode! }
     }
 
     private func isRaceDay(_ d: Date) -> Bool {
-        guard mode == .race else { return false }
+        guard mode == nil || mode == .race else { return false }
         let ev: RaceEvent = store.settings.event
         guard ev.isSet else { return false }
         return cal.isDate(ev.date, inSameDayAs: d)
@@ -271,9 +288,9 @@ struct HistoryCalendar: View {
     }
 
     private func recordRow(_ rec: Record, last: Bool) -> some View {
-        let title: String = mode == .training ? "\(rec.title.l10n) × \(rec.sets)" : rec.title.l10n
+        let title: String = rec.mode == .training ? "\(rec.title.l10n) × \(rec.sets)" : (rec.mode == .sim ? "Full Simulation" : rec.title.l10n)
         let sub: String = Fm.wdm.string(from: rec.date) + " · " + Self.timeFmt.string(from: rec.date)
-        let from: Scr = screen
+        let from: Scr = backScreen(rec)
         return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec),
                           partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: from) }
@@ -318,7 +335,7 @@ struct HistoryCalendar: View {
         let ev: RaceEvent = store.settings.event
         return Button { r.go(.setEvent) } label: {
             HStack(spacing: 12) {
-                Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 8, height: 8)
+                Circle().strokeBorder(Color(hex: Mode.race.calendarHex), lineWidth: 1.5).frame(width: 8, height: 8)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ev.name).font(F.t(15, .semibold)).lineLimit(1)
                     Text("Race day · \(ev.time)").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
@@ -343,7 +360,7 @@ struct HistoryCalendar: View {
 
     private func planTap() {
         let at: Date = cal.date(bySettingHour: 7, minute: 0, second: 0, of: selected) ?? selected
-        let m: Mode = mode == .race ? .training : mode
+        let m: Mode = (mode == nil || mode == .race) ? .training : mode!
         r.openPlan(date: at, mode: m, existing: nil)
     }
 }

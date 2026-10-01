@@ -28,7 +28,7 @@ struct LargeTitle: View {
     let text: String
     var top: CGFloat = 10
     var body: some View {
-        Text(text).font(F.t(34, .semibold)).tracking(-0.03 * 34)
+        Text(text.l10n).font(F.t(34, .semibold)).tracking(-0.03 * 34)
             .lineSpacing(0)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, top)
@@ -72,7 +72,7 @@ struct BackLink: View {
         Button(action: action) {
             HStack(spacing: 2) {
                 Glyph("i_chevL", 22, C.accent)
-                Text(label).font(F.t(17))
+                Text(label.l10n).font(F.t(17))
             }
             .foregroundStyle(C.accent)
             .frame(height: 44)
@@ -98,12 +98,12 @@ struct NavBar3: View {
     var edgeBack = true
     var body: some View {
         ZStack {
-            Text(title).font(F.t(17, .semibold))
+            Text(title.l10n).font(F.t(17, .semibold))
             HStack {
-                Button(left, action: onLeft).font(F.t(17)).foregroundStyle(leftColor).accessibilityIdentifier("nav.left")
+                Button(left.l10n, action: onLeft).font(F.t(17)).foregroundStyle(leftColor).accessibilityIdentifier("nav.left")
                 Spacer()
                 if let right {
-                    Button(right, action: onRight).font(F.t(17, .semibold)).foregroundStyle(rightColor).accessibilityIdentifier("nav.right")
+                    Button(right.l10n, action: onRight).font(F.t(17, .semibold)).foregroundStyle(rightColor).accessibilityIdentifier("nav.right")
                 } else {
                     Color.clear.frame(width: 40, height: 1)
                 }
@@ -186,7 +186,7 @@ struct YellowPill: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(F.t(13, .semibold)).foregroundStyle(.black)
+            Text(title.l10n).font(F.t(13, .semibold)).foregroundStyle(.black)
                 .padding(.horizontal, 14).frame(height: 34)
                 .yellowCapsule()
         }
@@ -204,7 +204,7 @@ struct GrayPill: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 if let icon { Glyph(icon, 13, .white) }
-                Text(title).font(F.t(13, .semibold))
+                Text(title.l10n).font(F.t(13, .semibold))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 14).frame(height: 34)
@@ -244,7 +244,7 @@ struct Seg8: View {
             ForEach(items.indices, id: \.self) { i in
                 let k = items[i].0, l = items[i].1
                 Button { onSelect(k) } label: {
-                    Text(l).font(F.t(fontSize, .semibold)).tracking(tracking).lineLimit(1)
+                    Text(l.l10n).font(F.t(fontSize, .semibold)).tracking(tracking).lineLimit(1)
                         .foregroundStyle(selected == k ? Color.white : C.text2)
                         .padding(.horizontal, minWidth > 0 ? 12 : 0)
                         .frame(minWidth: minWidth > 0 ? minWidth : nil, maxWidth: minWidth > 0 ? nil : .infinity)
@@ -271,7 +271,7 @@ struct Pills8: View {
             ForEach(items.indices, id: \.self) { i in
                 let k = items[i].0, l = items[i].1
                 Button { onSelect(k) } label: {
-                    Text(l).font(F.t(11, .semibold))
+                    Text(l.l10n).font(F.t(11, .semibold))
                         .foregroundStyle(selected == k ? Color.white : C.text2)
                         .padding(.horizontal, 9).frame(height: 24)
                         .background(selected == k ? C.segOn : Color.clear, in: RoundedRectangle(cornerRadius: 6))
@@ -343,8 +343,8 @@ struct SettingRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Text(title).font(F.t(17)).frame(maxWidth: .infinity, alignment: .leading)
-                Text(value).font(numeric ? F.num(15, .regular) : F.t(15)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
+                Text(title.l10n).font(F.t(17)).frame(maxWidth: .infinity, alignment: .leading)
+                Text(value.l10n).font(numeric ? F.num(15, .regular) : F.t(15)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
                 Chevron8()
             }
             .padding(.vertical, 14).padding(.horizontal, 18)
@@ -415,7 +415,7 @@ struct Field8: View {
     var size: CGFloat = 17
     var vPad: CGFloat = 14
     var body: some View {
-        TextField("", text: $text, prompt: Text(placeholder).foregroundColor(C.text3))
+        TextField("", text: $text, prompt: Text(placeholder.l10n).foregroundColor(C.text3))
             .font(F.t(size))
             .foregroundStyle(.white)
             .padding(.vertical, vPad).padding(.horizontal, 16)
@@ -432,7 +432,7 @@ struct SearchField8: View {
         HStack(spacing: 8) {
             if let prefix { Text(prefix).font(F.t(17)).foregroundStyle(C.text2) }
             else { Glyph("i_search", 16, C.text2) }
-            TextField("", text: $text, prompt: Text(placeholder).foregroundColor(C.text3))
+            TextField("", text: $text, prompt: Text(placeholder.l10n).foregroundColor(C.text3))
                 .font(F.t(17)).foregroundStyle(.white)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.search)
@@ -448,7 +448,7 @@ struct Note8: View {
     let text: String
     var color: Color = C.text3
     var body: some View {
-        Text(text).font(F.t(13)).foregroundStyle(color).lineSpacing(13 * 0.5 - 3)
+        Text(text.l10n).font(F.t(13)).foregroundStyle(color).lineSpacing(13 * 0.5 - 3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 4)

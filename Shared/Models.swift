@@ -14,7 +14,9 @@ struct Division: Codable, Hashable {
         Division(key: "proM", name: "Pro Men", push: 202, pull: 153, fc: 32, sb: 30, wb: 9, wbReps: 100, wbNote: ""),
         Division(key: "proW", name: "Pro Women", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: ""),
         Division(key: "dblM", name: "Doubles Men", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: " · shared"),
+        Division(key: "dblMP", name: "Doubles Men Pro", push: 202, pull: 153, fc: 32, sb: 30, wb: 9, wbReps: 100, wbNote: " · shared"),
         Division(key: "dblW", name: "Doubles Women", push: 102, pull: 78, fc: 16, sb: 10, wb: 4, wbReps: 100, wbNote: " · shared"),
+        Division(key: "dblWP", name: "Doubles Women Pro", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: " · shared"),
         Division(key: "dblX", name: "Doubles Mixed", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: " · shared"),
     ]
     static func of(_ key: String) -> Division { all.first { $0.key == key } ?? all[0] }
@@ -121,7 +123,12 @@ struct Program: Codable, Hashable, Identifiable {
     var quick: Bool = false        // 워치에서 만든 Quick training
 
     static func presets() -> [Program] {
-        [
+        // 부분 시뮬 (HYROX 앞 4구간 / 뒤 4구간: Run 1KM + 스테이션 × 4 = 8 segments). id 는 "preset." 으로 시작
+        let firstKeys: [String] = ["skiErg", "sledPush", "sledPull", "burpeeBroadJump"]
+        let secondKeys: [String] = ["row", "farmersCarry", "sandbagLunges", "wallBalls"]
+        let firstHalf: [ProgItem] = firstKeys.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0)] }
+        let secondHalf: [ProgItem] = secondKeys.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0)] }
+        return [
             Program(id: "p1", name: "Sled Intervals", sets: 1,
                     seq: [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: "sledPush"),
                           ProgItem(icon: "run", run: "1KM"), ProgItem(icon: "sledPull")],
@@ -129,13 +136,22 @@ struct Program: Codable, Hashable, Identifiable {
             Program(id: "p2", name: "Wall Ball Run", sets: 1,
                     seq: [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: "wallBalls"), ProgItem(icon: "sandbagLunges")],
                     meta: "1 set · about 14 min"),
+            Program(id: "preset.firstHalf", name: "First half", sets: 1, seq: firstHalf,
+                    meta: "1 set · 8 segments · about 34 min"),
+            Program(id: "preset.secondHalf", name: "Second half", sets: 1, seq: secondHalf,
+                    meta: "1 set · 8 segments · about 34 min"),
         ]
     }
 
     /// 아이폰 카드 설명
-    var cardMeta: String { meta ?? "\(sets) \(sets == 1 ? "set" : "sets") · \(seq.count) segments" }
+    var cardMeta: String { meta.map { $0.l10n } ?? watchMeta }
     /// 워치 목록 설명
-    var watchMeta: String { "\(sets) \(sets == 1 ? "set" : "sets") · \(seq.count) segments" }
+    var watchMeta: String { Self.setsText(sets, seq.count) }
+    /// 1 set · 8 segments (번역됨)
+    static func setsText(_ sets: Int, _ segs: Int) -> String {
+        if sets == 1 { return String(localized: "1 set · \(segs) segments") }
+        return String(localized: "\(sets) sets · \(segs) segments")
+    }
 }
 
 // MARK: - 대회
@@ -239,6 +255,8 @@ struct Record: Codable, Hashable, Identifiable {
     var goal: Int?             // 레이스 목표 시간
     var vsWord: String         // VS GOAL / VS BEST / VS JIHO
     var vsTarget: Int?         // 비교 기준 총 시간
+    var partner: String? = nil // 더블 파트너 닉네임 (@ 없이). 예전 기록엔 없음
+    var source: String? = nil  // "phone" = 워치 없이 아이폰으로 기록. nil = 워치
 
     /// 러닝·스테이션 16개 (Roxzone 제외)
     var splits16: [Int]? {
@@ -285,6 +303,18 @@ struct Settings: Codable, Hashable {
     var lbTab = "sim"                      // 순위표: sim / race / stations
     var lbStation = "skiErg"
     var lbAllDivisions = false
+
+    // 진동 알림 (워치) — 예전 저장 파일과 호환되도록 옵셔널로 저장
+    var hapticZoneOpt: Bool? = nil          // 심박 존 바뀔 때 진동
+    var hapticPaceOpt: Bool? = nil          // 목표보다 느려질 때 진동 (Race · Full Sim)
+    var hapticZone: Bool {
+        get { hapticZoneOpt ?? true }
+        set { hapticZoneOpt = newValue }
+    }
+    var hapticPace: Bool {
+        get { hapticPaceOpt ?? true }
+        set { hapticPaceOpt = newValue }
+    }
 
     var signedIn: Bool { nickname != nil }
 
@@ -377,5 +407,49 @@ enum JSONStore {
     static func load<T: Decodable>(_ t: T.Type, _ n: String) -> T? {
         guard let d = try? Data(contentsOf: url(n)) else { return nil }
         return try? dec.decode(t, from: d)
+    }
+}
+
+// MARK: - 운동 예약 (달력 · 미리 알림)
+
+enum PlanReminder: String, Codable, CaseIterable, Identifiable {
+    case none, hourBefore, dayBefore, weekBefore
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .none: return "None"
+        case .hourBefore: return "1 hour before"
+        case .dayBefore: return "Day before (8:00 PM)"
+        case .weekBefore: return "Week before"
+        }
+    }
+    var short: String {
+        switch self {
+        case .none: return ""
+        case .hourBefore: return "1 hour before"
+        case .dayBefore: return "Day before"
+        case .weekBefore: return "Week before"
+        }
+    }
+}
+
+/// 달력에 예약한 운동. 레이스는 등록한 대회(settings.event)가 자동으로 달력에 뜨므로 여기엔 training / sim만.
+struct PlannedWorkout: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var mode: Mode                 // .training / .sim (.race는 대회 알림용으로만)
+    var programId: String? = nil   // 트레이닝이면 프로그램 id
+    var title: String              // 표시 이름 (프로그램 이름 / Full Simulation)
+    var date: Date                 // 날짜 + 시간
+    var reminder: PlanReminder = .dayBefore
+}
+
+extension Mode {
+    /// 달력 점 색: 트레이닝 노랑 · 풀시뮬 하늘색 · 레이스 주황
+    var calendarHex: UInt32 {
+        switch self {
+        case .training: return 0xFFE600
+        case .sim: return 0x64D2FF
+        case .race: return 0xFF9F0A
+        }
     }
 }

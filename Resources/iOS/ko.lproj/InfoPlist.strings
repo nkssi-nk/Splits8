@@ -1,0 +1,6 @@
+/* Info.plist 권한 문구 — 한국어 */
+"CFBundleDisplayName" = "Splits8";
+"NSHealthShareUsageDescription" = "운동 기록과 심박수를 확인하기 위해 건강 데이터를 읽습니다.";
+"NSHealthUpdateUsageDescription" = "운동 기록을 건강 앱에 저장합니다.";
+"NSPhotoLibraryAddUsageDescription" = "공유 이미지를 사진 앱에 저장합니다.";
+"NSLocationWhenInUseUsageDescription" = "야외 러닝의 페이스와 거리를 재기 위해 위치를 사용합니다.";

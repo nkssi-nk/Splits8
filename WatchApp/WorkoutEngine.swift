@@ -26,6 +26,8 @@ final class WorkoutEngine: NSObject {
     private(set) var splits: [Int] = []
     private(set) var running = true
     private(set) var lastRecord: Record?
+    /// 구간이 넘어갈 때마다 +1 (스와이프·더블탭·Next 모두 advance() 하나로 모임) → 화면 노랑 플래시
+    private(set) var advanceCount = 0
 
     // 측정값
     private(set) var hr: Double = 0
@@ -41,6 +43,12 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var segStart = Date()
     @ObservationIgnored private var pauseAt: Date?
     @ObservationIgnored private var segPaused: Double = 0
+
+    // 진동 알림 (설정: hapticZone / hapticPace)
+    @ObservationIgnored private var lastZone = 0                 // 0 = 아직 심박 없음
+    @ObservationIgnored private var lastZoneBuzz: Date = .distantPast
+    @ObservationIgnored private var paceBuzzed: Set<Int> = []     // 목표 초과 진동을 이미 울린 구간
+    @ObservationIgnored private var tickTimer: Timer?
 
     // MARK: 권한
 
@@ -91,7 +99,9 @@ final class WorkoutEngine: NSObject {
         segDistStart = 0; segPaused = 0; pauseAt = nil
         let now = Date()
         startDate = now; segStart = now
+        lastZone = 0; lastZoneBuzz = .distantPast; paceBuzzed = []
         active = true
+        startTick()
 
         let cfg = HKWorkoutConfiguration()
         cfg.activityType = .running
@@ -122,6 +132,7 @@ final class WorkoutEngine: NSObject {
             idx = splits.count
             segStart = now; segPaused = 0
             segDistStart = distance
+            advanceCount += 1
             // 다음 구간 알림: .click 은 너무 약해서 운동 중에는 느껴지지 않음
             WKInterfaceDevice.current().play(.notification)
         }
@@ -149,7 +160,46 @@ final class WorkoutEngine: NSObject {
     }
 
     func reset() {
+        stopTick()
         active = false; finished = false; lastRecord = nil
+    }
+
+    // MARK: 진동 알림
+
+    private func startTick() {
+        stopTick()
+        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(t, forMode: .common)
+        tickTimer = t
+    }
+
+    private func stopTick() {
+        tickTimer?.invalidate()
+        tickTimer = nil
+    }
+
+    /// 1초마다: Race · Full Sim 에서 현재 구간이 목표 시간을 넘으면 그 구간에서 한 번만 .retry
+    private func tick() {
+        guard active, !finished, running else { return }
+        guard settings.hapticPace, mode == .race || mode == .sim else { return }
+        let c: Seg = cur
+        guard c.kind != .rox, c.target > 0, !paceBuzzed.contains(idx) else { return }
+        if segEl(Date()) > c.target {
+            paceBuzzed.insert(idx)
+            WKInterfaceDevice.current().play(.retry)
+        }
+    }
+
+    /// 심박 존이 바뀌면: 올라가면 .directionUp, 내려가면 .directionDown (첫 측정값 제외, 10초에 한 번까지)
+    private func checkZone(_ bpm: Double, _ now: Date) {
+        let z: Int = max(1, min(5, settings.zone(bpm)))
+        let prev: Int = lastZone
+        lastZone = z
+        guard prev > 0, z != prev else { return }
+        guard active, !finished, running, settings.hapticZone else { return }
+        guard now.timeIntervalSince(lastZoneBuzz) >= 10 else { return }
+        lastZoneBuzz = now
+        WKInterfaceDevice.current().play(z > prev ? .directionUp : .directionDown)
     }
 
     private func closeSeg(_ now: Date) {
@@ -178,6 +228,7 @@ final class WorkoutEngine: NSObject {
     }
 
     private func finish(_ now: Date) {
+        stopTick()
         let r = makeRecord()
         lastRecord = r
         finished = true
@@ -249,6 +300,7 @@ final class WorkoutEngine: NSObject {
 
     fileprivate func gotHR(_ v: Double, _ date: Date) {
         hr = v
+        if v > 0 { checkZone(v, Date()) }
         guard active, !finished, running else { return }
         let t = total(date)
         if segHR.indices.contains(idx) { segHR[idx].append(v) }

@@ -29,7 +29,7 @@ struct SetEventView: View {
             SectionLabel(text: "DATE & WAVE", top: 14)
             dateWaveCard
 
-            Note8(text: "저장하면 Apple Watch의 Race 시작 화면에 대회명·날짜·체급이 표시됩니다.").padding(.top, 4)
+            Note8(text: "Once saved, the event name, date and division appear on the Race start screen on Apple Watch.").padding(.top, 4)
         }
         .padding(.horizontal, 16)
         .onAppear { if r.evDraft == nil { r.evDraft = store.settings.event } }
@@ -38,6 +38,7 @@ struct SetEventView: View {
     private func save() {
         guard ev.isSet else { return }
         store.settings.event = ev
+        store.scheduleRaceReminders()   // 대회 일주일 전 · 전날 알림
         r.evDraft = nil
         r.go(.race)
     }
@@ -51,7 +52,7 @@ struct SetEventView: View {
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Find event").font(F.t(17, .semibold))
-                    Text("다가오는 대회 목록에서 고르기").font(F.t(13)).foregroundStyle(C.text2)
+                    Text("Pick from upcoming events").font(F.t(13)).foregroundStyle(C.text2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Chevron8()
@@ -93,7 +94,7 @@ struct SetEventView: View {
     /// 값 알약: 34 높이, 좌우 12, radius 8, 17pt 숫자. 열리면 노란 바탕 0.16 + 노란 글자
     private func pickRow(_ t: String, value: String, open: Bool, _ a: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
-            Text(t).font(F.t(17))
+            Text(t.l10n).font(F.t(17))
             Spacer()
             Button(action: a) {
                 Text(value).font(F.num(17, .regular)).foregroundStyle(open ? C.accent : Color.white).lineLimit(1)
@@ -114,10 +115,14 @@ struct SetEventView: View {
     private var monthBase: Date {
         calMonth ?? cal.date(from: cal.dateComponents([.year, .month], from: ev.date)) ?? ev.date
     }
-    private static let monthTitle: DateFormatter = {
-        let f = DateFormatter(); f.locale = Fm.gb; f.dateFormat = "MMMM yyyy"; return f
-    }()
-    private static let dow: [String] = ["S", "M", "T", "W", "T", "F", "S"]
+    private static var monthTitle: DateFormatter { Fm.monthYear }
+    /// S M T W T F S (한국어: 일 월 화 …)
+    private static var dow: [String] {
+        var c = Calendar(identifier: .gregorian)
+        c.locale = Fm.isKorean ? Locale(identifier: "ko_KR") : Locale(identifier: "en_US")
+        let s: [String] = c.veryShortWeekdaySymbols
+        return s.count == 7 ? s : ["S", "M", "T", "W", "T", "F", "S"]
+    }
     private var calCols: [GridItem] { Array(repeating: GridItem(.flexible(minimum: 0), spacing: 0), count: 7) }
 
     private var calendar: some View {
@@ -189,7 +194,7 @@ struct SetEventView: View {
     }
     private var timeLabel: String {
         let (h, m) = hm
-        return "\(h % 12 == 0 ? 12 : h % 12):\(String(format: "%02d", m)) \(h >= 12 ? "PM" : "AM")"
+        return HomeView.hm12(String(format: "%02d:%02d", h, m))     // 9:00 AM (한국어: 오전 9:00)
     }
     private func setTime(_ h: Int, _ m: Int) { set { $0.time = String(format: "%02d:%02d", h, m) } }
 
@@ -209,7 +214,7 @@ struct SetEventView: View {
                     cell(":" + String(format: "%02d", m), on: m == mi) { setTime(hh, m) }
                 }
             }
-            Text("티켓에 적힌 웨이브 시작 시간을 고르세요. 15분 단위.").font(F.t(13)).foregroundStyle(C.text3)
+            Text("Pick the wave start time on your ticket. 15-minute steps.").font(F.t(13)).foregroundStyle(C.text3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 2)
@@ -252,12 +257,12 @@ struct FindEventView: View {
             SectionLabel(text: "UPCOMING", top: 8)
             listCard
             Button { r.go(.setEvent) } label: {
-                (Text("목록에 없나요? ").foregroundColor(C.text2) + Text("직접 입력").foregroundColor(C.accent).fontWeight(.semibold))
+                (Text("Not on the list? ").foregroundColor(C.text2) + Text("Enter manually").foregroundColor(C.accent).fontWeight(.semibold))
                     .font(F.t(15)).frame(maxWidth: .infinity).padding(10).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("ev.manual")
-            Text("hyrox.com Find My Race 기준 · 2026년 9월 29일 확인").font(F.t(11)).foregroundStyle(C.chev)
+            Text("From hyrox.com Find My Race · checked 29 Sep 2026").font(F.t(11)).foregroundStyle(C.chev)
                 .multilineTextAlignment(.center).frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 16)
@@ -270,7 +275,7 @@ struct FindEventView: View {
             ForEach(EventItem.regions.indices, id: \.self) { i in
                 let k = EventItem.regions[i].0, l = EventItem.regions[i].1
                 Button { region = k } label: {
-                    Text(l).font(F.t(13, .semibold)).foregroundStyle(region == k ? Color.black : Color.white)
+                    Text(l.l10n).font(F.t(13, .semibold)).foregroundStyle(region == k ? Color.black : Color.white)
                         .padding(.horizontal, 14).frame(height: 32)
                         .background(region == k ? C.accent : Color.white.opacity(0.08), in: Capsule())
                 }
@@ -288,7 +293,7 @@ struct FindEventView: View {
                 eventRow(e, last: i == items.count - 1)
             }
             if items.isEmpty {
-                Text("검색 결과가 없어요").font(F.t(15)).foregroundStyle(C.text2)
+                Text("No results").font(F.t(15)).foregroundStyle(C.text2)
                     .frame(maxWidth: .infinity).padding(.vertical, 22).padding(.horizontal, 18)
             }
         }
@@ -328,8 +333,9 @@ struct FindEventView: View {
     private func range(_ a: Date, _ b: Date) -> String {
         let c = Calendar.current
         let da = c.component(.day, from: a), db = c.component(.day, from: b)
-        if c.component(.month, from: a) == c.component(.month, from: b) { return "\(da)–\(db) \(Fm.mon.string(from: b))" }
-        return "\(da) \(Fm.mon.string(from: a))–\(db) \(Fm.mon.string(from: b))"
+        let ma: String = Fm.mon.string(from: a), mb: String = Fm.mon.string(from: b)
+        if c.component(.month, from: a) == c.component(.month, from: b) { return String(localized: "\(da)–\(db) \(mb)") }
+        return String(localized: "\(da) \(ma)–\(db) \(mb)")
     }
 
     private func pickEvent(_ e: EventItem) {

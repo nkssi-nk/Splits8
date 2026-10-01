@@ -26,9 +26,35 @@ struct WWorkoutPager: View {
                 WEndSheet(onEnd: { endSheet = false; engine.endNow() }, onResume: { endSheet = false })
                     .transition(.opacity)
             }
+
+            // 구간 전환 플래시: 화면 전체 노랑 rgba(255,236,80,0.42), 60ms 켜짐 → 260ms 사라짐 (터치 막지 않음)
+            if !aod {
+                WSegmentFlash.color
+                    .opacity(flash)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea()
+            }
         }
         .ignoresSafeArea()
+        .onChange(of: engine.advanceCount) { _, _ in
+            flashNow()
+        }
     }
+
+    @Environment(\.isLuminanceReduced) private var aod
+    @State private var flash: Double = 0
+
+    private func flashNow() {
+        guard !aod else { return }
+        withAnimation(.linear(duration: 0.06)) { flash = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
+            withAnimation(.easeOut(duration: 0.26)) { flash = 0 }
+        }
+    }
+}
+
+enum WSegmentFlash {
+    static let color: Color = Color(red: 1.0, green: 236.0 / 255.0, blue: 80.0 / 255.0, opacity: 0.42)
 }
 
 // MARK: - W3–W6 Live
@@ -71,11 +97,34 @@ struct WLive: View {
             screen(now: ctx.date)
         }
         .ignoresSafeArea()
+        .onChange(of: liveZone) { old, new in
+            zoneChanged(from: old, to: new)
+        }
+    }
+
+    /// 심박이 들어오기 전(0)은 존 없음 → 첫 측정값에서는 번쩍이지 않음
+    private var liveZone: Int {
+        guard engine.hr > 0 else { return 0 }
+        return max(1, min(5, engine.zone))
+    }
+
+    @State private var pulse: Double = 0
+
+    /// 존이 바뀌면: 위쪽 빛이 새 존 색 0.75 로 켜졌다가 900ms 동안 평소(0.28)로 돌아감
+    private func zoneChanged(from old: Int, to new: Int) {
+        guard !aod, old > 0, new > 0, old != new else { return }
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) { pulse = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
+            withAnimation(.easeOut(duration: 0.9)) { pulse = 0 }
+        }
     }
 
     private func screen(now: Date) -> some View {
         ZStack {
             glow
+            zonePulse
             VStack(spacing: 0) {
                 totalBlock(now: now)
                 lower(now: now)
@@ -108,6 +157,16 @@ struct WLive: View {
             let z: Int = engine.zone
             AmbientLayer(a: Ambient(hex: C.zoneHex[max(1, min(5, z)) - 1], alpha: 0.28, rx: 1.2, ry: 0.55, cx: 0.5, cy: -0.14))
                 .animation(.easeInOut(duration: 0.6), value: z)
+        }
+    }
+
+    /// radial-gradient(120% 60% at 50% −10%, zone 0.75, transparent 72%) — 존 바뀔 때만 잠깐
+    @ViewBuilder
+    private var zonePulse: some View {
+        if !aod {
+            let z: Int = max(1, min(5, engine.zone))
+            AmbientLayer(a: Ambient(hex: C.zoneHex[z - 1], alpha: 0.75, rx: 1.2, ry: 0.6, cx: 0.5, cy: -0.1))
+                .opacity(pulse)
         }
     }
 
@@ -261,7 +320,7 @@ struct WControls: View {
                 }
                 .padding(.vertical, 10)
                 .frame(maxHeight: .infinity)
-                Text("‹ 왼쪽으로 밀어 돌아가기")
+                Text("‹ Swipe left to go back")
                     .font(F.t(10)).foregroundStyle(C.text3)
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
@@ -275,7 +334,7 @@ struct WControls: View {
 
     private func header(now: Date) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(engine.mode.name).font(F.t(11, .semibold)).foregroundStyle(C.accent).lineLimit(1)
+            Text(engine.mode.name.l10n).font(F.t(11, .semibold)).foregroundStyle(C.accent).lineLimit(1)
             Spacer(minLength: 4)
             Text(Fm.t(engine.total(now))).font(F.num(13)).lineLimit(1)
         }
@@ -304,7 +363,7 @@ struct WControls: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Icon8(glyph, glyphSize, fg)
-                Text(label).font(F.t(15, .semibold)).foregroundStyle(fg).lineLimit(1)
+                Text(label.l10n).font(F.t(15, .semibold)).foregroundStyle(fg).lineLimit(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(bg, in: Capsule())
@@ -392,8 +451,8 @@ struct WEndSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("운동을 끝낼까요?").font(F.t(15, .semibold))
-            Text("\(engine.idx)/\(engine.seq.count) 구간 완료. 남은 구간은 기록되지 않습니다.")
+            Text("End workout?").font(F.t(15, .semibold))
+            Text("\(engine.idx)/\(engine.seq.count) segments done. The rest won't be recorded.")
                 .font(F.t(11)).foregroundStyle(C.text2).lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -410,7 +469,7 @@ struct WEndSheet: View {
 
     private func sheetButton(_ t: String, fg: Color, bg: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(t).font(F.t(12, .semibold)).foregroundStyle(fg)
+            Text(t.l10n).font(F.t(12, .semibold)).foregroundStyle(fg)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
@@ -444,14 +503,14 @@ struct WSummary: View {
     private func head(_ r: Record) -> some View {
         let tg: Int = r.vsTarget ?? r.total
         return VStack(spacing: 0) {
-            Text("\(r.mode.name) complete").font(F.t(11, .semibold)).foregroundStyle(C.accent).lineLimit(1)
+            Text(String(localized: "\(r.mode.name.l10n) complete")).font(F.t(11, .semibold)).foregroundStyle(C.accent).lineLimit(1)
             Text(Fm.t(r.total)).font(F.num(32)).tracking(-0.96)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .padding(.top, 4)
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(Fm.d(r.total - tg)).font(F.num(13))
                     .foregroundStyle(r.total > tg ? C.bad : C.good)
-                Text(r.vsWord).font(F.t(8, .semibold)).tracking(0.8).foregroundStyle(C.text2)
+                Text(r.vsWord.l10n).font(F.t(8, .semibold)).tracking(0.8).foregroundStyle(C.text2)
             }
             .padding(.top, 2)
         }
@@ -500,7 +559,7 @@ struct WSummary: View {
 
     private func stat(_ l: String, _ v: String, _ c: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(l).font(F.t(8, .semibold)).tracking(0.64).foregroundStyle(C.text2)
+            Text(l.l10n).font(F.t(8, .semibold)).tracking(0.64).foregroundStyle(C.text2)
             Text(v).font(F.num(13)).foregroundStyle(c).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

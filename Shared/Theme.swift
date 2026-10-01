@@ -77,27 +77,35 @@ struct Label8: View {
         self.text = text; self.size = size; self.color = color; self.spacing = spacing; self.weight = weight
     }
     var body: some View {
-        Text(text).font(F.t(size, weight)).tracking(spacing * size).foregroundStyle(color).lineLimit(1)
+        Text(text.l10n).font(F.t(size, weight)).tracking(spacing * size).foregroundStyle(color).lineLimit(1)
     }
 }
 
 // MARK: - 워드마크 SPLITS8
 
+/// SPLITS8 로고 — 글꼴로 그리지 않고 시안 로고 이미지를 씀 (v4: 8이 세로로 갈라진 모양)
+/// 높이 = 예전 글자 크기 × 0.83. 원본 비율 1677 × 331.
+/// 검은 글자 → wordmark-black, 8도 흰색 → wordmark-white, 기본(흰 SPLITS + 노란 8) → wordmark-yellow
 struct Wordmark: View {
     var size: CGFloat
     var eightColor: Color = C.accent
     var color: Color = .white
-    var tracking: CGFloat = -0.02
-    var weight: Font.Weight = .heavy
+    var tracking: CGFloat = -0.02      // 예전 호출과 호환용 (이미지에는 쓰지 않음)
+    var weight: Font.Weight = .heavy   // 예전 호출과 호환용
+
+    private var imageName: String {
+        if color == Color.black { return "wordmark-black" }
+        if eightColor == C.accent { return "wordmark-yellow" }
+        return "wordmark-white"
+    }
     var body: some View {
-        HStack(spacing: 0) {
-            Text("SPLITS").foregroundStyle(color)
-            Text("8").foregroundStyle(eightColor).padding(.leading, size * 0.08)
-        }
-        .font(.system(size: size, weight: weight))
-        .tracking(tracking * size)
-        .lineLimit(1)
-        .fixedSize()
+        let h: CGFloat = size * 0.83
+        Image(imageName)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: h * 1677 / 331, height: h)
+            .accessibilityLabel("SPLITS8")
     }
 }
 
@@ -180,6 +188,14 @@ struct Icon8: View {
     }
 }
 
+// MARK: - 번역
+
+extension String {
+    /// Localizable.strings 에서 번역을 찾음 (키 = 영어 원문). 없으면 그대로.
+    /// 변수로 들어오는 화면 문자열(부품의 title/label 등)에 씀. 사용자 입력·숫자는 키가 없어 그대로 나옴.
+    var l10n: String { Bundle.main.localizedString(forKey: self, value: self, table: nil) }
+}
+
 // MARK: - 시간 형식
 
 enum Fm {
@@ -194,24 +210,44 @@ enum Fm {
     static func d(_ v: Int) -> String { v == 0 ? "±0:00" : (v < 0 ? "−" : "+") + t(abs(v)) }
 
     static let gb = Locale(identifier: "en_GB")
-    private static func df(_ f: String) -> DateFormatter {
-        let d = DateFormatter(); d.locale = gb; d.dateFormat = f; return d
+    static let posix = Locale(identifier: "en_US_POSIX")
+    /// 앱 화면 언어가 한국어인지 (Localizable.strings 기준)
+    static var isKorean: Bool { (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("ko") }
+    /// 화면용 날짜: 영어는 시안 그대로(en_GB 고정 형식), 한국어는 template 으로 현지 형식
+    private static func df(_ f: String, ko template: String, en: Locale = Fm.gb) -> DateFormatter {
+        let d = DateFormatter()
+        if isKorean {
+            d.locale = Locale(identifier: "ko_KR")
+            d.setLocalizedDateFormatFromTemplate(template)
+        } else {
+            d.locale = en; d.dateFormat = f
+        }
+        return d
+    }
+    /// 저장·파싱용 (언어와 상관없이 고정)
+    private static func fixed(_ f: String) -> DateFormatter {
+        let d = DateFormatter(); d.locale = posix; d.dateFormat = f; return d
     }
     /// Wed 24 Sep
-    static let wdm = df("EEE dd MMM")
+    static let wdm = df("EEE dd MMM", ko: "MMMdEEE")
     /// Sat 13 Sep 2026
-    static let wdmy = df("EEE dd MMM yyyy")
+    static let wdmy = df("EEE dd MMM yyyy", ko: "yMMMdEEE")
     /// 13 Sep 2026
-    static let dmy = df("d MMM yyyy")
+    static let dmy = df("d MMM yyyy", ko: "yMMMd")
     /// 20 Sep 2026 (두 자리 일)
-    static let ddmy = df("dd MMM yyyy")
+    static let ddmy = df("dd MMM yyyy", ko: "yMMMd")
     /// 14 JUN (그래프 축)
-    static func axis(_ d: Date) -> String { df("dd MMM").string(from: d).uppercased() }
+    private static let axisF = df("dd MMM", ko: "MMMd")
+    static func axis(_ d: Date) -> String { axisF.string(from: d).uppercased() }
     /// 28 Sep
-    static let dm = df("d MMM")
+    static let dm = df("d MMM", ko: "MMMd")
     /// Sep
-    static let mon = df("MMM")
-    static let ymd = df("yyyy-MM-dd")
-    static let hm = df("HH:mm")
+    static let mon = df("MMM", ko: "MMM")
+    /// September 2026 (달력 제목)
+    static let monthYear = df("MMMM yyyy", ko: "yMMMM")
+    /// 9:00 AM (12시간) — 한국어는 오전 9:00
+    static let time12 = df("h:mm a", ko: "ahmm", en: Locale(identifier: "en_US"))
+    static let ymd = fixed("yyyy-MM-dd")
+    static let hm = fixed("HH:mm")
     static let clock: DateFormatter = { let d = DateFormatter(); d.dateFormat = "H:mm"; return d }()
 }

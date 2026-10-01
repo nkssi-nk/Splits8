@@ -2,6 +2,7 @@ import Foundation
 import WatchConnectivity
 import Observation
 import UIKit
+import UserNotifications
 
 /// 아이폰 저장소: 설정·프로그램·기록·친구 + 워치 동기화 + 계정(선택)
 @Observable
@@ -12,6 +13,8 @@ final class Store: NSObject, WCSessionDelegate {
     var programs: [Program] = [] { didSet { persist("programs") } }
     private(set) var records: [Record] = []
     var friends: [Friend] = [] { didSet { persist("friends") } }
+    /// 달력에 예약한 운동 (이 기기에만 저장, 워치로는 안 보냄)
+    var plans: [PlannedWorkout] = [] { didSet { savePlans() } }
     var events: [EventItem] = EventItem.bundled
 
     /// 프로필 사진 (320px 정사각 JPEG, 이 기기에 저장)
@@ -36,12 +39,25 @@ final class Store: NSObject, WCSessionDelegate {
         programs = JSONStore.load([Program].self, "programs.json") ?? Program.presets()
         records = JSONStore.load([Record].self, "records.json") ?? []
         friends = JSONStore.load([Friend].self, "friends.json") ?? []
+        plans = JSONStore.load([PlannedWorkout].self, "plans.json") ?? []
+        // 기존 사용자에게도 새 기본 프리셋(전반전·후반전)을 한 번만 넣어 줌 (지운 건 다시 안 넣음)
+        let seedKey = "seeded.halfPresets.v1"
+        if !UserDefaults.standard.bool(forKey: seedKey) {
+            let have: Set<String> = Set(programs.map(\.id))
+            let missing: [Program] = Program.presets().filter { $0.id.hasPrefix("preset.") && !have.contains($0.id) }
+            if !missing.isEmpty {
+                programs.append(contentsOf: missing)
+                JSONStore.save(programs, "programs.json")
+            }
+            UserDefaults.standard.set(true, forKey: seedKey)
+        }
         if let d = try? Data(contentsOf: JSONStore.url("avatar.jpg")) { photo = UIImage(data: d) }
         if Demo.enabled {           // 화면 확인용 예시 데이터
             var s = Settings(); Demo.settings(&s); settings = s
             programs = Program.presets()
             records = Demo.records()
             friends = []
+            plans = []
         }
         if sb.session == nil && settings.nickname != nil { settings.nickname = nil }   // 세션이 없으면 로그아웃 상태
         loading = false
@@ -62,6 +78,107 @@ final class Store: NSObject, WCSessionDelegate {
         pushToWatch()
     }
 
+    // MARK: 운동 예약 + 미리 알림
+
+    private func savePlans() {
+        guard !loading, !Demo.enabled else { return }
+        JSONStore.save(plans, "plans.json")
+    }
+
+    /// 예약 추가·수정 (같은 id면 바꿈). 알림도 다시 잡음.
+    func savePlan(_ p: PlannedWorkout) {
+        if let i = plans.firstIndex(where: { $0.id == p.id }) { plans[i] = p } else { plans.append(p) }
+        plans.sort { $0.date < $1.date }
+        schedule(p)
+    }
+
+    func deletePlan(_ id: UUID) {
+        plans.removeAll { $0.id == id }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id.uuidString])
+    }
+
+    /// 앞으로 남은 예약 (오늘 이후)
+    var upcomingPlans: [PlannedWorkout] {
+        let start: Date = Calendar.current.startOfDay(for: Date())
+        return plans.filter { $0.date >= start }.sorted { $0.date < $1.date }
+    }
+
+    func plans(on day: Date) -> [PlannedWorkout] {
+        plans.filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
+    }
+
+    func records(on day: Date, mode: Mode? = nil) -> [Record] {
+        records.filter { Calendar.current.isDate($0.date, inSameDayAs: day) && (mode == nil || $0.mode == mode!) }
+            .sorted { $0.date > $1.date }
+    }
+
+    /// 알림 시각: 1시간 전 / 전날 오후 8시 / 일주일 전 같은 시각
+    static func reminderDate(_ date: Date, _ r: PlanReminder) -> Date? {
+        let cal = Calendar.current
+        switch r {
+        case .none: return nil
+        case .hourBefore: return date.addingTimeInterval(-3600)
+        case .dayBefore:
+            guard let prev = cal.date(byAdding: .day, value: -1, to: date) else { return nil }
+            return cal.date(bySettingHour: 20, minute: 0, second: 0, of: prev)
+        case .weekBefore: return cal.date(byAdding: .day, value: -7, to: date)
+        }
+    }
+
+    /// 알림 권한을 (처음이면) 묻고, 예약 알림을 잡음
+    func schedule(_ p: PlannedWorkout) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [p.id.uuidString])
+        guard let fire = Store.reminderDate(p.date, p.reminder), fire > Date() else { return }
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { ok, _ in
+            guard ok else { return }
+            let c = UNMutableNotificationContent()
+            c.title = p.title.l10n
+            c.body = Store.reminderBody(p)
+            c.sound = .default
+            let comps: DateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
+            let trig = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            center.add(UNNotificationRequest(identifier: p.id.uuidString, content: c, trigger: trig))
+        }
+    }
+
+    static func reminderBody(_ p: PlannedWorkout) -> String {
+        let f = DateFormatter()
+        f.locale = Locale.current
+        f.setLocalizedDateFormatFromTemplate("EEEMMMdjmm")
+        return f.string(from: p.date)
+    }
+
+    /// 등록한 대회 알림 (대회 일주일 전 · 전날). 대회를 바꾸면 다시 잡음.
+    func scheduleRaceReminders() {
+        let center = UNUserNotificationCenter.current()
+        let ids: [String] = ["race.week", "race.day"]
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        let ev = settings.event
+        guard ev.isSet else { return }
+        let pairs: [(String, PlanReminder)] = [("race.week", .weekBefore), ("race.day", .dayBefore)]
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { ok, _ in
+            guard ok else { return }
+            for (id, r) in pairs {
+                guard let fire = Store.reminderDate(ev.date, r), fire > Date() else { continue }
+                let c = UNMutableNotificationContent()
+                c.title = ev.name
+                c.body = r == .weekBefore ? "D-7" : "D-1"
+                c.sound = .default
+                let comps: DateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
+                center.add(UNNotificationRequest(identifier: id, content: c,
+                                                 trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
+            }
+        }
+    }
+
+    /// 워치 없이 아이폰으로 기록한 운동 저장
+    func addPhoneRecord(_ r: Record) {
+        var x = r
+        x.source = "phone"
+        add(x)
+    }
+
     // MARK: 기록
 
     func records(_ m: Mode) -> [Record] { records.filter { $0.mode == m }.sorted { $0.date > $1.date } }
@@ -74,6 +191,13 @@ final class Store: NSObject, WCSessionDelegate {
         if signedIn { Task { try? await sb.upload(r) } }
     }
 
+    /// 기록의 더블 파트너 바꾸기 (nil = 빼기). 이 기기에만 저장.
+    func updatePartner(_ id: UUID, _ nick: String?) {
+        guard let i = records.firstIndex(where: { $0.id == id }) else { return }
+        records[i].partner = nick
+        if !Demo.enabled { JSONStore.save(records, "records.json") }
+    }
+
     func delete(_ r: Record) {
         records.removeAll { $0.id == r.id }
         if !Demo.enabled { JSONStore.save(records, "records.json") }
@@ -84,6 +208,21 @@ final class Store: NSObject, WCSessionDelegate {
     /// 최고 Full Simulation
     var simBest: Record? { records(.sim).filter { $0.splits16 != nil }.min { $0.total < $1.total } }
     var raceBest: Record? { records(.race).min { $0.total < $1.total } }
+
+    /// ★ PB: 같은 종류(트레이닝은 같은 이름·세트 수, Full Sim·Race는 각각 전체) 중 가장 빠른 기록.
+    /// 비교할 기록이 2개 이상일 때만 표시 (하나뿐이면 PB 표시 없음). 저장·삭제하면 자동으로 다시 계산됨.
+    func isPB(_ r: Record) -> Bool {
+        let same: [Record] = pbGroup(r)
+        guard same.count >= 2, let best = same.min(by: { $0.total < $1.total }) else { return false }
+        return best.id == r.id
+    }
+    private func pbGroup(_ r: Record) -> [Record] {
+        switch r.mode {
+        case .training: return records(.training).filter { $0.title == r.title && $0.sets == r.sets }
+        case .sim: return records(.sim).filter { $0.splits16 != nil }
+        case .race: return records(.race)
+        }
+    }
 
     /// 트레이닝 구간별 최고
     var segBests: [String: Int] {

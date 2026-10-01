@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct TrainingView: View {
     let store = Store.shared
     let r = Router.shared
+    @AppStorage("histView.training") private var histView: String = "list"
 
     var body: some View {
         VStack(spacing: 10) {
@@ -54,16 +55,20 @@ struct TrainingView: View {
     @ViewBuilder
     private var history: some View {
         let recs: [Record] = store.records(.training)
-        if !recs.isEmpty {
-            SectionLabel(text: "HISTORY", top: 20)
+        HistoryHeader(view: $histView)
+        if histView == "calendar" {
+            HistoryCalendar(mode: .training)
+        } else if !recs.isEmpty {
             VStack(spacing: 0) {
                 ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                    HistoryRow(title: "\(rec.title) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
-                               time: Fm.t(rec.total), last: i == recs.count - 1,
+                    HistoryRow(title: "\(rec.title.l10n) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
+                               time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), partner: rec.partner,
                                onDelete: { store.delete(rec) }) { r.open(rec, from: .training) }
                 }
             }
             .card8()
+        } else {
+            EmptyHistory()
         }
     }
 }
@@ -97,7 +102,7 @@ struct ProgramCard: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(p.cardMeta).font(F.t(13)).foregroundStyle(C.text2)
-                Text(p.name).font(F.t(20, .semibold)).tracking(-0.4).lineLimit(1)
+                Text(p.name.l10n).font(F.t(20, .semibold)).tracking(-0.4).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             // 폰에서는 카드를 누르면 편집 → 시작 버튼처럼 보이지 않게 작은 회색 ›
@@ -133,6 +138,7 @@ struct HistoryRow: View {
     var delta: String?
     var deltaColor: Color
     var last: Bool
+    var pb: Bool
     var onDelete: (() -> Void)?
     let action: () -> Void
 
@@ -141,10 +147,14 @@ struct HistoryRow: View {
     @State private var ask = false
     private let reveal: CGFloat = 84
 
+    /// partner: 더블 파트너 닉네임 (@ 없이) — 있으면 아래 줄 끝에 " · with @닉네임"
     init(title: String, sub: String, subColor: Color = C.text2, subTracking: CGFloat = 0, time: String, delta: String? = nil,
-         deltaColor: Color = C.good, last: Bool = false, onDelete: (() -> Void)? = nil, action: @escaping () -> Void) {
-        self.title = title; self.sub = sub; self.subColor = subColor; self.subTracking = subTracking; self.time = time
-        self.delta = delta; self.deltaColor = deltaColor; self.last = last
+         deltaColor: Color = C.good, last: Bool = false, pb: Bool = false, partner: String? = nil,
+         onDelete: (() -> Void)? = nil, action: @escaping () -> Void) {
+        let nick: String = (partner ?? "").trimmingCharacters(in: .whitespaces)
+        self.title = title; self.sub = nick.isEmpty ? sub : sub + " · " + String(localized: "with @\(nick)")
+        self.subColor = subColor; self.subTracking = subTracking; self.time = time
+        self.delta = delta; self.deltaColor = deltaColor; self.last = last; self.pb = pb
         self.onDelete = onDelete; self.action = action
     }
 
@@ -154,7 +164,7 @@ struct HistoryRow: View {
                 Button { ask = true } label: {
                     VStack(spacing: 3) {
                         Image(systemName: "trash").font(.system(size: 17, weight: .semibold))
-                        Text("삭제").font(F.t(11, .semibold))
+                        Text("Delete").font(F.t(11, .semibold))
                     }
                     .foregroundStyle(.white)
                     .frame(width: max(reveal, -offset))
@@ -174,21 +184,29 @@ struct HistoryRow: View {
         .clipped()
         .rowLine(!last)
         .simultaneousGesture(onDelete == nil ? nil : swipe)
-        .alert("기록을 삭제할까요?", isPresented: $ask) {
-            Button("삭제", role: .destructive) {
-                close()
-                onDelete?()
+        .contextMenu {
+            if onDelete != nil {
+                Button(role: .destructive) { ask = true } label: { Label("Delete", systemImage: "trash") }
             }
-            Button("취소", role: .cancel) { close() }
+        }
+        .alert("Delete this record?", isPresented: $ask) {
+            Button("Delete", role: .destructive) {
+                close()
+                withAnimation(.easeOut(duration: 0.25)) { onDelete?() }
+            }
+            Button("Cancel", role: .cancel) { close() }
         } message: {
-            Text("삭제한 기록은 다시 볼 수 없어요.")
+            Text("This can't be undone.")
         }
     }
 
     private var rowContent: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(F.t(17, .medium)).lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(title).font(F.t(17, .medium)).lineLimit(1)
+                    if pb { PBPill() }
+                }
                 Text(sub).font(F.t(13)).tracking(subTracking).monospacedDigit().foregroundStyle(subColor).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -238,7 +256,7 @@ struct BuilderView: View {
     @Bindable var r = Router.shared
     private let cols: [GridItem] = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 8), count: 4)
     /// 한 세트 최대 구간 수
-    static let maxSeq = 8
+    static let maxSeq = 16
 
     // 순서 바꾸기 (손잡이를 잡고 위아래로 끌면 다른 칸이 실시간으로 밀려남)
     @State private var dragFrom: Int? = nil
@@ -257,6 +275,11 @@ struct BuilderView: View {
                 .submitLabel(.done)
                 .onSubmit { save() }
                 .accessibilityIdentifier("builder.name")
+
+            if let id = r.editId, let prog = store.programs.first(where: { $0.id == id }) {
+                StartOnPhoneButton(mode: .training, program: prog)   // 저장된 트레이닝을 아이폰으로 바로 시작
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
 
             runSection
             stationSection
@@ -320,7 +343,7 @@ struct BuilderView: View {
             .overlay {
                 VStack(spacing: 8) {
                     Icon8(s.key, 32, tint: .yellow)
-                    Text(s.name).font(F.t(11, .semibold)).tracking(0.11)
+                    Text(s.key == "farmersCarry" ? "Carry" : s.name).font(F.t(11, .semibold)).tracking(0.11)   // 버튼에서만 짧게
                         .multilineTextAlignment(.center).lineSpacing(1)
                         .foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
@@ -336,7 +359,7 @@ struct BuilderView: View {
     private var sequenceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Label8("SEQUENCE · \(r.draftSeq.count)/\(Self.maxSeq)").lineLimit(1)
+                Label8(String(localized: "SEQUENCE · \(r.draftSeq.count)/\(Self.maxSeq)")).lineLimit(1)
                 Spacer()
                 Button("Clear all") { withAnimation { r.draftSeq = [] } }
                     .font(F.t(13, .semibold)).foregroundStyle(C.bad).buttonStyle(.plain)
@@ -344,7 +367,7 @@ struct BuilderView: View {
             }
             .padding(.horizontal, 4)
             if r.draftSeq.count >= Self.maxSeq {
-                Text("한 세트는 최대 8개예요. 더 반복하려면 아래 Sets를 늘리세요.")
+                Text("A set can have up to 16 segments. To repeat more, increase Sets below.")
                     .font(F.t(13)).foregroundStyle(C.text2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -352,7 +375,7 @@ struct BuilderView: View {
             }
             VStack(spacing: 0) {
                 if r.draftSeq.isEmpty {
-                    Text("위에서 러닝과 스테이션을 누르면\n여기에 순서대로 쌓입니다")
+                    Text("Tap runs and stations above\nto add them here in order")
                         .font(F.t(13)).foregroundStyle(C.text3).multilineTextAlignment(.center).lineSpacing(3)
                         .frame(maxWidth: .infinity).padding(.vertical, 22).padding(.horizontal, 16)
                 }
@@ -494,7 +517,7 @@ struct BuilderView: View {
         guard !r.draftSeq.isEmpty else { return }
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         let typed = r.draftName.trimmingCharacters(in: .whitespaces)
-        let name = typed.isEmpty ? "Training \(store.programs.count + 1)" : typed
+        let name = typed.isEmpty ? String(localized: "Training \(store.programs.count + 1)") : typed
         let old = store.programs.first { $0.id == r.editId }
         let p = Program(id: r.editId ?? "u\(Int(Date().timeIntervalSince1970))", name: name, sets: r.draftSets,
                         seq: r.draftSeq, meta: nil, quick: old?.quick ?? false)
@@ -514,5 +537,34 @@ struct SaveSheet: View {
         Color.clear
             .frame(width: 0, height: 0)
             .onAppear { r.saveOpen = false }
+    }
+}
+
+/// ★ PB 알약 (높이 20, 반경 6, 노랑 0.14 바탕, 노란 글자 11/600, 별 10)
+struct PBPill: View {
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold))
+            Text("PB").font(F.t(11, .semibold)).tracking(0.22)
+        }
+        .foregroundStyle(C.accent)
+        .padding(.horizontal, 7)
+        .frame(height: 20)
+        .background(Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .fixedSize()
+    }
+}
+
+/// 기록이 하나도 없을 때 (삭제 후 포함)
+struct EmptyHistory: View {
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("No records yet").font(F.t(15, .semibold))
+            Text("Start a workout on your watch and your records will show up here.").font(F.t(13)).foregroundStyle(C.text2)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 22).padding(.horizontal, 18)
+        .card8()
     }
 }

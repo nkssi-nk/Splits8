@@ -69,6 +69,7 @@ struct DetailView: View {
     let store = Store.shared
     let r = Router.shared
     @State private var askDelete = false
+    @State private var partnerSheet = false
 
     var body: some View {
         if let rec = r.detail {
@@ -92,6 +93,10 @@ struct DetailView: View {
             BackLink(label: backLabel) { r.go(r.detailFrom) }
             header(rec)
             tilesGrid(rec)
+            if showsPartner(rec) {
+                SectionLabel(text: "PARTNER", top: 20)
+                partnerRow(rec)
+            }
             shareButton
             if let f = store.friend, let me = rec.splits16, f.splits.count == 16 {
                 friendCard(rec, me: me, f: f)
@@ -100,11 +105,18 @@ struct DetailView: View {
                 hrCard(rec)
                 zonesCard(rec)
             }
-            if !rec.runs.isEmpty { paceCard(rec) }
-
-            // SPLITS 라벨: margin 20px 4px 0
-            SectionLabel(text: "SPLITS", top: 20)
-            splits(rec)
+            Group {
+                if !rec.runs.isEmpty { paceCard(rec) }
+                if rec.mode == .sim, let f = Fatigue.analyze([rec], limit: 1) {
+                    SectionLabel(text: "RUN FATIGUE", top: 20)
+                    RunFatigueCard(result: f, footnote: "Based on this Full Sim")
+                }
+            }
+            Group {
+                // SPLITS 라벨: margin 20px 4px 0
+                SectionLabel(text: "SPLITS", top: 20)
+                splits(rec)
+            }
 
             deleteCard(rec).padding(.top, 10)
         }
@@ -113,7 +125,80 @@ struct DetailView: View {
             Button("Delete", role: .destructive) { deleteRecord(rec) }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("이 기록은 되돌릴 수 없어요.")
+            Text("This can't be undone.")
+        }
+        .sheet(isPresented: $partnerSheet) {
+            PartnerSheet(current: rec.partner) { nick in setPartner(rec, nick) }
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Color(hex: 0x1C1C1E))
+        }
+    }
+
+    // MARK: 더블 파트너
+
+    private func division(of rec: Record) -> Division? {
+        Division.all.first { $0.key == rec.division || $0.name == rec.division }
+    }
+
+    private func isDoubles(_ rec: Record) -> Bool {
+        division(of: rec)?.key.hasPrefix("dbl") ?? false
+    }
+
+    private func partnerNick(_ rec: Record) -> String? {
+        let n: String = (rec.partner ?? "").trimmingCharacters(in: .whitespaces)
+        return n.isEmpty ? nil : n
+    }
+
+    private func showsPartner(_ rec: Record) -> Bool {
+        isDoubles(rec) || partnerNick(rec) != nil
+    }
+
+    /// 제목 아래 알약: (M) with @minji · Doubles Mixed
+    private func partnerChip(_ rec: Record, nick: String) -> some View {
+        let divName: String = isDoubles(rec) ? (division(of: rec)?.name ?? "") : ""
+        return HStack(spacing: 6) {
+            Avatar8(size: 22, initial: String(nick.prefix(1)).uppercased(),
+                    bg: PartnerSheet.color(for: nick), fg: .black, fontSize: 12)
+            Text("with @\(nick)").font(F.t(15, .semibold)).lineLimit(1)
+            if !divName.isEmpty {
+                Text("· \(divName)").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+            }
+        }
+        .padding(.vertical, 5).padding(.leading, 5).padding(.trailing, 10)
+        .background(Color.white.opacity(0.10), in: Capsule())
+        .fixedSize()
+        .padding(.top, 8)
+    }
+
+    private func partnerRow(_ rec: Record) -> some View {
+        let nick: String? = partnerNick(rec)
+        let shown: String = (nick.map { (n: String) -> String in "@" + n } ?? "") + " ›"
+        return Button { partnerSheet = true } label: {
+            HStack(spacing: 12) {
+                Text(nick == nil ? "Add partner" : "Partner").font(F.t(15))
+                    .foregroundStyle(nick == nil ? C.accent : Color.white)
+                Spacer(minLength: 8)
+                Text(shown).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
+            }
+            .padding(.vertical, 14).padding(.horizontal, 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .card8()
+        .accessibilityIdentifier("detail.partner")
+    }
+
+    private func setPartner(_ rec: Record, _ nick: String?) {
+        var clean: String? = nil
+        if let n = nick {
+            var t: String = n.trimmingCharacters(in: .whitespacesAndNewlines)
+            while t.hasPrefix("@") { t.removeFirst() }
+            clean = t.isEmpty ? nil : t
+        }
+        store.updatePartner(rec.id, clean)
+        if var d = r.detail, d.id == rec.id {
+            d.partner = clean
+            r.detail = d
         }
     }
 
@@ -122,16 +207,28 @@ struct DetailView: View {
     private func header(_ rec: Record) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(rec.mode.name).font(F.t(11, .semibold)).foregroundStyle(.black)
+                Text(rec.mode.name.l10n).font(F.t(11, .semibold)).foregroundStyle(.black)
                     .padding(.vertical, 3).padding(.horizontal, 8)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Label8(Fm.wdmy.string(from: rec.date))
             }
             LargeTitle(text: rec.title, top: 10)
                 .fixedSize(horizontal: false, vertical: true)
+            if let nick = partnerNick(rec) {
+                partnerChip(rec, nick: nick)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4).padding(.bottom, 8)
+        .background(alignment: .top) {
+            if store.isPB(rec) {
+                PBGlow()
+                    .frame(height: 300)
+                    .padding(.horizontal, -40)
+                    .offset(y: -110)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     // MARK: 타일 2열 (gap 10, radius 18, padding 14×16)
@@ -252,7 +349,7 @@ struct DetailView: View {
     private func friendRow(_ row: (String, Int, Int), fr: [CGFloat]) -> some View {
         let d = row.1 - row.2
         return Cols(fr: fr, spacing: 8) {
-            Text(row.0).font(F.t(15)).frame(maxWidth: .infinity, alignment: .leading)
+            Text(row.0.l10n).font(F.t(15)).frame(maxWidth: .infinity, alignment: .leading)
             Text(Fm.t(row.1)).font(F.num(15)).frame(maxWidth: .infinity, alignment: .trailing)
             Text(Fm.t(row.2)).font(F.num(15)).foregroundStyle(C.text2).frame(maxWidth: .infinity, alignment: .trailing)
             Text(Fm.d(d)).font(F.num(15)).foregroundStyle(deltaColor(d)).frame(maxWidth: .infinity, alignment: .trailing)
@@ -317,7 +414,7 @@ struct DetailView: View {
             HStack(alignment: .firstTextBaseline) {
                 Label8("HEART RATE")
                 Spacer(minLength: 8)
-                Text("점선 = 구간 경계").font(F.t(11)).foregroundStyle(C.text3).lineLimit(1)
+                Text("Dotted lines = split boundaries").font(F.t(11)).foregroundStyle(C.text3).lineLimit(1)
             }
             hrChart(rec)
                 .frame(height: 140)
@@ -403,7 +500,7 @@ struct DetailView: View {
             HStack(alignment: .firstTextBaseline) {
                 Label8("RUN PACE")
                 Spacer(minLength: 8)
-                Text("AVG \(avg) /KM").font(F.num(15)).lineLimit(1)
+                Text(String(localized: "AVG \(avg) /KM")).font(F.num(15)).lineLimit(1)
             }
             paceBars(paces)
                 .frame(height: 110)
@@ -516,5 +613,135 @@ struct Cols: Layout {
         let sum = fr.reduce(0, +)
         let free = max(0, total - spacing * CGFloat(max(0, fr.count - 1)))
         return fr.map { free * $0 / sum }
+    }
+}
+
+/// ★ PB 기록을 열면 머리 뒤에 큰 노란 빛 (시안 s8burst: 0 → 1 (0.43초) → 0.45 (2.4초까지))
+struct PBGlow: View {
+    @State private var phase = 0
+    private var opacity: Double { phase == 0 ? 0 : (phase == 1 ? 1 : 0.45) }
+    var body: some View {
+        AmbientLayer(a: Ambient(hex: 0xFFE600, alpha: 0.55, rx: 0.6, ry: 0.65, cx: 0.5, cy: 0.3))
+            .opacity(opacity)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.43)) { phase = 1 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.43) {
+                    withAnimation(.easeOut(duration: 1.97)) { phase = 2 }
+                }
+            }
+    }
+}
+
+// MARK: - 파트너 고르기 시트 (친구 목록 · 직접 입력 · 빼기)
+
+struct PartnerSheet: View {
+    let current: String?
+    let onSave: (String?) -> Void
+    let store = Store.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var typing = false
+    @State private var typed = ""
+    @FocusState private var focused: Bool
+
+    private static let palette: [UInt32] = [0x30D158, 0x0A84FF, 0xFF9F0A, 0xBF5AF2, 0x64D2FF, 0xFF375F]
+
+    /// 닉네임마다 늘 같은 색
+    static func color(for nick: String) -> Color {
+        var h: Int = 0
+        for u in nick.lowercased().unicodeScalars { h = (h &* 31 &+ Int(u.value)) & 0x7FFFFFFF }
+        return Color(hex: palette[h % palette.count])
+    }
+
+    private var currentLower: String { (current ?? "").lowercased() }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 10) {
+                NavBar3(left: "Cancel", title: "Partner", right: typing ? "Save" : nil,
+                        rightColor: typed.trimmingCharacters(in: .whitespaces).isEmpty ? C.g3A : C.accent,
+                        onLeft: { dismiss() }, onRight: { saveTyped() }, edgeBack: false)
+                SectionLabel(text: "CHOOSE PARTNER", top: 10)
+                VStack(spacing: 0) {
+                    ForEach(store.friends) { f in
+                        friendRow(f)
+                    }
+                    typeRow
+                }
+                .card8()
+                if current != nil {
+                    Button {
+                        onSave(nil)
+                        dismiss()
+                    } label: {
+                        Text("Remove partner").font(F.t(17, .semibold)).foregroundStyle(C.bad)
+                            .frame(maxWidth: .infinity).frame(height: 50)
+                            .card8(14)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(Press())
+                    .padding(.top, 10)
+                    .accessibilityIdentifier("partner.remove")
+                }
+            }
+            .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
+        }
+    }
+
+    private func friendRow(_ f: Friend) -> some View {
+        let on: Bool = f.name.lowercased() == currentLower
+        return Button {
+            onSave(f.name)
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                Avatar8(size: 30, initial: f.ini, bg: Self.color(for: f.name), fg: .black, fontSize: 13)
+                Text("@\(f.name)").font(F.t(15)).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if on { Check8(size: 18) }
+            }
+            .padding(.vertical, 12).padding(.horizontal, 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .rowLine(true)
+    }
+
+    @ViewBuilder
+    private var typeRow: some View {
+        if typing {
+            HStack(spacing: 8) {
+                Text("@").font(F.t(15)).foregroundStyle(C.text2)
+                TextField("nickname", text: $typed)
+                    .font(F.t(15))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($focused)
+                    .onSubmit { saveTyped() }
+                    .accessibilityIdentifier("partner.field")
+            }
+            .padding(.vertical, 14).padding(.horizontal, 18)
+            .onAppear { focused = true }
+        } else {
+            Button {
+                let isFriend: Bool = store.friends.contains { $0.name.lowercased() == currentLower }
+                typed = isFriend ? "" : (current ?? "")
+                typing = true
+            } label: {
+                Text("＋ Type a name").font(F.t(15)).foregroundStyle(C.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 14).padding(.horizontal, 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("partner.type")
+        }
+    }
+
+    private func saveTyped() {
+        let t: String = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard typing, !t.isEmpty else { return }
+        onSave(t)
+        dismiss()
     }
 }

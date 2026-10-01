@@ -23,7 +23,7 @@ private struct BusyLabel: View {
     let busy: Bool
     var body: some View {
         ZStack {
-            Text(title).opacity(busy ? 0 : 1)
+            Text(title.l10n).opacity(busy ? 0 : 1)
             if busy { ProgressView().tint(.black) }
         }
     }
@@ -68,7 +68,7 @@ struct AuthView: View {
         Page8(spacing: 12) {
             BackLink(label: backLabel) { r.authMode = "signup"; r.go(r.authReturn == .ob1 ? .splash : r.authReturn) }
             AuthHead(title: r.authMode == "signin" ? "Sign in" : "Create account",
-                     sub: r.authMode == "signin" ? "가입한 이메일로 코드를 보내드려요." : "비밀번호 없이 이메일 코드로 가입합니다.")
+                     sub: r.authMode == "signin" ? "We'll send a code to the email you signed up with." : "Sign up with an email code. No password needed.")
             emailField
             YellowButton(enabled: emailOK, action: { if !busy { sendCode() } }) {
                 BusyLabel(title: "Continue with email", busy: busy)
@@ -78,7 +78,7 @@ struct AuthView: View {
             appleButton
             if let error { ErrorLine(text: error) }
             Spacer(minLength: 0)
-            Text("가입 없이도 혼자 기록은 모두 쓸 수 있어요.\n친구 추가와 순위 비교에만 계정이 필요합니다.")
+            Text("You can record everything on your own without an account.\nYou only need one to add friends and compare rankings.")
                 .font(F.t(13)).foregroundStyle(C.text3).lineSpacing(13 * 0.5 - 3).multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity).padding(.bottom, 14)
         }
@@ -201,10 +201,10 @@ struct CodeView: View {
     var body: some View {
         Page8(spacing: 12) {
             BackLink(label: "Email") { r.go(.auth) }
-            AuthHead(title: "Check your email", sub: "\(emailShown)으로 보낸 6자리 코드를 입력하세요.")
+            AuthHead(title: "Check your email", sub: String(localized: "Enter the 6-digit code we sent to \(emailShown)."))
             codeBoxes
             HStack {
-                Text(resent ? "다시 보냈어요" : "코드는 10분간 유효합니다").foregroundStyle(C.text3)
+                Text(resent ? "Code sent again" : "The code is valid for 10 minutes").foregroundStyle(C.text3)
                 Spacer()
                 Button { resend() } label: {
                     Text("Resend").font(F.t(13, .semibold)).foregroundStyle(C.accent)
@@ -274,7 +274,7 @@ struct CodeView: View {
                 store.settings.email = r.email
                 if let p = await store.loadProfile(), p.nickname != nil { r.go(r.authReturn) }
                 else { r.nickDraft = ""; r.go(.nick) }
-            } catch { self.error = "코드가 맞지 않아요. 다시 확인해 주세요." }
+            } catch { self.error = String(localized: "That code doesn't match. Please check and try again.") }
             busy = false
         }
     }
@@ -301,10 +301,10 @@ struct NickView: View {
     var body: some View {
         Page8(spacing: 12) {
             Color.clear.frame(height: 44)
-            AuthHead(title: "Pick a nickname", sub: "친구가 이 이름으로 나를 찾고, 순위표에 표시됩니다.")
+            AuthHead(title: "Pick a nickname", sub: "Friends find you by this name, and it appears on leaderboards.")
             field
             Text(msg).font(F.t(13, .medium)).foregroundStyle(msgColor).padding(.horizontal, 4)
-            Text("영문 소문자·숫자·밑줄(_), 3–16자. 나중에 Settings에서 바꿀 수 있어요.")
+            Text("Lowercase letters, numbers and underscores (_), 3–16 characters. You can change it later in Settings.")
                 .font(F.t(13)).foregroundStyle(C.text3).padding(.horizontal, 4)
                 .fixedSize(horizontal: false, vertical: true)
             if let error { ErrorLine(text: error) }
@@ -353,10 +353,10 @@ struct NickView: View {
 
     private var msg: String {
         if nd.isEmpty { return " " }
-        if taken { return "@\(nd) is taken" }
-        if !valid { return "3–16자, 영문 소문자·숫자·_만 가능" }
-        if checking { return "확인 중…" }
-        return "@\(nd) is available"
+        if taken { return String(localized: "@\(nd) is taken") }
+        if !valid { return String(localized: "3–16 characters: lowercase letters, numbers and _ only") }
+        if checking { return String(localized: "Checking…") }
+        return String(localized: "@\(nd) is available")
     }
 
     /// 입력이 멈추고 0.3초 뒤 서버에서 사용 가능 여부 확인
@@ -401,7 +401,7 @@ struct AccountView: View {
             photoBlock
             SectionLabel(text: "ATHLETE", top: 14)
             athleteCard
-            Note8(text: "체급은 스테이션 무게에, 심박은 존 계산에 쓰여요. 친구에게는 사진·닉네임·체급만 보입니다.")
+            Note8(text: "Division sets station weights, and heart rate is used for zones. Friends only see your photo, nickname and division.")
             if store.signedIn { accountBlock } else { signUpCard }
         }
         .padding(.horizontal, 16)
@@ -413,10 +413,10 @@ struct AccountView: View {
                 pick = nil
             }
         }
-        .confirmationDialog("계정을 삭제할까요?", isPresented: $confirmDelete, titleVisibility: .visible) {
+        .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive) { Task { await store.deleteAccount() } }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("서버의 닉네임·친구·공유 기록이 지워집니다.") }
+        } message: { Text("Your nickname, friends and shared records will be deleted from the server.") }
     }
 
     private var nick: String { store.settings.nickname ?? "" }
@@ -459,7 +459,7 @@ struct AccountView: View {
             .font(F.t(15, .semibold))
             VStack(spacing: 2) {
                 Text(signed ? "@\(nick)" : "My profile").font(F.t(20, .semibold)).tracking(-0.02 * 20).lineLimit(1)
-                Text(signed ? emailShown : "가입 전 · 이 기기에만 저장")
+                Text(signed ? emailShown.l10n : "Not signed up · Saved on this device only".l10n)
                     .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .multilineTextAlignment(.center)
@@ -470,7 +470,7 @@ struct AccountView: View {
 
     private var athleteCard: some View {
         let s = store.settings
-        let hr = (s.hrMode == "age" ? "Age \(s.age) · " : "") + "\(s.maxHR) BPM"
+        let hr: String = (s.hrMode == "age" ? String(localized: "Age \(s.age)") + " · " : "") + "\(s.maxHR) BPM"
         return VStack(spacing: 0) {
             SettingRow(title: "Division", value: store.div.name) { r.sub(.setDiv, from: .account) }
                 .accessibilityIdentifier("profile.division")
@@ -483,7 +483,7 @@ struct AccountView: View {
     /// 가입 전: 설명 13 회색 + Sign up 노란 알약 (padding 16×18, margin-top 10)
     private var signUpCard: some View {
         HStack(spacing: 12) {
-            Text("가입하면 닉네임이 생기고, 이 사진이 친구 목록과 순위표에 표시돼요.")
+            Text("Sign up to get a nickname. This photo will appear in friend lists and leaderboards.")
                 .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(13 * 0.45 - 3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -503,7 +503,7 @@ struct AccountView: View {
                 .accessibilityIdentifier("profile.nickname")
             HStack(spacing: 12) {
                 Text("Sign-in").font(F.t(17)).frame(maxWidth: .infinity, alignment: .leading)
-                Text(s.signMethod ?? "Email code").font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
+                Text((s.signMethod ?? "Email code").l10n).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
             }
             .padding(.vertical, 14).padding(.horizontal, 18)
         }
@@ -532,14 +532,14 @@ struct AccountView: View {
         }
         .card8()
         .padding(.top, 14)
-        Note8(text: "계정을 삭제하면 서버의 닉네임·친구·공유 기록이 지워집니다. 이 기기의 기록과 건강 데이터는 남아요.")
+        Note8(text: "Deleting your account removes your nickname, friends and shared records from the server. Records and health data on this device stay.")
     }
 
     private func visNote(_ v: String) -> String {
         switch v {
-        case "public": return "닉네임을 아는 누구나 내 최고 기록을 볼 수 있어요."
-        case "private": return "순위표에 나타나지 않고, 기록은 나만 봅니다."
-        default: return "친구로 추가된 사람만 내 기록과 순위를 볼 수 있어요."
+        case "public": return "Anyone who knows your nickname can see your best records."
+        case "private": return "You won't appear on leaderboards, and only you can see your records."
+        default: return "Only people you've added as friends can see your records and rankings."
         }
     }
 }

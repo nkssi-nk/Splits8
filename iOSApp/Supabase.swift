@@ -41,10 +41,10 @@ enum SBError: LocalizedError {
     case notConfigured, http(Int, String), noSession, bad
     var errorDescription: String? {
         switch self {
-        case .notConfigured: return "서버 설정이 아직 없어요 (Config.swift)"
-        case .http(let c, let m): return "서버 오류 \(c): \(m)"
-        case .noSession: return "로그인이 필요해요"
-        case .bad: return "응답을 읽을 수 없어요"
+        case .notConfigured: return String(localized: "The server isn't set up yet (Config.swift)")
+        case .http(let c, let m): return String(localized: "Server error \(c): \(m)")
+        case .noSession: return String(localized: "Please sign in first")
+        case .bad: return String(localized: "Couldn't read the server response")
         }
     }
 }

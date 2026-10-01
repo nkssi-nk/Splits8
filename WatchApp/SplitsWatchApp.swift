@@ -78,7 +78,7 @@ struct WBackHeader<Trailing: View>: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("w.back")
-            Text(title)
+            Text(title.l10n)
                 .font(F.t(14, .semibold))
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -173,9 +173,9 @@ struct WHome: View {
 
     private func desc(_ m: Mode) -> String {
         switch m {
-        case .training: return "Custom blocks"
-        case .sim: return "8 runs · 8 stations"
-        case .race: return "Goal " + Fm.t(store.settings.goalTime)
+        case .training: return "Custom blocks".l10n
+        case .sim: return "8 runs · 8 stations".l10n
+        case .race: return "Goal".l10n + " " + Fm.t(store.settings.goalTime)
         }
     }
 
@@ -200,9 +200,12 @@ struct WHome: View {
         HStack(spacing: 10) {
             WModeIcon(mode: m)
             VStack(alignment: .leading, spacing: 2) {
-                Text(m.name).font(F.t(13, .semibold)).tracking(-0.26).lineLimit(1)
+                // v4: 12pt 한 줄, 말줄임 없음 (좁은 41mm/40mm 에서는 글자를 살짝 줄여서 다 보이게)
+                Text(m.name.l10n).font(F.t(12, .semibold)).tracking(-0.24)
+                    .lineLimit(1).allowsTightening(true).minimumScaleFactor(0.6)
                 Text(desc(m)).font(F.t(10, .medium)).foregroundStyle(C.text2).lineLimit(1)
             }
+            .layoutPriority(1)
             Spacer(minLength: 0)
             action(m)
         }
@@ -267,7 +270,7 @@ struct WPrograms: View {
 
     private func programCard(_ p: Program) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(p.name).font(F.t(13, .semibold)).lineLimit(1)
+            Text(p.name.l10n).font(F.t(13, .semibold)).lineLimit(1)
             Text(p.watchMeta).font(F.t(10)).foregroundStyle(C.text2).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -281,7 +284,7 @@ struct WPrograms: View {
 struct WQuick: View {
     let store = WatchStore.shared
     let nav = WNav.shared
-    private let maxSegs = 8
+    private let maxSegs = 16   // 트레이닝 세트 최대 16구간 (오너 지정, 디자인의 8 대신)
     private let cols: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 5), count: 4)
 
     var body: some View {
@@ -446,7 +449,7 @@ struct WConfirm: View {
 
     private var trainingList: some View {
         VStack(spacing: 0) {
-            Text("\(seq.count) segments · \(program.sets) \(program.sets == 1 ? "set" : "sets")")
+            Text(String(localized: "\(seq.count) segments") + " · " + setsLabel)
                 .font(F.t(10, .medium)).foregroundStyle(C.text2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20).padding(.bottom, 8)
@@ -460,6 +463,11 @@ struct WConfirm: View {
             }
             .frame(maxHeight: .infinity)
         }
+    }
+
+    /// 1 set / 3 sets
+    private var setsLabel: String {
+        program.sets == 1 ? String(localized: "1 set") : String(localized: "\(program.sets) sets")
     }
 
     private func previewRow(_ s: Seg) -> some View {
@@ -476,7 +484,7 @@ struct WConfirm: View {
     private var emptyRace: some View {
         VStack(spacing: 6) {
             Text("No race set up").font(F.t(14, .semibold)).tracking(-0.14)
-            Text("iPhone 앱 Race 탭에서 대회를 등록하면 여기에 표시됩니다.")
+            Text("Add a race in the Race tab of the iPhone app and it will show up here.")
                 .font(F.t(10)).foregroundStyle(C.text2).lineSpacing(4)
                 .multilineTextAlignment(.center)
         }
@@ -486,7 +494,7 @@ struct WConfirm: View {
 
     private var simple: some View {
         VStack(spacing: 4) {
-            Text(mode == .race ? ev.name : "Full Simulation")
+            Text(mode == .race ? ev.name : "Full Simulation".l10n)
                 .font(F.t(18, .semibold)).tracking(-0.36)
                 .multilineTextAlignment(.center).lineLimit(2)
             Text(small).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
@@ -512,7 +520,7 @@ struct WConfirm: View {
         if mode == .race {
             return Fm.wdm.string(from: ev.date) + " · " + store.settings.div.name
         }
-        return store.settings.div.name + " · 8 runs · 8 stations"
+        return store.settings.div.name + " · " + "8 runs · 8 stations".l10n
     }
 
     private var goal: String {

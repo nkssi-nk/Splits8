@@ -20,7 +20,7 @@ struct FriendsView: View {
                 signUpCard
             }
 
-            Note8(text: "선택한 친구의 기록이 Full Simulation의 비교 대상과 Training 구간 목표로 쓰입니다.", color: C.text2)
+            Note8(text: "The selected friend's records are used as the Full Simulation comparison and as Training split targets.", color: C.text2)
                 .padding(.bottom, 4)
             if !store.friends.isEmpty {
                 VStack(spacing: 0) {
@@ -30,7 +30,7 @@ struct FriendsView: View {
                 }
                 .card8()
             }
-            Note8(text: "탭하면 비교 대상으로 선택 · 다시 탭하면 해제 · VS 값은 내 최고 기록 기준")
+            Note8(text: "Tap to compare · Tap again to clear · VS is against your best")
         }
         .padding(.horizontal, 16)
         .task { await store.refreshSocial() }
@@ -39,7 +39,7 @@ struct FriendsView: View {
     /// 가입 전: 설명 13 회색 + Sign up 노란 알약 (padding 14×18, margin-top 4)
     private var signUpCard: some View {
         HStack(spacing: 12) {
-            Text("닉네임으로 친구를 찾고 기록을 비교하려면 가입이 필요해요.")
+            Text("Sign up to find friends by nickname and compare records.")
                 .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(13 * 0.45 - 3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -86,7 +86,7 @@ struct FriendsView: View {
                 FriendAvatar(url: f.avatarUrl, ini: f.ini, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(f.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white).lineLimit(1)
-                    Text(f.hasSplits ? "\(f.div) · \(f.date)" : "\(f.div) · Full Simulation 기록 없음")
+                    Text(friendSub(f))
                         .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -104,6 +104,12 @@ struct FriendsView: View {
         .buttonStyle(.plain)
         .rowLine(!last)
         .accessibilityIdentifier("friend." + f.name)
+    }
+
+    /// Open Men · 13 Sep 2026  /  Open Men · No Full Simulation record
+    private func friendSub(_ f: Friend) -> String {
+        let tail: String = f.hasSplits ? f.date : "No Full Simulation record".l10n
+        return f.div + " · " + tail
     }
 
     private func search(_ v: String) {

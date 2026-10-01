@@ -1,0 +1,519 @@
+import SwiftUI
+import UIKit
+import CoreLocation
+import Observation
+
+// MARK: - 워치 없이 아이폰으로 기록 (시안 ⑤)
+// 큰 Next 버튼으로 구간을 넘김. 화면은 꺼지지 않음. 심박 없음.
+// 구간 순서는 워치(WatchStore.seq)와 같은 규칙: SeqBuilder 를 그대로 씀.
+
+/// 아이폰 운동 진행 (워치 WorkoutEngine 의 HealthKit 없는 축소판)
+@Observable
+final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
+    private(set) var active = false
+    private(set) var finished = false
+    private(set) var mode: Mode = .sim
+    private(set) var title = ""
+    private(set) var sets = 1
+    private(set) var seq: [Seg] = []
+    private(set) var idx = 0
+    private(set) var splits: [Int] = []
+    private(set) var running = true
+
+    // 시간 (일시정지 제외). Date 로 계산하므로 백그라운드에 다녀와도 맞음
+    private(set) var startDate = Date()
+    @ObservationIgnored private var segStart = Date()
+    @ObservationIgnored private var pauseAt: Date?
+    @ObservationIgnored private var segPaused: Double = 0
+
+    // 야외 러닝 GPS 거리 (Settings.runMode == outdoor, 레이스 제외 — 워치와 같음)
+    @ObservationIgnored private var location: CLLocationManager?
+    @ObservationIgnored private var lastLoc: CLLocation?
+    private(set) var useGPS = false
+    private(set) var segDist: Double = 0
+    @ObservationIgnored private var segDists: [Double?] = []
+
+    @ObservationIgnored private var settings = Settings()
+    @ObservationIgnored private var friend: Friend?
+
+    // MARK: 값
+
+    var cur: Seg {
+        if seq.indices.contains(idx) { return seq[idx] }
+        return seq.last ?? Seg(icon: "run", name: "Run", detail: "1KM", kind: .run, target: 270)
+    }
+    var hasNext: Bool { seq.indices.contains(idx + 1) }
+    var next: Seg? { hasNext ? seq[idx + 1] : nil }
+
+    func segEl(_ now: Date) -> Int {
+        let p: Double = pauseAt.map { now.timeIntervalSince($0) } ?? 0
+        let v: Double = now.timeIntervalSince(segStart) - segPaused - p
+        return max(0, Int(v))
+    }
+    func doneT() -> Int { splits.prefix(idx).reduce(0, +) }
+    func total(_ now: Date) -> Int { doneT() + segEl(now) }
+
+    /// Roxzone 을 뺀 구간 수 (시안: 4 / 16)
+    var countTotal: Int { seq.filter { $0.kind != .rox }.count }
+    /// 현재 구간이 Roxzone 을 뺀 몇 번째인지
+    var countNow: Int {
+        let upTo: ArraySlice<Seg> = seq.prefix(idx + 1)
+        return upTo.filter { $0.kind != .rox }.count
+    }
+
+    // MARK: 구간 순서 (워치 WatchStore.seq 와 같은 규칙)
+
+    static func buildSeq(mode: Mode, program: Program?, store: Store) -> [Seg] {
+        let s: Settings = store.settings
+        switch mode {
+        case .race:
+            let g: [Int] = s.goals.count == 16 ? s.goals : Defaults.goals
+            return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: g)
+        case .sim:
+            return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: simTargets(store))
+        case .training:
+            let p: Program = program ?? Program.presets()[0]
+            return SeqBuilder.training(p, div: s.div, bests: store.segBests)
+        }
+    }
+
+    /// Full Simulation 목표 16개: 선택한 친구 → 내 최고 → 기본값
+    static func simTargets(_ store: Store) -> [Int] {
+        if let f = store.friend, f.hasSplits { return f.splits }
+        if let b = store.simBest?.splits16, b.count == 16 { return b }
+        return SeqBuilder.defaultTargets16
+    }
+
+    static func title(mode: Mode, program: Program?, store: Store) -> String {
+        switch mode {
+        case .training: return (program ?? Program.presets()[0]).name
+        case .sim: return "Full Simulation"
+        case .race:
+            let n: String = store.settings.event.name.trimmingCharacters(in: .whitespaces)
+            return n.isEmpty ? "Race" : n
+        }
+    }
+
+    // MARK: 시작
+
+    func start(_ req: PhoneRunRequest) {
+        guard !active else { return }
+        let store = Store.shared
+        settings = store.settings
+        friend = store.friend?.hasSplits == true ? store.friend : nil
+        mode = req.mode
+        title = PhoneRunEngine.title(mode: req.mode, program: req.program, store: store)
+        sets = req.mode == .training ? max(1, (req.program ?? Program.presets()[0]).sets) : 1
+        seq = PhoneRunEngine.buildSeq(mode: req.mode, program: req.program, store: store)
+        idx = 0; splits = []; running = true; finished = false
+        segDists = Array(repeating: nil, count: seq.count)
+        segDist = 0; lastLoc = nil
+        segPaused = 0; pauseAt = nil
+        let now = Date()
+        startDate = now; segStart = now
+        active = true
+
+        useGPS = req.mode != .race && settings.runMode == "outdoor"
+        if useGPS { startGPS() }
+    }
+
+    // MARK: 진행
+
+    /// 다음 구간. 마지막 구간이면 끝내고 기록을 돌려줌
+    func advance() -> Record? {
+        guard active, !finished, running else { return nil }
+        let now = Date()
+        closeSeg(now)
+        if splits.count >= seq.count {
+            return finish()
+        }
+        idx = splits.count
+        segStart = now; segPaused = 0
+        segDist = 0
+        return nil
+    }
+
+    func togglePause() {
+        guard active, !finished else { return }
+        if running {
+            pauseAt = Date(); running = false
+        } else {
+            if let p = pauseAt { segPaused += Date().timeIntervalSince(p) }
+            pauseAt = nil; running = true
+            lastLoc = nil
+        }
+    }
+
+    /// End → Save: 현재 구간까지 기록하고 끝냄
+    func endNow() -> Record? {
+        guard active, !finished else { return nil }
+        if !running { togglePause() }
+        closeSeg(Date())
+        return finish()
+    }
+
+    /// End → Discard
+    func discard() {
+        stopGPS()
+        active = false; finished = true
+    }
+
+    private func closeSeg(_ now: Date) {
+        splits.append(segEl(now))
+        if useGPS, cur.kind == .run, segDists.indices.contains(idx), segDist > 0 {
+            segDists[idx] = segDist
+        }
+    }
+
+    private func finish() -> Record {
+        stopGPS()
+        finished = true
+        return makeRecord()
+    }
+
+    /// 워치 WorkoutEngine.makeRecord 와 같은 모양 (심박·칼로리 없음)
+    private func makeRecord() -> Record {
+        var results: [SegResult] = []
+        for (i, t) in splits.enumerated() where seq.indices.contains(i) {
+            let s: Seg = seq[i]
+            let d: Double? = segDists.indices.contains(i) ? segDists[i] : nil
+            results.append(SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
+                                     hr: nil, dist: d))
+        }
+        let total: Int = splits.reduce(0, +)
+        let tg: Int = seq.prefix(splits.count).map(\.target).reduce(0, +)
+        return Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: [],
+                      kcal: 0, avgHR: 0, maxHR: 0, division: settings.div.name,
+                      goal: mode == .race ? settings.goalTime : nil,
+                      vsWord: deltaWord, vsTarget: tg)
+    }
+
+    /// VS GOAL / VS JIHO / VS BEST (워치와 같음)
+    var deltaWord: String {
+        if mode == .race { return "VS GOAL" }
+        if mode == .sim, let f = friend { return "VS " + f.first.uppercased() }
+        return "VS BEST"
+    }
+
+    // MARK: GPS
+
+    private func startGPS() {
+        let m = CLLocationManager()
+        m.delegate = self
+        m.desiredAccuracy = kCLLocationAccuracyBest
+        m.activityType = .fitness
+        m.distanceFilter = 5
+        location = m
+        if m.authorizationStatus == .notDetermined {
+            m.requestWhenInUseAuthorization()
+        } else {
+            m.startUpdatingLocation()
+        }
+    }
+
+    private func stopGPS() {
+        location?.stopUpdatingLocation()
+        location?.delegate = nil
+        location = nil
+        lastLoc = nil
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let st = manager.authorizationStatus
+        if st == .authorizedWhenInUse || st == .authorizedAlways {
+            manager.startUpdatingLocation()
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        for loc in locations {
+            DispatchQueue.main.async { self.gotLocation(loc) }
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
+
+    private func gotLocation(_ loc: CLLocation) {
+        guard active, !finished else { return }
+        guard loc.horizontalAccuracy > 0, loc.horizontalAccuracy <= 30 else { return }
+        guard running, cur.kind == .run else { lastLoc = nil; return }
+        if let prev = lastLoc {
+            let d: Double = loc.distance(from: prev)
+            if d < 100 { segDist += d }       // 튀는 값은 버림
+        }
+        lastLoc = loc
+    }
+}
+
+// MARK: - 화면 높이별 크기 (6.1" 기준 1.0, SE 는 줄이고 Pro Max 는 키움)
+
+struct PhoneLiveMetrics {
+    let k: CGFloat
+
+    init(height h: CGFloat) {
+        let v: CGFloat = h / 760
+        k = max(0.8, min(1.14, v))
+    }
+
+    var totalFont: CGFloat { 76 * k }
+    var segFont: CGFloat { 64 * k }
+    var icon: CGFloat { 52 * k }
+    var nameFont: CGFloat { 24 * min(k, 1.08) }
+    var detailFont: CGFloat { 15 * min(k, 1.08) }
+    var nextFont: CGFloat { 18 * min(k, 1.06) }
+    var nextIcon: CGFloat { 24 * min(k, 1.06) }
+    var top: CGFloat { 24 * k }
+    var segTop: CGFloat { 30 * k }
+    var dividerTop: CGFloat { 26 * k }
+    var buttonH: CGFloat { max(80, min(104, 96 * k)) }
+    var buttonFont: CGFloat { 26 * min(k, 1.08) }
+    var pillH: CGFloat { max(54, min(68, 64 * k)) }
+    var bottom: CGFloat { 16 * k }
+}
+
+// MARK: - 화면
+
+struct PhoneLiveView: View {
+    let r = Router.shared
+    @State private var eng = PhoneRunEngine()
+    @State private var askEnd = false
+    @State private var flash: Double = 0
+
+    private var req: PhoneRunRequest { r.phoneRun ?? PhoneRunRequest(mode: .sim) }
+
+    var body: some View {
+        GeometryReader { g in
+            let m = PhoneLiveMetrics(height: g.size.height)
+            content(m)
+                .frame(width: g.size.width, height: g.size.height)
+        }
+        .overlay {
+            C.accent.opacity(flash * 0.22)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
+        .onAppear(perform: begin)
+        .onDisappear(perform: leave)
+        .alert("End workout?", isPresented: $askEnd) {
+            Button("Save") { save() }
+            Button("Discard", role: .destructive) { discard() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Save the segments you've done so far?")
+        }
+    }
+
+    private func content(_ m: PhoneLiveMetrics) -> some View {
+        VStack(spacing: 0) {
+            header
+            TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+                live(m, now: ctx.date)
+            }
+            .padding(.top, m.top)
+            nextRow(m)
+            Spacer(minLength: 16)
+            nextButton(m)
+            HStack(spacing: 12) {
+                endPill(m)
+                pausePill(m)
+            }
+            .padding(.top, 16 * m.k)
+            .padding(.bottom, m.bottom)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: 위
+
+    /// Full Simulation (15/600 노랑) · iPhone · No HR (13 회색)
+    private var header: some View {
+        HStack {
+            Text((eng.mode == .training ? eng.title : eng.mode.name).l10n)
+                .font(F.t(15, .semibold)).foregroundStyle(C.accent).lineLimit(1)
+            Spacer(minLength: 12)
+            Text("iPhone · No HR").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
+        }
+        .frame(height: 44)
+    }
+
+    /// TOTAL · 큰 전체 시간 · [아이콘 구간 시간] · 이름 · 설명
+    private func live(_ m: PhoneLiveMetrics, now: Date) -> some View {
+        let cur: Seg = eng.cur
+        let el: Int = eng.segEl(now)
+        let tint: IconTint = cur.kind == .rox ? .mute : .yellow
+        let timeColor: Color = eng.running ? .white : C.text2
+        return VStack(spacing: 0) {
+            Text("TOTAL").font(F.t(12, .semibold)).tracking(0.12 * 12).foregroundStyle(C.text2)
+            Text(Fm.t(eng.total(now)))
+                .font(F.num(m.totalFont)).tracking(-0.02 * m.totalFont)
+                .foregroundStyle(timeColor)
+                .lineLimit(1).minimumScaleFactor(0.6)
+                .accessibilityIdentifier("phone.total")
+            HStack(spacing: 14 * m.k) {
+                Icon8(cur.icon, m.icon, tint: tint)
+                Text(Fm.t(el))
+                    .font(F.num(m.segFont)).tracking(-0.01 * m.segFont)
+                    .foregroundStyle(timeColor)
+                    .lineLimit(1).minimumScaleFactor(0.6)
+            }
+            .padding(.top, m.segTop)
+            Text(cur.name)
+                .font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                .padding(.top, 8 * m.k)
+            Text(detailLine)
+                .font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// 50M · 152KG · 4 / 16  /  러닝: 1KM (GPS면 0.38 KM / 1KM) · 3 / 16  /  Roxzone: TRANSITION
+    private var detailLine: String {
+        let cur: Seg = eng.cur
+        if cur.kind == .rox { return cur.detail }
+        var head: String = cur.detail
+        if cur.kind == .run && eng.useGPS {
+            let km: Double = eng.segDist / 1000
+            head = String(format: "%.2f KM / ", km) + cur.detail
+        }
+        return head + " · \(eng.countNow) / \(eng.countTotal)"
+    }
+
+    /// 선 · NEXT [아이콘] 이름
+    private func nextRow(_ m: PhoneLiveMetrics) -> some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
+                .padding(.horizontal, 20)
+                .padding(.top, m.dividerTop)
+                .padding(.bottom, 14 * m.k)
+            HStack(spacing: 10) {
+                Text("NEXT").font(F.t(13)).tracking(0.1 * 13).foregroundStyle(C.text2)
+                if let nx = eng.next {
+                    Icon8(nx.icon, m.nextIcon, tint: nx.kind == .rox ? .mute : .yellow)
+                    Text(nx.name).font(F.t(m.nextFont, .semibold)).lineLimit(1)
+                } else {
+                    Text("Finish").font(F.t(m.nextFont, .semibold)).foregroundStyle(C.accent).lineLimit(1)
+                }
+            }
+        }
+    }
+
+    // MARK: 아래 버튼
+
+    private func nextButton(_ m: PhoneLiveMetrics) -> some View {
+        YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: eng.running, action: { next() }) {
+            HStack(spacing: 10) {
+                Text(eng.hasNext ? "Next" : "Finish")
+                Text("›")
+            }
+            .font(F.t(m.buttonFont, .semibold))
+        }
+        .accessibilityIdentifier("phone.next")
+    }
+
+    /// ■ End (빨강 글자, 빨강 22% 바탕)
+    private func endPill(_ m: PhoneLiveMetrics) -> some View {
+        Button { askEnd = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "stop.fill").font(.system(size: 15, weight: .semibold))
+                Text("End").font(F.t(17, .semibold))
+            }
+            .foregroundStyle(C.bad)
+            .frame(maxWidth: .infinity).frame(height: m.pillH)
+            .background(Color(hex: 0xFF453A, alpha: 0.22), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(Press(scale: 0.97))
+        .accessibilityIdentifier("phone.end")
+    }
+
+    /// ❚❚ Pause / ▶ Resume (회색 12%)
+    private func pausePill(_ m: PhoneLiveMetrics) -> some View {
+        Button { eng.togglePause() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: eng.running ? "pause.fill" : "play.fill").font(.system(size: 15, weight: .semibold))
+                Text(eng.running ? "Pause" : "Resume").font(F.t(17, .semibold))
+            }
+            .foregroundStyle(eng.running ? Color.white : C.accent)
+            .frame(maxWidth: .infinity).frame(height: m.pillH)
+            .background(Color.white.opacity(0.12), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(Press(scale: 0.97))
+        .accessibilityIdentifier("phone.pause")
+    }
+
+    // MARK: 동작
+
+    private func begin() {
+        UIApplication.shared.isIdleTimerDisabled = true
+        if !eng.active { eng.start(req) }
+        // 왼쪽 끝에서 밀기 = End 확인 (실수로 나가지 않게)
+        r.backAction = { askEnd = true }
+    }
+
+    private func leave() {
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    private func next() {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        flashNow()
+        if let rec = eng.advance() {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            done(rec)
+        }
+    }
+
+    private func flashNow() {
+        withAnimation(.linear(duration: 0.06)) { flash = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
+            withAnimation(.easeOut(duration: 0.26)) { flash = 0 }
+        }
+    }
+
+    private func save() {
+        if let rec = eng.endNow() { done(rec) }
+    }
+
+    private func done(_ rec: Record) {
+        let from: Scr = req.from
+        UIApplication.shared.isIdleTimerDisabled = false
+        Store.shared.addPhoneRecord(rec)
+        // addPhoneRecord 가 source = "phone" 을 붙여 저장 → 저장된 것으로 상세 열기
+        var shown = rec
+        shown.source = "phone"
+        r.open(shown, from: from)
+    }
+
+    private func discard() {
+        let from: Scr = req.from
+        eng.discard()
+        UIApplication.shared.isIdleTimerDisabled = false
+        r.go(from)
+    }
+}
+
+// MARK: - Start on iPhone (탭 화면에 놓는 작은 회색 버튼)
+
+struct StartOnPhoneButton: View {
+    let mode: Mode
+    var program: Program? = nil
+
+    var body: some View {
+        Button { Router.shared.startOnPhone(mode, program: program) } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "iphone").font(.system(size: 14, weight: .semibold))
+                Text("Start on iPhone").font(F.t(14, .semibold)).lineLimit(1)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14).frame(height: 36)
+            .background(Color.white.opacity(0.10), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(Press(scale: 0.96))
+        .fixedSize()
+        .accessibilityIdentifier("startOnPhone." + mode.rawValue)
+    }
+}

@@ -37,7 +37,7 @@ struct Page8<Content: View>: View {
 struct PageSub: View {
     let text: String
     var body: some View {
-        Text(text).font(F.t(15)).foregroundStyle(C.text2).lineSpacing(15 * 0.45 - 3)
+        Text(text.l10n).font(F.t(15)).foregroundStyle(C.text2).lineSpacing(15 * 0.45 - 3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -70,12 +70,8 @@ struct SplashView: View {
     private var bottomBlock: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("8 RUNS · 8 STATIONS").font(F.t(11, .semibold)).tracking(0.28 * 11).foregroundStyle(C.accent)
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("SPLITS").foregroundStyle(.white)
-                Text("8").foregroundStyle(C.accent).padding(.leading, 8)
-            }
-            .font(.system(size: 72, weight: .heavy)).tracking(-0.03 * 72)
-            .lineLimit(1).minimumScaleFactor(0.8)
+            Wordmark(size: 72)   // 로고 이미지 (시안 v4)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Text("Every run. Every station. Every second on your wrist.")
                 .font(F.t(15)).lineSpacing(15 * 0.45 - 3).foregroundStyle(.white.opacity(0.78))
                 .frame(maxWidth: 300, alignment: .leading)
@@ -149,7 +145,7 @@ struct ObFrame<Content: View>: View {
             PageSub(text: sub).padding(.bottom, 10)
             content
             Spacer(minLength: 0)
-            YellowButton(action: action) { Text(button) }
+            YellowButton(action: action) { Text(button.l10n) }
                 .padding(.bottom, 14)
                 .accessibilityIdentifier("ob.next")
         }
@@ -215,7 +211,7 @@ struct DivisionList: View {
 
 struct Onboarding1: View {
     var body: some View {
-        ObFrame(step: 1, title: "Your division", sub: "무게와 횟수의 기본값이 됩니다. Settings에서 언제든 바꿀 수 있어요.",
+        ObFrame(step: 1, title: "Your division", sub: "This sets your default weights and reps. You can change it anytime in Settings.",
                 button: "Continue", action: { Router.shared.go(.ob2) }) {
             DivisionList(checkSize: 20)
         }
@@ -229,7 +225,7 @@ struct Onboarding2: View {
 
     var body: some View {
         let s = store.settings
-        ObFrame(step: 2, title: "Heart rate zones", sub: "최대 심박을 기준으로 Z1–Z5를 계산합니다. 워치의 심박 색이 이 범위를 따라요.",
+        ObFrame(step: 2, title: "Heart rate zones", sub: "Z1–Z5 are calculated from your max heart rate. Heart rate colors on your watch follow these ranges.",
                 button: "Continue", action: { Router.shared.go(.ob3) }) {
             Seg8(items: [("age", "By age"), ("manual", "Manual")], selected: s.hrMode) { store.settings.hrMode = $0 }
             inputCard
@@ -293,7 +289,7 @@ struct Onboarding3: View {
 
     var body: some View {
         ObFrame(step: 3, title: "Connect Apple Watch",
-                sub: "운동 기록과 심박은 Apple Watch에서 측정합니다. 건강 데이터 접근을 허용해 주세요.",
+                sub: "Workouts and heart rate are measured on Apple Watch. Please allow access to Health data.",
                 button: granted ? "Start training" : "Allow & connect", action: tap) {
             VStack(spacing: 0) {
                 perm("i_permWatch", "Apple Watch", granted ? "Connected" : "Tap Allow to pair", last: false)
@@ -301,7 +297,7 @@ struct Onboarding3: View {
                 perm("i_permLoc", "Location", granted ? "Allowed · outdoor runs" : "Outdoor run pace (optional)", last: true)
             }
             .card8()
-            Note8(text: "계정은 필요 없습니다. 기록은 이 기기와 iCloud에만 저장돼요.")
+            Note8(text: "No account needed. Records are saved only on this device and in iCloud.")
         }
     }
 
@@ -312,8 +308,8 @@ struct Onboarding3: View {
                 .frame(width: 36, height: 36)
                 .background(granted ? C.good.opacity(0.15) : C.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(F.t(17, .medium))
-                Text(sub).font(F.t(13)).foregroundStyle(C.text2)
+                Text(name.l10n).font(F.t(17, .medium))
+                Text(sub.l10n).font(F.t(13)).foregroundStyle(C.text2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if granted { Check8(color: C.good, size: 20) }

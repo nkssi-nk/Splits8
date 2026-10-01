@@ -24,10 +24,41 @@ struct SettingsView: View {
             }
             .card8()
 
+            SectionLabel(text: "VIBRATION", top: 14)
+            VStack(spacing: 0) {
+                hapticRow("Heart rate zone change", sub: nil, on: zoneBinding, last: false)
+                    .accessibilityIdentifier("settings.hapticZone")
+                hapticRow("Behind target pace", sub: "Race · Full Sim", on: paceBinding, last: true)
+                    .accessibilityIdentifier("settings.hapticPace")
+            }
+            .card8()
+            Note8(text: "Apple Watch alerts you with a vibration during workouts.")
+
             SectionLabel(text: "DEVICE", top: 14)
             deviceCard
         }
         .padding(.horizontal, 16)
+    }
+
+    private var zoneBinding: Binding<Bool> {
+        Binding(get: { store.settings.hapticZone }, set: { store.settings.hapticZone = $0 })
+    }
+    private var paceBinding: Binding<Bool> {
+        Binding(get: { store.settings.hapticPace }, set: { store.settings.hapticPace = $0 })
+    }
+
+    /// 제목 17 · 설명 13 회색 · 토글 (padding 14×18 → 토글 높이 때문에 세로 10)
+    private func hapticRow(_ title: String, sub: String?, on: Binding<Bool>, last: Bool) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.l10n).font(F.t(17)).lineLimit(1)
+                if let sub { Text(sub.l10n).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Toggle8(on: on)
+        }
+        .padding(.vertical, sub == nil ? 10 : 11).padding(.horizontal, 18)
+        .rowLine(!last)
     }
 
     /// "2" 또는 "2 · Jiho selected"
@@ -35,7 +66,7 @@ struct SettingsView: View {
         let n = "\(store.friends.count)"
         guard let f = store.friend else { return n }
         let first = f.name.split(separator: " ").first.map(String.init) ?? f.name
-        return n + " · \(first) selected"
+        return n + " · " + String(localized: "\(first) selected")
     }
 
     /// 44 원 (17/600) · 제목 17/600 · 설명 13 회색 · › (padding 14×18, gap 14, margin-bottom 10)
@@ -49,7 +80,7 @@ struct SettingsView: View {
                         bg: signed ? C.accent : C.control, fg: signed ? .black : C.text2, fontSize: 17)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(signed ? "@\(nick)" : "My profile").font(F.t(17, .semibold)).foregroundStyle(.white).lineLimit(1)
-                    Text("\(store.div.name) · 사진·체급·심박\(signed ? "" : " · 가입 전")")
+                    Text(profileSub(signed))
                         .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -64,6 +95,13 @@ struct SettingsView: View {
         .padding(.bottom, 10)
     }
 
+    /// Open Men · Photo · division · heart rate (· Not signed up)
+    private func profileSub(_ signed: Bool) -> String {
+        var parts: [String] = [store.div.name, "Photo · division · heart rate".l10n]
+        if !signed { parts.append("Not signed up".l10n) }
+        return parts.joined(separator: " · ")
+    }
+
     /// 워치 22 · Apple Watch 17 · 설명 13 · ● Connected (13/600 초록) / ● Not connected (회색)
     private var deviceCard: some View {
         let on = store.watchPaired && store.watchInstalled
@@ -72,7 +110,7 @@ struct SettingsView: View {
             Glyph("i_device", 22, .white)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Apple Watch").font(F.t(17))
-                Text(sub).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                Text(sub.l10n).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) {
@@ -94,7 +132,7 @@ struct SetDivView: View {
     var body: some View {
         VStack(spacing: 10) {
             DivisionList(checkSize: 18)
-            Note8(text: "체급을 바꾸면 Training·Full Simulation·Race의 모든 스테이션 무게와 횟수가 함께 바뀝니다. 무게는 시즌마다 조정될 수 있으니 공식 규정을 확인하세요.")
+            Note8(text: "Changing your division updates every station weight and rep count in Training, Full Simulation and Race. Weights can change each season, so check the official rules.")
                 .padding(.top, 4)
         }
         .padding(.horizontal, 16)
@@ -114,7 +152,7 @@ struct SetRunView: View {
                 }
             }
             .card8()
-            Note8(text: "Training과 Full Simulation에 적용됩니다. Race는 현장 러닝이라 GPS·모션을 자동으로 선택합니다. 트레드밀 거리는 기계 표시값으로 보정할 수 있습니다.")
+            Note8(text: "Applies to Training and Full Simulation. Race runs are on site, so GPS or motion is chosen automatically. Treadmill distance can be calibrated with the machine reading.")
                 .padding(.top, 4)
         }
         .padding(.horizontal, 16)
@@ -126,8 +164,8 @@ struct SetRunView: View {
         return Button { store.settings.runMode = k } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(RunModes.name(k)).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white)
-                    Text(RunModes.spec(k)).font(F.t(13)).foregroundStyle(C.text3)
+                    Text(RunModes.name(k).l10n).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white)
+                    Text(RunModes.spec(k).l10n).font(F.t(13)).foregroundStyle(C.text3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if on { Check8(size: 18) }
@@ -153,7 +191,7 @@ struct SetHrView: View {
                 ForEach(0..<5, id: \.self) { i in zoneRow(i) }
             }
             .card8()
-            Note8(text: "최대 심박에서 자동 계산됩니다. 워치의 심박 색과 Z1–Z5 표시가 이 범위를 따릅니다.")
+            Note8(text: "Calculated automatically from your max heart rate. Heart rate colors and Z1–Z5 on your watch follow these ranges.")
         }
         .padding(.horizontal, 16)
     }
@@ -172,7 +210,7 @@ struct SetHrView: View {
                     }
                 }
                 Spacer()
-                Text(age ? "220 − \(s.age)세" : "직접 입력").font(F.t(13)).foregroundStyle(C.text2)
+                Text(age ? String(localized: "220 − \(s.age) yrs") : "Manual entry".l10n).font(F.t(13)).foregroundStyle(C.text2)
                     .multilineTextAlignment(.trailing)
             }
             Seg8(items: [("age", "By age"), ("manual", "Manual")], selected: s.hrMode) { store.settings.hrMode = $0 }
@@ -228,7 +266,7 @@ struct SetGoalsView: View {
             .lineLimit(1)
             .padding(.horizontal, 4).padding(.bottom, 6)
             VStack(spacing: 0) {
-                Text("Full Simulation과 Race에서 구간별 목표로 쓰입니다. 5초 단위로 조절.")
+                Text("Used as split targets in Full Simulation and Race. Adjust in 5-second steps.")
                     .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(13 * 0.45 - 3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)

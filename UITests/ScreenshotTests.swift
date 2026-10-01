@@ -14,9 +14,12 @@ final class ScreenshotTests: XCTestCase {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     }
 
+    /// 앱은 영어(기본) + 한국어. 화면 찾기는 영어 글자로 하므로 테스트는 항상 영어로 띄움
+    static let english: [String] = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+
     private func launch(onboarded: Bool) {
         app = XCUIApplication()
-        app.launchArguments = onboarded ? ["--demo", "--onboarded"] : ["--demo"]
+        app.launchArguments = (onboarded ? ["--demo", "--onboarded"] : ["--demo"]) + Self.english
         app.launch()
         sleep(2)
     }
@@ -58,7 +61,7 @@ final class ScreenshotTests: XCTestCase {
     // MARK: 0. 앱 켤 때 가운데 로고
     func test0_launchLogo() {
         app = XCUIApplication()
-        app.launchArguments = ["--demo", "--onboarded", "--launch"]
+        app.launchArguments = ["--demo", "--onboarded", "--launch"] + Self.english
         app.launch()
         let s = XCUIScreen.main.screenshot()
         try? s.pngRepresentation.write(to: dir.appendingPathComponent("00_launch_logo.png"))

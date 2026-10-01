@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import Observation
 
 @main
@@ -43,6 +44,21 @@ enum Scr: String {
     case setHr, setDiv, setRun, setGoals, setEvent, friends
     case auth, code, nick, findEvent, account
     case detail, share
+    case phoneLive          // 워치 없이 아이폰으로 기록 (PhoneLiveView)
+}
+
+/// 운동 예약 시트 요청 (달력 날짜 / 홈 UPCOMING 에서 엶)
+struct PlanRequest: Equatable {
+    var date: Date
+    var mode: Mode                     // .training 또는 .sim (기본 선택)
+    var existing: PlannedWorkout? = nil
+}
+
+/// 아이폰으로 기록 시작 요청
+struct PhoneRunRequest: Equatable {
+    var mode: Mode
+    var program: Program? = nil        // 트레이닝이면 프로그램
+    var from: Scr = .home              // 끝나면 / 취소하면 돌아갈 화면
 }
 
 /// 화면 이동 (시안의 screen 상태와 같은 구조)
@@ -66,6 +82,19 @@ final class Router {
     // 대회 편집
     var evDraft: RaceEvent? = nil
 
+    // 운동 예약 시트 (nil 이면 닫힘)
+    var planRequest: PlanRequest? = nil
+    func openPlan(date: Date, mode: Mode = .training, existing: PlannedWorkout? = nil) {
+        planRequest = PlanRequest(date: date, mode: mode, existing: existing)
+    }
+
+    // 아이폰으로 기록
+    var phoneRun: PhoneRunRequest? = nil
+    func startOnPhone(_ mode: Mode, program: Program? = nil) {
+        phoneRun = PhoneRunRequest(mode: mode, program: program, from: scr)
+        go(.phoneLive)
+    }
+
     // 만들기 화면
     var editId: String?
     var draftSeq: [ProgItem] = []
@@ -84,9 +113,9 @@ final class Router {
 
     func newTraining() {
         editId = nil; draftName = ""; draftSets = 1
-        // 기본: HYROX 순서 앞 8구간 (Run, SkiErg, Run, Sled Push, Run, Sled Pull, Run, BBJ) — 한 세트 최대 8
+        // 기본: HYROX 한 바퀴 16구간 (Run 1KM + 스테이션 8개 순서대로) — 한 세트 최대 16
         let hyrox: [ProgItem] = Station.all.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0.key)] }
-        draftSeq = Array(hyrox.prefix(8))
+        draftSeq = Array(hyrox.prefix(BuilderView.maxSeq))
         go(.builder)
     }
     func edit(_ p: Program) {
@@ -173,6 +202,7 @@ extension Scr {
         case .findEvent: return .y(0.22, 1.3, 0.5, 0.5, 0)
         case .account: return .y(0.18, 1.2, 0.5, 0.5, 0)
         case .splash: return .none
+        case .phoneLive: return .y(0.18, 1.3, 0.5, 0.5, 0)
         }
     }
 
@@ -232,27 +262,24 @@ struct PhoneRoot: View {
 
             if r.scr.showsBar { TopBar8() }
 
-            // 아이폰처럼 화면 왼쪽 끝에서 오른쪽으로 밀면 뒤로
-            if edgeBack != nil && !r.saveOpen {
-                Color.clear
-                    .frame(width: 22)
-                    .contentShape(Rectangle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .ignoresSafeArea()
-                    .gesture(
-                        DragGesture(minimumDistance: 8)
-                            .onChanged { v in edgeDrag = max(0, v.translation.width) * 0.6 }
-                            .onEnded { v in
-                                let go = v.translation.width > 80 || v.predictedEndTranslation.width > 200
-                                if go, let back = edgeBack {
-                                    edgeDrag = 0
-                                    back()
-                                } else {
-                                    withAnimation(.snappy(duration: 0.25)) { edgeDrag = 0 }
-                                }
-                            }
-                    )
-            }
+            // 아이폰처럼 화면 왼쪽 끝에서 오른쪽으로 밀면 뒤로.
+            // SwiftUI 제스처는 스크롤 화면이 터치를 먼저 가져가서 안 먹었음 → UIKit 화면 가장자리 제스처로 교체
+            // (다른 스크롤 제스처들이 이 제스처가 실패할 때까지 기다리게 해서 가장자리 밀기가 항상 우선)
+            EdgeSwipeBack(
+                enabled: edgeBack != nil && !r.saveOpen,
+                onChanged: { dx in edgeDrag = max(0, dx) * 0.6 },
+                onEnded: { dx, vx in
+                    let go: Bool = dx > 80 || (dx > 30 && vx > 500)
+                    if go, let back = edgeBack {
+                        edgeDrag = 0
+                        back()
+                    } else {
+                        withAnimation(.snappy(duration: 0.25)) { edgeDrag = 0 }
+                    }
+                }
+            )
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
 
             if r.scr.showsTabs {
                 TabBar8()
@@ -263,6 +290,14 @@ struct PhoneRoot: View {
             }
 
             if r.saveOpen { SaveSheet() }
+        }
+        .sheet(isPresented: Binding(get: { r.planRequest != nil }, set: { if !$0 { r.planRequest = nil } })) {
+            if let req = r.planRequest {
+                PlanSheet(request: req)
+                    .presentationDetents([.large])
+                    .presentationBackground(Color(hex: 0x1C1C1E))
+                    .preferredColorScheme(.dark)
+            }
         }
     }
 
@@ -291,6 +326,7 @@ struct PhoneRoot: View {
         case .account: Scroll8 { AccountView() }
         case .detail: Scroll8 { DetailView() }
         case .share: Scroll8(bottom: 40) { ShareView() }
+        case .phoneLive: PhoneLiveView()
         }
     }
 }
@@ -322,7 +358,7 @@ struct TopBar8: View {
                     Button(action: b.action) {
                         HStack(spacing: 2) {
                             Glyph("i_chevL", 22, C.accent)
-                            Text(b.label).font(F.t(17))
+                            Text(b.label.l10n).font(F.t(17))
                         }
                         .foregroundStyle(C.accent)
                         .frame(height: 44)
@@ -335,7 +371,7 @@ struct TopBar8: View {
                     Wordmark(size: 17, tracking: -0.03)
                 }
                 Spacer(minLength: 12)
-                Text(r.barTitle).font(F.t(17, .semibold)).tracking(-0.17).lineLimit(1)
+                Text(r.barTitle.l10n).font(F.t(17, .semibold)).tracking(-0.17).lineLimit(1)
             }
             .padding(.horizontal, 20)
             .frame(height: 44)
@@ -374,7 +410,7 @@ struct TabBar8: View {
                 Button { r.go(t.scr) } label: {
                     VStack(spacing: 2) {
                         if t.icon == "modeTraining" { Icon8(t.icon, 26, c) } else { Glyph(t.icon, 25, c) }
-                        Text(t.label).font(F.t(11, .semibold)).lineLimit(1).fixedSize()
+                        Text(t.label.l10n).font(F.t(11, .semibold)).lineLimit(1).fixedSize()
                     }
                     .foregroundStyle(c)
                     .frame(maxWidth: .infinity).frame(height: 54)
@@ -398,15 +434,96 @@ struct TabBar8: View {
     var body: some View {
         if #available(iOS 26.0, *) {
             row
-                .glassEffect(.regular.tint(Color(hex: 0x161616, alpha: 0.55)), in: Capsule())
+                .glassEffect(.regular.tint(Color(hex: 0x161616, alpha: 0.12)), in: Capsule())   // 뒤 화면이 비치도록 아주 옅게
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
         } else {
             row
                 .background(.ultraThinMaterial, in: Capsule())
-                .background(Color(hex: 0x161616, alpha: 0.8), in: Capsule())
+                .background(Color(hex: 0x161616, alpha: 0.25), in: Capsule())
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
+        }
+    }
+}
+
+// MARK: - 왼쪽 가장자리 밀어서 뒤로 (UIKit)
+
+/// 창(window)에 UIScreenEdgePanGestureRecognizer 를 하나 붙임.
+/// 다른 팬 제스처(스크롤 등)는 이 제스처가 실패해야 시작하므로 가장자리에서 밀면 항상 뒤로 가기가 먼저 잡힘.
+struct EdgeSwipeBack: UIViewRepresentable {
+    var enabled: Bool
+    var onChanged: (CGFloat) -> Void
+    var onEnded: (CGFloat, CGFloat) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView(frame: .zero)
+        v.isUserInteractionEnabled = false
+        context.coordinator.host = v
+        context.coordinator.attachSoon()
+        return v
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.recognizer?.isEnabled = enabled
+        if context.coordinator.recognizer == nil { context.coordinator.attachSoon() }
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        if let g = coordinator.recognizer { g.view?.removeGestureRecognizer(g) }
+        coordinator.recognizer = nil
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: EdgeSwipeBack
+        weak var host: UIView?
+        var recognizer: UIScreenEdgePanGestureRecognizer?
+        private var tries = 0
+
+        init(_ parent: EdgeSwipeBack) { self.parent = parent }
+
+        func attachSoon() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.attach() }
+        }
+
+        private func attach() {
+            guard recognizer == nil else { return }
+            guard let window = host?.window else {
+                tries += 1
+                if tries < 40 { attachSoon() }
+                return
+            }
+            let g = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handle(_:)))
+            g.edges = .left
+            g.delegate = self
+            g.isEnabled = parent.enabled
+            window.addGestureRecognizer(g)
+            recognizer = g
+        }
+
+        @objc func handle(_ g: UIScreenEdgePanGestureRecognizer) {
+            let dx: CGFloat = g.translation(in: g.view).x
+            switch g.state {
+            case .changed:
+                parent.onChanged(dx)
+            case .ended:
+                parent.onEnded(dx, g.velocity(in: g.view).x)
+            case .cancelled, .failed:
+                parent.onEnded(0, 0)
+            default:
+                break
+            }
+        }
+
+        // 다른 제스처(스크롤 팬 등)는 가장자리 제스처가 실패할 때까지 기다림
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            // 탭(버튼)은 그대로, 끌기(스크롤·드래그) 제스처만 기다리게 함
+            guard otherGestureRecognizer is UIPanGestureRecognizer else { return false }
+            return !(otherGestureRecognizer is UIScreenEdgePanGestureRecognizer)
         }
     }
 }

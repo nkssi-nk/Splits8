@@ -1,0 +1,349 @@
+import SwiftUI
+
+// MARK: - HISTORY 머리줄 (라벨 + List | Calendar 전환)
+
+/// HISTORY 라벨 줄. 오른쪽 작은 세그먼트로 목록 ↔ 달력 (값: "list" / "calendar")
+struct HistoryHeader: View {
+    @Binding var view: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label8("HISTORY")
+            Spacer(minLength: 8)
+            Seg8(items: [("list", "List"), ("calendar", "Calendar")], selected: view,
+                 height: 28, radius: 9, fontSize: 13) { v in
+                withAnimation(.easeOut(duration: 0.2)) { view = v }
+            }
+            .frame(width: 150)
+            .accessibilityIdentifier("history.viewToggle")
+        }
+        .padding(.top, 20).padding(.horizontal, 4)
+    }
+}
+
+// MARK: - 기록 달력 (모드별)
+
+/// 달력: 채운 점 = 그 모드 기록, 빈 링 = 예약 (레이스는 등록한 대회 날짜). 날짜를 누르면 아래에 그날 기록·예약.
+struct HistoryCalendar: View {
+    let mode: Mode
+    let store = Store.shared
+    let r = Router.shared
+
+    @State private var month: Date = HistoryCalendar.monthStart(Date())
+    @State private var selected: Date = Calendar.current.startOfDay(for: Date())
+
+    private enum DayMark { case empty, filled, ring }
+
+    private static var monthFmt: DateFormatter { Fm.monthYear }
+    private static var timeFmt: DateFormatter { Fm.time12 }
+
+    static func monthStart(_ d: Date) -> Date {
+        let c = Calendar.current
+        let comps: DateComponents = c.dateComponents([.year, .month], from: d)
+        return c.date(from: comps) ?? c.startOfDay(for: d)
+    }
+
+    private var cal: Calendar { Calendar.current }
+    private var tint: Color { Color(hex: mode.calendarHex) }
+
+    private var isPast: Bool { selected < cal.startOfDay(for: Date()) }
+
+    private var screen: Scr {
+        switch mode {
+        case .training: return .training
+        case .sim: return .sim
+        case .race: return .race
+        }
+    }
+
+    private var modeLabel: String {
+        switch mode {
+        case .training: return "Training"
+        case .sim: return "Full Sim"
+        case .race: return "Race"
+        }
+    }
+
+    var body: some View {
+        let recs: [Record] = store.records(on: selected, mode: mode)
+        let plans: [PlannedWorkout] = plansOn(selected)
+        let race: Bool = isRaceDay(selected)
+        return VStack(spacing: 10) {
+            calendarCard
+            SectionLabel(text: Fm.wdm.string(from: selected).uppercased(), top: 10)
+            if !recs.isEmpty { recordsCard(recs) }
+            if !plans.isEmpty || race { plansCard(plans, race: race) }
+            if recs.isEmpty && plans.isEmpty && !race && isPast {
+                Text("No records on this day")
+                    .font(F.t(13)).foregroundStyle(C.text2)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .card8()
+            }
+            if !isPast { planButton }
+        }
+    }
+
+    // MARK: 달력 카드
+
+    private var calendarCard: some View {
+        VStack(spacing: 0) {
+            monthHeader
+            weekdayRow.padding(.bottom, 6)
+            grid
+            legend.padding(.top, 10)
+        }
+        .padding(.top, 14).padding(.horizontal, 14).padding(.bottom, 10)
+        .card8()
+    }
+
+    private var monthHeader: some View {
+        HStack(spacing: 0) {
+            Button { shift(-1) } label: { arrow("chevron.left") }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("cal.prev")
+            Spacer(minLength: 0)
+            Text(Self.monthFmt.string(from: month)).font(F.t(17, .semibold)).lineLimit(1)
+            Spacer(minLength: 0)
+            Button { shift(1) } label: { arrow("chevron.right") }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("cal.next")
+        }
+        .padding(.bottom, 10)
+    }
+
+    private func arrow(_ name: String) -> some View {
+        Image(systemName: name).font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(C.accent)
+            .frame(width: 40, height: 32)
+            .contentShape(Rectangle())
+    }
+
+    /// 요일 머리글 (영문 한 글자, 주 시작 요일은 기기 설정)
+    private var weekdaySymbols: [String] {
+        var g = Calendar(identifier: .gregorian)
+        g.locale = Fm.isKorean ? Locale(identifier: "ko_KR") : Fm.gb
+        let s: [String] = g.veryShortStandaloneWeekdaySymbols
+        guard s.count == 7 else { return ["S", "M", "T", "W", "T", "F", "S"] }
+        let k: Int = max(0, min(6, cal.firstWeekday - 1))
+        return Array(s[k..<7]) + Array(s[0..<k])
+    }
+
+    private var weekdayRow: some View {
+        let syms: [String] = weekdaySymbols
+        return HStack(spacing: 0) {
+            ForEach(0..<7, id: \.self) { i in
+                Text(syms[i]).font(F.t(11)).foregroundStyle(C.text2)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    /// 칸 목록 (0 = 빈 칸)
+    private var cells: [Int] {
+        let wd: Int = cal.component(.weekday, from: month)
+        let lead: Int = (wd - cal.firstWeekday + 7) % 7
+        let n: Int = cal.range(of: .day, in: .month, for: month)?.count ?? 30
+        var o: [Int] = Array(repeating: 0, count: lead)
+        o.append(contentsOf: Array(1...max(1, n)))
+        while o.count % 7 != 0 { o.append(0) }
+        return o
+    }
+
+    private var grid: some View {
+        let cs: [Int] = cells
+        let weeks: Int = cs.count / 7
+        return VStack(spacing: 6) {
+            ForEach(0..<weeks, id: \.self) { w in
+                HStack(spacing: 0) {
+                    ForEach(0..<7, id: \.self) { c in
+                        dayCell(cs[w * 7 + c])
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func dayCell(_ day: Int) -> some View {
+        if day == 0 {
+            Color.clear.frame(maxWidth: .infinity).frame(height: 41)
+        } else {
+            dayButton(day)
+        }
+    }
+
+    private func date(of day: Int) -> Date {
+        cal.date(byAdding: .day, value: day - 1, to: month) ?? month
+    }
+
+    private func dayButton(_ day: Int) -> some View {
+        let d: Date = date(of: day)
+        let isSel: Bool = cal.isDate(d, inSameDayAs: selected)
+        let isToday: Bool = cal.isDateInToday(d)
+        let m: DayMark = mark(for: d)
+        return Button {
+            withAnimation(.easeOut(duration: 0.15)) { selected = cal.startOfDay(for: d) }
+        } label: {
+            VStack(spacing: 2) {
+                Text("\(day)").font(F.t(15, isSel ? .semibold : .regular)).monospacedDigit()
+                    .foregroundStyle(isSel ? Color.black : Color.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(isSel ? C.accent : Color.clear))
+                    .overlay {
+                        if isToday && !isSel { Circle().strokeBorder(C.accent, lineWidth: 1) }
+                    }
+                markView(m)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("cal.day.\(day)")
+    }
+
+    private func mark(for d: Date) -> DayMark {
+        if !store.records(on: d, mode: mode).isEmpty { return .filled }
+        if !plansOn(d).isEmpty { return .ring }
+        if isRaceDay(d) { return .ring }
+        return .empty
+    }
+
+    @ViewBuilder
+    private func markView(_ m: DayMark) -> some View {
+        switch m {
+        case .empty:
+            Color.clear.frame(width: 7, height: 7)
+        case .filled:
+            Circle().fill(tint).frame(width: 7, height: 7)
+        case .ring:
+            Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
+        }
+    }
+
+    private var legend: some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 5) {
+                Circle().fill(tint).frame(width: 7, height: 7)
+                Text(modeLabel.l10n)
+            }
+            HStack(spacing: 5) {
+                Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 7, height: 7)
+                Text(mode == .race ? "Race day" : "Planned")
+            }
+        }
+        .font(F.t(13)).foregroundStyle(C.text2)
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: 데이터
+
+    private func plansOn(_ d: Date) -> [PlannedWorkout] {
+        store.plans(on: d).filter { $0.mode == mode }
+    }
+
+    private func isRaceDay(_ d: Date) -> Bool {
+        guard mode == .race else { return false }
+        let ev: RaceEvent = store.settings.event
+        guard ev.isSet else { return false }
+        return cal.isDate(ev.date, inSameDayAs: d)
+    }
+
+    private func shift(_ by: Int) {
+        guard let m = cal.date(byAdding: .month, value: by, to: month) else { return }
+        let start: Date = Self.monthStart(m)
+        withAnimation(.easeOut(duration: 0.2)) {
+            month = start
+            let today: Date = cal.startOfDay(for: Date())
+            selected = cal.isDate(today, equalTo: start, toGranularity: .month) ? today : start
+        }
+    }
+
+    // MARK: 선택한 날
+
+    private func recordsCard(_ recs: [Record]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
+                recordRow(rec, last: i == recs.count - 1)
+            }
+        }
+        .card8()
+    }
+
+    private func recordRow(_ rec: Record, last: Bool) -> some View {
+        let title: String = mode == .training ? "\(rec.title.l10n) × \(rec.sets)" : rec.title.l10n
+        let sub: String = Fm.wdm.string(from: rec.date) + " · " + Self.timeFmt.string(from: rec.date)
+        let from: Scr = screen
+        return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec),
+                          partner: rec.partner,
+                          onDelete: { store.delete(rec) }) { r.open(rec, from: from) }
+    }
+
+    private func plansCard(_ plans: [PlannedWorkout], race: Bool) -> some View {
+        VStack(spacing: 0) {
+            if race { raceRow(last: plans.isEmpty) }
+            ForEach(Array(plans.enumerated()), id: \.element.id) { i, p in
+                planRow(p, last: i == plans.count - 1)
+            }
+        }
+        .card8()
+    }
+
+    private func planSub(_ p: PlannedWorkout) -> String {
+        var s: String = "Planned".l10n + " · " + Self.timeFmt.string(from: p.date)
+        if p.reminder != PlanReminder.none { s += " · " + p.reminder.short.l10n }
+        return s
+    }
+
+    private func planRow(_ p: PlannedWorkout, last: Bool) -> some View {
+        Button { r.openPlan(date: p.date, mode: p.mode, existing: p) } label: {
+            HStack(spacing: 12) {
+                Circle().strokeBorder(Color(hex: p.mode.calendarHex), lineWidth: 1.5).frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(p.title.l10n).font(F.t(15, .semibold)).lineLimit(1)
+                    Text(planSub(p)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Chevron8()
+            }
+            .padding(.vertical, 14).padding(.horizontal, 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .rowLine(!last)
+        .accessibilityIdentifier("cal.plan")
+    }
+
+    private func raceRow(last: Bool) -> some View {
+        let ev: RaceEvent = store.settings.event
+        return Button { r.go(.setEvent) } label: {
+            HStack(spacing: 12) {
+                Circle().strokeBorder(tint, lineWidth: 1.5).frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ev.name).font(F.t(15, .semibold)).lineLimit(1)
+                    Text("Race day · \(ev.time)").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Chevron8()
+            }
+            .padding(.vertical, 14).padding(.horizontal, 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .rowLine(!last)
+    }
+
+    private var planButton: some View {
+        YellowButton(height: 44, radius: 22, action: { planTap() }) {
+            Text("＋ Plan a workout on this day").font(F.t(15, .semibold))
+        }
+        .padding(.top, 4)
+        .accessibilityIdentifier("cal.planButton")
+    }
+
+    private func planTap() {
+        let at: Date = cal.date(bySettingHour: 7, minute: 0, second: 0, of: selected) ?? selected
+        let m: Mode = mode == .race ? .training : mode
+        r.openPlan(date: at, mode: m, existing: nil)
+    }
+}

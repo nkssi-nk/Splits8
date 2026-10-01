@@ -8,6 +8,7 @@ options:
     iOS: "17.0"
     watchOS: "10.0"
   createIntermediateGroups: true
+  developmentLanguage: en      # 기본 언어 영어 + 한국어 (Resources/*/ko.lproj)
 
 settings:
   base:
@@ -37,6 +38,8 @@ targets:
       path: Resources/iOS/Info.plist
       properties:
         CFBundleDisplayName: Splits8
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, ko]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
@@ -44,11 +47,12 @@ targets:
           UIColorName: LaunchBg
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
-        NSHealthShareUsageDescription: 운동 기록과 심박수를 확인하기 위해 건강 데이터를 읽습니다.
-        NSHealthUpdateUsageDescription: 운동 기록을 건강 앱에 저장합니다.
-        NSPhotoLibraryAddUsageDescription: 공유 이미지를 사진 앱에 저장합니다.
+        # 권한 문구: 영어 기본, 한국어는 Resources/iOS/ko.lproj/InfoPlist.strings
+        NSHealthShareUsageDescription: Splits8 reads Health data to show your workouts and heart rate.
+        NSHealthUpdateUsageDescription: Splits8 saves your workouts to the Health app.
+        NSPhotoLibraryAddUsageDescription: Splits8 saves share images to your photo library.
         LSApplicationQueriesSchemes: [instagram-stories]
-        NSLocationWhenInUseUsageDescription: 야외 러닝의 페이스와 거리를 재기 위해 위치를 사용합니다.
+        NSLocationWhenInUseUsageDescription: Splits8 uses your location to measure pace and distance on outdoor runs.
     entitlements:
       path: Resources/iOS/Splits8.entitlements
       properties:
@@ -80,15 +84,18 @@ targets:
       path: Resources/Watch/Info.plist
       properties:
         CFBundleDisplayName: Splits8
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, ko]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         WKApplication: true
         WKCompanionAppBundleIdentifier: $(APP_BUNDLE_ID)
         WKRunsIndependentlyOfCompanionApp: false
         WKBackgroundModes: [workout-processing]
-        NSHealthShareUsageDescription: 운동 중 심박수와 칼로리를 측정하기 위해 건강 데이터를 읽습니다.
-        NSHealthUpdateUsageDescription: 운동 기록을 건강 앱에 저장합니다.
-        NSLocationWhenInUseUsageDescription: 야외 러닝의 페이스와 거리를 재기 위해 위치를 사용합니다.
+        # 권한 문구: 영어 기본, 한국어는 Resources/Watch/ko.lproj/InfoPlist.strings
+        NSHealthShareUsageDescription: Splits8 reads Health data to measure heart rate and calories during workouts.
+        NSHealthUpdateUsageDescription: Splits8 saves your workouts to the Health app.
+        NSLocationWhenInUseUsageDescription: Splits8 uses your location to measure pace and distance on outdoor runs.
     entitlements:
       path: Resources/Watch/Splits8Watch.entitlements
       properties:

@@ -181,4 +181,63 @@ final class ScreenshotTests: XCTestCase {
         shot("I7_share_block")
         id("nav.left")
     }
+
+    // MARK: 4. 카드를 밀다 말았을 때 — 만들기 화면이 잘못 열려도 Cancel · Save 가 눌리는지
+
+    private var cardButton: XCUIElement {
+        app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Sled Intervals")).firstMatch
+    }
+
+    /// 만들기 화면이 열려 있으면 Cancel 을 눌러 트레이닝 목록으로 돌아오는지 확인
+    private func leaveBuilderIfOpen(_ why: String) {
+        let cancel = app.buttons["nav.left"]
+        guard cancel.waitForExistence(timeout: 2) else { return }
+        shot("S_builder_opened_" + why)
+        cancel.tap()
+        sleep(1)
+        XCTAssertTrue(app.buttons["training.new"].waitForExistence(timeout: 3), "Cancel 이 안 눌림 (" + why + ")")
+        shot("S_after_cancel_" + why)
+    }
+
+    func test4_swipe_then_builder() {
+        launch(onboarded: true)
+        tab("Training")
+        XCTAssertTrue(cardButton.waitForExistence(timeout: 5))
+
+        // 1) 천천히 조금만 왼쪽으로 밀다 놓기
+        var a = cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.80, dy: 0.5))
+        var b = cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.5))
+        a.press(forDuration: 0.2, thenDragTo: b, withVelocity: .slow, thenHoldForDuration: 0.2)
+        shot("S_slow_short_swipe")
+        leaveBuilderIfOpen("slow_short")
+
+        // 2) 비스듬히(왼쪽 + 아래) 밀다 놓기
+        a = cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.80, dy: 0.3))
+        b = cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.60, dy: 0.7))
+        a.press(forDuration: 0.1, thenDragTo: b, withVelocity: .slow, thenHoldForDuration: 0.1)
+        shot("S_diagonal_swipe")
+        leaveBuilderIfOpen("diagonal")
+
+        // 3) 빠르게 절반쯤 밀기 (Delete 가 열린 채 남음) → 카드 눌러 닫기
+        a = cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        b = cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.5))
+        a.press(forDuration: 0.05, thenDragTo: b, withVelocity: .fast, thenHoldForDuration: 0.05)
+        shot("S_half_swipe_open")
+        leaveBuilderIfOpen("half")
+        cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
+        sleep(1)
+        shot("S_after_tap_to_close")
+        leaveBuilderIfOpen("tap_close")
+
+        // 4) 그 뒤 카드를 눌러 만들기 화면 → 아래로 스크롤 → Cancel / Save
+        cardButton.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
+        sleep(1)
+        XCTAssertTrue(app.buttons["nav.left"].waitForExistence(timeout: 3), "만들기 화면이 안 열림")
+        app.swipeUp()
+        shot("S_builder_scrolled")
+        app.buttons["nav.right"].tap()          // Save
+        sleep(1)
+        XCTAssertTrue(app.buttons["training.new"].waitForExistence(timeout: 3), "Save 가 안 눌림")
+        shot("S_after_save")
+    }
 }

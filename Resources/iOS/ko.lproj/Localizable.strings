@@ -134,7 +134,7 @@
 "Applies to Training and Full Simulation. Race runs are on site, so GPS or motion is chosen automatically. Treadmill distance can be calibrated with the machine reading." = "트레이닝과 풀 시뮬레이션에 적용돼요. 레이스는 현장 러닝이라 GPS·모션을 자동으로 골라요. 트레드밀 거리는 기계에 표시된 값으로 보정할 수 있어요.";
 "Outdoor" = "야외";
 "Treadmill" = "트레드밀";
-"Curved treadmill" = "커브드 트레드밀";
+"Curved treadmill" = "무동력 트레드밀";
 "GPS pace and distance" = "GPS 페이스와 거리";
 "Motion estimate · calibrate with machine distance" = "모션 추정 · 기계 거리로 보정";
 "Motion estimate · pace shown as approximate" = "모션 추정 · 페이스는 근삿값으로 표시";
@@ -413,3 +413,6 @@
 "Allow Splits8 to add photos: Settings > Splits8 > Photos > Add Photos Only." = "사진 저장을 허용해 주세요: 설정 > Splits8 > 사진 > 사진 추가만 허용";
 "Couldn't save to Photos. Please try again." = "사진 앱에 저장하지 못했어요. 다시 시도해 주세요.";
 "Open Settings" = "설정 열기";
+"ABOUT" = "정보";
+"Website" = "홈페이지";
+"Privacy Policy" = "개인정보처리방침";

@@ -136,6 +136,31 @@ final class Router {
         editId = p.id; draftName = p.name; draftSets = p.sets; draftSeq = p.seq
         go(.builder)
     }
+    /// 만들기 화면 Cancel
+    func cancelDraft() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        editId = nil
+        saveOpen = false
+        scr = .builder            // 혹시 화면 상태가 어긋나 있어도 반드시 트레이닝으로 돌아가게
+        go(.training)
+    }
+    /// 만들기 화면 Save: 바로 저장. 이름이 비면 "Training N"
+    func saveDraft() {
+        guard !draftSeq.isEmpty else { return }
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        let store = Store.shared
+        let typed = draftName.trimmingCharacters(in: .whitespaces)
+        let name = typed.isEmpty ? String(localized: "Training \(store.programs.count + 1)") : typed
+        let old = store.programs.first { $0.id == editId }
+        let p = Program(id: editId ?? "u\(Int(Date().timeIntervalSince1970))", name: name, sets: draftSets,
+                        seq: draftSeq, meta: nil, quick: old?.quick ?? false)
+        store.save(p)
+        saveOpen = false
+        editId = nil
+        draftName = ""
+        scr = .builder
+        go(.training)
+    }
     func open(_ r: Record, from: Scr) {
         detail = r; detailFrom = from; go(.detail)
     }
@@ -234,6 +259,8 @@ extension Scr {
     var showsTabs: Bool {
         [.home, .training, .sim, .race, .settings, .findEvent, .account, .setHr, .setGoals, .setDiv, .setRun, .setEvent, .friends].contains(self)
     }
+    /// 화면 자체 머리줄(Cancel · 제목 · Save)을 맨 위에 고정하는 화면
+    var pinsNav: Bool { self == .builder }
     /// 위 고정 바 (44pt, 반투명 검정 + 흐림, 스크롤해도 제자리)
     var showsBar: Bool {
         [.home, .training, .sim, .race, .settings, .findEvent, .account, .setHr, .setGoals, .setDiv, .setRun, .friends].contains(self)
@@ -259,8 +286,11 @@ struct PhoneRoot: View {
             }
             .animation(.easeInOut(duration: 0.5), value: r.scr)
 
+            // 나가는 화면은 바로 없앰 (사라지는 중인 화면이 남아 터치를 가로막지 않게), 들어오는 화면만 부드럽게
             screen
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .transition(.asymmetric(insertion: .opacity, removal: .identity))
+                .id(r.scr)
                 .offset(x: edgeDrag)
 
             // 상태바 뒤 검은 그라데이션 (시안: linear-gradient(#000 60%, transparent), 54px)
@@ -274,7 +304,7 @@ struct PhoneRoot: View {
                 }
             }
 
-            if r.scr.showsBar { TopBar8() }
+            if r.scr.showsBar { TopBar8().transition(.identity) }
 
             // 아이폰처럼 화면 왼쪽 끝에서 오른쪽으로 밀면 뒤로.
             // SwiftUI 제스처는 스크롤 화면이 터치를 먼저 가져가서 안 먹었음 → UIKit 화면 가장자리 제스처로 교체
@@ -301,6 +331,13 @@ struct PhoneRoot: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 26)
                     .ignoresSafeArea(edges: .bottom)
+            }
+
+            // 만들기 화면 Cancel · Save: 스크롤해도 맨 위에 고정, 다른 것에 가리지 않게 맨 앞에
+            if r.scr.pinsNav {
+                BuilderBar()
+                    .transition(.identity)
+                    .zIndex(5)
             }
 
             if r.saveOpen { SaveSheet() }
@@ -365,7 +402,7 @@ struct Scroll8<Content: View>: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             content
-                .padding(.top, Router.shared.scr.showsBar ? 52 : 4)
+                .padding(.top, (Router.shared.scr.showsBar || Router.shared.scr.pinsNav) ? 52 : 4)
                 .padding(.bottom, bottom)
                 .background(alignment: .top) {
                     GeometryReader { g in

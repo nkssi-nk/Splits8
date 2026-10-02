@@ -36,6 +36,7 @@ struct WWorkoutPager: View {
             }
         }
         .ignoresSafeArea()
+        .persistentSystemOverlays(.hidden)      // 운동 중에는 오른쪽 위 시스템 시계를 숨김 (안 숨겨져도 겹치지 않게 배치해 둠)
         .onChange(of: engine.advanceCount) { _, _ in
             flashNow()
         }
@@ -342,44 +343,64 @@ struct WControls: View {
     }
 
     private func header(now: Date) -> some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
             Text(engine.mode.name.l10n).font(F.t(13, .semibold)).foregroundStyle(C.accent).lineLimit(1).minimumScaleFactor(0.85)
-            Spacer(minLength: 4)
             Text(Fm.t(engine.total(now))).font(F.num(15)).lineLimit(1).minimumScaleFactor(0.85)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 2)
+        .padding(.leading, 2)
+        .padding(.trailing, WClock.reserve)     // 오른쪽 위 시스템 시계 자리
     }
 
     private var endPill: some View {
-        pill("End", glyph: "i_x", glyphSize: 22, fg: C.bad, bg: Color(hex: 0xFF453A, alpha: 0.22), action: onEnd)
+        pill("End", glyph: "i_x", fg: C.bad, bg: Color(hex: 0xFF453A, alpha: 0.22),
+             dot: C.bad, glyphColor: .white, action: onEnd)
             .accessibilityIdentifier("w.end")
     }
 
     private var pausePill: some View {
-        pill(engine.running ? "Pause" : "Resume", glyph: engine.running ? "i_pause" : "i_play", glyphSize: 20,
-             fg: .white, bg: Color.white.opacity(0.12), action: { engine.togglePause() })
+        pill(engine.running ? "Pause" : "Resume", glyph: engine.running ? "i_pause" : "i_play",
+             fg: .white, bg: Color.white.opacity(0.12),
+             dot: Color.white.opacity(0.20), glyphColor: .white, action: { engine.togglePause() })
             .accessibilityIdentifier("w.pause")
     }
 
     private var nextPill: some View {
-        pill("Next", glyph: "i_dblChev", glyphSize: 22, fg: .black, bg: C.accent, action: onNext)
+        pill("Next", glyph: "i_dblChev", fg: .black, bg: C.accent,
+             dot: .black, glyphColor: C.accent, action: onNext)
             .accessibilityIdentifier("w.controlsNext")
     }
 
-    /// 가로로 긴 알약: 아이콘 + 15/600 라벨, 세 개가 같은 높이로 공간을 채움
-    private func pill(_ label: String, glyph: String, glyphSize: CGFloat, fg: Color, bg: Color,
+    /// 가로로 긴 알약: 왼쪽 동그라미 안에 아이콘(세 버튼이 같은 자리), 글자는 버튼 가운데에서 살짝 오른쪽.
+    /// 세 개가 같은 높이로 공간을 채움
+    private func pill(_ label: String, glyph: String, fg: Color, bg: Color, dot: Color, glyphColor: Color,
                       action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Icon8(glyph, glyphSize, fg)
-                Text(label.l10n).font(F.t(16, .semibold)).foregroundStyle(fg).lineLimit(1).minimumScaleFactor(0.85)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(bg, in: Capsule())
-            .contentShape(Capsule())
+            Text(label.l10n).font(F.t(16, .semibold)).foregroundStyle(fg).lineLimit(1).minimumScaleFactor(0.8)
+                .offset(x: 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(bg, in: Capsule())
+                .overlay(alignment: .leading) {
+                    Circle().fill(dot)
+                        .overlay {
+                            GeometryReader { g in
+                                Icon8(glyph, g.size.height * 0.56, glyphColor)
+                                    .frame(width: g.size.width, height: g.size.height)
+                            }
+                        }
+                        .padding(4)
+                        .aspectRatio(1, contentMode: .fit)
+                        .allowsHitTesting(false)
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
+}
+
+/// 오른쪽 위 시스템 시계가 차지하는 자리 (제목 줄에서 비워 둘 폭)
+enum WClock {
+    static let reserve: CGFloat = 58
 }
 
 // MARK: - W8 Segments
@@ -415,11 +436,11 @@ struct WSegmentList: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("SEGMENTS").font(F.t(13, .semibold)).tracking(1).foregroundStyle(C.accent)
-            Spacer(minLength: 0)
             Text("\(min(engine.idx + 1, engine.seq.count))/\(engine.seq.count)")
                 .font(F.num(13, .regular)).foregroundStyle(C.text2)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8).padding(.bottom, 6)
+        .padding(.leading, 8).padding(.trailing, WClock.reserve).padding(.bottom, 6)
     }
 
     private func rowTime(_ i: Int, _ s: Seg, now: Date) -> String {
@@ -503,11 +524,12 @@ struct WSummary: View {
                         rows(r)
                         doneButton
                     }
-                    .padding(.top, 24).padding(.horizontal, 16).padding(.bottom, 16)
+                    .padding(.top, 38).padding(.horizontal, 16).padding(.bottom, 16)   // 38: 제목이 시계 줄 아래로
                 }
             }
         }
         .ignoresSafeArea()
+        .persistentSystemOverlays(.hidden)
     }
 
     private func head(_ r: Record) -> some View {

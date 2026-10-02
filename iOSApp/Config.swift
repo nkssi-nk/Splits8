@@ -8,5 +8,9 @@ enum Config {
     /// Instagram 스토리 공유용 (Meta 개발자 앱 ID). 비우면 iOS 공유 창으로 대신 보냅니다.
     static let facebookAppID = ""
 
+    /// 홈페이지 · 개인정보처리방침 (깃허브 페이지)
+    static let homeURL = "https://nkssi-nk.github.io/splits8/"
+    static let privacyURL = "https://nkssi-nk.github.io/splits8/privacy.html"
+
     static var hasSupabase: Bool { !supabaseURL.isEmpty && !supabaseAnonKey.isEmpty }
 }

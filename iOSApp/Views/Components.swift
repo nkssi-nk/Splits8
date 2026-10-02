@@ -485,6 +485,8 @@ struct SwipeDelete<Content: View>: View {
     @State private var ask = false
     /// 이번 손동작에서 옆으로 밀었는지 (그러면 손을 떼도 누름 무시)
     @State private var dragged = false
+    /// 손을 떼면 Delete 가 열린 채 남는 지점을 넘었는지 (넘는 순간 진동 한 번)
+    @State private var armed = false
     private let reveal: CGFloat = 84
 
     var body: some View {
@@ -519,7 +521,7 @@ struct SwipeDelete<Content: View>: View {
         }
         .onDisappear {
             // 화면이 바뀌면 열린 확인창·밀린 상태를 정리 (보이지 않는 확인창이 터치를 막지 않게)
-            ask = false; offset = 0; settled = 0; dragged = false
+            ask = false; offset = 0; settled = 0; dragged = false; armed = false
         }
     }
 
@@ -540,11 +542,19 @@ struct SwipeDelete<Content: View>: View {
     /// 옆으로 미는 중 (dx: 손가락이 옆으로 움직인 거리)
     private func dragChanged(_ dx: CGFloat) {
         dragged = true
-        offset = min(0, settled + dx)
+        let x: CGFloat = min(0, settled + dx)
+        offset = x
+        // 닫힌 상태에서 밀다가 "여기서 놓으면 Delete 가 열림" 지점을 넘는 순간 가볍게 한 번
+        let over: Bool = x < -reveal / 2
+        if over != armed {
+            armed = over
+            if over && settled == 0 { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        }
     }
 
     private func dragEnded(_ dx: CGFloat) {
         let x = settled + dx
+        armed = false
         withAnimation(.snappy(duration: 0.25)) {
             if x < -reveal / 2 {
                 offset = -reveal; settled = -reveal      // 많이 밀어도 확인창은 Delete 를 눌러야
@@ -627,11 +637,14 @@ struct HorizontalPan: UIGestureRecognizerRepresentable {
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        /// 가로로 밀 때만 시작 (세로는 스크롤에 양보)
+        /// 가로로 밀 때만 시작 (세로는 스크롤에 양보).
+        /// 움직인 거리로 판단 — 천천히 밀면 속도가 0 에 가까워 못 잡고, 그러면 카드가 눌린 것으로 처리돼 화면이 잘못 열렸음
         func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
             guard let p = g as? UIPanGestureRecognizer else { return false }
+            let t: CGPoint = p.translation(in: p.view)
+            if abs(t.x) + abs(t.y) >= 2 { return abs(t.x) > abs(t.y) }
             let v: CGPoint = p.velocity(in: p.view)
-            return abs(v.x) > abs(v.y) * 1.2
+            return abs(v.x) > abs(v.y)
         }
     }
 }

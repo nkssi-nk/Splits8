@@ -80,7 +80,17 @@ struct AuthView: View {
             Spacer(minLength: 0)
             Text("You can record everything on your own without an account.\nYou only need one to add friends and compare rankings.")
                 .font(F.t(13)).foregroundStyle(C.text3).lineSpacing(13 * 0.5 - 3).multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity).padding(.bottom, 14)
+                .frame(maxWidth: .infinity)
+            Button {
+                if let u = URL(string: Config.privacyURL) { UIApplication.shared.open(u) }
+            } label: {
+                Text("Privacy Policy").font(F.t(13, .semibold)).foregroundStyle(C.text2).underline()
+                    .frame(maxWidth: .infinity).frame(minHeight: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 8)
+            .accessibilityIdentifier("auth.privacy")
         }
     }
 

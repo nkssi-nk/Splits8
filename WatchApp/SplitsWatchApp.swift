@@ -203,7 +203,9 @@ struct WHome: View {
                 // v4: 12pt 한 줄, 말줄임 없음 (좁은 41mm/40mm 에서는 글자를 살짝 줄여서 다 보이게)
                 Text(m.name.l10n).font(F.t(14, .semibold)).tracking(-0.24)
                     .lineLimit(1).minimumScaleFactor(0.85).allowsTightening(true).minimumScaleFactor(0.6)
-                Text(desc(m)).font(F.t(13, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
+                // 길면 두 줄 ("8 runs · 8 stations" 가 잘리지 않게)
+                Text(desc(m)).font(F.t(13, .medium)).foregroundStyle(C.text2).lineLimit(2).minimumScaleFactor(0.85)
+                    .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
             }
             .layoutPriority(1)
             Spacer(minLength: 0)

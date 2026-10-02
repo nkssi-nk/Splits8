@@ -227,11 +227,7 @@ struct BuilderView: View {
 
     var body: some View {
         VStack(spacing: 22) {
-            NavBar3(left: "Cancel", title: r.editId == nil ? "New training" : "Edit training", right: "Save",
-                    rightColor: r.draftSeq.isEmpty ? C.g3A : C.accent,
-                    onLeft: { r.editId = nil; r.go(.training) },
-                    onRight: { save() })
-
+            // Cancel · 제목 · Save 는 BuilderBar (맨 위 고정, PhoneRoot 가 맨 앞에 올림)
             Field8(placeholder: "Training name", text: $r.draftName)
                 .submitLabel(.done)
                 .onSubmit { save() }
@@ -524,20 +520,31 @@ struct BuilderView: View {
         withAnimation { _ = r.draftSeq.remove(at: i) }
     }
 
-    /// Save: 바로 저장. 이름이 비면 "Training N"
-    private func save() {
-        guard !r.draftSeq.isEmpty else { return }
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        let typed = r.draftName.trimmingCharacters(in: .whitespaces)
-        let name = typed.isEmpty ? String(localized: "Training \(store.programs.count + 1)") : typed
-        let old = store.programs.first { $0.id == r.editId }
-        let p = Program(id: r.editId ?? "u\(Int(Date().timeIntervalSince1970))", name: name, sets: r.draftSets,
-                        seq: r.draftSeq, meta: nil, quick: old?.quick ?? false)
-        store.save(p)
-        r.saveOpen = false
-        r.editId = nil
-        r.draftName = ""
-        r.go(.training)
+    /// Save: 바로 저장 (Router.saveDraft)
+    private func save() { r.saveDraft() }
+}
+
+/// 만들기 화면 머리줄 (Cancel · 제목 · Save) — 스크롤해도 맨 위에 고정.
+/// 스크롤 내용 안에 있을 때는 다른 것에 가려 안 눌리는 일이 있어 PhoneRoot 맨 앞 층으로 옮김
+struct BuilderBar: View {
+    let r = Router.shared
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar3(left: "Cancel", title: r.editId == nil ? "New training" : "Edit training", right: "Save",
+                    rightColor: r.draftSeq.isEmpty ? C.g3A : C.accent,
+                    onLeft: { r.cancelDraft() },
+                    onRight: { r.saveDraft() })
+                .padding(.horizontal, 16)
+                .background {
+                    ZStack {
+                        Rectangle().fill(.ultraThinMaterial)
+                        Rectangle().fill(Color.black.opacity(0.55))
+                    }
+                    .ignoresSafeArea(edges: .top)
+                }
+                .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1) }
+            Spacer(minLength: 0)
+        }
     }
 }
 

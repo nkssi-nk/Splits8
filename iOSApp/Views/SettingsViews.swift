@@ -36,10 +36,25 @@ struct SettingsView: View {
 
             languageSection
 
-            SectionLabel(text: "DEVICE", top: 14)
-            deviceCard
+            Group {
+                SectionLabel(text: "DEVICE", top: 14)
+                deviceCard
+
+                SectionLabel(text: "ABOUT", top: 14)
+                VStack(spacing: 0) {
+                    SettingRow(title: "Website", value: "") { openWeb(Config.homeURL) }
+                        .accessibilityIdentifier("settings.website")
+                    SettingRow(title: "Privacy Policy", value: "", last: true) { openWeb(Config.privacyURL) }
+                        .accessibilityIdentifier("settings.privacy")
+                }
+                .card8()
+            }
         }
         .padding(.horizontal, 16)
+    }
+
+    private func openWeb(_ s: String) {
+        if let u = URL(string: s) { UIApplication.shared.open(u) }
     }
 
     // MARK: 언어 (기본: iPhone 언어를 따름. 고르면 이 앱만 그 언어로 — 앱을 다시 시작하면 적용)

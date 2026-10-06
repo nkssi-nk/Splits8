@@ -245,18 +245,15 @@ struct SimView: View {
         let recs: [Record] = store.records(.sim)
         HistoryHeader()
         if !recs.isEmpty {
-            VStack(spacing: 0) {
-                ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                    simRow(recs, i, rec)
-                }
+            PagedCard(ids: recs.map(\.id)) { i, last in
+                simRow(recs, i, recs[i], last: last)
             }
-            .card8()
         } else {
             EmptyHistory()
         }
     }
 
-    private func simRow(_ recs: [Record], _ i: Int, _ rec: Record) -> some View {
+    private func simRow(_ recs: [Record], _ i: Int, _ rec: Record, last: Bool) -> some View {
         let older: Record? = i + 1 < recs.count ? recs[i + 1] : nil
         let isBest: Bool = rec.id == store.simBest?.id
         let d: Int? = older.map { rec.total - $0.total }
@@ -269,7 +266,7 @@ struct SimView: View {
         else { sub = " " }
         let color: Color = isBest ? C.accent : ((d ?? 0) <= 0 ? C.good : C.bad)
         return HistoryRow(title: Fm.wdm.string(from: rec.date), sub: sub, subColor: color,
-                          time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
+                          time: Fm.t(rec.total), last: last, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: .sim) }
     }
 }
@@ -350,7 +347,7 @@ struct RaceView: View {
             history
         }
         .padding(.horizontal, 16)
-        .sheet(isPresented: $goalSheet) { GoalTimeSheet().presentationDetents([.height(340)]) }
+        .sheet(isPresented: $goalSheet) { GoalTimeSheet().presentationDetents([.height(GoalTimeSheet.height)]) }
     }
 
     // MARK: GOAL 카드 (padding 20/18/18, gap 18)
@@ -511,22 +508,19 @@ struct RaceView: View {
         let recs: [Record] = store.records(.race)
         HistoryHeader()
         if !recs.isEmpty {
-            VStack(spacing: 0) {
-                ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                    raceRow(recs, i, rec)
-                }
+            PagedCard(ids: recs.map(\.id)) { i, last in
+                raceRow(recs, i, recs[i], last: last)
             }
-            .card8()
         } else {
             EmptyHistory()
         }
     }
 
-    private func raceRow(_ recs: [Record], _ i: Int, _ rec: Record) -> some View {
+    private func raceRow(_ recs: [Record], _ i: Int, _ rec: Record, last: Bool) -> some View {
         let d: Int = rec.total - (rec.goal ?? store.settings.goalTime)
         return HistoryRow(title: rec.title, sub: Fm.wdmy.string(from: rec.date), time: Fm.t(rec.total),
                           delta: Fm.d(d) + " " + "vs goal".l10n, deltaColor: d < 0 ? C.good : C.bad,
-                          last: i == recs.count - 1, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
+                          last: last, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: .race) }
     }
 }
@@ -700,20 +694,40 @@ private struct RaceLbAvatar: View {
 // MARK: - Goal time 고르기 → 구간 목표를 같은 비율로 나눔
 
 struct GoalTimeSheet: View {
+    static let height: CGFloat = 470
     let store = Store.shared
     @Environment(\.dismiss) private var dismiss
     @State private var h = 1
     @State private var m = 12
     @State private var s = 0
+    /// 구간으로 나누는 방식 (GoalSplit.styles)
+    @State private var style = "keep"
+
+    private var total: Int { h * 3600 + m * 60 + s }
+    private var bestSplits: [Int]? { store.simBest?.splits16 }
+    /// 내 최고 풀 시뮬레이션이 있을 때만 "My best" 를 보여 줌
+    private var styles: [String] { GoalSplit.styles.filter { $0 != "best" || bestSplits != nil } }
+    private var preview: [Int] {
+        GoalSplit.split(total: max(600, total), style: style, current: store.settings.goals, best: bestSplits)
+    }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             NavBar3(left: "Cancel", title: "Goal time", right: "Save", onLeft: { dismiss() }, onRight: save, edgeBack: false)
             HStack(spacing: 0) {
                 picker($h, 0..<3, String(localized: "unit.h", defaultValue: "h")); picker($m, 0..<60, String(localized: "unit.m", defaultValue: "m")); picker($s, 0..<60, String(localized: "unit.s", defaultValue: "s"))
             }
-            .frame(height: 180)
-            Text("Split goals are rescaled evenly to match this time.").font(F.t(13)).foregroundStyle(C.text3)
+            .frame(height: 150)
+            // 구간으로 나누는 방식: 지금 비율 · 균형형 · 러너형 · 근력형 · 내 최고 기록 비율
+            Seg8(items: styles.map { ($0, GoalSplit.name($0)) }, selected: style, height: 34, radius: 11, fontSize: 13) { k in
+                withAnimation(.easeOut(duration: 0.2)) { style = k }
+            }
+            .accessibilityIdentifier("goal.style")
+            bars
+            Text(GoalSplit.note(style).l10n).font(F.t(13)).foregroundStyle(C.text3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 16).padding(.top, 8)
         .background(Color(hex: 0x141414).ignoresSafeArea())
@@ -723,21 +737,32 @@ struct GoalTimeSheet: View {
         }
     }
 
+    /// 나눈 결과 미리 보기: 16 막대 (러닝 회색 · 종목 노랑), 가장 긴 칸 기준 높이
+    private var bars: some View {
+        let g: [Int] = preview
+        let mx: CGFloat = CGFloat(max(1, g.max() ?? 1))
+        return HStack(alignment: .bottom, spacing: 3) {
+            ForEach(Array(g.enumerated()), id: \.offset) { i, t in
+                Rectangle().fill(i % 2 == 0 ? C.control : C.accent)
+                    .frame(height: 44 * max(0.08, CGFloat(t) / mx))
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: 44, alignment: .bottom)
+        .padding(.vertical, 12).padding(.horizontal, 14)
+        .card8(14)
+        .accessibilityIdentifier("goal.preview")
+    }
+
     private func picker(_ b: Binding<Int>, _ r: Range<Int>, _ u: String) -> some View {
         Picker(u, selection: b) { ForEach(r, id: \.self) { Text("\($0) \(u)").tag($0) } }
             .pickerStyle(.wheel)
     }
 
     private func save() {
-        let total = h * 3600 + m * 60 + s
         guard total > 600 else { dismiss(); return }
         var st = store.settings
-        let cur = st.goals.reduce(0, +)
-        let target = max(16 * 30, total - 8 * Defaults.roxTarget)
-        if cur > 0 {
-            let f = Double(target) / Double(cur)
-            st.goals = st.goals.map { max(30, Int((Double($0) * f / 5).rounded()) * 5) }
-        }
+        st.goals = GoalSplit.split(total: total, style: style, current: st.goals, best: bestSplits)
         st.goalTime = total
         store.settings = st
         dismiss()

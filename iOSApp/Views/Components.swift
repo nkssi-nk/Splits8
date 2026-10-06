@@ -36,12 +36,44 @@ struct LargeTitle: View {
     }
 }
 
-/// 섹션 라벨 (HISTORY 등): 11 / 600, 자간 0.1em, 회색. 시안 margin: top 14 또는 20, 좌우 4
+/// 구역 소제목 글자 (Modes · Personal Bests · History …): 15 / 600, 흰색.
+/// 코드에는 예전처럼 대문자 키("PERSONAL BESTS")로 적고, 보여 줄 때 첫 글자만 대문자로 바꿈.
+/// 한국어 번역이 있으면 번역을 그대로 씀 (번역 키는 대문자 원문 그대로라 ko 파일을 안 바꿔도 됨)
+struct SectionText: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(Self.shown(text)).font(F.t(F.sub, .semibold)).foregroundStyle(.white).lineLimit(1)
+            .minimumScaleFactor(0.85)
+    }
+
+    /// 그대로 대문자로 두는 낱말
+    private static let keep: Set<String> = ["PFT", "HIIT", "HR", "PB", "KM", "ID", "VS"]
+
+    static func shown(_ key: String) -> String {
+        let loc: String = key.l10n
+        if loc != key { return loc }
+        return titleCase(key)
+    }
+
+    /// "PERSONAL BESTS" → "Personal Bests" (이미 소문자가 섞여 있으면 그대로)
+    static func titleCase(_ s: String) -> String {
+        guard s == s.uppercased() else { return s }
+        let words: [String] = s.components(separatedBy: " ").map { w in
+            if keep.contains(w) || w.count <= 1 { return w }
+            guard w.rangeOfCharacter(from: .letters) != nil else { return w }
+            return String(w.prefix(1)) + w.dropFirst().lowercased()
+        }
+        return words.joined(separator: " ")
+    }
+}
+
+/// 구역 소제목 줄. 시안 margin: top 14 또는 20, 좌우 4
 struct SectionLabel: View {
     let text: String
     var top: CGFloat = 14
     var body: some View {
-        Label8(text).frame(maxWidth: .infinity, alignment: .leading)
+        SectionText(text).frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, top).padding(.horizontal, 4)
     }
 }
@@ -647,4 +679,80 @@ struct HorizontalPan: UIGestureRecognizerRepresentable {
             return abs(v.x) > abs(v.y)
         }
     }
+}
+
+// MARK: - 기록 목록 쪽 넘기기 (History)
+
+/// 기록 목록 카드: 한 번에 5줄만 보여 주고, 아래 "‹ 1 / 6 ›" 로 쪽을 넘김 (목록이 끝없이 길어지지 않게).
+/// 5개 이하면 넘기는 줄이 없음. 화면을 떠났다 오면 1쪽으로 돌아옴.
+/// ids = 기록 id 전체(최신순). row(전체에서 몇 번째인지, 아래 선을 뺄지)
+struct PagedCard<Row: View>: View {
+    let ids: [UUID]
+    @ViewBuilder let row: (_ index: Int, _ last: Bool) -> Row
+
+    @State private var page = 0
+    /// 5줄이 다 찼을 때의 높이 — 마지막 쪽이 5줄보다 적어도 카드 길이가 변하지 않게
+    @State private var fullH: CGFloat = 0
+
+    private struct Line: Identifiable { let i: Int; let id: UUID }
+
+    var body: some View {
+        let size: Int = Paging.size
+        let pages: Int = Paging.pages(ids.count)
+        let p: Int = min(max(0, page), pages - 1)
+        let lo: Int = p * size
+        let hi: Int = min(ids.count, lo + size)
+        let lines: [Line] = (lo..<hi).map { Line(i: $0, id: ids[$0]) }
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                ForEach(lines) { l in
+                    row(l.i, pages == 1 && l.i == hi - 1)
+                }
+            }
+            .background {
+                // 5줄이 다 찬 쪽의 높이를 기억
+                GeometryReader { g in
+                    let full: Bool = lines.count == size
+                    Color.clear
+                        .onAppear { if full && g.size.height > fullH { fullH = g.size.height } }
+                        .onChange(of: g.size.height) { _, hgt in if full && hgt > fullH { fullH = hgt } }
+                }
+            }
+            .frame(minHeight: pages > 1 && fullH > 0 ? fullH : nil, alignment: .top)
+            if pages > 1 { pager(p, pages) }
+        }
+        .card8()
+    }
+
+    private func pager(_ p: Int, _ pages: Int) -> some View {
+        HStack(spacing: 22) {
+            arrow("chevron.left", on: p > 0, id: "pager.prev") { page = p - 1 }
+            (Text(verbatim: "\(p + 1)").foregroundColor(.white).fontWeight(.semibold)
+                + Text(verbatim: " / \(pages)").foregroundColor(C.text2))
+                .font(F.num(14, .regular)).lineLimit(1)
+                .frame(minWidth: 52)
+                .accessibilityIdentifier("pager.label")
+            arrow("chevron.right", on: p < pages - 1, id: "pager.next") { page = p + 1 }
+        }
+        .frame(maxWidth: .infinity).frame(height: 52)
+    }
+
+    private func arrow(_ name: String, on: Bool, id: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name).font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(on ? C.accent : Color(hex: 0x4A4A4A))
+                .frame(width: 34, height: 34)
+                .background(Color.white.opacity(on ? 0.08 : 0.04), in: Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(Press(scale: 0.92))
+        .disabled(!on)
+        .accessibilityIdentifier(id)
+    }
+}
+
+enum Paging {
+    static let size = 5
+    static func pages(_ n: Int) -> Int { max(1, (n + size - 1) / size) }
 }

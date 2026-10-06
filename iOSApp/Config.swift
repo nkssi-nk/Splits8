@@ -11,6 +11,10 @@ enum Config {
     /// 홈페이지 · 개인정보처리방침 (깃허브 페이지)
     static let homeURL = "https://nkssi-nk.github.io/splits8/"
     static let privacyURL = "https://nkssi-nk.github.io/splits8/privacy.html"
+    /// 이용약관 (가입 화면 · 설정에서 엶)
+    static let termsURL = "https://nkssi-nk.github.io/splits8/terms.html"
+    /// 문의 · 신고 받는 메일 (홈페이지·개인정보 처리방침에 공개된 주소와 같음)
+    static let supportEmail = "nkssi1981@gmail.com"
 
     static var hasSupabase: Bool { !supabaseURL.isEmpty && !supabaseAnonKey.isEmpty }
 }

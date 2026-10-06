@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - HISTORY 머리줄
 
-/// HISTORY 라벨 줄 (모드 화면 기록은 목록만. 달력은 홈 한 곳에서 모드 필터로 확인)
+/// History 소제목 줄 (모드 화면 기록은 목록만. 달력은 홈 한 곳)
 struct HistoryHeader: View {
     var body: some View {
         SectionLabel(text: "HISTORY", top: 20)
@@ -11,16 +11,21 @@ struct HistoryHeader: View {
 
 // MARK: - 기록 달력 (모드별)
 
-/// 홈 달력: 채운 점 = 기록, 빈 링 = 예약, 깃발 = 대회 날. 날짜를 누르면 아래에 그날 기록·예약.
-/// 위쪽 필터(All · Training · Full Sim · Race)로 모드별로 볼 수 있음. All 이면 점 색으로 구분
+/// 홈 달력: 채운 점 = 기록, 빈 링 = 예약, 깃발 = 대회 날.
+/// 처음에는 아무 날짜도 고르지 않은 상태 → 날짜를 누르면 아래에 그날 기록·예약이 펼쳐지고, 같은 날짜를 다시 누르면 접힘.
+/// month · selected 는 홈 화면이 들고 있음 (주/월 요약이 같은 달·같은 날짜를 따라가도록)
 struct HistoryCalendar: View {
     /// 모드 필터는 뺌 (밑의 MODES 와 헷갈려서) → 항상 전체
     private var mode: Mode? { nil }
     let store = Store.shared
     let r = Router.shared
 
-    @State private var month: Date = HistoryCalendar.monthStart(Date())
-    @State private var selected: Date = Calendar.current.startOfDay(for: Date())
+    @Binding var month: Date
+    /// nil = 아무 날짜도 안 고름 (달력 아래를 비움)
+    @Binding var selected: Date?
+
+    /// 달력을 옆으로 미는 중 (손가락이 움직인 거리)
+    @State private var dragX: CGFloat = 0
 
     private enum DayMark { case empty, filled([Color]), ring(Color), race }
 
@@ -37,7 +42,7 @@ struct HistoryCalendar: View {
     private static let raceColor: Color = Color(hex: Mode.race.calendarHex)
     private var tint: Color { mode.map { Color(hex: $0.calendarHex) } ?? C.text2 }
 
-    private var isPast: Bool { selected < cal.startOfDay(for: Date()) }
+    private func isPast(_ d: Date) -> Bool { d < cal.startOfDay(for: Date()) }
 
     /// 기록을 연 화면 (홈 달력 → 홈으로 돌아옴)
     private func backScreen(_ rec: Record) -> Scr { .home }
@@ -52,23 +57,34 @@ struct HistoryCalendar: View {
     }
 
     var body: some View {
-        let recs: [Record] = store.records(on: selected, mode: mode)
-        let plans: [PlannedWorkout] = plansOn(selected)
-        let race: Bool = isRaceDay(selected)
-        return VStack(spacing: 10) {
+        VStack(spacing: 10) {
             calendarCard
-            SectionLabel(text: Fm.wdm.string(from: selected).uppercased(), top: 10)
-            if !recs.isEmpty { recordsCard(recs) }
-            if !plans.isEmpty || race { plansCard(plans, race: race) }
-            if recs.isEmpty && plans.isEmpty && !race && isPast {
-                Text("No records on this day")
-                    .font(F.t(13)).foregroundStyle(C.text2)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .card8()
+            if let sel = selected {
+                daySection(sel)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            if !isPast { planButton }
         }
+    }
+
+    /// 고른 날짜의 기록 · 예약 · 예약 버튼
+    @ViewBuilder
+    private func daySection(_ sel: Date) -> some View {
+        let recs: [Record] = store.records(on: sel, mode: mode)
+        let plans: [PlannedWorkout] = plansOn(sel)
+        let race: Bool = isRaceDay(sel)
+        let past: Bool = isPast(sel)
+        SectionLabel(text: Fm.wdm.string(from: sel), top: 10)
+            .accessibilityIdentifier("cal.dayLabel")
+        if !recs.isEmpty { recordsCard(recs) }
+        if !plans.isEmpty || race { plansCard(plans, race: race) }
+        if recs.isEmpty && plans.isEmpty && !race && past {
+            Text("No records on this day")
+                .font(F.t(13)).foregroundStyle(C.text2)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .card8()
+        }
+        if !past { planButton(sel) }
     }
 
     // MARK: 달력 카드
@@ -78,10 +94,18 @@ struct HistoryCalendar: View {
             monthHeader
             weekdayRow.padding(.bottom, 6)
             grid
+                .offset(x: dragX * 0.35)
+                .opacity(1 - min(0.5, abs(dragX) / 300))
             legend.padding(.top, 10)
         }
         .padding(.top, 14).padding(.horizontal, 14).padding(.bottom, 10)
         .card8()
+        .contentShape(Rectangle())
+        // 좌우로 밀어 달 넘기기: 왼쪽으로 밀면 다음 달, 오른쪽으로 밀면 지난 달 (세로 스크롤은 그대로)
+        .modifier(SwipeGesture(onChanged: { dx in dragX = dx }, onEnded: { dx in
+            if dx <= -44 { shift(1) } else if dx >= 44 { shift(-1) }
+            withAnimation(.snappy(duration: 0.25)) { dragX = 0 }
+        }))
     }
 
     private var monthHeader: some View {
@@ -166,12 +190,13 @@ struct HistoryCalendar: View {
 
     private func dayButton(_ day: Int) -> some View {
         let d: Date = date(of: day)
-        let isSel: Bool = cal.isDate(d, inSameDayAs: selected)
+        let isSel: Bool = selected.map { cal.isDate(d, inSameDayAs: $0) } ?? false
         let isToday: Bool = cal.isDateInToday(d)
         let m: DayMark = mark(for: d)
         let raceDay: Bool = isRaceDay(d)
         return Button {
-            withAnimation(.easeOut(duration: 0.15)) { selected = cal.startOfDay(for: d) }
+            // 같은 날짜를 다시 누르면 접힘
+            withAnimation(.easeOut(duration: 0.2)) { selected = isSel ? nil : cal.startOfDay(for: d) }
         } label: {
             VStack(spacing: 2) {
                 Text("\(day)").font(F.t(15, isSel ? .semibold : .regular)).monospacedDigit()
@@ -282,8 +307,7 @@ struct HistoryCalendar: View {
         let start: Date = Self.monthStart(m)
         withAnimation(.easeOut(duration: 0.2)) {
             month = start
-            let today: Date = cal.startOfDay(for: Date())
-            selected = cal.isDate(today, equalTo: start, toGranularity: .month) ? today : start
+            selected = nil            // 달을 넘기면 고른 날짜를 풂
         }
     }
 
@@ -361,16 +385,16 @@ struct HistoryCalendar: View {
         .rowLine(!last)
     }
 
-    private var planButton: some View {
-        YellowButton(height: 44, radius: 22, action: { planTap() }) {
+    private func planButton(_ sel: Date) -> some View {
+        YellowButton(height: 44, radius: 22, action: { planTap(sel) }) {
             Text("＋ Plan a workout on this day").font(F.t(15, .semibold))
         }
         .padding(.top, 4)
         .accessibilityIdentifier("cal.planButton")
     }
 
-    private func planTap() {
-        let at: Date = cal.date(bySettingHour: 7, minute: 0, second: 0, of: selected) ?? selected
+    private func planTap(_ sel: Date) {
+        let at: Date = cal.date(bySettingHour: 7, minute: 0, second: 0, of: sel) ?? sel
         let m: Mode = (mode == nil || mode == .race) ? .training : mode!
         r.openPlan(date: at, mode: m, existing: nil)
     }

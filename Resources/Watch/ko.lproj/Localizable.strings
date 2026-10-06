@@ -66,3 +66,7 @@
 
 /* 빌드 18 · PFT */
 "6 movements · for time" = "6종목 · 시간 기록";
+
+/* 빌드 19 */
+"Undo" = "되돌리기";
+"Tap to cancel" = "누르면 취소";

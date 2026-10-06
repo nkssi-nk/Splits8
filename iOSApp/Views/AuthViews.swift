@@ -81,17 +81,32 @@ struct AuthView: View {
             Text("You can record everything on your own without an account.\nYou only need one to add friends and compare rankings.")
                 .font(F.t(13)).foregroundStyle(C.text3).lineSpacing(13 * 0.5 - 3).multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-            Button {
-                if let u = URL(string: Config.privacyURL) { UIApplication.shared.open(u) }
-            } label: {
-                Text("Privacy Policy").font(F.t(13, .semibold)).foregroundStyle(C.text2).underline()
-                    .frame(maxWidth: .infinity).frame(minHeight: 32)
-                    .contentShape(Rectangle())
+            // 이용 규칙 한 줄 + 이용약관 · 개인정보 처리방침 링크
+            Group {
+                Text("By continuing, you agree to the Terms of Use and Privacy Policy. Offensive nicknames or photos are not allowed.")
+                    .font(F.t(12)).foregroundStyle(C.text3).lineSpacing(2).multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+                HStack(spacing: 18) {
+                    legalLink("Terms of Use", Config.termsURL).accessibilityIdentifier("auth.terms")
+                    legalLink("Privacy Policy", Config.privacyURL).accessibilityIdentifier("auth.privacy")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 8)
             }
-            .buttonStyle(.plain)
-            .padding(.bottom, 8)
-            .accessibilityIdentifier("auth.privacy")
         }
+    }
+
+    private func legalLink(_ title: String, _ url: String) -> some View {
+        Button {
+            if let u = URL(string: url) { UIApplication.shared.open(u) }
+        } label: {
+            Text(title.l10n).font(F.t(13, .semibold)).foregroundStyle(C.text2).underline()
+                .frame(minHeight: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     /// radius 14 카드, padding 15×16, 17pt · 이메일 키보드
@@ -302,7 +317,9 @@ struct NickView: View {
 
     private var nd: String { r.nickDraft }
     private var valid: Bool { nd.range(of: "^[a-z0-9_]{3,16}$", options: .regularExpression) != nil }
-    private var ok: Bool { valid && !taken && !checking }
+    /// 욕설 · 운영자 사칭 같은 쓸 수 없는 말이 들어 있는지
+    private var clean: Bool { NickFilter.allowed(nd) }
+    private var ok: Bool { valid && clean && !taken && !checking }
     private var editing: Bool { store.settings.nickname != nil }
 
     private var ring: Color { nd.isEmpty ? C.cardBorder : ok ? C.good.opacity(0.6) : C.bad.opacity(0.6) }
@@ -365,6 +382,7 @@ struct NickView: View {
         if nd.isEmpty { return " " }
         if taken { return String(localized: "@\(nd) is taken") }
         if !valid { return String(localized: "3–16 characters: lowercase letters, numbers and _ only") }
+        if !clean { return String(localized: "Please choose a different nickname") }
         if checking { return String(localized: "Checking…") }
         return String(localized: "@\(nd) is available")
     }

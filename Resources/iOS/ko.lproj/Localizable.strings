@@ -131,12 +131,12 @@
 "Connected" = "연결됨";
 "Not connected" = "연결 안 됨";
 "Changing your division updates every station weight and rep count in Training, Full Simulation and Race. Weights can change each season, so check the official rules." = "체급을 바꾸면 트레이닝·풀 시뮬레이션·레이스의 모든 스테이션 무게와 횟수가 함께 바뀌어요. 무게는 시즌마다 조정될 수 있으니 공식 규정을 확인하세요.";
-"Applies to Training and Full Simulation. Race runs are on site, so GPS or motion is chosen automatically. Treadmill distance can be calibrated with the machine reading." = "트레이닝과 풀 시뮬레이션에 적용돼요. 레이스는 현장 러닝이라 GPS·모션을 자동으로 골라요. 트레드밀 거리는 기계에 표시된 값으로 보정할 수 있어요.";
+"Applies to Training and Full Simulation. Race runs are on site, so GPS or motion is chosen automatically. Indoors, distance and pace are estimated from arm motion and may differ from the machine." = "트레이닝과 풀 시뮬레이션에 적용돼요. 레이스는 현장 러닝이라 GPS·모션을 자동으로 골라요. 실내에서는 거리와 페이스를 팔 움직임으로 추정해서 기계 숫자와 다를 수 있어요.";
 "Outdoor" = "야외";
 "Treadmill" = "트레드밀";
 "Curved treadmill" = "무동력 트레드밀";
 "GPS pace and distance" = "GPS 페이스와 거리";
-"Motion estimate · calibrate with machine distance" = "모션 추정 · 기계 거리로 보정";
+"Motion estimate · may differ from the machine" = "모션 추정 · 기계 숫자와 다를 수 있어요";
 "Motion estimate · pace shown as approximate" = "모션 추정 · 페이스는 근삿값으로 표시";
 "ZONES" = "존";
 "Calculated automatically from your max heart rate. Heart rate colors and Z1–Z5 on your watch follow these ranges." = "최대 심박에서 자동으로 계산돼요. 워치의 심박 색과 Z1–Z5 표시가 이 범위를 따라요.";
@@ -220,7 +220,7 @@
 "Location" = "위치";
 "Allowed · outdoor runs" = "허용됨 · 야외 러닝";
 "Outdoor run pace (optional)" = "야외 러닝 페이스 (선택)";
-"No account needed. Records are saved only on this device and in iCloud." = "계정은 필요 없어요. 기록은 이 기기와 iCloud에만 저장돼요.";
+"No account needed. Records are saved only on this device." = "계정은 필요 없어요. 기록은 이 기기에만 저장돼요.";
 
 /* event */
 "EVENT" = "대회";
@@ -429,7 +429,8 @@
 "%@ to Gold" = "골드까지 %@";
 "%@ to Silver" = "실버까지 %@";
 "Gold is under 22:00" = "골드: 22:00 미만";
-"Silver is 22:00 – 26:00" = "실버: 22:00 – 26:00";
+"Silver is within 26:00" = "실버: 26:00 이내";
+"Within 26:00" = "26:00 이내";
 "Bronze is over 26:00" = "브론즈: 26:00 초과";
 "or start PFT on your Apple Watch" = "또는 Apple Watch에서 PFT를 시작하세요";
 "HOW IT WORKS" = "하는 방법";
@@ -445,3 +446,41 @@
 "TOTAL TIME" = "총 시간";
 "First record" = "첫 기록";
 "New best · %@" = "최고 기록 갱신 · %@";
+
+/* 빌드 19 */
+"MY TRAININGS" = "내 트레이닝";
+"You can save up to %lld trainings" = "트레이닝은 %lld개까지 만들 수 있어요";
+"Delete one to make a new training." = "하나를 지우고 새로 만들어 주세요.";
+"Less" = "접기";
+"Set from goal time" = "목표 시간으로 나누기";
+"Current" = "지금 비율";
+"Balanced" = "균형형";
+"Runner" = "러너형";
+"Strong" = "근력형";
+"My best" = "내 기록";
+"Keeps the ratio of your current split goals." = "지금 구간 목표의 비율을 그대로 써요.";
+"An even mix of running and stations." = "러닝과 스테이션을 고르게 나눠요.";
+"Faster runs, a little more time on stations." = "러닝을 더 빠르게, 스테이션에 시간을 조금 더 줘요.";
+"Faster stations, a little more time on runs." = "스테이션을 더 빠르게, 러닝에 시간을 조금 더 줘요.";
+"Follows the ratio of your best Full Simulation." = "내 최고 풀 시뮬레이션의 비율을 따라가요.";
+"Undo" = "되돌리기";
+"Tap to cancel" = "누르면 취소";
+"≈ %lld reps" = "≈ %lld회";
+"≈ %lld strokes" = "≈ %lld회";
+"Report" = "신고";
+"Block user" = "차단";
+"Block this user?" = "이 사용자를 차단할까요?";
+"They are removed from your friends and hidden from your search and rankings. You can unblock them here later." = "친구 목록에서 빠지고, 검색과 순위표에 보이지 않아요. 나중에 이 화면에서 차단을 풀 수 있어요.";
+"Report by email" = "메일로 신고해 주세요";
+"Tell us what is wrong (nickname, photo or records):" = "무엇이 문제인지 적어 주세요 (닉네임 · 사진 · 기록):";
+"BLOCKED" = "차단한 사용자";
+"Unblock" = "차단 풀기";
+"By continuing, you agree to the Terms of Use and Privacy Policy. Offensive nicknames or photos are not allowed." = "계속하면 이용약관과 개인정보 처리방침에 동의하는 것으로 봐요. 불쾌감을 주는 닉네임이나 사진은 쓸 수 없어요.";
+"Terms of Use" = "이용약관";
+"Please choose a different nickname" = "다른 닉네임을 골라 주세요";
+"Smoke" = "연기";
+"Off" = "끔";
+"Light" = "옅게";
+"Heavy" = "짙게";
+"Drag the time, splits or logo to move them" = "시간 · 구간 표 · 로고를 끌어서 옮길 수 있어요";
+"Reset" = "처음대로";

@@ -204,7 +204,8 @@ struct Icon8: View {
 
 // MARK: - PFT 등급 뱃지 (아이폰 · 워치 공통)
 
-/// GOLD / SILVER / BRONZE — 셋 다 같은 크기 (기본 78 × 22). 왼쪽에 작은 메달 점
+/// GOLD / SILVER / BRONZE — 셋 다 같은 크기 (기본 78 × 22).
+/// 메달 점은 글자 길이와 상관없이 왼쪽 같은 자리에 고정하고, 글자는 남은 칸의 가운데에 둠
 struct PFTBadge: View {
     let grade: PFTGrade
     var width: CGFloat = 78
@@ -213,14 +214,19 @@ struct PFTBadge: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: height * 0.32, style: .continuous)
-        return HStack(spacing: 5) {
+        let dot: CGFloat = fontSize * 0.92
+        let lead: CGFloat = (height - dot) / 2 + 1          // 점 왼쪽 여백 (위아래 여백과 비슷하게)
+        return HStack(spacing: 0) {
             Circle().fill(Color.black.opacity(0.28))
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: 2))
-                .frame(width: fontSize, height: fontSize)
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: max(1.5, fontSize / 6)))
+                .frame(width: dot, height: dot)
+                .padding(.leading, lead)
             Text(verbatim: grade.label)
                 .font(F.t(fontSize, .heavy)).tracking(0.04 * fontSize)
                 .foregroundStyle(Color(hex: grade.inkHex))
-                .lineLimit(1).fixedSize()
+                .lineLimit(1).minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.leading, 2).padding(.trailing, lead * 0.7)
         }
         .frame(width: width, height: height)
         .background(LinearGradient(colors: [Color(hex: grade.hex1), Color(hex: grade.hex2)],

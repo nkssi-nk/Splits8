@@ -7,6 +7,9 @@ struct HomeView: View {
     let r = Router.shared
     /// 이번 주 / 이번 달 요약 선택 (week / month)
     @AppStorage("home.summaryPeriod") private var period: String = "week"
+    /// 달력에 보이는 달 · 고른 날짜 (nil = 안 고름). 아래 주/월 요약도 이 값을 따라감
+    @State private var calMonth: Date = HistoryCalendar.monthStart(Date())
+    @State private var calSelected: Date? = nil
 
     var body: some View {
         VStack(spacing: 10) {
@@ -16,7 +19,7 @@ struct HomeView: View {
                 SectionLabel(text: "NEXT RACE")
                 nextRace
                 SectionLabel(text: "CALENDAR")
-                HistoryCalendar()
+                HistoryCalendar(month: $calMonth, selected: $calSelected)
                 summaryHeader
                 summaryCard
             }
@@ -67,48 +70,45 @@ struct HomeView: View {
         .accessibilityIdentifier("home.profile")
     }
 
-    /// 내 최고 기록: Full Sim 최고 (없으면 Race 최고). 둘 다 없으면 표시 안 함
+    /// 오른쪽 두 줄 (왼쪽 아이디 / 체급 두 줄과 줄을 맞춤):
+    /// 기록이 있으면 시간 / "★ PB · Full Sim" (Race 최고면 Race), 없으면 목표 시간 / "Race goal"
     @ViewBuilder private var profileBest: some View {
         let sim: Record? = store.simBest
         let best: Record? = sim ?? store.raceBest
-        if let b = best {
-            VStack(alignment: .trailing, spacing: 1) {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(Fm.t(best?.total ?? store.settings.goalTime)).font(F.num(22)).tracking(-0.44).lineLimit(1)
+            if best != nil {
                 HStack(spacing: 3) {
-                    Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold))
-                    Text("PB").font(F.t(11, .semibold)).tracking(0.22)
+                    Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(C.accent)
+                    Text("PB").font(F.t(F.foot, .semibold)).foregroundStyle(C.accent)
+                    Text("· " + (sim != nil ? "Full Sim" : "Race").l10n).font(F.t(F.foot)).foregroundStyle(C.text2)
                 }
-                .foregroundStyle(C.accent)
-                Text(Fm.t(b.total)).font(F.num(22)).tracking(-0.44).lineLimit(1)
-                Text(sim != nil ? "Full Sim" : "Race").font(F.t(F.foot)).foregroundStyle(C.text2)
+                .lineLimit(1)
+            } else {
+                Text("Race goal").font(F.t(F.foot)).foregroundStyle(C.text2).lineLimit(1)
             }
-            .fixedSize()
-        } else {
-            // 기록이 아직 없으면 목표 시간
-            VStack(alignment: .trailing, spacing: 1) {
-                Text("GOAL").font(F.t(11, .semibold)).tracking(0.22).foregroundStyle(C.text2)
-                Text(Fm.t(store.settings.goalTime)).font(F.num(22)).tracking(-0.44).lineLimit(1)
-                Text("Race goal").font(F.t(F.foot)).foregroundStyle(C.text2)
-            }
-            .fixedSize()
         }
+        .fixedSize()
+        .accessibilityIdentifier("home.profileBest")
     }
 
-    // 다음 대회: 이름 20/600 · 장소·날짜·시간 13 · D-day 28/600 노랑 · 체급 11
+    // 다음 대회: 왼쪽 3줄 (이름 20/600 · 장소·날짜·시간 13 · "Division · 체급" 13), 오른쪽에는 D-day 만 (34/600 노랑, 세로 가운데)
     @ViewBuilder private var nextRace: some View {
         let ev = store.settings.event
         if ev.isSet {
             Button { r.go(.race) } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .center, spacing: 12) {
+                    // 세 줄 사이 빈틈이 눈으로 같게: 큰 글자(20) 아래는 글자 자체 여백이 커서 4, 작은 글자(13) 사이는 6
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(ev.name).font(F.t(20, .semibold)).tracking(-0.2).lineLimit(1)
-                        Text(eventSub(ev)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                        Text(eventSub(ev)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).padding(.top, 4)
+                        (Text("Division".l10n + " · ").foregroundColor(C.text2) + Text(store.div.name).foregroundColor(C.d1))
+                            .font(F.t(13)).lineLimit(1).padding(.top, 6)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(dday(ev.date)).font(F.num(28)).tracking(-0.84).foregroundStyle(C.accent).lineLimit(1)
-                        Text(store.div.name).font(F.t(F.foot)).foregroundStyle(C.text2)
-                    }
-                    .fixedSize()
+                    Text(dday(ev.date)).font(F.num(34)).tracking(-1.02).foregroundStyle(C.accent).lineLimit(1)
+                        .fixedSize()
+                        .accessibilityIdentifier("home.dday")
                 }
                 .padding(.vertical, 16).padding(.horizontal, 18)
                 .background { raceCardBg(near: isNear(ev.date)) }
@@ -249,9 +249,19 @@ struct HomeView: View {
 
     private var isWeek: Bool { period != "month" }
 
+    /// 요약 제목: 이번 주·이번 달이면 "This Week" / "This Month", 아니면 기간("7 Sep – 13 Sep") / 달("September 2026")
+    private var summaryTitle: String {
+        let iv: DateInterval = periodInterval
+        let now = Date()
+        if iv.start <= now && now < iv.end { return isWeek ? "THIS WEEK" : "THIS MONTH" }
+        if !isWeek { return Fm.monthYear.string(from: iv.start) }
+        let last: Date = monCal.date(byAdding: .day, value: -1, to: iv.end) ?? iv.end
+        return Fm.dm.string(from: iv.start) + " – " + Fm.dm.string(from: last)
+    }
+
     private var summaryHeader: some View {
         HStack(spacing: 8) {
-            Label8(isWeek ? "THIS WEEK" : "THIS MONTH")
+            SectionText(summaryTitle).accessibilityIdentifier("home.summary.title")
             Spacer(minLength: 0)
             Seg8(items: [("week", "Week"), ("month", "Month")], selected: isWeek ? "week" : "month",
                  height: 28, radius: 10, fontSize: 13, minWidth: 56) { k in
@@ -270,11 +280,17 @@ struct HomeView: View {
         return c
     }
 
-    /// 지금 보고 있는 기간 (이번 주 월~일 / 이번 달)
+    /// 지금 보고 있는 기간 — 달력을 따라감.
+    /// 월: 달력에 보이는 달. 주: 고른 날짜가 든 주 / 안 골랐으면 이번 달은 이번 주, 다른 달은 그 달 첫째 주 (월요일 시작)
     private var periodInterval: DateInterval {
         let now = Date()
-        let comp: Calendar.Component = isWeek ? .weekOfYear : .month
-        return monCal.dateInterval(of: comp, for: now) ?? DateInterval(start: now, duration: 1)
+        let fallback = DateInterval(start: now, duration: 1)
+        if !isWeek { return monCal.dateInterval(of: .month, for: calMonth) ?? fallback }
+        let anchor: Date
+        if let s = calSelected { anchor = s }
+        else if monCal.isDate(now, equalTo: calMonth, toGranularity: .month) { anchor = now }
+        else { anchor = calMonth }
+        return monCal.dateInterval(of: .weekOfYear, for: anchor) ?? fallback
     }
 
     private func recordsIn(_ iv: DateInterval) -> [Record] {

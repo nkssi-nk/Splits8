@@ -37,6 +37,8 @@ struct WRoot: View {
                 WSummary()
             } else if engine.active {
                 WWorkoutPager()
+            } else if let n = engine.countdown {
+                WCountdown(n: n)
             } else {
                 switch nav.screen {
                 case .home: WHome()
@@ -46,6 +48,36 @@ struct WRoot: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - 시작 전 3 · 2 · 1
+
+/// Start 를 누르면 3 · 2 · 1 을 센 뒤 시간이 시작됨. 화면을 누르면 취소
+struct WCountdown: View {
+    let n: Int
+    let engine = WorkoutEngine.shared
+
+    var body: some View {
+        ZStack {
+            AmbientLayer(a: Ambient.y(0.30, 1.0, 0.6, 0.5, 0.5))
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                Text(verbatim: "\(n)")
+                    .font(F.num(96, .bold)).foregroundStyle(C.accent)
+                    .contentTransition(.numericText(countsDown: true))
+                    .animation(.snappy(duration: 0.25), value: n)
+                    .accessibilityIdentifier("w.count")
+                Spacer(minLength: 0)
+                Text("Tap to cancel").font(F.t(13)).foregroundStyle(C.text3)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                    .padding(.bottom, 14)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture { engine.cancelCountdown() }
+        .ignoresSafeArea()
     }
 }
 
@@ -582,7 +614,8 @@ struct WConfirm: View {
         case .race: title = ev.name
         }
         engine.settings = store.settings
-        engine.start(mode: mode, title: title, sets: mode == .training ? program.sets : 1, seq: seq,
-                     program: mode == .training ? program : nil)
+        // 3 · 2 · 1 을 센 뒤 시작
+        engine.startAfterCountdown(mode: mode, title: title, sets: mode == .training ? program.sets : 1, seq: seq,
+                                   program: mode == .training ? program : nil)
     }
 }

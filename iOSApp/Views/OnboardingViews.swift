@@ -297,7 +297,7 @@ struct Onboarding3: View {
                 perm("i_permLoc", "Location", granted ? "Allowed · outdoor runs" : "Outdoor run pace (optional)", last: true)
             }
             .card8()
-            Note8(text: "No account needed. Records are saved only on this device and in iCloud.")
+            Note8(text: "No account needed. Records are saved only on this device.")
         }
     }
 

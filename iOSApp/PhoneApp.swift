@@ -349,6 +349,10 @@ struct PhoneRoot: View {
             .allowsHitTesting(false)
 
             if r.scr.showsTabs {
+                // 탭 바 뒤로 지나가는 내용이 탭 글자와 겹쳐 보이지 않게: 화면 맨 아래 띠가 아래로 갈수록 흐려지고 어두워짐
+                TabFade()
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
                 TabBar8()
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .padding(.horizontal, 20)
@@ -435,8 +439,28 @@ struct Scroll8<Content: View>: View {
                 }
         }
         .coordinateSpace(name: "s8scroll")
-        .onPreferenceChange(ScrollY8.self) { y in TabBarScroll.shared.update(y) }
+        .onPreferenceChange(ScrollY8.self) { y in
+            // iOS 18 부터는 아래 ScrollTrack 이 스크롤 위치를 직접 받음 (예전 방식은 새 스크롤 뷰에서 값이 안 들어왔음)
+            if #available(iOS 18.0, *) { return }
+            TabBarScroll.shared.update(y)
+        }
+        .modifier(ScrollTrack())
         .scrollDismissesKeyboard(.interactively)
+    }
+}
+
+/// iOS 18+: 스크롤 위치(맨 위 = 0)를 스크롤 뷰에서 직접 받아 탭 바 접기/펴기에 씀
+private struct ScrollTrack: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { g in
+                g.contentOffset.y + g.contentInsets.top
+            } action: { _, y in
+                TabBarScroll.shared.update(y)
+            }
+        } else {
+            content
+        }
     }
 }
 
@@ -518,7 +542,6 @@ struct TopBar8: View {
 struct TabBar8: View {
     let r = Router.shared
     let scroll = TabBarScroll.shared
-    @Namespace private var ns
     struct Tab: Identifiable { let scr: Scr; let label: String; let icon: String; var id: String { label } }
     private let tabs: [Tab] = [
         Tab(scr: .home, label: "Home", icon: "i_home"), Tab(scr: .training, label: "Training", icon: "modeTraining"),
@@ -526,43 +549,97 @@ struct TabBar8: View {
         Tab(scr: .settings, label: "Settings", icon: "i_gear"),
     ]
 
+    // 고른 탭 표시: 아이콘 아래 짧은 노란 선. 선의 왼쪽 끝·오른쪽 끝을 따로 움직여서
+    // 옮겨 갈 때 가는 쪽 끝이 먼저 뻗고 뒤쪽 끝이 늦게 따라붙음 (늘어났다 줄어드는 모양)
+    @State private var edgeL: CGFloat = 0      // 선 왼쪽 끝이 있는 칸 번호 (0…4, 움직이는 동안 소수)
+    @State private var edgeR: CGFloat = 0
+    @State private var pop: Int? = nil         // 방금 고른 칸 (아이콘이 살짝 커졌다 돌아옴)
+
+    private static let side: CGFloat = 6       // 바 안쪽 좌우 여백
+    private static let lineW: CGFloat = 18
+    private static let lineH: CGFloat = 3
+
+    private var selected: Int? { tabs.firstIndex { $0.scr == r.scr.tab } }
+    private var barH: CGFloat { scroll.compact ? 50 : 64 }
+
     private var row: some View {
         HStack(spacing: 0) {
-            ForEach(tabs) { t in
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { i, t in
                 let on = r.scr.tab == t.scr
                 let c = on ? C.accent : C.text2
                 Button { r.go(t.scr) } label: {
-                    VStack(spacing: 2) {
-                        if t.icon == "modeTraining" { Icon8(t.icon, 26, c) } else { Glyph(t.icon, 25, c) }
+                    VStack(spacing: 3) {
+                        Group {
+                            if t.icon == "modeTraining" { Icon8(t.icon, 25, c) } else { Glyph(t.icon, 24, c) }
+                        }
+                        .frame(width: 25, height: 24)
+                        .scaleEffect(pop == i ? 1.14 : 1)
+                        .offset(y: pop == i ? -2 : 0)
                         if !scroll.compact {   // 아래로 읽어 내려갈 땐 아이콘만, 위로 올리면 글자까지
                             Text(t.label.l10n).font(F.t(11, .semibold)).lineLimit(1).fixedSize()
+                                .frame(height: 13)
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
                     }
                     .foregroundStyle(c)
-                    .frame(maxWidth: .infinity).frame(height: scroll.compact ? 40 : 54)
-                    .background {
-                        if on {
-                            Capsule().fill(Color.white.opacity(0.08))
-                                .matchedGeometryEffect(id: "pill", in: ns)
-                        }
-                    }
-                    .contentShape(Capsule())
+                    .padding(.bottom, scroll.compact ? 7 : 9)      // 아래 선 자리
+                    .frame(maxWidth: .infinity).frame(height: barH)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("tab." + t.label)
             }
         }
-        .padding(4)
-        .frame(height: scroll.compact ? 48 : 62)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: r.scr.tab)
+        .padding(.horizontal, Self.side)
+        .frame(height: barH)
+        .overlay(alignment: .bottomLeading) { line }
+        .animation(.easeInOut(duration: 0.25), value: r.scr.tab)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: scroll.compact)
+        .onAppear { if let i = selected { edgeL = CGFloat(i); edgeR = CGFloat(i) } }
+        .onChange(of: selected) { old, new in move(from: old, to: new) }
+    }
+
+    /// 노란 선 (길이 18 · 두께 3 · 둥근 끝 · 옅은 노란 빛). 글자와 5, 바 아래와 7 떨어짐
+    private var line: some View {
+        GeometryReader { g in
+            let cell: CGFloat = (g.size.width - Self.side * 2) / CGFloat(tabs.count)
+            let x0: CGFloat = Self.side + (edgeL + 0.5) * cell - Self.lineW / 2
+            let x1: CGFloat = Self.side + (edgeR + 0.5) * cell + Self.lineW / 2
+            Capsule().fill(C.accent)
+                .frame(width: max(Self.lineH, x1 - x0), height: Self.lineH)
+                .shadow(color: C.accent.opacity(0.55), radius: 4)
+                .offset(x: min(x0, x1), y: g.size.height - Self.lineH - (scroll.compact ? 6 : 7))
+                .opacity(selected == nil ? 0 : 1)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func move(from old: Int?, to new: Int?) {
+        guard let new else { return }
+        let to = CGFloat(new)
+        guard let old, old != new else { edgeL = to; edgeR = to; return }
+        let fast: Animation = .timingCurve(0.3, 0.9, 0.3, 1, duration: 0.24)
+        let slow: Animation = .spring(response: 0.42, dampingFraction: 0.62).delay(0.05)
+        if new > old {
+            withAnimation(fast) { edgeR = to }
+            withAnimation(slow) { edgeL = to }
+        } else {
+            withAnimation(fast) { edgeL = to }
+            withAnimation(slow) { edgeR = to }
+        }
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) { pop = new }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.17) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { if pop == new { pop = nil } }
+        }
     }
 
     var body: some View {
         if #available(iOS 26.0, *) {
             row
-                .glassEffect(.regular.tint(Color(hex: 0x161616, alpha: 0.12)), in: Capsule())   // 뒤 화면이 비치도록 아주 옅게
+                // 유리 밑에 약한 흐림을 한 겹 (뒤 글자가 그대로 비치지 않게, 유리 느낌은 남게)
+                .background(Capsule().fill(.ultraThinMaterial).opacity(0.55))
+                .glassEffect(.regular.tint(Color(hex: 0x161616, alpha: 0.12)), in: Capsule())
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
         } else {
@@ -572,6 +649,26 @@ struct TabBar8: View {
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
         }
+    }
+}
+
+/// 화면 맨 아래 띠: 아래로 갈수록 흐려지고 어두워짐 (탭 바 뒤로 지나가는 내용용). 누르는 것은 막지 않음
+struct TabFade: View {
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+                .mask(LinearGradient(stops: [.init(color: .black.opacity(0), location: 0),
+                                             .init(color: .black.opacity(0.85), location: 0.55),
+                                             .init(color: .black, location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+            LinearGradient(stops: [.init(color: .black.opacity(0), location: 0),
+                                   .init(color: .black.opacity(0.45), location: 0.55),
+                                   .init(color: .black.opacity(0.78), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+        }
+        .frame(height: 132)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

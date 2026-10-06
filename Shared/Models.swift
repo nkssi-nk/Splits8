@@ -66,6 +66,73 @@ enum Defaults {
     static let roxTarget = 30
 }
 
+// MARK: - 목표 시간 → 구간별 목표 나누기
+
+/// 총 목표 시간을 러닝 8개 · 종목 8개(16칸)로 나눔. Roxzone(8 × 30초)은 빼고 나눔.
+/// 비율은 공식 수치가 아니라 앱이 정한 값: 균형형 = 기본 목표 비율, 러너형 = 러닝을 더 빠르게, 근력형 = 종목을 더 빠르게
+enum GoalSplit {
+    /// keep = 지금 내 구간 비율 그대로 / balanced / runner / strong / best = 내 최고 풀 시뮬레이션 비율
+    static let styles: [String] = ["keep", "balanced", "runner", "strong", "best"]
+
+    static func name(_ k: String) -> String {
+        ["keep": "Current", "balanced": "Balanced", "runner": "Runner", "strong": "Strong", "best": "My best"][k] ?? "Balanced"
+    }
+    static func note(_ k: String) -> String {
+        ["keep": "Keeps the ratio of your current split goals.",
+         "balanced": "An even mix of running and stations.",
+         "runner": "Faster runs, a little more time on stations.",
+         "strong": "Faster stations, a little more time on runs.",
+         "best": "Follows the ratio of your best Full Simulation."][k] ?? ""
+    }
+
+    /// 16칸 비율 (합은 아무 값이나 됨 — 나눌 때 맞춤)
+    static func weights(_ style: String, current: [Int], best: [Int]?) -> [Double] {
+        let base: [Double] = Defaults.goals.map(Double.init)
+        func tilt(run: Double, st: Double) -> [Double] {
+            base.enumerated().map { $0.offset % 2 == 0 ? $0.element * run : $0.element * st }
+        }
+        switch style {
+        case "runner": return tilt(run: 0.94, st: 1.07)
+        case "strong": return tilt(run: 1.06, st: 0.93)
+        case "best":
+            if let b = best, b.count == 16, b.reduce(0, +) > 0 { return b.map(Double.init) }
+            return base
+        case "keep":
+            if current.count == 16, current.reduce(0, +) > 0 { return current.map(Double.init) }
+            return base
+        default: return base
+        }
+    }
+
+    /// 16칸 목표(초). 5초 단위, 칸마다 최소 30초, 합계 = (총 목표 − Roxzone) 을 5초 단위로 맞춘 값
+    static func split(total: Int, style: String, current: [Int], best: [Int]?) -> [Int] {
+        let w: [Double] = weights(style, current: current, best: best)
+        let sumW: Double = max(1, w.reduce(0, +))
+        let raw: Int = max(16 * 30, total - 8 * Defaults.roxTarget)
+        let target: Int = Int((Double(raw) / 5).rounded()) * 5
+        let exact: [Double] = w.map { $0 / sumW * Double(target) }
+        var out: [Int] = exact.map { max(30, Int(($0 / 5).rounded()) * 5) }
+        // 반올림으로 생긴 차이를 5초씩 나눠서 합계를 맞춤 (반올림에서 손해·이득을 가장 많이 본 칸부터)
+        var diff: Int = target - out.reduce(0, +)
+        var guardCount = 0
+        while diff != 0 && guardCount < 200 {
+            guardCount += 1
+            let step: Int = diff > 0 ? 5 : -5
+            var pick: Int = -1
+            var bestErr: Double = -Double.greatestFiniteMagnitude
+            for i in 0..<out.count {
+                if step < 0 && out[i] - 5 < 30 { continue }
+                let err: Double = (exact[i] - Double(out[i])) * (step > 0 ? 1 : -1)
+                if err > bestErr { bestErr = err; pick = i }
+            }
+            if pick < 0 { break }
+            out[pick] += step
+            diff -= step
+        }
+        return out
+    }
+}
+
 // MARK: - 모드
 
 /// 순서 = 화면에 나오는 순서 (워치 홈 카드 · 달력 점): Training → PFT → Full Simulation → Race
@@ -234,6 +301,9 @@ struct Program: Codable, Hashable, Identifiable {
     var isRun: Bool { kind == "run" }
     var isOpen: Bool { isHIIT || isRun }
 
+    /// 만들어 둘 수 있는 트레이닝 개수 (기본 카드 · HIIT · 러닝 카드 포함 전체). 이미 더 많이 가진 경우 있던 것은 그대로 두고 새로 만드는 것만 막음
+    static let freeLimit: Int = 5
+
     static let runChoices: [Int] = [3, 5, 10, 21, 0]
     /// "Run 5K" / "Free run" (번역 키)
     static func runName(_ km: Int) -> String { km > 0 ? "Run \(km)K" : "Free run" }
@@ -350,6 +420,8 @@ struct SegResult: Codable, Hashable {
     var target: Int
     var hr: Int?
     var dist: Double?          // 러닝 거리(m)
+    /// 워치가 팔 움직임으로 센 횟수 (스키 당긴 횟수 · 로잉 저은 횟수 · 월볼 던진 횟수). 참고용 짐작값 — 시간·순위·등급에는 쓰지 않음. 예전 기록엔 없음
+    var reps: Int? = nil
 }
 
 /// 경로 한 점 (위도·경도)
@@ -461,6 +533,13 @@ struct Settings: Codable, Hashable {
         set { hapticPaceOpt = newValue }
     }
 
+    // 차단한 사용자 (이 기기에 저장). 친구 목록 · 검색 · 순위표에서 숨김 — 예전 저장 파일과 호환되도록 옵셔널
+    var blockedOpt: [BlockedUser]? = nil
+    var blocked: [BlockedUser] {
+        get { blockedOpt ?? [] }
+        set { blockedOpt = newValue.isEmpty ? nil : newValue }
+    }
+
     var signedIn: Bool { nickname != nil }
 
     var div: Division { Division.of(division) }
@@ -473,6 +552,34 @@ struct Settings: Codable, Hashable {
     }
 }
 
+/// 차단한 사용자 (id = 서버 user id, name = 차단할 때의 닉네임 — 차단 목록에 보여 주려고)
+struct BlockedUser: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+}
+
+/// 닉네임에 쓸 수 없는 말 거르기 (기본 욕설 · 운영자 사칭). 숫자로 바꿔 쓴 것(0→o, 1→i …)과 밑줄을 풀어서 봄
+enum NickFilter {
+    private static let banned: [String] = [
+        "fuck", "shit", "bitch", "cunt", "nigg", "fagg", "pussy", "whore", "slut",
+        "nazi", "hitler", "porn", "asshole", "bastard", "retard",
+        "admin", "official", "splits8", "moderator",
+        "ssibal", "sibal", "gaesaek", "byungsin",
+    ]
+
+    static func plain(_ n: String) -> String {
+        let map: [Character: Character] = ["0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b"]
+        return String(n.lowercased().filter { $0 != "_" }.map { map[$0] ?? $0 })
+    }
+
+    /// 써도 되는 닉네임인지
+    static func allowed(_ n: String) -> Bool {
+        let p: String = plain(n)
+        let raw: String = n.lowercased().filter { $0 != "_" }
+        return !banned.contains { p.contains($0) || raw.contains($0) }
+    }
+}
+
 enum RunModes {
     static let keys = ["outdoor", "treadmill", "curved"]
     static func name(_ k: String) -> String {
@@ -480,7 +587,7 @@ enum RunModes {
     }
     static func spec(_ k: String) -> String {
         ["outdoor": "GPS pace and distance",
-         "treadmill": "Motion estimate · calibrate with machine distance",
+         "treadmill": "Motion estimate · may differ from the machine",
          "curved": "Motion estimate · pace shown as approximate"][k] ?? ""
     }
 }

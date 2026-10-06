@@ -3,3 +3,4 @@
 "NSHealthShareUsageDescription" = "운동 중 심박수와 칼로리를 측정하기 위해 건강 데이터를 읽습니다.";
 "NSHealthUpdateUsageDescription" = "운동 기록을 건강 앱에 저장합니다.";
 "NSLocationWhenInUseUsageDescription" = "야외 러닝의 페이스와 거리를 재기 위해 위치를 사용합니다.";
+"NSMotionUsageDescription" = "운동 중 저은 횟수와 던진 횟수를 짐작하기 위해 손목 움직임을 사용합니다.";

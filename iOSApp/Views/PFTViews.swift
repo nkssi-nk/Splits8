@@ -102,7 +102,7 @@ enum PFTText {
     static func rule(_ g: PFTGrade) -> String {
         switch g {
         case .gold: return String(localized: "Gold is under 22:00")
-        case .silver: return String(localized: "Silver is 22:00 – 26:00")
+        case .silver: return String(localized: "Silver is within 26:00")
         case .bronze: return String(localized: "Bronze is over 26:00")
         }
     }
@@ -111,7 +111,7 @@ enum PFTText {
     static func range(_ g: PFTGrade) -> String {
         switch g {
         case .gold: return String(localized: "Under 22:00")
-        case .silver: return "22:00 – 26:00"
+        case .silver: return String(localized: "Within 26:00")
         case .bronze: return String(localized: "Over 26:00")
         }
     }
@@ -193,15 +193,12 @@ struct PFTView: View {
     // MARK: HISTORY
 
     private func historyCard(_ recs: [Record]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                historyRow(recs, i, rec)
-            }
+        PagedCard(ids: recs.map(\.id)) { i, last in
+            historyRow(recs, i, recs[i], last: last)
         }
-        .card8()
     }
 
-    private func historyRow(_ recs: [Record], _ i: Int, _ rec: Record) -> some View {
+    private func historyRow(_ recs: [Record], _ i: Int, _ rec: Record, last: Bool) -> some View {
         let older: Record? = recs.dropFirst(i + 1).first { $0.counts }
         let isBest: Bool = rec.id == store.pftBest?.id
         let d: Int? = (rec.counts ? older : nil).map { rec.total - $0.total }
@@ -214,7 +211,7 @@ struct PFTView: View {
         else { sub = Fm.time12.string(from: rec.date) }
         let color: Color = sub == "Personal best".l10n ? C.accent : (d == nil ? C.text2 : ((d ?? 0) <= 0 ? C.good : C.bad))
         return HistoryRow(title: Fm.wdm.string(from: rec.date), sub: sub, subColor: color,
-                          time: Fm.t(rec.total), last: i == recs.count - 1, flag: rec.flag, grade: rec.pftGrade,
+                          time: Fm.t(rec.total), last: last, flag: rec.flag, grade: rec.pftGrade,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: .sim) }
     }
 }

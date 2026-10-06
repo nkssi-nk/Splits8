@@ -15,6 +15,12 @@ enum Demo {
         s.event = RaceEvent()      // 시안 I1h · I4 처럼 "대회 없음" 상태
     }
 
+    /// 기본 카드 2장 + 16구간짜리 한 장 (아이콘 한 줄 + "+13" 모양 확인용)
+    static func programs() -> [Program] {
+        let full: [ProgItem] = Station.all.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0.key)] }
+        return Program.presets() + [Program(id: "demo.full", name: "Full HYROX", sets: 1, seq: full)]
+    }
+
     static func records() -> [Record] {
         var out: [Record] = []
         let runs = [261, 275, 280, 278, 281, 284, 287, 292]
@@ -31,7 +37,9 @@ enum Demo {
                 segs.append(SegResult(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, time: r, target: 270, hr: 158 + (i % 3) * 3, dist: 1000))
                 segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, time: 18, target: 30, hr: 150, dist: nil))
                 let st = Station.all[i]
-                segs.append(SegResult(icon: st.key, name: st.name, detail: st.detail(div), kind: .st, time: s, target: Defaults.stationGoals[i], hr: 165 + (i % 4) * 4, dist: nil))
+                // 스키 · 로잉 · 월볼은 워치가 센 횟수(참고용)를 예시로 넣음
+                let reps: Int? = ["skiErg": 118, "row": 104, "wallBalls": 97][st.key]
+                segs.append(SegResult(icon: st.key, name: st.name, detail: st.detail(div), kind: .st, time: s, target: Defaults.stationGoals[i], hr: 165 + (i % 4) * 4, dist: nil, reps: reps))
                 if i < 7 { segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, time: 18, target: 30, hr: 150, dist: nil)) }
             }
             let fix = want - segs.map(\.time).reduce(0, +)
@@ -81,7 +89,8 @@ enum Demo {
                 for (i, s) in seq.enumerated() {
                     let t: Int = Int(Double(base6[i]) * Double(want) / Double(sum6))
                     segs.append(SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
-                                          hr: 162 + i * 3, dist: s.kind == .run ? 1000 : nil))
+                                          hr: 162 + i * 3, dist: s.kind == .run ? 1000 : nil,
+                                          reps: ["row": 96, "wallBalls": 99][s.icon]))
                 }
                 let fix: Int = want - segs.map(\.time).reduce(0, +)
                 segs[segs.count - 1].time += fix

@@ -95,7 +95,15 @@ struct ShareCard: View {
     var gradient = true
     /// "" 이면 닉네임 숨김 (@ 없이 넘김)
     var nick = ""
+    /// Smoke (Poster 만): 0 = 끔 · 0.6 = 옅게 · 1 = 짙게. 켜면 사진이 전체에 깔리고, 그라데이션·유리판 대신 연기가 글자 바탕이 됨
+    var smoke: Double = 0
+    /// Poster 글자 덩어리 자리 (끌어서 옮김)
+    var layout = PosterLayout()
+    /// 미리보기에서 끄는 중인 덩어리와 옮긴 거리
+    var dragKey: String? = nil
+    var dragOffset: CGSize = .zero
 
+    private var smokeOn: Bool { smoke > 0 }
     private var post: Bool { ratio == "post" }
     private var h: CGFloat { post ? 450 : 640 }
     private var hasNick: Bool { !nick.isEmpty }
@@ -205,22 +213,45 @@ struct ShareCard: View {
 
     private static let cardSpace = "shareCard"
 
-    /// 검은 글자 = 흰 스크림, 흰 글자 = 검은 스크림
-    private var posterScrim: [Gradient.Stop] {
-        let c: Color = textBlack ? Color.white : Color.black
-        let top: Double = textBlack ? 0.45 : 0.5
-        if post {
-            return [.init(color: c.opacity(top), location: 0), .init(color: c.opacity(0), location: 0.18),
-                    .init(color: c.opacity(0), location: 0.26), .init(color: c.opacity(0.92), location: 0.46),
-                    .init(color: c, location: 0.58)]
-        }
-        return [.init(color: c.opacity(top), location: 0), .init(color: c.opacity(0), location: 0.20),
-                .init(color: c.opacity(0), location: 0.34), .init(color: c.opacity(0.9), location: 0.60),
-                .init(color: c, location: 0.72)]
+    /// 그 자리(0 위 · 1 가운데 · 2 아래)에 글자 덩어리가 있는지
+    private func occupied(_ v: Int) -> Bool {
+        layout.head == v || layout.time == v || (showSplits && !d.pairs.isEmpty && layout.table == v)
     }
 
+    /// 검은 글자 = 흰 스크림, 흰 글자 = 검은 스크림. 글자가 있는 자리만 어둡게(밝게) 함.
+    /// 기본 배치(위: 로고, 아래: 시간·표)에서는 예전과 같은 모양
+    private var posterScrim: [Gradient.Stop] {
+        let c: Color = textBlack ? Color.white : Color.black
+        let top: Double = occupied(0) ? (textBlack ? 0.45 : 0.5) : 0
+        let mid: Bool = occupied(1)
+        let bot: Bool = occupied(2)
+        var st: [Gradient.Stop] = [.init(color: c.opacity(top), location: 0)]
+        if mid {
+            st.append(.init(color: c.opacity(top > 0 ? 0.25 : 0), location: 0.18))
+            st.append(.init(color: c.opacity(0.62), location: 0.32))
+            st.append(.init(color: c.opacity(0.62), location: 0.62))
+        } else {
+            st.append(.init(color: c.opacity(0), location: post ? 0.18 : 0.20))
+            st.append(.init(color: c.opacity(0), location: post ? 0.26 : 0.34))
+        }
+        if bot {
+            if mid {
+                st.append(.init(color: c.opacity(0.9), location: 0.68))
+                st.append(.init(color: c, location: 0.76))
+            } else {
+                st.append(.init(color: c.opacity(post ? 0.92 : 0.9), location: post ? 0.46 : 0.60))
+                st.append(.init(color: c, location: post ? 0.58 : 0.72))
+            }
+        } else {
+            st.append(.init(color: c.opacity(0), location: mid ? 0.80 : 0.90))
+        }
+        return st
+    }
+
+    /// 그라데이션일 때 아래에 글자가 있으면 사진은 위쪽만 (아래는 단색), 아니면 사진이 전체
     private var posterPhotoH: CGFloat {
-        if !gradient { return h }
+        if smokeOn || !gradient || !occupied(2) { return h }
+        if occupied(1) { return h * 0.72 }
         return h * (post ? 0.52 : 0.64)
     }
 
@@ -228,20 +259,62 @@ struct ShareCard: View {
         let glowA: Double = textBlack ? 0.45 : 0.30
         let glowB: Double = textBlack ? 0.22 : 0.12
         return ZStack(alignment: .topLeading) {
-            filteredPhoto()
+            posterPhoto
                 .frame(width: 360, height: posterPhotoH).clipped()
-            if gradient {
-                LinearGradient(stops: posterScrim, startPoint: .top, endPoint: .bottom)
+            if smokeOn {
+                // 영화 느낌: 옅은 안개 결 + 가장자리 어둡게 + 필름 입자
+                SmokeHaze(strength: smoke)
+                    .frame(width: 360, height: h)
                     .allowsHitTesting(false)
+                if !textBlack {
+                    RadialGradient(stops: [.init(color: .black.opacity(0), location: 0.45),
+                                           .init(color: .black.opacity(0.42 * smoke), location: 1)],
+                                   center: .center, startRadius: 0, endRadius: h * 0.72)
+                        .allowsHitTesting(false)
+                }
+                FilmGrain(amount: 0.05 * smoke)
+                    .frame(width: 360, height: h)
+                    .allowsHitTesting(false)
+            } else {
+                if gradient {
+                    LinearGradient(stops: posterScrim, startPoint: .top, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                }
+                glow(glowA, rx: 0.9, ry: 0.45, cx: 0.85, cy: 1.0)
+                glow(glowB, rx: 0.7, ry: 0.35, cx: 0, cy: 0.6)
             }
-            glow(glowA, rx: 0.9, ry: 0.45, cx: 0.85, cy: 1.0)
-            glow(glowB, rx: 0.7, ry: 0.35, cx: 0, cy: 0.6)
             posterContent
                 .padding(.top, 22).padding(.horizontal, 22).padding(.bottom, 24)
                 .frame(width: 360, height: h, alignment: .topLeading)
+                // 연기는 글자 덩어리 뒤에 더 짙게 모임 (덩어리를 옮기면 따라감). 모든 글자보다 아래에 그림
+                .backgroundPreferenceValue(PosterBlockAnchors.self) { anchors in
+                    if smokeOn {
+                        GeometryReader { g in
+                            ForEach(anchors.keys.sorted(), id: \.self) { k in
+                                if let a = anchors[k] {
+                                    let r: CGRect = g[a]
+                                    SmokePuff(dark: !textBlack, strength: smoke * (k == "head" ? 0.55 : 1),
+                                              bias: k == "time" ? layout.timeAlign : 1, seed: UInt64(k.count) &* 977 &+ 13)
+                                        .frame(width: r.width + 76, height: r.height + 64)
+                                        .position(x: r.midX, y: r.midY)
+                                }
+                            }
+                        }
+                        .allowsHitTesting(false)
+                    }
+                }
         }
         .frame(width: 360, height: h)
         .coordinateSpace(NamedCoordinateSpace.named(ShareCard.cardSpace))
+    }
+
+    /// 연기를 켜면 사진을 영화처럼 조금 눌러 줌 (채도 ↓ · 대비 ↑)
+    @ViewBuilder private var posterPhoto: some View {
+        if smokeOn {
+            filteredPhoto().saturation(mono ? 1 : 0.86).contrast(1.08)
+        } else {
+            filteredPhoto()
+        }
     }
 
     private var posterHeader: some View {
@@ -265,10 +338,42 @@ struct ShareCard: View {
         }
     }
 
+    /// 위 · 가운데 · 아래 세 자리에 덩어리를 나눠 놓음. 같은 자리에 여러 개면 로고 → 시간 → 표 순서
     private var posterContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            posterHeader
-            Spacer(minLength: 0)
+            slot(0)
+            Spacer(minLength: 10)
+            slot(1)
+            Spacer(minLength: 10)
+            slot(2)
+        }
+    }
+
+    @ViewBuilder private func slot(_ v: Int) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if layout.head == v { posterBlock("head") { posterHeader } }
+            if layout.time == v { posterBlock("time") { posterTime } }
+            if showSplits && !d.pairs.isEmpty && layout.table == v { posterBlock("table") { posterTableBox } }
+        }
+    }
+
+    /// 옮길 수 있는 덩어리: 자리(앵커)를 알리고, 끄는 동안은 손가락을 따라 움직임. 연기 위에서는 글자에 옅은 그림자
+    private func posterBlock<V: View>(_ key: String, @ViewBuilder _ content: () -> V) -> some View {
+        let lifted: Bool = dragKey == key
+        return content()
+            .shadow(color: smokeOn ? (textBlack ? Color.white : Color.black).opacity(0.5) : Color.clear, radius: 3, y: 1)
+            .anchorPreference(key: PosterBlockAnchors.self, value: .bounds) { [key: $0] }
+            .offset(lifted ? dragOffset : .zero)
+            .opacity(lifted ? 0.85 : 1)
+            .zIndex(lifted ? 1 : 0)
+    }
+
+    /// 장소·날짜 / 큰 시간 / 숫자 3개. 왼쪽 · 가운데 · 오른쪽 정렬
+    private var posterTime: some View {
+        let i: Int = max(0, min(2, layout.timeAlign))
+        let ha: HorizontalAlignment = [HorizontalAlignment.leading, .center, .trailing][i]
+        let fa: Alignment = [Alignment.leading, .center, .trailing][i]
+        return VStack(alignment: ha, spacing: 0) {
             Text("\(d.place) · \(d.date)").font(F.t(13, .medium))
                 .foregroundStyle(tc).lineLimit(1)
             if !d.partner.isEmpty {
@@ -277,29 +382,28 @@ struct ShareCard: View {
             }
             big(d.total, post ? 64 : 76, track: -0.045, color: tc).padding(.top, 6)
             HStack(alignment: .top, spacing: 12) {
-                posterStat("AVG HR", d.avgHR)
-                posterStat("ROXZONE", d.rox)
-                posterStat("KCAL", d.kcal)
+                posterStat("AVG HR", d.avgHR, ha, fa)
+                posterStat("ROXZONE", d.rox, ha, fa)
+                posterStat("KCAL", d.kcal, ha, fa)
             }
             .padding(.top, 14)
-            if showSplits && !d.pairs.isEmpty {
-                posterTableBox.padding(.top, 16)
-            }
         }
+        .frame(maxWidth: .infinity, alignment: fa)
     }
 
-    private func posterStat(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private func posterStat(_ label: String, _ value: String, _ ha: HorizontalAlignment = .leading,
+                            _ fa: Alignment = .leading) -> some View {
+        VStack(alignment: ha, spacing: 0) {
             tinyLabel(label, color: tc)
             Text(value).font(F.num(18, .semibold)).tracking(-0.01 * 18)
                 .foregroundStyle(tc).lineLimit(1).minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: fa)
     }
 
-    /// Dark gradient 끄면: 흐린 유리판 (padding 6 12 4, radius 16)
+    /// 그라데이션 위(아래 자리)나 연기 위에서는 표만, 사진 바로 위에서는 흐린 유리판 (padding 6 12 4, radius 16)
     @ViewBuilder private var posterTableBox: some View {
-        if gradient {
+        if smokeOn || (gradient && layout.table == 2) {
             posterTable
         } else {
             let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -606,6 +710,141 @@ struct ShareCard: View {
     }
 }
 
+// MARK: - Poster 글자 자리 · 연기
+
+/// Poster 의 글자 덩어리 자리. 미리보기에서 끌어서 옮기면 가장 가까운 자리에 붙음
+struct PosterLayout: Equatable {
+    /// 로고 · 닉네임 줄: 0 위 / 2 아래
+    var head = 0
+    /// 장소 · 큰 시간 · 숫자: 0 위 / 1 가운데 / 2 아래
+    var time = 2
+    /// 그 덩어리의 정렬: 0 왼쪽 / 1 가운데 / 2 오른쪽
+    var timeAlign = 0
+    /// 구간 표: 0 위 / 1 가운데 / 2 아래
+    var table = 2
+
+    static let standard = PosterLayout()
+}
+
+/// 덩어리(head · time · table)의 자리
+struct PosterBlockAnchors: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] = [:]
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+/// 항상 같은 모양이 나오는 난수 (미리보기와 저장한 그림이 같아야 함)
+struct SeededRandom: RandomNumberGenerator {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed == 0 ? 0x9E3779B97F4A7C15 : seed }
+    mutating func next() -> UInt64 {
+        state &+= 0x9E3779B97F4A7C15
+        var z: UInt64 = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        return z ^ (z >> 31)
+    }
+    /// 0…1
+    mutating func unit() -> Double { Double(next() >> 11) / Double(1 << 53) }
+    /// 가운데에 몰린 0…1
+    mutating func bell() -> Double { (unit() + unit() + unit()) / 3 }
+}
+
+/// 글자 덩어리 뒤에 모이는 연기. dark = 어두운 연기(흰 글자용) / 밝은 연기(검은 글자용).
+/// bias = 연기가 몰리는 쪽 (0 왼쪽 · 1 가운데 · 2 오른쪽)
+struct SmokePuff: View {
+    let dark: Bool
+    let strength: Double
+    var bias: Int = 1
+    var seed: UInt64 = 1
+
+    var body: some View {
+        Canvas { ctx, size in
+            var rng = SeededRandom(seed: seed)
+            let color: Color = dark ? Color.black : Color.white
+            let w: Double = Double(size.width), h: Double = Double(size.height)
+            let cx: Double = [0.36, 0.5, 0.64][max(0, min(2, bias))]
+            let count: Int = 26 + Int(w * h / 5200)
+            for _ in 0..<count {
+                let x: Double = (cx + (rng.bell() - 0.5) * 1.5) * w
+                let y: Double = (0.5 + (rng.bell() - 0.5) * 1.3) * h
+                let r: Double = max(26, min(150, h * (0.32 + rng.unit() * 0.5)))
+                let rx: Double = r * (1.1 + rng.unit() * 0.9)
+                let a: Double = (0.10 + rng.unit() * 0.13) * strength
+                let rect = CGRect(x: x - rx, y: y - r, width: rx * 2, height: r * 2)
+                ctx.drawLayer { layer in
+                    // 가로로 퍼진 뭉치: 원 모양 그라데이션을 옆으로 늘림
+                    layer.translateBy(x: rect.midX, y: rect.midY)
+                    layer.scaleBy(x: rx / r, y: 1)
+                    let shade = GraphicsContext.Shading.radialGradient(
+                        Gradient(stops: [.init(color: color.opacity(a), location: 0),
+                                         .init(color: color.opacity(a * 0.55), location: 0.5),
+                                         .init(color: color.opacity(0), location: 1)]),
+                        center: .zero, startRadius: 0, endRadius: r)
+                    layer.fill(Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2)), with: shade)
+                }
+            }
+        }
+        .blur(radius: 9)
+        // 가장자리는 저절로 사라지게 (네모난 끝이 보이지 않게)
+        .mask {
+            RoundedRectangle(cornerRadius: 46, style: .continuous)
+                .padding(20)
+                .blur(radius: 16)
+        }
+    }
+}
+
+/// 화면 전체에 깔리는 옅은 안개 결 (밝은 회색). 사진에 깊이를 주는 용도라 글자 바탕보다 훨씬 옅음
+struct SmokeHaze: View {
+    let strength: Double
+
+    var body: some View {
+        Canvas { ctx, size in
+            var rng = SeededRandom(seed: 41)
+            let w: Double = Double(size.width), h: Double = Double(size.height)
+            for _ in 0..<16 {
+                let x: Double = rng.unit() * w
+                let y: Double = rng.unit() * h
+                let r: Double = 70 + rng.unit() * 130
+                let stretch: Double = 1.6 + rng.unit() * 1.6
+                let a: Double = (0.035 + rng.unit() * 0.06) * strength
+                ctx.drawLayer { layer in
+                    layer.translateBy(x: x, y: y)
+                    layer.scaleBy(x: stretch, y: 1)
+                    let shade = GraphicsContext.Shading.radialGradient(
+                        Gradient(stops: [.init(color: Color(white: 0.92).opacity(a), location: 0),
+                                         .init(color: Color(white: 0.92).opacity(0), location: 1)]),
+                        center: .zero, startRadius: 0, endRadius: r)
+                    layer.fill(Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2)), with: shade)
+                }
+            }
+        }
+        .blur(radius: 12)
+    }
+}
+
+/// 필름 입자 (아주 옅은 흰·검은 점)
+struct FilmGrain: View {
+    let amount: Double
+
+    var body: some View {
+        Canvas { ctx, size in
+            var rng = SeededRandom(seed: 7)
+            let w: Double = Double(size.width), h: Double = Double(size.height)
+            let n: Int = Int(w * h / 22)
+            for i in 0..<n {
+                let x: Double = rng.unit() * w
+                let y: Double = rng.unit() * h
+                let a: Double = amount * (0.4 + rng.unit() * 0.9)
+                let c: Color = i % 2 == 0 ? Color.white : Color.black
+                ctx.fill(Path(CGRect(x: x, y: y, width: 0.9, height: 0.9)), with: .color(c.opacity(a)))
+            }
+        }
+    }
+}
+
 // MARK: - I7 공유 화면 (시안 isShare)
 
 struct ShareView: View {
@@ -623,6 +862,48 @@ struct ShareView: View {
     @State private var saved = false
     @State private var mapOn = false           // 실외 러닝: 경로 지도를 배경으로
     @State private var saveFail: String? = nil  // 저장 실패 안내
+    @State private var smoke = "off"           // Smoke: off / light / strong (Poster)
+    @State private var layout = PosterLayout() // Poster 글자 자리
+    // 미리보기에서 글자 덩어리 끌기
+    @State private var blockRects: [String: CGRect] = [:]
+    @State private var dragKey: String? = nil
+    @State private var dragStart: CGRect = .zero
+    @State private var dragOffset: CGSize = .zero
+
+    private var smokeValue: Double { smoke == "strong" ? 1 : (smoke == "light" ? 0.6 : 0) }
+
+    /// 화면 확인용 예시 사진 (--sharephoto): 밝고 복잡한 체육관 느낌의 그림. 연기·그라데이션 위 글자가 읽히는지 보려고
+    static func demoPhoto() -> UIImage {
+        let size = CGSize(width: 720, height: 1280)
+        let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: fmt).image { c in
+            let g = c.cgContext
+            let colors = [UIColor(white: 0.86, alpha: 1).cgColor, UIColor(red: 0.55, green: 0.60, blue: 0.66, alpha: 1).cgColor,
+                          UIColor(white: 0.30, alpha: 1).cgColor] as CFArray
+            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 0.5, 1]) {
+                g.drawLinearGradient(grad, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
+            }
+            var rng = SeededRandom(seed: 99)
+            // 천장 조명 줄 · 기둥 · 바닥 선 · 사람 그림자 같은 덩어리
+            for i in 0..<9 {
+                UIColor(white: 1, alpha: 0.85).setFill()
+                g.fill(CGRect(x: 40 + Double(i) * 78, y: 60 + rng.unit() * 30, width: 44, height: 10))
+            }
+            for _ in 0..<26 {
+                let w: Double = 30 + rng.unit() * 150, h: Double = 60 + rng.unit() * 360
+                UIColor(hue: 0.05 + rng.unit() * 0.6, saturation: 0.25 + rng.unit() * 0.4,
+                        brightness: 0.25 + rng.unit() * 0.7, alpha: 0.75).setFill()
+                g.fill(CGRect(x: rng.unit() * size.width - 40, y: 160 + rng.unit() * 980, width: w, height: h))
+            }
+            UIColor(white: 0.08, alpha: 0.9).setFill()
+            g.fillEllipse(in: CGRect(x: 250, y: 330, width: 130, height: 130))          // 머리
+            g.fill(CGRect(x: 215, y: 450, width: 200, height: 420))                     // 몸
+            for i in 0..<14 {
+                UIColor(white: 1, alpha: 0.5).setFill()
+                g.fill(CGRect(x: 0, y: 900 + Double(i) * 28, width: size.width, height: 3))
+            }
+        }
+    }
 
     private var data: ShareData { r.detail.map { ShareData($0, store: store) } ?? ShareData() }
     private var post: Bool { ratio == "post" }
@@ -640,6 +921,7 @@ struct ShareView: View {
         VStack(spacing: 14) {
             NavBar3(left: "Close", title: "Share", onLeft: { r.go(.detail) })
             preview
+            if variant == "poster" { moveHint }
             Seg8(items: [("story", "Story 9:16"), ("post", "Post 4:5")], selected: ratio,
                  fontSize: 13, track: Color(hex: 0x141414), tracking: 0.04 * 13) { k in
                 withAnimation(.easeInOut(duration: 0.2)) { ratio = k }
@@ -649,6 +931,9 @@ struct ShareView: View {
             actionButtons
         }
         .padding(.horizontal, 16)
+        .onAppear {
+            if photo == nil && CommandLine.arguments.contains("--sharephoto") { photo = Self.demoPhoto(); mono = false }
+        }
         .alert("Couldn't save", isPresented: Binding(get: { saveFail != nil }, set: { if !$0 { saveFail = nil } })) {
             Button("Open Settings") {
                 if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
@@ -666,10 +951,23 @@ struct ShareView: View {
         let ph: CGFloat = post ? 387 : 461
         return PhotosPicker(selection: $pick, matching: .images) {
             card(placeholder: true)
+                // 덩어리 자리를 카드 좌표로 받아 둠 (끌기 시작할 때 어느 덩어리인지 찾음)
+                .overlayPreferenceValue(PosterBlockAnchors.self) { anchors in
+                    GeometryReader { g in
+                        let rects: [String: CGRect] = anchors.mapValues { g[$0] }
+                        Color.clear
+                            .onAppear { if dragKey == nil { blockRects = rects } }
+                            .onChange(of: rects) { _, v in if dragKey == nil { blockRects = v } }
+                    }
+                    .allowsHitTesting(false)
+                }
                 .scaleEffect(scale, anchor: .topLeading)
                 .frame(width: pw, height: ph, alignment: .topLeading)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color(hex: 0x262626)).padding(-1))
+                .contentShape(Rectangle())
+                // Poster: 글자 덩어리를 끌어서 옮김 (그냥 누르면 사진 고르기)
+                .highPriorityGesture(blockDrag(scale: scale), including: variant == "poster" ? .all : .subviews)
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
@@ -694,6 +992,66 @@ struct ShareView: View {
                 }
             }
         }
+    }
+
+    // MARK: 글자 덩어리 끌기 (Poster)
+
+    /// 미리보기 위에서 끌기: 손가락 아래의 덩어리(시간 · 표 · 로고)를 잡아 옮기고, 놓으면 가장 가까운 자리에 붙음
+    private func blockDrag(scale: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { v in
+                if dragKey == nil {
+                    let p = CGPoint(x: v.startLocation.x / scale, y: v.startLocation.y / scale)
+                    // 겹치면 작은 덩어리부터 (표 위에 걸친 시간 덩어리를 잡기 쉽게)
+                    let hits = blockRects.filter { $0.value.insetBy(dx: -6, dy: -8).contains(p) }
+                    guard let k = hits.min(by: { $0.value.height < $1.value.height })?.key else { return }
+                    dragKey = k
+                    dragStart = blockRects[k] ?? .zero
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+                dragOffset = CGSize(width: v.translation.width / scale, height: v.translation.height / scale)
+            }
+            .onEnded { v in
+                guard let k = dragKey else { return }
+                let off = CGSize(width: v.translation.width / scale, height: v.translation.height / scale)
+                let cardH: CGFloat = post ? 450 : 640
+                let fy: CGFloat = (dragStart.midY + off.height) / cardH
+                var l = layout
+                switch k {
+                case "head": l.head = fy < 0.5 ? 0 : 2
+                case "table": l.table = fy < 0.36 ? 0 : (fy < 0.64 ? 1 : 2)
+                default:
+                    l.time = fy < 0.36 ? 0 : (fy < 0.64 ? 1 : 2)
+                    // 옆으로 민 만큼 정렬을 한 칸 또는 두 칸 옮김
+                    let step: Int = off.width > 130 ? 2 : (off.width > 44 ? 1 : (off.width < -130 ? -2 : (off.width < -44 ? -1 : 0)))
+                    l.timeAlign = max(0, min(2, l.timeAlign + step))
+                }
+                let moved: Bool = l != layout
+                withAnimation(.snappy(duration: 0.28)) {
+                    layout = l
+                    dragOffset = .zero
+                    dragKey = nil
+                }
+                if moved { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+            }
+    }
+
+    /// 미리보기 아래 한 줄: 끌어서 옮길 수 있다는 안내 + (옮겼으면) 되돌리기
+    private var moveHint: some View {
+        HStack(spacing: 10) {
+            Text("Drag the time, splits or logo to move them").font(F.t(12)).foregroundStyle(C.text3)
+                .lineLimit(1).minimumScaleFactor(0.8)
+            if layout != PosterLayout.standard {
+                Button { withAnimation(.snappy(duration: 0.28)) { layout = PosterLayout.standard } } label: {
+                    Text("Reset").font(F.t(12, .semibold)).foregroundStyle(C.accent)
+                        .frame(minHeight: 28).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("share.resetLayout")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, -6)
     }
 
     // 3칸 (38 높이, radius 10, #111, 선택 1.5px 노랑 링 + 노랑 글자, 아니면 1px #1C1C1C + #AEAEB2)
@@ -755,6 +1113,12 @@ struct ShareView: View {
             } trailing: {
                 Toggle8(on: $gradient, w: 50, h: 30).accessibilityIdentifier("share.gradient")
             }
+            // Smoke: 사진 위에 연기를 겹쳐 영화 느낌 + 글자 바탕 (Poster). 켜면 그라데이션 대신 연기를 씀
+            optionRow(last: false) {
+                Text("Smoke").font(F.t(15))
+            } trailing: {
+                smokeSeg
+            }
             optionRow(last: true) {
                 nickLabel
             } trailing: {
@@ -782,6 +1146,29 @@ struct ShareView: View {
         return HStack(spacing: 0) {
             ForEach(items.indices, id: \.self) { i in
                 textColorButton(items[i].0, items[i].1)
+            }
+        }
+        .padding(2)
+        .background(Color(hex: 0x141414), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    // Off / Light / Strong (Text color 와 같은 모양, 버튼 56×28)
+    private var smokeSeg: some View {
+        let items: [(String, String)] = [("off", "Off"), ("light", "Light"), ("strong", "Heavy")]
+        return HStack(spacing: 0) {
+            ForEach(items.indices, id: \.self) { i in
+                let k: String = items[i].0
+                let on: Bool = smoke == k
+                let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+                Button { withAnimation(.easeOut(duration: 0.2)) { smoke = k } } label: {
+                    Text(items[i].1.l10n).font(F.t(13, .semibold)).foregroundStyle(Color.white)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .frame(width: 56, height: 28)
+                        .background(on ? Color.white.opacity(0.16) : Color.clear, in: shape)
+                        .contentShape(shape)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("share.smoke.\(k)")
             }
         }
         .padding(2)
@@ -844,7 +1231,8 @@ struct ShareView: View {
     private func card(placeholder: Bool) -> ShareCard {
         ShareCard(d: data, variant: variant, ratio: ratio, showSplits: splits, photo: photo,
                   placeholder: placeholder, textBlack: textColor == "black", mono: mono,
-                  gradient: gradient, nick: shownNick)
+                  gradient: gradient, nick: shownNick, smoke: smokeValue, layout: layout,
+                  dragKey: placeholder ? dragKey : nil, dragOffset: placeholder ? dragOffset : .zero)
     }
 
     /// 360pt 너비 시안을 3배로 → 1080 너비

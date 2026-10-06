@@ -7,6 +7,10 @@ struct FriendsView: View {
     let r = Router.shared
     @State private var query = ""
     @State private var hit: RemoteProfile?
+    /// 차단 확인창에 띄울 사람
+    @State private var blockAsk: BlockedUser?
+    /// 메일 앱을 열 수 없을 때 주소 안내
+    @State private var mailFail = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -31,9 +35,84 @@ struct FriendsView: View {
                 .card8()
             }
             Note8(text: "Tap to compare · Tap again to clear · VS is against your best")
+            blockedSection
         }
         .padding(.horizontal, 16)
         .task { await store.refreshSocial() }
+        .alert("Block this user?", isPresented: Binding(get: { blockAsk != nil }, set: { if !$0 { blockAsk = nil } })) {
+            Button("Block user", role: .destructive) {
+                if let b = blockAsk {
+                    if hit?.id == b.id { hit = nil }
+                    withAnimation(.easeOut(duration: 0.25)) { store.block(id: b.id, name: b.name) }
+                }
+                blockAsk = nil
+            }
+            Button("Cancel", role: .cancel) { blockAsk = nil }
+        } message: {
+            Text("They are removed from your friends and hidden from your search and rankings. You can unblock them here later.")
+        }
+        .alert("Report by email", isPresented: $mailFail) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(verbatim: Config.supportEmail)
+        }
+    }
+
+    // MARK: 신고 · 차단 (다른 사용자의 닉네임 · 사진이 보이는 곳)
+
+    /// ··· 메뉴: Report (운영자에게 메일) · Block
+    private func moreMenu(id: String, name: String) -> some View {
+        Menu {
+            Button { report(id: id, name: name) } label: { Label("Report", systemImage: "flag") }
+            Button(role: .destructive) { blockAsk = BlockedUser(id: id, name: name) } label: {
+                Label("Block user", systemImage: "hand.raised")
+            }
+        } label: {
+            Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(C.text2)
+                .frame(width: 36, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("friends.more")
+    }
+
+    /// 신고: 메일 앱을 열어 운영자에게 보냄 (누구를 신고하는지 미리 적어 둠). 메일 앱이 없으면 주소를 알려 줌
+    private func report(id: String, name: String) {
+        let subject: String = "[SPLITS8] Report @" + name
+        let body: String = "Reported user: @\(name)\nUser ID: \(id)\n\n" + String(localized: "Tell us what is wrong (nickname, photo or records):") + "\n"
+        var c = URLComponents()
+        c.scheme = "mailto"
+        c.path = Config.supportEmail
+        c.queryItems = [URLQueryItem(name: "subject", value: subject), URLQueryItem(name: "body", value: body)]
+        guard let u = c.url else { mailFail = true; return }
+        UIApplication.shared.open(u) { ok in if !ok { mailFail = true } }
+    }
+
+    /// 차단한 사람 목록 (Unblock 으로 풂)
+    @ViewBuilder private var blockedSection: some View {
+        let list: [BlockedUser] = store.settings.blocked
+        if !list.isEmpty {
+            SectionLabel(text: "BLOCKED", top: 14)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, b in
+                    HStack(spacing: 12) {
+                        Text("@" + b.name).font(F.t(17)).foregroundStyle(C.text2).lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button { withAnimation(.easeOut(duration: 0.2)) { store.unblock(b.id) } } label: {
+                            Text("Unblock").font(F.t(13, .semibold)).foregroundStyle(.white)
+                                .padding(.horizontal, 14).frame(height: 32)
+                                .background(Color.white.opacity(0.12), in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(Press(scale: 0.96))
+                        .accessibilityIdentifier("friends.unblock")
+                    }
+                    .padding(.vertical, 11).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+        }
     }
 
     /// 가입 전: 설명 13 회색 + Sign up 노란 알약 (padding 14×18, margin-top 4)
@@ -72,8 +151,9 @@ struct FriendsView: View {
             .buttonStyle(Press(scale: 0.96))
             .disabled(req)
             .accessibilityIdentifier("friends.add")
+            moreMenu(id: h.id, name: n)
         }
-        .padding(.vertical, 12).padding(.horizontal, 18)
+        .padding(.vertical, 12).padding(.leading, 18).padding(.trailing, 6)
         .card8()
     }
 
@@ -82,7 +162,8 @@ struct FriendsView: View {
         let on = store.settings.friendId == f.id
         let myBest = store.simBest?.total
         let d: Int? = (myBest != nil && f.hasSplits) ? f.total - (myBest ?? 0) : nil
-        return Button { if f.hasSplits { store.toggleFriend(f) } } label: {
+        return HStack(spacing: 0) {
+          Button { if f.hasSplits { store.toggleFriend(f) } } label: {
             HStack(spacing: 14) {
                 FriendAvatar(url: f.avatarUrl, ini: f.ini, size: 40)
                     .photoTap(f.avatarUrl.map { PhotoItem(url: $0, title: "@" + f.name, sub: f.div) })
@@ -101,11 +182,14 @@ struct FriendsView: View {
                 .fixedSize()
                 if on { Check8(size: 20) } else { Color.clear.frame(width: 20, height: 20) }
             }
-            .padding(.vertical, 14).padding(.horizontal, 18).contentShape(Rectangle())
+            .padding(.vertical, 14).padding(.leading, 18).padding(.trailing, 4).contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .accessibilityIdentifier("friend." + f.name)
+          moreMenu(id: f.id, name: f.name)
+              .padding(.trailing, 6)
         }
-        .buttonStyle(.plain)
         .rowLine(!last)
-        .accessibilityIdentifier("friend." + f.name)
     }
 
     /// Open Men · 13 Sep 2026  /  Open Men · No Full Simulation record
@@ -121,7 +205,7 @@ struct FriendsView: View {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard q == query.lowercased().replacingOccurrences(of: "@", with: "") else { return }
             let res = (try? await store.sb.searchProfiles(prefix: q)) ?? []
-            hit = res.first { $0.id != store.sb.userId }
+            hit = res.first { $0.id != store.sb.userId && !store.isBlocked($0.id) }
         }
     }
 

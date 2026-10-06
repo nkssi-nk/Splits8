@@ -51,7 +51,7 @@ final class Store: NSObject, WCSessionDelegate {
         if let d = try? Data(contentsOf: JSONStore.url("avatar.jpg")) { photo = UIImage(data: d) }
         if Demo.enabled {           // 화면 확인용 예시 데이터
             var s = Settings(); Demo.settings(&s); settings = s
-            programs = Program.presets()
+            programs = Demo.programs()
             records = Demo.records()
             friends = []
             plans = []
@@ -266,6 +266,32 @@ final class Store: NSObject, WCSessionDelegate {
         settings = s
     }
 
+    // MARK: 차단 (다른 사용자를 내 화면에서 숨김)
+
+    func isBlocked(_ id: String) -> Bool { settings.blocked.contains { $0.id == id } }
+
+    /// 차단: 이 기기의 차단 목록에 넣고, 친구 목록 · 순위표에서 바로 빼고, 서버의 친구 관계도 끊음
+    func block(id: String, name: String) {
+        var s = settings
+        if !s.blocked.contains(where: { $0.id == id }) { s.blocked = s.blocked + [BlockedUser(id: id, name: name)] }
+        if s.friendId == id {
+            s.friendId = nil
+            if s.simCmp == "friend" { s.simCmp = "goal" }
+            s.tgtSrc = "mine"
+        }
+        settings = s
+        friends.removeAll { $0.id == id }
+        leaderboard.removeAll { $0.user_id == id }
+        requested.remove(id)
+        if signedIn { Task { try? await sb.removeFriend(id) } }
+    }
+
+    func unblock(_ id: String) {
+        var s = settings
+        s.blocked = s.blocked.filter { $0.id != id }
+        settings = s
+    }
+
     // MARK: 프로필 사진
 
     func setPhoto(_ img: UIImage?) {
@@ -337,7 +363,7 @@ final class Store: NSObject, WCSessionDelegate {
         guard signedIn else { return }
         if let rows = try? await sb.friends() {
             let sel = settings.friendId
-            friends = rows.filter { $0.status == "accepted" || $0.status == "pending" }.map {
+            friends = rows.filter { ($0.status == "accepted" || $0.status == "pending") && !isBlocked($0.user_id) }.map {
                 Friend(id: $0.user_id, name: $0.nickname, div: $0.division, date: $0.best_date ?? "",
                        splits: $0.splits ?? [], avatarUrl: $0.avatar_url)
             }
@@ -351,7 +377,7 @@ final class Store: NSObject, WCSessionDelegate {
         let kind = settings.lbTab == "stations" ? "station" : settings.lbTab
         let st = Station.all.firstIndex { $0.key == settings.lbStation } ?? 0
         if let rows = try? await sb.leaderboard(kind: kind, station: st, division: settings.lbAllDivisions ? nil : div.name) {
-            leaderboard = rows
+            leaderboard = rows.filter { !isBlocked($0.user_id) }
         }
     }
 

@@ -37,6 +37,22 @@ final class ScreenshotTests: XCTestCase {
         add(a)
     }
 
+    /// 기다리지 않고 바로 저장 (카운트다운처럼 금방 지나가는 화면)
+    private func shotNow(_ name: String) {
+        let s = XCUIScreen.main.screenshot()
+        n += 1
+        let file = dir.appendingPathComponent(String(format: "%02d_%@.png", n, name))
+        try? s.pngRepresentation.write(to: file)
+        let a = XCTAttachment(screenshot: s)
+        a.name = name
+        a.lifetime = .keepAlways
+        add(a)
+    }
+
+    private func element(_ i: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", i)).firstMatch
+    }
+
     private func tap(_ label: String, timeout: TimeInterval = 5) {
         let q = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR identifier == %@", label, label))
         let e = q.firstMatch
@@ -89,11 +105,40 @@ final class ScreenshotTests: XCTestCase {
     func test2_tabs() {
         launch(onboarded: true)
         shot("I1h_home")
+        // 달력: 날짜를 누르면 그날 구역이 펼쳐지고, 다시 누르면 접힘
+        id("cal.day.15")
+        shot("I1h_home_day_open")
+        id("cal.day.15")
+        shot("I1h_home_day_closed")
+        // 달력을 지난 달로 넘기면 아래 요약도 그 달로 (예시 기록은 9월)
+        id("cal.prev")
+        tap("Month")
         app.swipeUp()
-        shot("I1h_home_bottom")
+        shot("I1h_home_prev_month_summary")
+        app.swipeDown()
+        // 달력을 왼쪽으로 밀면 다음 달
+        let day = element("cal.day.15")
+        if day.waitForExistence(timeout: 3) { day.swipeLeft() }
+        shot("I1h_home_swiped_next_month")
+        tap("Week")
+        app.swipeUp()
+        shot("I1h_home_bottom")          // 아래로 내린 상태: 탭 바가 아이콘만
+        app.swipeUp()
+        shot("I1h_home_bottom2")
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
 
         tab("Training")
         shot("I1_training")
+        // 16구간 카드의 "+13" 을 눌러 펼침
+        let fullCard = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Full HYROX")).firstMatch
+        if fullCard.waitForExistence(timeout: 3) {
+            fullCard.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.76)).tap()
+            sleep(1)
+            shot("I1_training_card_expanded")
+        }
+        app.swipeUp()
+        shot("I1_training_history")
+        app.swipeDown(); app.swipeDown()
         tapContaining("Sled Intervals")
         shot("I2_edit_training")
         id("nav.left")
@@ -111,9 +156,24 @@ final class ScreenshotTests: XCTestCase {
         shot("I3_wall_balls")
         app.swipeUp()
         shot("I3_history")
+        // 기록 6개 → 5개씩 두 쪽
+        app.swipeUp()
+        if element("pager.next").waitForExistence(timeout: 3) {
+            id("pager.next")
+            shot("I3_history_page2")
+        } else {
+            shot("I3_history_no_pager")
+        }
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
 
         tab("Race")
         shot("I4_race")
+        // 목표 시간 → 구간별로 나누기 (유형 고르기)
+        id("race.Goal time")
+        shot("I4g_goal_time")
+        tap("Runner")
+        shot("I4g_goal_time_runner")
+        id("nav.left")
         app.swipeUp()
         shot("I4_race_bottom")
         app.swipeDown()
@@ -160,7 +220,7 @@ final class ScreenshotTests: XCTestCase {
     // MARK: 3. 기록 상세 · 공유  — 시안 I6, I7, S1–S6
 
     func test3_detail_share() {
-        launch(onboarded: true)
+        launch(onboarded: true, extra: ["--sharephoto"])
         tab("Race")
         app.swipeUp(); app.swipeUp()
         tapContaining("vs goal")
@@ -181,7 +241,56 @@ final class ScreenshotTests: XCTestCase {
         shot("I7_share_ticket")
         tap("Block")
         shot("I7_share_block")
+        // Poster + 연기 (옅게 · 짙게) + 글자 옮기기 + 검은 글자
+        tap("Poster")
+        app.swipeUp()
+        id("share.smoke.light")
+        app.swipeDown()
+        shot("I7_share_smoke_light")
+        app.swipeUp()
+        id("share.smoke.strong")
+        app.swipeDown()
+        shot("I7_share_smoke_heavy")
+        let pic = element("share.photo")
+        if pic.waitForExistence(timeout: 3) {
+            let from = pic.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.62))
+            let to = pic.coordinate(withNormalizedOffset: CGVector(dx: 0.80, dy: 0.22))
+            from.press(forDuration: 0.15, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
+            sleep(1)
+            shot("I7_share_smoke_time_moved")
+        }
+        app.swipeUp()
+        id("share.text.black")
+        app.swipeDown()
+        shot("I7_share_smoke_black_text")
+        app.swipeUp()
+        id("share.smoke.off")
+        id("share.text.white")
+        app.swipeDown()
+        shot("I7_share_gradient_time_moved")
         id("nav.left")
+    }
+
+    // MARK: 6. 아이폰으로 기록: 3 · 2 · 1 → 진행 → 넘기기 → 되돌리기
+
+    func test6_phone_live() {
+        launch(onboarded: true)
+        tab("Test")
+        let startBtn = element("startOnPhone.pft")
+        if startBtn.waitForExistence(timeout: 3) && !startBtn.isHittable { app.swipeUp() }
+        id("startOnPhone.pft")
+        tap("Start")                       // 확인창
+        shotNow("L1_countdown")
+        sleep(4)
+        shot("L2_live_started")
+        id("phone.next")
+        shot("L3_after_next")
+        id("phone.undo")
+        shot("L4_after_undo")
+        id("phone.end")
+        shot("L5_end_alert")
+        tap("Discard")
+        shot("L6_back")
     }
 
     // MARK: 5. PFT — Test 탭 · 기록 화면 · 설명 · 처음 화면

@@ -177,6 +177,15 @@ final class Supabase {
         _ = try await request("/rest/v1/rpc/add_friend", method: "POST", body: ["other": otherId])
     }
 
+    /// 친구 끊기 (차단할 때): 두 사람 사이의 친구·요청 줄을 양쪽 방향 모두 지움 (서버 삭제 규칙: 당사자만)
+    func removeFriend(_ otherId: String) async throws {
+        guard let me = userId else { throw SBError.noSession }
+        _ = try await request("/rest/v1/friendships?requester=eq.\(me)&addressee=eq.\(otherId)", method: "DELETE",
+                              headers: ["Prefer": "return=minimal"])
+        _ = try await request("/rest/v1/friendships?requester=eq.\(otherId)&addressee=eq.\(me)", method: "DELETE",
+                              headers: ["Prefer": "return=minimal"])
+    }
+
     /// 친구 + 각자의 최고 Full Simulation (SQL 함수 friends_with_best)
     func friends() async throws -> [FriendRow] {
         let d = try await request("/rest/v1/rpc/friends_with_best", method: "POST", body: [:])

@@ -28,6 +28,10 @@ targets:
       - path: iOSApp
       - path: Shared
       - path: Resources/iOS
+        excludes: ["PrivacyInfo.xcprivacy"]
+      # 개인정보 사용 명세 파일 (앱 묶음 안에 리소스로 들어가야 함)
+      - path: Resources/iOS/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
@@ -74,6 +78,9 @@ targets:
       - path: WatchApp
       - path: Shared
       - path: Resources/Watch
+        excludes: ["PrivacyInfo.xcprivacy"]
+      - path: Resources/Watch/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).watchkitapp
@@ -96,6 +103,7 @@ targets:
         NSHealthShareUsageDescription: Splits8 reads Health data to measure heart rate and calories during workouts.
         NSHealthUpdateUsageDescription: Splits8 saves your workouts to the Health app.
         NSLocationWhenInUseUsageDescription: Splits8 uses your location to measure pace and distance on outdoor runs.
+        NSMotionUsageDescription: Splits8 uses wrist motion to estimate stroke and rep counts during workouts.
     entitlements:
       path: Resources/Watch/Splits8Watch.entitlements
       properties:

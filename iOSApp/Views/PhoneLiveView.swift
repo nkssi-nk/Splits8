@@ -53,6 +53,17 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored private var routePts: [RoutePt] = []
     @ObservationIgnored private var lastRouteLoc: CLLocation?
 
+    // 잘못 넘김 되돌리기 (방금 넘긴 것 한 번만) — 워치와 같음
+    private struct UndoPoint {
+        let idx: Int
+        let segStart: Date
+        let segPaused: Double
+        let segDist: Double
+        let grew: Bool
+    }
+    @ObservationIgnored private var undoPoint: UndoPoint?
+    private(set) var canUndo = false
+
     // MARK: 값
 
     var cur: Seg {
@@ -130,6 +141,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         segDists = Array(repeating: nil, count: seq.count)
         segDist = 0; lastLoc = nil
         segPaused = 0; pauseAt = nil
+        undoPoint = nil; canUndo = false
         let now = Date()
         startDate = now; segStart = now
         active = true
@@ -174,15 +186,38 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         guard active, !finished, running else { return nil }
         if isRunKind && useGPS { return nil }            // GPS 러닝은 1km마다 저절로 넘어감
         let now = Date()
+        let up = UndoPoint(idx: idx, segStart: segStart, segPaused: segPaused, segDist: segDist,
+                           grew: growsOpen && splits.count + 1 >= seq.count)
         closeSeg(now)
         if growsOpen && splits.count >= seq.count { growSeq() }
         if splits.count >= seq.count {
             return finish(complete: true)
         }
+        undoPoint = up
+        canUndo = true
         idx = splits.count
         segStart = now; segPaused = 0
         segDist = 0
         return nil
+    }
+
+    /// 잘못 넘겼을 때: 방금 넘긴 것을 한 번 되돌림 (앞 구간 시간이 끊기지 않고 이어짐)
+    func undo() {
+        guard active, !finished, canUndo, let u = undoPoint else { return }
+        guard idx == u.idx + 1, splits.count == u.idx + 1 else { undoPoint = nil; canUndo = false; return }
+        let newIdx: Int = idx
+        splits.removeLast()
+        if segDists.indices.contains(u.idx) { segDists[u.idx] = nil }
+        if u.grew, seq.count == newIdx + 1 {
+            seq.removeLast()
+            if segDists.count > seq.count { segDists.removeLast() }
+        }
+        idx = u.idx
+        segStart = u.segStart
+        segPaused = u.segPaused + segPaused
+        segDist = u.segDist + segDist
+        undoPoint = nil
+        canUndo = false
     }
 
     func togglePause() {
@@ -219,6 +254,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
 
     private func finish(complete: Bool) -> Record {
         stopGPS()
+        undoPoint = nil; canUndo = false
         finished = true
         return makeRecord(complete: complete)
     }
@@ -317,6 +353,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     private func autoSplitIfNeeded() {
         guard isRunKind, useGPS, active, !finished, running, segDist >= 1000 else { return }
         let now = Date()
+        undoPoint = nil; canUndo = false
         closeSeg(now)
         if runKm == 0 && splits.count >= seq.count { growSeq() }
         if splits.count >= seq.count {
@@ -363,6 +400,9 @@ struct PhoneLiveView: View {
     @State private var eng = PhoneRunEngine()
     @State private var askEnd = false
     @State private var flash: Double = 0
+    /// 시작 전 3 · 2 · 1 (nil = 세는 중 아님)
+    @State private var count: Int? = nil
+    @State private var countTimer: Timer? = nil
 
     private var req: PhoneRunRequest { r.phoneRun ?? PhoneRunRequest(mode: .sim) }
 
@@ -377,6 +417,7 @@ struct PhoneLiveView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
         }
+        .overlay { if let n = count { countdownView(n) } }
         .onAppear(perform: begin)
         .onDisappear(perform: leave)
         .onChange(of: eng.autoDone) { _, rec in
@@ -404,8 +445,9 @@ struct PhoneLiveView: View {
             nextRow(m)
             Spacer(minLength: 16)
             nextButton(m)
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 endPill(m)
+                undoPill(m)
                 pausePill(m)
             }
             .padding(.top, 16 * m.k)
@@ -507,9 +549,9 @@ struct PhoneLiveView: View {
     /// ■ End (빨강 글자, 빨강 22% 바탕)
     private func endPill(_ m: PhoneLiveMetrics) -> some View {
         Button { askEnd = true } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "stop.fill").font(.system(size: 15, weight: .semibold))
-                Text("End").font(F.t(17, .semibold))
+            HStack(spacing: 7) {
+                Image(systemName: "stop.fill").font(.system(size: 14, weight: .semibold))
+                Text("End").font(F.t(16, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(C.bad)
             .frame(maxWidth: .infinity).frame(height: m.pillH)
@@ -523,9 +565,9 @@ struct PhoneLiveView: View {
     /// ❚❚ Pause / ▶ Resume (회색 12%)
     private func pausePill(_ m: PhoneLiveMetrics) -> some View {
         Button { eng.togglePause() } label: {
-            HStack(spacing: 8) {
-                Image(systemName: eng.running ? "pause.fill" : "play.fill").font(.system(size: 15, weight: .semibold))
-                Text(eng.running ? "Pause" : "Resume").font(F.t(17, .semibold))
+            HStack(spacing: 7) {
+                Image(systemName: eng.running ? "pause.fill" : "play.fill").font(.system(size: 14, weight: .semibold))
+                Text(eng.running ? "Pause" : "Resume").font(F.t(16, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(eng.running ? Color.white : C.accent)
             .frame(maxWidth: .infinity).frame(height: m.pillH)
@@ -536,17 +578,100 @@ struct PhoneLiveView: View {
         .accessibilityIdentifier("phone.pause")
     }
 
+    /// ↩ Undo (회색 12%, 되돌릴 것이 없으면 흐리게): 방금 넘긴 것을 한 번 되돌림
+    private func undoPill(_ m: PhoneLiveMetrics) -> some View {
+        let on: Bool = eng.canUndo
+        return Button { undo() } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "arrow.uturn.backward").font(.system(size: 14, weight: .semibold))
+                Text("Undo").font(F.t(16, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(on ? Color.white : C.text3)
+            .frame(maxWidth: .infinity).frame(height: m.pillH)
+            .background(Color.white.opacity(on ? 0.12 : 0.05), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(Press(scale: 0.97))
+        .disabled(!on)
+        .accessibilityIdentifier("phone.undo")
+    }
+
+    // MARK: 시작 전 3 · 2 · 1
+
+    /// 화면 전체를 덮는 큰 숫자. 숫자마다 가벼운 진동, 시작 순간은 세게. 누르면 취소하고 돌아감
+    private func countdownView(_ n: Int) -> some View {
+        ZStack {
+            Color.black.opacity(0.92).ignoresSafeArea()
+            VStack(spacing: 14) {
+                Text(verbatim: "\(n)")
+                    .font(F.num(160, .bold)).foregroundStyle(C.accent)
+                    .contentTransition(.numericText(countsDown: true))
+                    .animation(.snappy(duration: 0.25), value: n)
+                    .accessibilityIdentifier("phone.count")
+                Text("Tap to cancel").font(F.t(15)).foregroundStyle(C.text2)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { cancelCount() }
+        .transition(.opacity)
+    }
+
+    private func startCount() {
+        count = 3
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        let t = Timer(timeInterval: 1, repeats: true) { _ in
+            DispatchQueue.main.async { countTick() }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        countTimer = t
+    }
+
+    private func countTick() {
+        guard let c = count else { return }
+        if c > 1 {
+            count = c - 1
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        } else {
+            stopCountTimer()
+            withAnimation(.easeOut(duration: 0.15)) { count = nil }
+            if !eng.active { eng.start(req) }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            flashNow()
+        }
+    }
+
+    private func stopCountTimer() {
+        countTimer?.invalidate()
+        countTimer = nil
+    }
+
+    private func cancelCount() {
+        stopCountTimer()
+        count = nil
+        UIApplication.shared.isIdleTimerDisabled = false
+        r.go(req.from)
+    }
+
     // MARK: 동작
 
     private func begin() {
         UIApplication.shared.isIdleTimerDisabled = true
-        if !eng.active { eng.start(req) }
-        // 왼쪽 끝에서 밀기 = End 확인 (실수로 나가지 않게)
-        r.backAction = { askEnd = true }
+        // 3 · 2 · 1 을 센 뒤 시작 (화면 확인용 --nocount 는 바로 시작)
+        if !eng.active && count == nil {
+            if CommandLine.arguments.contains("--nocount") { eng.start(req) } else { startCount() }
+        }
+        // 왼쪽 끝에서 밀기 = End 확인 (실수로 나가지 않게). 세는 중이면 취소
+        r.backAction = { if count != nil { cancelCount() } else { askEnd = true } }
     }
 
     private func leave() {
+        stopCountTimer()
         UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    private func undo() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        eng.undo()
     }
 
     private func next() {

@@ -629,13 +629,17 @@ struct DetailView: View {
         let d = s.time - s.target
         let first: String = s.kind == .run ? "\(Fm.t(rec.pace(s))) /KM" : s.detail
         let bpm: String = s.hr.map { String($0) } ?? "--"
-        let sub = "\(first) · \(bpm) BPM"
+        // 스키 · 로잉 · 월볼: 워치가 팔 움직임으로 센 횟수를 참고용으로 덧붙임 ("≈" = 짐작값)
+        let reps: String = s.reps.map { n in
+            " · " + (s.icon == "wallBalls" ? String(localized: "≈ \(n) reps") : String(localized: "≈ \(n) strokes"))
+        } ?? ""
+        let sub = "\(first) · \(bpm) BPM" + reps
         return HStack(spacing: 12) {
             Icon8(s.icon, 24, tint: s.kind == .run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 1) {
                 Text(s.name).font(F.t(15, .medium)).lineLimit(1)
                 Text(sub).font(F.num(11, .medium)).tracking(0.02 * 11)
-                    .foregroundStyle(C.text2).lineLimit(1)
+                    .foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {

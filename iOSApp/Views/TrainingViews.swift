@@ -6,27 +6,44 @@ import UniformTypeIdentifiers
 struct TrainingView: View {
     let store = Store.shared
     let r = Router.shared
+    /// 아이콘을 펼친 카드 (프로그램 id)
+    @State private var expanded: Set<String> = []
+    /// 5개가 꽉 찼을 때 안내
+    @State private var limitAlert = false
+
     var body: some View {
         VStack(spacing: 10) {
             newButton
             if let f = store.friend { friendCard(f) }
+            if !store.programs.isEmpty { listHeader }
             ForEach(store.programs) { p in
                 SwipeDelete(corner: 20, press: true, menu: false, alertTitle: "Delete this training?",
                             alertMessage: "Records you've done with it stay in History.",
                             onTap: { if p.isOpen { r.bonus = BonusRequest(kind: p.kind ?? "run", existing: p) } else { r.edit(p) } },
                             onDelete: { store.deleteProgram(p.id) }) {
-                    ProgramCard(p: p)
+                    ProgramCard(p: p, expanded: expanded.contains(p.id)) {
+                        withAnimation(.snappy(duration: 0.25)) {
+                            if expanded.contains(p.id) { expanded.remove(p.id) } else { expanded.insert(p.id) }
+                        }
+                    }
                 }
                 .accessibilityIdentifier("training.card")
             }
             history
         }
         .padding(.horizontal, 16)
+        .alert("You can save up to \(Program.freeLimit) trainings", isPresented: $limitAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Delete one to make a new training.")
+        }
     }
 
-    /// 노란 "New training" 카드 (radius 20, 16×18, 17/600, + 22)
+    /// 노란 "New training" 카드 (radius 20, 16×18, 17/600, + 22). 5개가 꽉 차면 안내만 띄움
     private var newButton: some View {
-        Button { r.newTraining() } label: {
+        Button {
+            if store.programs.count >= Program.freeLimit { limitAlert = true } else { r.newTraining() }
+        } label: {
             HStack(spacing: 0) {
                 Text("New training").font(F.t(17, .semibold)).tracking(-0.17)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -38,6 +55,18 @@ struct TrainingView: View {
         }
         .buttonStyle(Press())
         .accessibilityIdentifier("training.new")
+    }
+
+    /// 소제목 "My Trainings" + 오른쪽에 개수 "3 / 5"
+    private var listHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            SectionText("MY TRAININGS")
+            Spacer(minLength: 0)
+            Text(verbatim: "\(store.programs.count) / \(Program.freeLimit)")
+                .font(F.num(13)).foregroundStyle(store.programs.count >= Program.freeLimit ? C.accent : C.text2)
+                .accessibilityIdentifier("training.count")
+        }
+        .padding(.top, 14).padding(.horizontal, 4)
     }
 
     private func friendCard(_ f: Friend) -> some View {
@@ -61,29 +90,32 @@ struct TrainingView: View {
         let recs: [Record] = store.records(.training)
         HistoryHeader()
         if !recs.isEmpty {
-            VStack(spacing: 0) {
-                ForEach(Array(recs.enumerated()), id: \.element.id) { i, rec in
-                    HistoryRow(title: rec.kind != nil ? rec.title.l10n : "\(rec.title.l10n) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
-                               time: Fm.t(rec.total), last: i == recs.count - 1, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
-                               onDelete: { store.delete(rec) }) { r.open(rec, from: .training) }
-                }
+            PagedCard(ids: recs.map(\.id)) { i, last in
+                let rec: Record = recs[i]
+                HistoryRow(title: rec.kind != nil ? rec.title.l10n : "\(rec.title.l10n) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
+                           time: Fm.t(rec.total), last: last, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
+                           onDelete: { store.delete(rec) }) { r.open(rec, from: .training) }
             }
-            .card8()
         } else {
             EmptyHistory()
         }
     }
 }
 
-/// 저장된 트레이닝 카드 (padding 18, gap 16)
+/// 저장된 트레이닝 카드 — 아래 기록 목록과 구분되게 옅은 노란 기운 + 노란 테두리 + 오른쪽 노란 › 버튼.
+/// 아이콘 칩은 한 줄만 보이고 나머지는 "+13" (누르면 그 카드만 펼쳐지고, "Less" 를 누르면 접힘)
 struct ProgramCard: View {
     let store = Store.shared
     let p: Program
-    private let cols: [GridItem] = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4)
+    var expanded: Bool = false
+    var onMore: () -> Void = {}
+    private static let perRow: Int = 4
+    private let cols: [GridItem] = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: ProgramCard.perRow)
 
     /// 누르기·밀어서 삭제는 바깥 SwipeDelete 가 맡음
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        return VStack(alignment: .leading, spacing: 12) {
             header
             if p.isOpen {
                 // HIIT · 러닝: 칩 대신 아이콘 하나
@@ -94,17 +126,38 @@ struct ProgramCard: View {
                 .padding(.horizontal, 10).frame(height: 34)
                 .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             } else {
-                LazyVGrid(columns: cols, spacing: 6) {
-                    ForEach(Array(p.seq.enumerated()), id: \.offset) { _, it in
-                        chip(it)
-                    }
-                }
+                chips
             }
         }
-        .padding(18)
+        .padding(.vertical, 16).padding(.horizontal, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card8()
+        .background {
+            shape.fill(LinearGradient(stops: [.init(color: C.accent.opacity(0.15), location: 0),
+                                              .init(color: Color.white.opacity(0.07), location: 0.55),
+                                              .init(color: Color.white.opacity(0.05), location: 1)],
+                                      startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
+        .overlay(shape.strokeBorder(C.accent.opacity(0.28), lineWidth: 1))
+        .clipShape(shape)
         .contentShape(Rectangle())
+    }
+
+    /// 접힌 상태: 3개 + "+N" / 펼친 상태: 전부 + "Less" / 4개 이하면 그대로
+    private var chips: some View {
+        let n: Int = p.seq.count
+        let long: Bool = n > Self.perRow
+        let collapsed: Bool = long && !expanded
+        let shown: [ProgItem] = collapsed ? Array(p.seq.prefix(Self.perRow - 1)) : p.seq
+        return LazyVGrid(columns: cols, spacing: 6) {
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, it in
+                chip(it)
+            }
+            if collapsed {
+                moreChip("+\(n - (Self.perRow - 1))")
+            } else if long {
+                moreChip("Less".l10n)
+            }
+        }
     }
 
     /// HIIT: "Intervals" / 러닝: "5 KM · Outdoor"
@@ -122,8 +175,10 @@ struct ProgramCard: View {
                 Text(p.name.l10n).font(F.t(20, .semibold)).tracking(-0.4).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            // 폰에서는 카드를 누르면 편집 → 시작 버튼처럼 보이지 않게 작은 회색 ›
-            Chevron8()
+            // "고르는 카드" 느낌: 노란 동그라미 안 ›
+            Glyph("i_chevR", 13, .black)
+                .frame(width: 30, height: 30)
+                .background(C.accent, in: Circle())
         }
     }
 
@@ -142,6 +197,18 @@ struct ProgramCard: View {
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity).frame(height: 34)
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    /// 점선 칩 ("+13" / "Less"). 카드 전체 누름(편집)보다 먼저 받음
+    private func moreChip(_ text: String) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        return Text(verbatim: text).font(F.t(12, .semibold)).foregroundStyle(C.aeb).lineLimit(1).minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity).frame(height: 34)
+            .overlay(shape.strokeBorder(Color.white.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+            .contentShape(Rectangle())
+            .highPriorityGesture(TapGesture().onEnded { onMore() })
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("training.more")
     }
 }
 
@@ -302,7 +369,7 @@ struct BuilderView: View {
 
     private var runSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label8("RUN").padding(.horizontal, 4)
+            SectionText("RUN").padding(.horizontal, 4)
             LazyVGrid(columns: cols, spacing: 8) {
                 ForEach(Defaults.runs, id: \.self) { d in
                     Button { add(ProgItem(icon: "run", run: d), key: "run|" + d) } label: {
@@ -322,7 +389,7 @@ struct BuilderView: View {
 
     private var stationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label8("STATIONS").padding(.horizontal, 4)
+            SectionText("STATIONS").padding(.horizontal, 4)
             LazyVGrid(columns: cols, spacing: 8) {
                 ForEach(Station.all, id: \.key) { s in
                     Button { add(ProgItem(icon: s.key), key: s.key) } label: {
@@ -359,7 +426,7 @@ struct BuilderView: View {
     private var sequenceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Label8(String(localized: "SEQUENCE · \(r.draftSeq.count)/\(Self.maxSeq)")).lineLimit(1)
+                SectionText(String(localized: "SEQUENCE · \(r.draftSeq.count)/\(Self.maxSeq)"))
                 Spacer()
                 Button("Clear all") { withAnimation { r.draftSeq = [] } }
                     .font(F.t(13, .semibold)).foregroundStyle(C.bad).buttonStyle(.plain)

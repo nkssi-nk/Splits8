@@ -44,6 +44,8 @@ struct SettingsView: View {
                 VStack(spacing: 0) {
                     SettingRow(title: "Website", value: "") { openWeb(Config.homeURL) }
                         .accessibilityIdentifier("settings.website")
+                    SettingRow(title: "Terms of Use", value: "") { openWeb(Config.termsURL) }
+                        .accessibilityIdentifier("settings.terms")
                     SettingRow(title: "Privacy Policy", value: "", last: true) { openWeb(Config.privacyURL) }
                         .accessibilityIdentifier("settings.privacy")
                 }
@@ -198,7 +200,7 @@ struct SetRunView: View {
                 }
             }
             .card8()
-            Note8(text: "Applies to Training and Full Simulation. Race runs are on site, so GPS or motion is chosen automatically. Treadmill distance can be calibrated with the machine reading.")
+            Note8(text: "Applies to Training and Full Simulation. Race runs are on site, so GPS or motion is chosen automatically. Indoors, distance and pace are estimated from arm motion and may differ from the machine.")
                 .padding(.top, 4)
         }
         .padding(.horizontal, 16)
@@ -299,10 +301,18 @@ struct SetHrView: View {
 
 struct SetGoalsView: View {
     let store = Store.shared
+    @State private var goalSheet = false
 
     var body: some View {
         let g = store.settings.goals
         VStack(spacing: 10) {
+            // 총 목표 시간을 넣고 유형을 고르면 아래 16칸이 한 번에 채워짐 (그 뒤 하나씩 고칠 수 있음)
+            VStack(spacing: 0) {
+                SettingRow(title: "Set from goal time", value: Fm.t(store.settings.goalTime), numeric: true, last: true) { goalSheet = true }
+                    .accessibilityIdentifier("goals.auto")
+            }
+            .card8()
+            .padding(.bottom, 4)
             HStack(spacing: 0) {
                 Spacer()
                 Text("TOTAL ").font(F.t(F.foot, .semibold)).foregroundStyle(C.text2)
@@ -322,6 +332,7 @@ struct SetGoalsView: View {
             .card8()
         }
         .padding(.horizontal, 16)
+        .sheet(isPresented: $goalSheet) { GoalTimeSheet().presentationDetents([.height(GoalTimeSheet.height)]) }
     }
 
     /// padding 9 12 9 18, gap 12: 아이콘 20 · 이름 15/500 + 설명 11 · − (30, radius 9) 시간 46폭 17/600 +

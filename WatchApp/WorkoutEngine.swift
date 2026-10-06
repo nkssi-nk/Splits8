@@ -61,6 +61,28 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var pauseAt: Date?
     @ObservationIgnored private var segPaused: Double = 0
 
+    // 시작 전 3 · 2 · 1 (nil = 세는 중 아님)
+    private(set) var countdown: Int? = nil
+    @ObservationIgnored private var countTimer: Timer?
+    @ObservationIgnored private var pendingStart: (() -> Void)?
+
+    // 잘못 넘김 되돌리기 (방금 넘긴 것 한 번만)
+    private struct UndoPoint {
+        let idx: Int
+        let segStart: Date
+        let segPaused: Double
+        let segDistStart: Double
+        let grew: Bool
+        let reps: Int?
+    }
+    @ObservationIgnored private var undoPoint: UndoPoint?
+    /// 조작 화면의 Undo 를 누를 수 있는지
+    private(set) var canUndo = false
+
+    // 횟수 세기 (스키 · 로잉 · 월볼 — 참고용)
+    @ObservationIgnored private let repCounter = RepCounter()
+    @ObservationIgnored private var segReps: [Int?] = []
+
     // 진동 알림 (설정: hapticZone / hapticPace)
     @ObservationIgnored private var lastZone = 0                 // 0 = 아직 심박 없음
     @ObservationIgnored private var lastZoneBuzz: Date = .distantPast
@@ -101,9 +123,55 @@ final class WorkoutEngine: NSObject {
     /// 현재 러닝 구간 거리(m)
     var segDist: Double { max(0, distance - segDistStart) }
 
+    // MARK: 시작 전 3 · 2 · 1
+
+    /// 3 · 2 · 1 을 센 뒤 시작. 숫자마다 짧은 진동, 시작 순간은 길게(약 1초)
+    func startAfterCountdown(mode: Mode, title: String, sets: Int = 1, seq: [Seg], program: Program? = nil) {
+        guard !active, countdown == nil else { return }
+        pendingStart = { [weak self] in
+            self?.start(mode: mode, title: title, sets: sets, seq: seq, program: program, buzz: false)
+        }
+        countdown = WBuzz.countFrom
+        WKInterfaceDevice.current().play(WBuzz.tick)
+        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.countTick() }
+        RunLoop.main.add(t, forMode: .common)
+        countTimer = t
+    }
+
+    private func countTick() {
+        guard let c = countdown else { stopCount(); return }
+        if c > 1 {
+            countdown = c - 1
+            WKInterfaceDevice.current().play(WBuzz.tick)
+        } else {
+            stopCount()
+            countdown = nil
+            let go: (() -> Void)? = pendingStart
+            pendingStart = nil
+            go?()
+            // 시작: 길고 센 진동을 이어서 두 번 (약 1초)
+            WKInterfaceDevice.current().play(WBuzz.go1)
+            DispatchQueue.main.asyncAfter(deadline: .now() + WBuzz.goGap) {
+                WKInterfaceDevice.current().play(WBuzz.go2)
+            }
+        }
+    }
+
+    private func stopCount() {
+        countTimer?.invalidate()
+        countTimer = nil
+    }
+
+    /// 세는 중에 취소 (화면을 누르면)
+    func cancelCountdown() {
+        stopCount()
+        countdown = nil
+        pendingStart = nil
+    }
+
     // MARK: 시작
 
-    func start(mode: Mode, title: String, sets: Int = 1, seq: [Seg], program: Program? = nil) {
+    func start(mode: Mode, title: String, sets: Int = 1, seq: [Seg], program: Program? = nil, buzz: Bool = true) {
         guard !active else { return }
         kind = mode == .training ? program?.kind : nil
         runKm = program?.runKm ?? 0
@@ -118,12 +186,15 @@ final class WorkoutEngine: NSObject {
         hr = 0; kcal = 0; distance = 0; hrSamples = []
         segHR = Array(repeating: [], count: seq.count)
         segDists = Array(repeating: nil, count: seq.count)
+        segReps = Array(repeating: nil, count: seq.count)
         segDistStart = 0; segPaused = 0; pauseAt = nil
+        undoPoint = nil; canUndo = false
         let now = Date()
         startDate = now; segStart = now
         lastZone = 0; lastZoneBuzz = .distantPast; paceBuzzed = []
         active = true
         startTick()
+        repCounter.start(icon: cur.icon)
 
         let cfg = HKWorkoutConfiguration()
         if isHIIT {
@@ -146,7 +217,7 @@ final class WorkoutEngine: NSObject {
             s.startActivity(with: now)
             b.beginCollection(withStart: now) { _, _ in }
         }
-        WKInterfaceDevice.current().play(.start)
+        if buzz { WKInterfaceDevice.current().play(.start) }
         startPlaceAndRoute()
     }
 
@@ -208,20 +279,62 @@ final class WorkoutEngine: NSObject {
             return                                    // 러닝은 1km마다 자동으로 넘어감
         }
         let now = Date()
+        let prevIdx: Int = idx
+        let prevStart: Date = segStart
+        let prevPaused: Double = segPaused
+        let prevDistStart: Double = segDistStart
         closeSeg(now)
+        var grew = false
         if splits.count >= seq.count && (isHIIT || (isRunKind && runKm == 0)) {
             growSeq()
+            grew = true
         }
         if splits.count >= seq.count {
             finish(now, complete: true)
         } else {
+            // 되돌리기용으로 방금 구간의 상태를 기억 (한 번만 되돌릴 수 있음)
+            undoPoint = UndoPoint(idx: prevIdx, segStart: prevStart, segPaused: prevPaused, segDistStart: prevDistStart,
+                                  grew: grew, reps: segReps.indices.contains(prevIdx) ? segReps[prevIdx] : nil)
+            canUndo = !isRunKind
             idx = splits.count
             segStart = now; segPaused = 0
             segDistStart = distance
             advanceCount += 1
+            repCounter.start(icon: cur.icon)
             // 다음 구간 알림: .click 은 너무 약해서 운동 중에는 느껴지지 않음
             WKInterfaceDevice.current().play(.notification)
         }
+    }
+
+    /// 잘못 넘겼을 때: 방금 넘긴 것을 한 번 되돌림.
+    /// 앞 구간으로 돌아가고 그 구간 시간이 끊기지 않고 이어짐 (넘긴 뒤 흐른 시간은 앞 구간에 합쳐짐)
+    func undo() {
+        guard active, !finished, canUndo, let u = undoPoint else { return }
+        guard idx == u.idx + 1, splits.count == u.idx + 1 else { undoPoint = nil; canUndo = false; return }
+        let newIdx: Int = idx
+        splits.removeLast()
+        if segHR.indices.contains(newIdx), segHR.indices.contains(u.idx) {
+            segHR[u.idx].append(contentsOf: segHR[newIdx])
+            segHR[newIdx] = []
+        }
+        if segDists.indices.contains(u.idx) { segDists[u.idx] = nil }
+        if segReps.indices.contains(u.idx) { segReps[u.idx] = nil }
+        if u.grew, seq.count == newIdx + 1 {          // HIIT·자유 러닝에서 붙였던 다음 라운드를 뗌
+            seq.removeLast()
+            if segHR.count > seq.count { segHR.removeLast() }
+            if segDists.count > seq.count { segDists.removeLast() }
+            if segReps.count > seq.count { segReps.removeLast() }
+        }
+        idx = u.idx
+        segStart = u.segStart
+        segPaused = u.segPaused + segPaused       // 넘긴 뒤에 일시정지한 시간도 빼 줌
+        segDistStart = u.segDistStart
+        paceBuzzed.remove(newIdx)
+        undoPoint = nil
+        canUndo = false
+        repCounter.start(icon: cur.icon, base: u.reps ?? 0)
+        if !running { repCounter.setPaused(true) }
+        WKInterfaceDevice.current().play(.directionDown)
     }
 
     /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
@@ -230,12 +343,14 @@ final class WorkoutEngine: NSObject {
         seq.append(isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n))
         segHR.append([])
         segDists.append(nil)
+        segReps.append(nil)
     }
 
     /// 러닝: 1km 넘으면 자동으로 다음 km (총거리 다 뛰면 끝)
     private func autoSplitIfNeeded() {
         guard isRunKind, active, !finished, running, segDist >= 1000 else { return }
         let now = Date()
+        undoPoint = nil; canUndo = false
         closeSeg(now)
         if runKm == 0 && splits.count >= seq.count { growSeq() }
         if splits.count >= seq.count {
@@ -254,10 +369,12 @@ final class WorkoutEngine: NSObject {
         if running {
             pauseAt = Date(); running = false
             session?.pause()
+            repCounter.setPaused(true)
         } else {
             if let p = pauseAt { segPaused += Date().timeIntervalSince(p) }
             pauseAt = nil; running = true
             session?.resume()
+            repCounter.setPaused(false)
         }
     }
 
@@ -274,6 +391,8 @@ final class WorkoutEngine: NSObject {
 
     func reset() {
         stopTick()
+        repCounter.stop()
+        undoPoint = nil; canUndo = false
         active = false; finished = false; lastRecord = nil
     }
 
@@ -319,6 +438,8 @@ final class WorkoutEngine: NSObject {
         let t = segEl(now)
         splits.append(t)
         if cur.kind == .run, segDists.indices.contains(idx) { segDists[idx] = segDist }
+        let reps: Int? = repCounter.stop()
+        if segReps.indices.contains(idx) { segReps[idx] = reps }
     }
 
     private func makeRecord(complete: Bool) -> Record {
@@ -329,7 +450,8 @@ final class WorkoutEngine: NSObject {
             let h = segHR.indices.contains(i) ? segHR[i] : []
             results.append(SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
                                      hr: h.isEmpty ? nil : Int((h.reduce(0, +) / Double(h.count)).rounded()),
-                                     dist: segDists.indices.contains(i) ? segDists[i] : nil))
+                                     dist: segDists.indices.contains(i) ? segDists[i] : nil,
+                                     reps: segReps.indices.contains(i) ? segReps[i] : nil))
         }
         let total = splits.reduce(0, +)
         let tg = seq.prefix(splits.count).map(\.target).reduce(0, +)
@@ -347,6 +469,8 @@ final class WorkoutEngine: NSObject {
 
     private func finish(_ now: Date, complete: Bool) {
         stopTick()
+        repCounter.stop()
+        undoPoint = nil; canUndo = false
         let r = makeRecord(complete: complete)
         lastRecord = r
         finished = true
@@ -371,7 +495,9 @@ final class WorkoutEngine: NSObject {
         self.hr = hr; kcal = 214; distance = 380
         segHR = Array(repeating: [], count: seq.count)
         segDists = Array(repeating: nil, count: seq.count)
+        segReps = Array(repeating: nil, count: seq.count)
         segDistStart = 0; segPaused = 0; pauseAt = nil
+        undoPoint = nil; canUndo = !done && idx > 0      // 화면 캡처에서 Undo 가 켜진 모습
         let now = Date()
         if done {
             var sp: [Int] = []
@@ -473,4 +599,17 @@ extension WorkoutEngine: HKLiveWorkoutBuilderDelegate {
             }
         }
     }
+}
+
+/// 워치 진동 종류를 한곳에 (실제 워치로 느껴 본 뒤 여기만 바꾸면 됨).
+/// 워치는 진동 길이를 마음대로 정할 수 없고 정해진 종류 중에서 골라야 함
+enum WBuzz {
+    /// 3 · 2 · 1
+    static let countFrom: Int = 3
+    /// 숫자마다: 짧게 한 번
+    static let tick: WKHapticType = .start
+    /// 시작 순간: 긴 진동 두 가지를 goGap 초 간격으로 이어 울림 (합쳐서 약 1초)
+    static let go1: WKHapticType = .notification
+    static let go2: WKHapticType = .success
+    static let goGap: Double = 0.5
 }

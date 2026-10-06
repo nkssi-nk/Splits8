@@ -323,12 +323,13 @@ struct WControls: View {
             AmbientLayer(a: Ambient(hex: 0xFFFFFF, alpha: 0.07, rx: 0.8, ry: 0.5, cx: 0.5, cy: 0.5))
             VStack(spacing: 0) {
                 header(now: now)
-                VStack(spacing: 6) {
+                VStack(spacing: 5) {
                     endPill
                     pausePill
+                    undoPill
                     nextPill
                 }
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 .frame(maxHeight: .infinity)
                 Text("‹ Swipe left to go back")
                     .font(F.t(13)).foregroundStyle(C.text3)
@@ -371,9 +372,23 @@ struct WControls: View {
             .accessibilityIdentifier("w.controlsNext")
     }
 
+    /// 잘못 넘겼을 때 방금 넘긴 것을 한 번 되돌림. 되돌릴 것이 없으면 흐리게
+    private var undoPill: some View {
+        let on: Bool = engine.canUndo
+        return pill("Undo", glyph: "", symbol: "arrow.uturn.backward", fg: on ? .white : C.text3,
+                    bg: Color.white.opacity(on ? 0.12 : 0.05),
+                    dot: Color.white.opacity(on ? 0.20 : 0.07), glyphColor: on ? .white : C.text3,
+                    action: {
+                        withAnimation(WLive.slideCurve) { engine.undo() }
+                        onBack()
+                    })
+            .disabled(!on)
+            .accessibilityIdentifier("w.undo")
+    }
+
     /// 가로로 긴 알약: 왼쪽 동그라미 안에 아이콘(세 버튼이 같은 자리), 글자는 버튼 가운데에서 살짝 오른쪽.
     /// 세 개가 같은 높이로 공간을 채움
-    private func pill(_ label: String, glyph: String, fg: Color, bg: Color, dot: Color, glyphColor: Color,
+    private func pill(_ label: String, glyph: String, symbol: String? = nil, fg: Color, bg: Color, dot: Color, glyphColor: Color,
                       action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label.l10n).font(F.t(16, .semibold)).foregroundStyle(fg).lineLimit(1).minimumScaleFactor(0.8)
@@ -384,8 +399,16 @@ struct WControls: View {
                     Circle().fill(dot)
                         .overlay {
                             GeometryReader { g in
-                                Icon8(glyph, g.size.height * 0.56, glyphColor)
-                                    .frame(width: g.size.width, height: g.size.height)
+                                Group {
+                                    if let symbol {
+                                        Image(systemName: symbol)
+                                            .font(.system(size: g.size.height * 0.46, weight: .bold))
+                                            .foregroundStyle(glyphColor)
+                                    } else {
+                                        Icon8(glyph, g.size.height * 0.56, glyphColor)
+                                    }
+                                }
+                                .frame(width: g.size.width, height: g.size.height)
                             }
                         }
                         .padding(4)

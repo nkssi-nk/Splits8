@@ -482,5 +482,5 @@
 "Off" = "끔";
 "Light" = "옅게";
 "Heavy" = "짙게";
-"Drag the time, splits or logo to move them" = "시간 · 구간 표 · 로고를 끌어서 옮길 수 있어요";
+"Press and hold the time, splits or logo to move it" = "시간 · 구간 표 · 로고를 꾹 눌러서 옮길 수 있어요";
 "Reset" = "처음대로";

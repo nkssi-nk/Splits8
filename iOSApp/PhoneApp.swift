@@ -454,7 +454,9 @@ private struct ScrollTrack: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
             content.onScrollGeometryChange(for: CGFloat.self) { g in
-                g.contentOffset.y + g.contentInsets.top
+                // 맨 아래에서 튕겨 돌아오는 움직임은 "위로 올림"으로 치지 않도록 끝 위치에서 자름
+                let end: CGFloat = max(0, g.contentSize.height + g.contentInsets.top + g.contentInsets.bottom - g.containerSize.height)
+                return min(g.contentOffset.y + g.contentInsets.top, end)
             } action: { _, y in
                 TabBarScroll.shared.update(y)
             }

@@ -363,6 +363,7 @@ struct ShareCard: View {
         return content()
             .shadow(color: smokeOn ? (textBlack ? Color.white : Color.black).opacity(0.5) : Color.clear, radius: 3, y: 1)
             .anchorPreference(key: PosterBlockAnchors.self, value: .bounds) { [key: $0] }
+            .scaleEffect(lifted ? 1.03 : 1)
             .offset(lifted ? dragOffset : .zero)
             .opacity(lifted ? 0.85 : 1)
             .zIndex(lifted ? 1 : 0)
@@ -966,7 +967,7 @@ struct ShareView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color(hex: 0x262626)).padding(-1))
                 .contentShape(Rectangle())
-                // Poster: 글자 덩어리를 끌어서 옮김 (그냥 누르면 사진 고르기)
+                // Poster: 글자 덩어리를 꾹 눌러 끌어서 옮김 (그냥 누르면 사진 고르기 · 쓸면 화면 넘기기)
                 .highPriorityGesture(blockDrag(scale: scale), including: variant == "poster" ? .all : .subviews)
         }
         .buttonStyle(.plain)
@@ -996,24 +997,31 @@ struct ShareView: View {
 
     // MARK: 글자 덩어리 끌기 (Poster)
 
-    /// 미리보기 위에서 끌기: 손가락 아래의 덩어리(시간 · 표 · 로고)를 잡아 옮기고, 놓으면 가장 가까운 자리에 붙음
+    /// 미리보기 위에서 꾹 누른 뒤 끌기: 손가락 아래의 덩어리(시간 · 표 · 로고)를 잡아 옮기고, 놓으면 가장 가까운 자리에 붙음.
+    /// 그냥 쓸어 넘기면 화면이 내려가야 하므로 (미리보기가 화면의 대부분을 차지함) 꾹 눌러야만 잡힘
     private func blockDrag(scale: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 8)
-            .onChanged { v in
+        LongPressGesture(minimumDuration: 0.25, maximumDistance: 12)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard case .second(true, let drag?) = value else { return }
                 if dragKey == nil {
-                    let p = CGPoint(x: v.startLocation.x / scale, y: v.startLocation.y / scale)
+                    let p = CGPoint(x: drag.startLocation.x / scale, y: drag.startLocation.y / scale)
                     // 겹치면 작은 덩어리부터 (표 위에 걸친 시간 덩어리를 잡기 쉽게)
                     let hits = blockRects.filter { $0.value.insetBy(dx: -6, dy: -8).contains(p) }
                     guard let k = hits.min(by: { $0.value.height < $1.value.height })?.key else { return }
                     dragKey = k
                     dragStart = blockRects[k] ?? .zero
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
-                dragOffset = CGSize(width: v.translation.width / scale, height: v.translation.height / scale)
+                dragOffset = CGSize(width: drag.translation.width / scale, height: drag.translation.height / scale)
             }
-            .onEnded { v in
+            .onEnded { value in
                 guard let k = dragKey else { return }
-                let off = CGSize(width: v.translation.width / scale, height: v.translation.height / scale)
+                guard case .second(true, let drag?) = value else {
+                    withAnimation(.snappy(duration: 0.28)) { dragOffset = .zero; dragKey = nil }
+                    return
+                }
+                let off = CGSize(width: drag.translation.width / scale, height: drag.translation.height / scale)
                 let cardH: CGFloat = post ? 450 : 640
                 let fy: CGFloat = (dragStart.midY + off.height) / cardH
                 var l = layout
@@ -1039,7 +1047,7 @@ struct ShareView: View {
     /// 미리보기 아래 한 줄: 끌어서 옮길 수 있다는 안내 + (옮겼으면) 되돌리기
     private var moveHint: some View {
         HStack(spacing: 10) {
-            Text("Drag the time, splits or logo to move them").font(F.t(12)).foregroundStyle(C.text3)
+            Text("Press and hold the time, splits or logo to move it").font(F.t(12)).foregroundStyle(C.text3)
                 .lineLimit(1).minimumScaleFactor(0.8)
             if layout != PosterLayout.standard {
                 Button { withAnimation(.snappy(duration: 0.28)) { layout = PosterLayout.standard } } label: {

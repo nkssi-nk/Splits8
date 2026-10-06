@@ -253,9 +253,9 @@ final class ScreenshotTests: XCTestCase {
         shot("I7_share_smoke_heavy")
         let pic = element("share.photo")
         if pic.waitForExistence(timeout: 3) {
-            let from = pic.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.62))
+            let from = pic.coordinate(withNormalizedOffset: CGVector(dx: 0.40, dy: 0.52))
             let to = pic.coordinate(withNormalizedOffset: CGVector(dx: 0.80, dy: 0.22))
-            from.press(forDuration: 0.15, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
+            from.press(forDuration: 0.7, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
             sleep(1)
             shot("I7_share_smoke_time_moved")
         }

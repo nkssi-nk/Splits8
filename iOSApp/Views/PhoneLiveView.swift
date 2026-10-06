@@ -601,7 +601,7 @@ struct PhoneLiveView: View {
     /// 화면 전체를 덮는 큰 숫자. 숫자마다 가벼운 진동, 시작 순간은 세게. 누르면 취소하고 돌아감
     private func countdownView(_ n: Int) -> some View {
         ZStack {
-            Color.black.opacity(0.92).ignoresSafeArea()
+            Color.black.ignoresSafeArea()      // 뒤의 준비 화면이 비치지 않게 완전히 가림
             VStack(spacing: 14) {
                 Text(verbatim: "\(n)")
                     .font(F.num(160, .bold)).foregroundStyle(C.accent)

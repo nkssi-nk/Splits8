@@ -95,7 +95,7 @@ struct HistoryCalendar: View {
             weekdayRow.padding(.bottom, 6)
             grid
                 .offset(x: dragX * 0.35)
-                .opacity(1 - min(0.5, abs(dragX) / 300))
+                .opacity(1 - min(0.5, Double(abs(dragX)) / 300))
             legend.padding(.top, 10)
         }
         .padding(.top, 14).padding(.horizontal, 14).padding(.bottom, 10)

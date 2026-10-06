@@ -92,13 +92,14 @@ extension WBackHeader where Trailing == EmptyView {
     }
 }
 
-/// 모드 아이콘: Training = modeTraining PNG 22, Full Sim = i_sim 20, Race = i_race 20 (노랑)
+/// 모드 아이콘: Training = modeTraining PNG 22, PFT = modePFT 22, Full Sim = i_sim 20, Race = i_race 20 (노랑)
 struct WModeIcon: View {
     let mode: Mode
     var color: Color = C.accent
     var body: some View {
         switch mode {
         case .training: Icon8("modeTraining", 22, color)
+        case .pft: Icon8("modePFT", 22, color)
         case .sim: Icon8("i_sim", 20, color)
         case .race: Icon8("i_race", 20, color)
         }
@@ -171,14 +172,6 @@ struct WHome: View {
         }
     }
 
-    private func desc(_ m: Mode) -> String {
-        switch m {
-        case .training: return "Custom blocks".l10n
-        case .sim: return "8 runs · 8 stations".l10n
-        case .race: return "Goal".l10n + " " + Fm.t(store.settings.goalTime)
-        }
-    }
-
     @ViewBuilder
     private func action(_ m: Mode) -> some View {
         if m == .training {
@@ -187,31 +180,29 @@ struct WHome: View {
                 Icon8("i_chevRw", 10, C.accent)
             }
             .frame(width: 22, height: 22)
+            .fixedSize()
         } else {
             ZStack {
                 Circle().fill(C.accent)
                 Icon8("i_play", 9, .black)
             }
             .frame(width: 22, height: 22)
+            .fixedSize()
         }
     }
 
     private func card(_ m: Mode) -> some View {
+        // 설명 줄 없음: 아이콘 · 이름 · 버튼만 (카드 4개가 한 화면에 들어오게)
+        // 버튼(22)은 크기 고정 — 이름이 길면 글자만 조금 줄어듦
         HStack(spacing: 10) {
             WModeIcon(mode: m)
-            VStack(alignment: .leading, spacing: 2) {
-                // v4: 12pt 한 줄, 말줄임 없음 (좁은 41mm/40mm 에서는 글자를 살짝 줄여서 다 보이게)
-                Text(m.name.l10n).font(F.t(14, .semibold)).tracking(-0.24)
-                    .lineLimit(1).minimumScaleFactor(0.85).allowsTightening(true).minimumScaleFactor(0.6)
-                // 길면 두 줄 ("8 runs · 8 stations" 가 잘리지 않게)
-                Text(desc(m)).font(F.t(13, .medium)).foregroundStyle(C.text2).lineLimit(2).minimumScaleFactor(0.85)
-                    .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
-            }
-            .layoutPriority(1)
-            Spacer(minLength: 0)
+                .frame(width: 22, height: 22)
+            Text(m.name.l10n).font(F.t(15, .semibold)).tracking(-0.24)
+                .lineLimit(1).allowsTightening(true).minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
             action(m)
         }
-        .padding(.vertical, 11).padding(.horizontal, 12)
+        .padding(.vertical, 9).padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .wCard(18)
     }
@@ -436,6 +427,8 @@ struct WConfirm: View {
 
                 if mode == .training && program.isOpen {
                     openInfo
+                } else if mode == .pft {
+                    pftList
                 } else if mode == .training {
                     trainingList
                 } else if noEvent {
@@ -467,6 +460,41 @@ struct WConfirm: View {
             }
             .frame(maxHeight: .infinity)
         }
+    }
+
+    /// PFT: 최고 기록(등급) 한 줄 + 종목 6개와 횟수
+    private var pftList: some View {
+        let best: Int? = store.ctx.pftBestTotal
+        let head: String = best.map { "BEST".l10n + " " + Fm.t($0) } ?? "6 movements · for time".l10n
+        return VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Text(head).font(F.num(13, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                if let best { PFTBadge(grade: PFT.grade(best), width: 62, height: 18, fontSize: 10) }
+            }
+            .padding(.horizontal, 20).padding(.bottom, 8)
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(seq.enumerated()), id: \.offset) { _, s in
+                        pftRow(s)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    private func pftRow(_ s: Seg) -> some View {
+        HStack(spacing: 8) {
+            Icon8(s.icon, 14, tint: .yellow)
+            Text(s.name).font(F.t(14)).lineLimit(1).minimumScaleFactor(0.85)
+            Spacer(minLength: 0)
+            Text(s.detail.components(separatedBy: " · ").first ?? s.detail)
+                .font(F.num(13, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
+        }
+        .padding(.vertical, 5).padding(.horizontal, 4)
+        .overlay(alignment: .bottom) { Rectangle().fill(Color(hex: 0x161616)).frame(height: 1) }
     }
 
     /// 1 set / 3 sets
@@ -524,7 +552,7 @@ struct WConfirm: View {
     private var startButton: some View {
         Button { start() } label: {
             Text("Start").font(F.t(14, .semibold)).foregroundStyle(.black)
-                .frame(maxWidth: .infinity).frame(height: mode == .training ? 36 : 44)
+                .frame(maxWidth: .infinity).frame(height: (mode == .training || mode == .pft) ? 36 : 44)
                 .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -549,6 +577,7 @@ struct WConfirm: View {
         let title: String
         switch mode {
         case .training: title = program.name
+        case .pft: title = PFT.title
         case .sim: title = "Full Simulation"
         case .race: title = ev.name
         }

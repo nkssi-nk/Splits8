@@ -35,6 +35,8 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
 
     @ObservationIgnored private var settings = Settings()
     @ObservationIgnored private var friend: Friend?
+    /// PFT: 시작할 때 이미 최고 기록이 있었는지 (있으면 그 구간 시간이 목표)
+    @ObservationIgnored private var hasPFTBest = false
 
     // HIIT · 러닝 카드
     private(set) var kind: String? = nil
@@ -86,6 +88,8 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: g)
         case .sim:
             return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: simTargets(store))
+        case .pft:
+            return PFT.seq(div: s.div, targets: store.pftBest?.pftSplits)
         case .training:
             let p: Program = program ?? Program.presets()[0]
             return SeqBuilder.training(p, div: s.div, bests: store.segBests)
@@ -103,6 +107,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         switch mode {
         case .training: return (program ?? Program.presets()[0]).name
         case .sim: return "Full Simulation"
+        case .pft: return PFT.title
         case .race:
             let n: String = store.settings.event.name.trimmingCharacters(in: .whitespaces)
             return n.isEmpty ? "Race" : n
@@ -116,6 +121,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         let store = Store.shared
         settings = store.settings
         friend = store.friend?.hasSplits == true ? store.friend : nil
+        hasPFTBest = store.pftBest != nil
         mode = req.mode
         title = PhoneRunEngine.title(mode: req.mode, program: req.program, store: store)
         sets = req.mode == .training ? max(1, (req.program ?? Program.presets()[0]).sets) : 1
@@ -231,7 +237,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         var r = Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: [],
                        kcal: 0, avgHR: 0, maxHR: 0, division: settings.div.name,
                        goal: mode == .race ? settings.goalTime : nil,
-                       vsWord: deltaWord, vsTarget: kind == nil ? tg : nil, complete: complete)
+                       vsWord: deltaWord, vsTarget: (kind == nil && (mode != .pft || hasPFTBest)) ? tg : nil, complete: complete)
         r.endDate = startDate.addingTimeInterval(Double(total))
         r.place = place
         r.kind = kind
@@ -588,21 +594,34 @@ struct StartOnPhoneButton: View {
     var program: Program? = nil
     /// 시작 직전에 할 일 (예: 시트 닫기). 있으면 닫힌 뒤 조금 있다가 시작
     var before: (() -> Void)? = nil
+    /// true = 가로로 꽉 찬 큰 노란 버튼 (PFT 첫 화면)
+    var big: Bool = false
     @State private var confirm = false
 
-    var body: some View {
-        Button { confirm = true } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "iphone").font(.system(size: 14, weight: .semibold))
-                Text("Start on iPhone").font(F.t(14, .semibold)).lineLimit(1)
+    @ViewBuilder
+    private var label: some View {
+        if big {
+            YellowButton(height: 50, radius: 16, action: { confirm = true }) {
+                Text("Start on iPhone")
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14).frame(height: 36)
-            .background(Color.white.opacity(0.10), in: Capsule())
-            .contentShape(Capsule())
+        } else {
+            Button { confirm = true } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "iphone").font(.system(size: 14, weight: .semibold))
+                    Text("Start on iPhone").font(F.t(14, .semibold)).lineLimit(1)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14).frame(height: 36)
+                .background(Color.white.opacity(0.10), in: Capsule())
+                .contentShape(Capsule())
+            }
+            .buttonStyle(Press(scale: 0.96))
+            .fixedSize()
         }
-        .buttonStyle(Press(scale: 0.96))
-        .fixedSize()
+    }
+
+    var body: some View {
+        label
         .accessibilityIdentifier("startOnPhone." + mode.rawValue)
         // 시작 전 확인: 아이폰 기록은 워치 기능(심박 등)을 못 씀
         .alert("Start on iPhone?", isPresented: $confirm) {

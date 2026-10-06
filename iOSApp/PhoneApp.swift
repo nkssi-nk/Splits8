@@ -89,6 +89,29 @@ final class Router {
     // 대회 편집
     var evDraft: RaceEvent? = nil
 
+    /// Test 탭에서 고른 쪽: "pft" / "sim" (다음에 켜도 그대로)
+    var testTab: String = Router.savedTestTab {
+        didSet { if !Demo.enabled { UserDefaults.standard.set(testTab, forKey: "test.tab") } }
+    }
+    private static var savedTestTab: String {
+        if Demo.enabled { return "pft" }
+        return UserDefaults.standard.string(forKey: "test.tab") == "sim" ? "sim" : "pft"
+    }
+    /// Test 탭의 PFT / Full Sim 으로 바로 가기
+    func goTest(_ tab: String) {
+        testTab = tab == "sim" ? "sim" : "pft"
+        go(.sim)
+    }
+    /// 그 기록 종류의 탭 화면으로
+    func goMode(_ m: Mode) {
+        switch m {
+        case .training: go(.training)
+        case .pft: goTest("pft")
+        case .sim: goTest("sim")
+        case .race: go(.race)
+        }
+    }
+
     // 운동 예약 시트 (nil 이면 닫힘)
     var planRequest: PlanRequest? = nil
     func openPlan(date: Date, mode: Mode = .training, existing: PlannedWorkout? = nil) {
@@ -187,7 +210,7 @@ final class Router {
         switch scr {
         case .home: return "Home"
         case .training: return "Training"
-        case .sim: return "Full Sim"
+        case .sim: return "Test"
         case .race: return "Race"
         case .settings: return "Settings"
         case .findEvent: return "Find event"
@@ -374,7 +397,7 @@ struct PhoneRoot: View {
         case .home: Scroll8 { HomeView() }
         case .training: Scroll8 { TrainingView() }
         case .builder: Scroll8 { BuilderView() }
-        case .sim: Scroll8 { SimView() }
+        case .sim: Scroll8 { TestView() }
         case .race: Scroll8 { RaceView() }
         case .settings: Scroll8 { SettingsView() }
         case .setHr: Scroll8 { SetHrView() }
@@ -499,7 +522,7 @@ struct TabBar8: View {
     struct Tab: Identifiable { let scr: Scr; let label: String; let icon: String; var id: String { label } }
     private let tabs: [Tab] = [
         Tab(scr: .home, label: "Home", icon: "i_home"), Tab(scr: .training, label: "Training", icon: "modeTraining"),
-        Tab(scr: .sim, label: "Full Sim", icon: "i_sim"), Tab(scr: .race, label: "Race", icon: "i_race"),
+        Tab(scr: .sim, label: "Test", icon: "i_sim"), Tab(scr: .race, label: "Race", icon: "i_race"),
         Tab(scr: .settings, label: "Settings", icon: "i_gear"),
     ]
 

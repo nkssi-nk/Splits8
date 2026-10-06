@@ -416,3 +416,32 @@
 "ABOUT" = "정보";
 "Website" = "홈페이지";
 "Privacy Policy" = "개인정보처리방침";
+
+/* 빌드 18 · PFT / Test 탭 */
+"Test" = "테스트";
+"Physical Fitness Test · six movements back to back, for time." = "PFT 체력 테스트 · 6가지 종목을 이어서 하고 시간을 잽니다.";
+"Full Simulation · the full race order, 8 runs + 8 stations, for time." = "풀 시뮬레이션 · 실제 레이스 순서 그대로, 러닝 8 + 스테이션 8.";
+"Physical Fitness Test" = "PFT 체력 테스트";
+"Six movements back to back, no rest. Your total time shows your level." = "6가지 종목을 쉬지 않고 이어서 합니다. 총 시간으로 내 수준을 알 수 있어요.";
+"Under 22:00" = "22:00 미만";
+"Over 26:00" = "26:00 초과";
+"%@ inside Gold" = "골드 기준보다 %@ 빠름";
+"%@ to Gold" = "골드까지 %@";
+"%@ to Silver" = "실버까지 %@";
+"Gold is under 22:00" = "골드: 22:00 미만";
+"Silver is 22:00 – 26:00" = "실버: 22:00 – 26:00";
+"Bronze is over 26:00" = "브론즈: 26:00 초과";
+"or start PFT on your Apple Watch" = "또는 Apple Watch에서 PFT를 시작하세요";
+"HOW IT WORKS" = "하는 방법";
+"1000 m. Outdoors, or on a treadmill at 2% incline." = "1000 m. 야외 또는 경사 2% 트레드밀.";
+"50 reps." = "50회.";
+"100 reps, no weight." = "100회, 맨몸으로.";
+"30 reps. Lift your hands off the floor at the bottom." = "30회. 내려갔을 때 손을 바닥에서 뗍니다.";
+"100 reps with a %lld kg ball (6 kg men · 4 kg women)." = "%lld kg 공으로 100회 (남 6 kg · 여 4 kg).";
+"The clock keeps running between movements. Tap Next (or swipe left on your watch) when you finish each one." = "종목 사이에도 시간은 계속 갑니다. 한 종목이 끝나면 다음을 누르세요 (워치는 왼쪽으로 밀기).";
+"Grades are SPLITS8's own guide, not an official HYROX result." = "등급은 SPLITS8 자체 기준이며 HYROX 공식 기록이 아닙니다.";
+"The full race order for time: a 1 km run before each of the 8 stations." = "실제 레이스 순서 그대로 시간을 잽니다. 스테이션 8개마다 앞에 1 km 러닝이 있어요.";
+"Weights follow your division. Turn on Add Roxzone to time the transitions separately." = "무게는 내 체급을 따릅니다. Roxzone 추가를 켜면 이동 시간을 따로 잽니다.";
+"TOTAL TIME" = "총 시간";
+"First record" = "첫 기록";
+"New best · %@" = "최고 기록 갱신 · %@";

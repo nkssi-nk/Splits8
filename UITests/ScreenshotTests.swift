@@ -17,9 +17,9 @@ final class ScreenshotTests: XCTestCase {
     /// 앱은 영어(기본) + 한국어. 화면 찾기는 영어 글자로 하므로 테스트는 항상 영어로 띄움
     static let english: [String] = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
 
-    private func launch(onboarded: Bool) {
+    private func launch(onboarded: Bool, extra: [String] = []) {
         app = XCUIApplication()
-        app.launchArguments = (onboarded ? ["--demo", "--onboarded"] : ["--demo"]) + Self.english
+        app.launchArguments = (onboarded ? ["--demo", "--onboarded"] : ["--demo"]) + extra + Self.english
         app.launch()
         sleep(2)
     }
@@ -103,7 +103,9 @@ final class ScreenshotTests: XCTestCase {
         shot("I2_new_training_bottom")
         id("nav.left")
 
-        tab("Full Sim")
+        tab("Test")
+        shot("I3p_test_pft")
+        id("test.seg.sim")
         shot("I3_full_simulation")
         tap("WALL BALLS")
         shot("I3_wall_balls")
@@ -180,6 +182,42 @@ final class ScreenshotTests: XCTestCase {
         tap("Block")
         shot("I7_share_block")
         id("nav.left")
+    }
+
+    // MARK: 5. PFT — Test 탭 · 기록 화면 · 설명 · 처음 화면
+
+    func test5_pft() {
+        launch(onboarded: true)
+        tab("Test")
+        shot("P1_pft_with_records")
+        app.swipeUp()
+        shot("P1_pft_history")
+        tapContaining("21:48")
+        shot("P2_pft_result")
+        app.swipeUp()
+        shot("P2_pft_result_splits")
+        app.swipeDown(); app.swipeDown()
+        back()
+        app.swipeDown(); app.swipeDown()
+        id("pft.info")
+        shot("P3_pft_info")
+        id("nav.left")
+        id("test.seg.sim")
+        id("sim.info")
+        shot("P3_sim_info")
+        id("nav.left")
+        tab("Home")
+        shot("P4_home_badge")
+        app.swipeUp()
+        shot("P4_home_modes")
+
+        // 기록이 하나도 없을 때 (처음 화면)
+        app.terminate()
+        launch(onboarded: true, extra: ["--nopft"])
+        tab("Test")
+        shot("P5_pft_first_time")
+        app.swipeUp()
+        shot("P5_pft_first_time_bottom")
     }
 
     // MARK: 4. 카드를 밀다 말았을 때 — 만들기 화면이 잘못 열려도 Cancel · Save 가 눌리는지

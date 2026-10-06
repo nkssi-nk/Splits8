@@ -45,6 +45,7 @@ struct HistoryCalendar: View {
     private static func label(for m: Mode) -> String {
         switch m {
         case .training: return "Training"
+        case .pft: return "PFT"
         case .sim: return "Full Sim"
         case .race: return "Race"
         }
@@ -302,7 +303,7 @@ struct HistoryCalendar: View {
         let sub: String = Fm.wdm.string(from: rec.date) + " · " + Self.timeFmt.string(from: rec.date)
         let from: Scr = backScreen(rec)
         return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec), flag: rec.flag,
-                          partner: rec.partner,
+                          grade: rec.pftGrade, partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: from) }
     }
 

@@ -206,6 +206,9 @@ final class Store: NSObject, WCSessionDelegate {
     /// (미완료·확인 필요 기록은 빼고)
     var simBest: Record? { records(.sim).filter { $0.counts && $0.splits16 != nil }.min { $0.total < $1.total } }
     var raceBest: Record? { records(.race).filter(\.counts).min { $0.total < $1.total } }
+    /// 최고 PFT (끝까지 한 정상 기록 중 가장 빠른 것) — 홈 프로필 뱃지는 이 기록의 등급
+    var pftBest: Record? { records(.pft).filter { $0.counts && $0.pftSplits != nil }.min { $0.total < $1.total } }
+    var pftGrade: PFTGrade? { pftBest?.pftGrade }
 
     /// ★ PB: 같은 종류(트레이닝은 같은 이름·세트 수, Full Sim·Race는 각각 전체) 중 가장 빠른 기록.
     /// 비교할 기록이 2개 이상일 때만 표시 (하나뿐이면 PB 표시 없음). 저장·삭제하면 자동으로 다시 계산됨.
@@ -220,6 +223,7 @@ final class Store: NSObject, WCSessionDelegate {
         case .training: return records(.training).filter { $0.counts && $0.title == r.title && $0.sets == r.sets }
         case .sim: return records(.sim).filter { $0.counts && $0.splits16 != nil }
         case .race: return records(.race).filter(\.counts)
+        case .pft: return records(.pft).filter { $0.counts && $0.pftSplits != nil }
         }
     }
 
@@ -381,8 +385,10 @@ final class Store: NSObject, WCSessionDelegate {
     func pushToWatch() {
         guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return }
         let best = simBest
+        let pft = pftBest
         let ctx = WatchContext(settings: settings, programs: programs, friend: friend?.hasSplits == true ? friend : nil,
-                               simBest: best?.splits16, simBestTotal: best?.total, segBests: segBests)
+                               simBest: best?.splits16, simBestTotal: best?.total, segBests: segBests,
+                               pftBest: pft?.pftSplits, pftBestTotal: pft?.total)
         guard let d = try? JSONStore.enc.encode(ctx) else { return }
         try? WCSession.default.updateApplicationContext([SyncKey.context: d])
     }

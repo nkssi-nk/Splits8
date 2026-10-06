@@ -36,7 +36,7 @@ struct WWorkoutPager: View {
             }
         }
         .ignoresSafeArea()
-        .persistentSystemOverlays(.hidden)      // 운동 중에는 오른쪽 위 시스템 시계를 숨김 (안 숨겨져도 겹치지 않게 배치해 둠)
+        // 오른쪽 위 시스템 시계는 앱에서 숨길 수 없음 → 각 화면이 시계 자리를 비워 둠 (WClock)
         .onChange(of: engine.advanceCount) { _, _ in
             flashNow()
         }
@@ -418,18 +418,22 @@ struct WSegmentList: View {
         .ignoresSafeArea()
     }
 
+    /// 제목 줄은 시계 줄에 고정, 목록은 그 아래에서만 움직임 (구간 줄이 시계 밑으로 지나가지 않게)
     private func list(now: Date) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 0) {
-                    header
-                    ForEach(Array(engine.seq.enumerated()), id: \.offset) { i, s in
-                        row(i, s, now: now).id(i)
+        VStack(spacing: 0) {
+            header
+                .padding(.top, 22).padding(.horizontal, 12)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(Array(engine.seq.enumerated()), id: \.offset) { i, s in
+                            row(i, s, now: now).id(i)
+                        }
                     }
+                    .padding(.horizontal, 12).padding(.bottom, 14)
                 }
-                .padding(.top, 22).padding(.horizontal, 12).padding(.bottom, 14)
+                .onAppear { proxy.scrollTo(engine.idx, anchor: .center) }
             }
-            .onAppear { proxy.scrollTo(engine.idx, anchor: .center) }
         }
     }
 
@@ -516,20 +520,23 @@ struct WSummary: View {
     var body: some View {
         ZStack {
             AmbientLayer(a: Ambient(hex: 0x30D158, alpha: 0.18, rx: 1.2, ry: 0.6, cx: 0.5, cy: -0.1))
-            ScrollView {
-                if let r = engine.lastRecord {
-                    VStack(spacing: 10) {
-                        head(r)
-                        stats(r)
-                        rows(r)
-                        doneButton
+            // 위 34 는 시계 줄: 내용은 그 아래에서만 움직임 (위로 밀어도 시계와 겹치지 않게)
+            VStack(spacing: 0) {
+                Color.clear.frame(height: 34)
+                ScrollView {
+                    if let r = engine.lastRecord {
+                        VStack(spacing: 10) {
+                            head(r)
+                            stats(r)
+                            rows(r)
+                            doneButton
+                        }
+                        .padding(.top, 4).padding(.horizontal, 16).padding(.bottom, 16)
                     }
-                    .padding(.top, 38).padding(.horizontal, 16).padding(.bottom, 16)   // 38: 제목이 시계 줄 아래로
                 }
             }
         }
         .ignoresSafeArea()
-        .persistentSystemOverlays(.hidden)
     }
 
     private func head(_ r: Record) -> some View {
@@ -540,13 +547,17 @@ struct WSummary: View {
             Text(Fm.t(r.total)).font(F.num(32)).tracking(-0.96)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .padding(.top, 4)
+            if let g = r.pftGrade {
+                PFTBadge(grade: g, width: 84, height: 24, fontSize: 13)
+                    .padding(.top, 5)
+            }
             if showVs {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(Fm.d(r.total - tg)).font(F.num(15))
                         .foregroundStyle(r.total > tg ? C.bad : C.good)
                     Text(r.vsWord.l10n).font(F.t(12, .semibold)).tracking(0.8).foregroundStyle(C.text2)
                 }
-                .padding(.top, 2)
+                .padding(.top, r.pftGrade != nil ? 5 : 2)
             }
         }
         .frame(maxWidth: .infinity)

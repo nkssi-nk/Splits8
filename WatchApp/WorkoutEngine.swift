@@ -16,6 +16,8 @@ final class WorkoutEngine: NSObject {
     // HIIT · 러닝 카드 (nil = 하이록스 운동)
     private(set) var kind: String? = nil
     @ObservationIgnored private var runKm = 0              // 0 = 자유 러닝
+    /// PFT: 시작할 때 이미 최고 기록이 있었는지 (있으면 그 구간 시간이 목표 → 끝 화면에 최고 기록 대비 표시)
+    @ObservationIgnored private var hasPFTBest = false
     @ObservationIgnored private var outdoorRun = false
     var isHIIT: Bool { kind == "hiit" }
     var isRunKind: Bool { kind == "run" }
@@ -106,6 +108,7 @@ final class WorkoutEngine: NSObject {
         kind = mode == .training ? program?.kind : nil
         runKm = program?.runKm ?? 0
         outdoorRun = isRunKind && !(program?.indoor ?? true)
+        hasPFTBest = mode == .pft && WatchStore.shared.ctx.pftBest?.count == PFT.items.count
         place = nil; routePts = []; lastRouteLoc = nil
         self.mode = mode
         self.title = title
@@ -334,7 +337,7 @@ final class WorkoutEngine: NSObject {
                        kcal: Int(kcal.rounded()), avgHR: bpms.isEmpty ? 0 : bpms.reduce(0, +) / bpms.count,
                        maxHR: bpms.max() ?? 0, division: settings.div.name,
                        goal: mode == .race ? settings.goalTime : nil,
-                       vsWord: deltaWord, vsTarget: kind == nil ? tg : nil, complete: complete)
+                       vsWord: deltaWord, vsTarget: (kind == nil && (mode != .pft || hasPFTBest)) ? tg : nil, complete: complete)
         r.endDate = startDate.addingTimeInterval(Double(total))
         r.place = place
         r.kind = kind
@@ -361,7 +364,8 @@ final class WorkoutEngine: NSObject {
     }
 
     /// 화면 캡처용: 건강 앱·타이머 없이 운동 중 / 요약 상태를 만든다 (--shot)
-    func demoRun(mode: Mode, title: String, seq: [Seg], idx: Int, elapsed: Int, hr: Double, done: Bool) {
+    func demoRun(mode: Mode, title: String, seq: [Seg], idx: Int, elapsed: Int, hr: Double, done: Bool, vsBest: Bool = false) {
+        kind = nil; hasPFTBest = vsBest
         self.mode = mode; self.title = title; sets = 1; self.seq = seq
         running = true; finished = false; lastRecord = nil
         self.hr = hr; kcal = 214; distance = 380

@@ -50,7 +50,13 @@ struct HomeView: View {
                 .photoTap(store.photo.map { PhotoItem(image: $0, title: signed ? "@" + nick : "My profile".l10n, sub: store.div.name) })
                 .accessibilityIdentifier("home.photo")
             VStack(alignment: .leading, spacing: 2) {
-                Text(signed ? "@" + nick : "My profile".l10n).font(F.t(17, .semibold)).tracking(-0.17).lineLimit(1)
+                // 아이디 옆에 PFT 등급 뱃지 (내 최고 PFT 기록의 등급)
+                HStack(spacing: 8) {
+                    Text(signed ? "@" + nick : "My profile".l10n).font(F.t(17, .semibold)).tracking(-0.17).lineLimit(1)
+                    if let g = store.pftGrade {
+                        PFTBadge(grade: g).accessibilityIdentifier("home.pftBadge")
+                    }
+                }
                 Text(store.div.name).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -122,19 +128,20 @@ struct HomeView: View {
         }
     }
 
-    // 시작: 3칸 86 높이
+    // 시작: 4칸 86 높이 (워치 홈과 같은 순서: Training · PFT · Full Sim · Race)
     private var startTiles: some View {
         HStack(spacing: 8) {
             startTile("Training", to: .training) { Icon8("modeTraining", 28, C.accent) }
+            startTile("PFT", to: .pft) { Icon8("modePFT", 28, C.accent) }
             startTile("Full Sim", to: .sim) { Glyph("i_sim", 28, C.accent) }   // 탭 바와 같은 아이콘
             startTile("Race", to: .race) { Glyph("i_race", 28, C.accent) }
         }
     }
-    private func startTile<I: View>(_ label: String, to: Scr, @ViewBuilder icon: () -> I) -> some View {
-        Button { r.go(to) } label: {
+    private func startTile<I: View>(_ label: String, to: Mode, @ViewBuilder icon: () -> I) -> some View {
+        Button { r.goMode(to) } label: {
             VStack(spacing: 8) {
                 icon()
-                Text(label.l10n).font(F.t(13, .semibold)).lineLimit(1)
+                Text(label.l10n).font(F.t(13, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity).frame(height: 86)
             .card8()
@@ -171,11 +178,12 @@ struct HomeView: View {
         let d = Fm.wdm.string(from: x.date)
         let sub: String = Self.recentSub(x.mode, d)
         let title: String = x.mode == .sim ? "Full Simulation".l10n : x.title.l10n
-        return Button { r.go(x.mode == .training ? .training : x.mode == .sim ? .sim : .race) } label: {
+        return Button { r.goMode(x.mode) } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Text(title).font(F.t(15, .semibold)).lineLimit(1)
+                        if let g = x.pftGrade { PFTBadge(grade: g) }
                         if let f = x.flag { FlagPill(flag: f) }
                     }
                     Text(sub).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
@@ -196,7 +204,7 @@ struct HomeView: View {
         switch m {
         case .training: return "Training".l10n + " · " + d
         case .race: return "Race".l10n + " · " + d
-        case .sim: return d
+        case .sim, .pft: return d
         }
     }
 

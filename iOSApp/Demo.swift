@@ -71,6 +71,30 @@ enum Demo {
         out.append(training("Sled Intervals", "2026-09-24", 1822))
         out.append(training("Wall Ball Run", "2026-09-21", 2410))
         out.append(training("Sled Intervals", "2026-09-17", 1875))
+        // PFT (Gold · Silver · Bronze 하나씩). `--nopft` 로 켜면 뺌 (처음 화면 확인용)
+        if !CommandLine.arguments.contains("--nopft") {
+            let base6: [Int] = [262, 236, 188, 245, 82, 295]       // 21:48
+            let sum6: Int = base6.reduce(0, +)
+            func pft(_ date: String, _ want: Int) -> Record {
+                let seq: [Seg] = PFT.seq(div: div)
+                var segs: [SegResult] = []
+                for (i, s) in seq.enumerated() {
+                    let t: Int = Int(Double(base6[i]) * Double(want) / Double(sum6))
+                    segs.append(SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
+                                          hr: 162 + i * 3, dist: s.kind == .run ? 1000 : nil))
+                }
+                let fix: Int = want - segs.map(\.time).reduce(0, +)
+                segs[segs.count - 1].time += fix
+                let start: Date = (Fm.ymd.date(from: date) ?? Date()).addingTimeInterval(7 * 3600 + 120)
+                return Record(mode: .pft, title: PFT.title, sets: 1, date: start, total: want, segs: segs,
+                              hr: (0...24).map { HRPoint(t: $0 * want / 24, b: 138 + min(40, $0 * 4) + ($0 % 3) * 2) },
+                              kcal: 318, avgHR: 171, maxHR: 186, division: "openM", goal: nil, vsWord: "VS BEST", vsTarget: nil,
+                              complete: true)
+            }
+            out.append(pft("2026-10-04", 1308))
+            out.append(pft("2026-09-12", 1390))
+            out.append(pft("2026-08-16", 1655))
+        }
         return out
     }
 }

@@ -197,6 +197,7 @@ final class Supabase {
     func upload(_ r: Record) async throws {
         guard let id = userId else { throw SBError.noSession }
         guard r.counts else { return }
+        guard r.mode != .pft else { return }      // PFT 기록은 아직 이 기기에만 (서버 표가 training·sim·race 만 받음)
         var b: [String: Any] = ["id": r.id.uuidString.lowercased(), "user_id": id, "mode": r.mode.rawValue,
                                 "date": Fm.ymd.string(from: r.date), "total_s": r.total, "rox_s": r.roxTotal,
                                 "division": r.division]

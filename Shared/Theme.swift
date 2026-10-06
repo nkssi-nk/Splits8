@@ -202,6 +202,34 @@ struct Icon8: View {
     }
 }
 
+// MARK: - PFT 등급 뱃지 (아이폰 · 워치 공통)
+
+/// GOLD / SILVER / BRONZE — 셋 다 같은 크기 (기본 78 × 22). 왼쪽에 작은 메달 점
+struct PFTBadge: View {
+    let grade: PFTGrade
+    var width: CGFloat = 78
+    var height: CGFloat = 22
+    var fontSize: CGFloat = 12
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: height * 0.32, style: .continuous)
+        return HStack(spacing: 5) {
+            Circle().fill(Color.black.opacity(0.28))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: 2))
+                .frame(width: fontSize, height: fontSize)
+            Text(verbatim: grade.label)
+                .font(F.t(fontSize, .heavy)).tracking(0.04 * fontSize)
+                .foregroundStyle(Color(hex: grade.inkHex))
+                .lineLimit(1).fixedSize()
+        }
+        .frame(width: width, height: height)
+        .background(LinearGradient(colors: [Color(hex: grade.hex1), Color(hex: grade.hex2)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing), in: shape)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: grade.label))
+    }
+}
+
 // MARK: - 번역
 
 extension String {

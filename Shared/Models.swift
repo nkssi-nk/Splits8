@@ -68,14 +68,118 @@ enum Defaults {
 
 // MARK: - 모드
 
+/// 순서 = 화면에 나오는 순서 (워치 홈 카드 · 달력 점): Training → PFT → Full Simulation → Race
 enum Mode: String, Codable, CaseIterable, Identifiable {
-    case training, sim, race
+    case training, pft, sim, race
     var id: String { rawValue }
     var name: String {
-        switch self { case .training: return "Training"; case .sim: return "Full Simulation"; case .race: return "Race" }
+        switch self {
+        case .training: return "Training"
+        case .pft: return "PFT"
+        case .sim: return "Full Simulation"
+        case .race: return "Race"
+        }
     }
     var icon: String {
-        switch self { case .training: return "modeTraining"; case .sim: return "modeSim"; case .race: return "modeRace" }
+        switch self {
+        case .training: return "modeTraining"
+        case .pft: return "modePFT"
+        case .sim: return "modeSim"
+        case .race: return "modeRace"
+        }
+    }
+}
+
+// MARK: - PFT (Physical Fitness Test)
+
+/// 등급: Gold 22:00 미만 · Silver 22:00–26:00 · Bronze 26:00 초과 (남녀 같음).
+/// HYROX 공식 등급이 아니라 SPLITS8 자체 기준.
+enum PFTGrade: String, Codable, CaseIterable {
+    case gold, silver, bronze
+
+    var label: String { rawValue.uppercased() }
+    /// Gold / Silver / Bronze (문장 안에서)
+    var word: String { rawValue.capitalized }
+
+    /// 뱃지 바탕 그라데이션 (왼쪽 위 → 오른쪽 아래)
+    var hex1: UInt32 {
+        switch self { case .gold: return 0xFFE08A; case .silver: return 0xEEF1F4; case .bronze: return 0xE8A66E }
+    }
+    var hex2: UInt32 {
+        switch self { case .gold: return 0xC9981E; case .silver: return 0x9098A1; case .bronze: return 0x9A5A28 }
+    }
+    /// 뱃지 글자색
+    var inkHex: UInt32 {
+        switch self { case .gold: return 0x201600; case .silver: return 0x15181C; case .bronze: return 0x1D0F04 }
+    }
+}
+
+enum PFT {
+    static let title = "PFT"
+    /// 이 시간 미만이면 Gold
+    static let goldLimit: Int = 22 * 60
+    /// 이 시간 이하이면 Silver, 넘으면 Bronze
+    static let silverLimit: Int = 26 * 60
+
+    static func grade(_ total: Int) -> PFTGrade {
+        if total < goldLimit { return .gold }
+        if total <= silverLimit { return .silver }
+        return .bronze
+    }
+
+    /// 여자 체급은 월볼 4 kg, 그 외 6 kg
+    static func wallBallKg(_ d: Division) -> Int {
+        ["openW", "proW", "dblW", "dblWP"].contains(d.key) ? 4 : 6
+    }
+
+    /// 종목 6개 (순서 고정). name = 기록에 남는 짧은 이름, long = 설명 화면용, amount = 설명 화면 오른쪽 값
+    struct Item {
+        let icon: String
+        let name: String
+        let long: String
+        let kind: SegKind
+        let target: Int         // 기본 목표(초). 합계 22:00
+    }
+    static let items: [Item] = [
+        Item(icon: "run", name: "Run", long: "Run", kind: .run, target: 285),
+        Item(icon: "burpeeBroadJump", name: "BBJ", long: "Burpee Broad Jumps", kind: .st, target: 225),
+        Item(icon: "sandbagLunges", name: "Lunges", long: "Lunges", kind: .st, target: 195),
+        Item(icon: "row", name: "Row", long: "Row", kind: .st, target: 240),
+        Item(icon: "pushUp", name: "Push-Ups", long: "Hand-Release Push-Ups", kind: .st, target: 75),
+        Item(icon: "wallBalls", name: "Wall Balls", long: "Wall Balls", kind: .st, target: 300),
+    ]
+
+    /// 운동 중·기록에 쓰는 세부 (러닝은 거리 계산 때문에 "1KM" 그대로)
+    static func detail(_ i: Int, _ d: Division) -> String {
+        switch i {
+        case 0: return "1KM"
+        case 1: return "50 REPS"
+        case 2: return "100 REPS"
+        case 3: return "1K"
+        case 4: return "30 REPS"
+        default: return "100 REPS · \(wallBallKg(d))KG"
+        }
+    }
+
+    /// 설명 화면 오른쪽 값: 1000 M · 50 · 100 · 1000 M · 30 · 100 · 6 KG
+    static func amount(_ i: Int, _ d: Division) -> String {
+        switch i {
+        case 0, 3: return "1000 M"
+        case 1: return "50"
+        case 2: return "100"
+        case 4: return "30"
+        default: return "100 · \(wallBallKg(d)) KG"
+        }
+    }
+
+    /// 구간 순서. targets = 내 최고 기록의 구간 시간 6개 (없으면 기본 목표)
+    static func seq(div: Division, targets: [Int]? = nil) -> [Seg] {
+        var o: [Seg] = []
+        for (i, it) in items.enumerated() {
+            let t: Int = (targets?.count == items.count) ? targets![i] : it.target
+            o.append(Seg(icon: it.icon, name: it.name, detail: detail(i, div), kind: it.kind, target: t))
+        }
+        return o
     }
 }
 
@@ -293,6 +397,17 @@ struct Record: Codable, Hashable, Identifiable {
         let s = segs.filter { $0.kind != .rox }.map(\.time)
         return s.count == 16 ? s : nil
     }
+    /// PFT 구간 6개
+    var pftSplits: [Int]? {
+        guard mode == .pft else { return nil }
+        let s = segs.filter { $0.kind != .rox }.map(\.time)
+        return s.count == PFT.items.count ? s : nil
+    }
+    /// PFT 등급 (끝까지 한 정상 기록만)
+    var pftGrade: PFTGrade? {
+        guard mode == .pft, counts else { return nil }
+        return PFT.grade(total)
+    }
     var roxTotal: Int { segs.filter { $0.kind == .rox }.map(\.time).reduce(0, +) }
     var runs: [SegResult] { segs.filter { $0.kind == .run } }
     var runTotal: Int { runs.map(\.time).reduce(0, +) }
@@ -431,6 +546,8 @@ struct WatchContext: Codable {
     var simBest: [Int]?           // 최고 Full Simulation 16구간
     var simBestTotal: Int?
     var segBests: [String: Int]   // 트레이닝 구간별 최고
+    var pftBest: [Int]? = nil     // 최고 PFT 6구간 (예전 저장 파일엔 없음)
+    var pftBestTotal: Int? = nil
 }
 
 enum SyncKey {
@@ -488,10 +605,11 @@ struct PlannedWorkout: Codable, Hashable, Identifiable {
 }
 
 extension Mode {
-    /// 달력 점 색: 트레이닝 노랑 · 풀시뮬 하늘색 · 레이스 주황
+    /// 달력 점 색: 트레이닝 노랑 · PFT 보라 · 풀시뮬 하늘색 · 레이스 주황
     var calendarHex: UInt32 {
         switch self {
         case .training: return 0xFFE600
+        case .pft: return 0xBF5AF2
         case .sim: return 0x64D2FF
         case .race: return 0xFF9F0A
         }
@@ -515,12 +633,15 @@ extension Record {
     /// 1km 런 2:30, 스테이션 30초보다 빠르면 확인 필요
     static let minRun: Int = 150
     static let minStation: Int = 30
+    static let minPFT: Int = 10 * 60
+    static let minPFTStation: Int = 15
 
     var isDoubles: Bool { division.lowercased().hasPrefix("doubles") || division.hasPrefix("dbl") }
 
     /// 끝까지 했는지 (예전 기록: Full Sim·Race 는 16구간이 다 있으면 끝까지 한 것으로 봄)
     var isComplete: Bool {
         if let complete { return complete }
+        if mode == .pft { return pftSplits != nil }
         return mode == .training ? true : splits16 != nil
     }
 
@@ -528,6 +649,15 @@ extension Record {
     var flag: RecordFlag? {
         if !isComplete { return .incomplete }
         guard mode != .training else { return nil }
+        if mode == .pft {
+            // PFT: 전체 10분, 러닝 2:30, 그 외 15초보다 빠르면 확인 필요
+            if total < Self.minPFT { return .check }
+            for s in segs {
+                if s.kind == .run && s.time < Self.minRun { return .check }
+                if s.kind == .st && s.time < Self.minPFTStation { return .check }
+            }
+            return nil
+        }
         if total < (isDoubles ? Self.minDoubles : Self.minSolo) { return .check }
         for s in segs {
             if s.kind == .run && s.time < Self.minRun { return .check }

@@ -6,6 +6,7 @@ struct SimView: View {
     let store = Store.shared
     let r = Router.shared
     @State private var metric = "total"
+    @State private var info = false
     fileprivate struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
     private static let stationMetrics: [(String, String, String)] = [
         ("skiErg", "SKIERG", "SkiErg"), ("sledPush", "SLED PUSH", "Sled Push"), ("sledPull", "SLED PULL", "Sled Pull"),
@@ -89,6 +90,9 @@ struct SimView: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            TestIntro(text: "Full Simulation · the full race order, 8 runs + 8 stations, for time.", id: "sim.info") {
+                info = true
+            }
             graphCard
             bestCard
             settingsCard
@@ -101,6 +105,12 @@ struct SimView: View {
             history
         }
         .padding(.horizontal, 16)
+        .sheet(isPresented: $info) {
+            SimInfoSheet()
+                .presentationDetents([.large])
+                .presentationBackground(Color(hex: 0x1C1C1E))
+                .preferredColorScheme(.dark)
+        }
     }
 
     // MARK: 그래프 카드 (padding 18, gap 18)
@@ -656,7 +666,7 @@ struct RaceLeaderboard: View {
         s.friendId = f.id
         s.simCmp = "friend"
         store.settings = s
-        r.go(.sim)
+        r.goTest("sim")
     }
 }
 

@@ -12,7 +12,7 @@ extension Store {
             return ("VS GOAL", g.map { r.total - $0 })
         case .sim:
             return ("VS LAST", previous(for: r).map { r.total - $0.total })
-        case .training:
+        case .training, .pft:
             return ("VS BEST", previousBest(for: r).map { r.total - $0 })
         }
     }
@@ -83,7 +83,7 @@ struct DetailView: View {
     private var backLabel: String {
         switch r.detailFrom {
         case .training: return "Training"
-        case .sim: return "Full Simulation"
+        case .sim: return "Test"
         case .home: return "Home"
         default: return "Race"
         }
@@ -99,6 +99,7 @@ struct DetailView: View {
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
+            if rec.mode == .pft { pftCard(rec) }
             tilesGrid(rec)
             if showsPartner(rec) {
                 SectionLabel(text: "PARTNER", top: 20)
@@ -113,7 +114,7 @@ struct DetailView: View {
                 zonesCard(rec)
             }
             Group {
-                if !rec.runs.isEmpty { paceCard(rec) }
+                if !rec.runs.isEmpty && rec.mode != .pft { paceCard(rec) }
                 if rec.mode == .sim, let f = Fatigue.analyze([rec], limit: 1) {
                     SectionLabel(text: "RUN FATIGUE", top: 20)
                     RunFatigueCard(result: f, footnote: "Based on this Full Sim")
@@ -157,7 +158,8 @@ struct DetailView: View {
     }
 
     private func showsPartner(_ rec: Record) -> Bool {
-        isDoubles(rec) || partnerNick(rec) != nil
+        if rec.mode == .pft { return partnerNick(rec) != nil }      // PFT 는 혼자 하는 테스트
+        return isDoubles(rec) || partnerNick(rec) != nil
     }
 
     /// 제목 아래 알약: (M) with @minji · Doubles Mixed
@@ -264,9 +266,12 @@ struct DetailView: View {
     private func tiles(_ rec: Record) -> [DetailTile] {
         let vs = store.vs(rec)
         let pace: String = rec.runPace.map { Fm.t($0) } ?? "--:--"
-        return [
+        // PFT 는 총 시간·최고 기록 대비를 위의 큰 카드(pftCard)가 보여 줌
+        let head: [DetailTile] = rec.mode == .pft ? [] : [
             DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear),
             DetailTile(label: vs.word, value: vs.value.map(Fm.d) ?? "--:--", unit: "", color: deltaColor(vs.value), unitColor: .clear),
+        ]
+        return head + [
             DetailTile(label: "AVG HR", value: rec.avgHR > 0 ? "\(rec.avgHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "MAX HR", value: rec.maxHR > 0 ? "\(rec.maxHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "CALORIES", value: grouped(rec.kcal), unit: "KCAL", color: .white, unitColor: C.text2),
@@ -299,6 +304,51 @@ struct DetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 14).padding(.horizontal, 16)
         .card8(18)
+    }
+
+    // MARK: PFT 총 시간 카드 (등급 뱃지 + 등급 색 얇은 테두리)
+
+    private func pftVsLine(_ v: Int?) -> (String, Color) {
+        guard let v else { return (String(localized: "First record"), C.text2) }
+        if v < 0 { return (String(localized: "New best · \(Fm.d(v))"), C.good) }
+        return (Fm.d(v) + " " + "vs best".l10n, v == 0 ? C.text2 : C.bad)
+    }
+
+    private func pftBorder(_ g: PFTGrade?) -> AnyShapeStyle {
+        guard let g else { return AnyShapeStyle(C.cardBorder) }
+        return AnyShapeStyle(LinearGradient(stops: [.init(color: Color(hex: g.hex1, alpha: 0.9), location: 0),
+                                                    .init(color: Color(hex: g.hex2, alpha: 0.25), location: 0.45),
+                                                    .init(color: Color.white.opacity(0.08), location: 1)],
+                                            startPoint: .topLeading, endPoint: .bottomTrailing))
+    }
+
+    private func pftCard(_ rec: Record) -> some View {
+        let g: PFTGrade? = rec.pftGrade
+        let line: (String, Color) = pftVsLine(store.vs(rec).value)
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Label8("TOTAL TIME")
+                Spacer(minLength: 8)
+                if let g { PFTBadge(grade: g) }
+            }
+            Text(Fm.t(rec.total)).font(F.num(56, .bold)).tracking(-1.68)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .padding(.top, 12)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(line.0).font(F.t(F.foot, .semibold)).foregroundStyle(line.1).lineLimit(1)
+                Spacer(minLength: 8)
+                if let g {
+                    Text(PFTText.rule(g)).font(F.t(F.foot)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+                }
+            }
+            .padding(.top, 12)
+        }
+        .padding(.top, 20).padding(.horizontal, 18).padding(.bottom, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(hex: 0x121210), in: shape)
+        .overlay(shape.strokeBorder(pftBorder(g), lineWidth: 1))
+        .accessibilityIdentifier("detail.pft")
     }
 
     // MARK: Share with photo (노란 유리, 52 높이, radius 14, 15/600)

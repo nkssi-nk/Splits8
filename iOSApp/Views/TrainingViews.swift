@@ -157,17 +157,21 @@ struct HistoryRow: View {
     var last: Bool
     var pb: Bool
     var flag: RecordFlag?
+    /// PFT 등급 뱃지 (제목 옆)
+    var grade: PFTGrade?
     var onDelete: (() -> Void)?
     let action: () -> Void
 
     /// partner: 더블 파트너 닉네임 (@ 없이) — 있으면 아래 줄 끝에 " · with @닉네임"
     init(title: String, sub: String, subColor: Color = C.text2, subTracking: CGFloat = 0, time: String, delta: String? = nil,
-         deltaColor: Color = C.good, last: Bool = false, pb: Bool = false, flag: RecordFlag? = nil, partner: String? = nil,
+         deltaColor: Color = C.good, last: Bool = false, pb: Bool = false, flag: RecordFlag? = nil,
+         grade: PFTGrade? = nil, partner: String? = nil,
          onDelete: (() -> Void)? = nil, action: @escaping () -> Void) {
         let nick: String = (partner ?? "").trimmingCharacters(in: .whitespaces)
         self.title = title; self.sub = nick.isEmpty ? sub : sub + " · " + String(localized: "with @\(nick)")
         self.subColor = subColor; self.subTracking = subTracking; self.time = time
         self.delta = delta; self.deltaColor = deltaColor; self.last = last; self.pb = pb; self.flag = flag
+        self.grade = grade
         self.onDelete = onDelete; self.action = action
     }
 
@@ -188,6 +192,7 @@ struct HistoryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
                     Text(title).font(F.t(17, .medium)).lineLimit(1)
+                    if let grade { PFTBadge(grade: grade) }
                     if pb { PBPill() }
                     if let flag { FlagPill(flag: flag) }
                 }

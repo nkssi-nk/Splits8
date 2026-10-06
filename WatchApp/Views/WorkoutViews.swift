@@ -432,6 +432,7 @@ struct WSegmentList: View {
                     }
                     .padding(.horizontal, 12).padding(.bottom, 14)
                 }
+                .clipped()      // 워치 스크롤은 기본으로 안 잘림 → 줄이 제목·시계 뒤로 지나가지 않게 자름
                 .onAppear { proxy.scrollTo(engine.idx, anchor: .center) }
             }
         }
@@ -534,6 +535,7 @@ struct WSummary: View {
                         .padding(.top, 4).padding(.horizontal, 16).padding(.bottom, 16)
                     }
                 }
+                .clipped()
             }
         }
         .ignoresSafeArea()

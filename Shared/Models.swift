@@ -145,7 +145,7 @@ enum PFT {
         Item(icon: "burpeeBroadJump", name: "BBJ", long: "Burpee Broad Jumps", kind: .st, target: 225),
         Item(icon: "sandbagLunges", name: "Lunges", long: "Lunges", kind: .st, target: 195),
         Item(icon: "row", name: "Row", long: "Row", kind: .st, target: 240),
-        Item(icon: "pushUp", name: "Push-Ups", long: "Hand-Release Push-Ups", kind: .st, target: 75),
+        Item(icon: "pushUp", name: "Push-Ups", long: "Push-Ups", kind: .st, target: 75),
         Item(icon: "wallBalls", name: "Wall Balls", long: "Wall Balls", kind: .st, target: 300),
     ]
 

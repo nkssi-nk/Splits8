@@ -437,7 +437,7 @@
 "50 reps." = "50회.";
 "100 reps, no weight." = "100회, 맨몸으로.";
 "30 reps. Lift your hands off the floor at the bottom." = "30회. 내려갔을 때 손을 바닥에서 뗍니다.";
-"100 reps with a %lld kg ball (6 kg men · 4 kg women)." = "%lld kg 공으로 100회 (남 6 kg · 여 4 kg).";
+"100 reps. 6 kg ball for men, 4 kg for women." = "100회. 공 무게는 남 6 kg, 여 4 kg.";
 "The clock keeps running between movements. Tap Next (or swipe left on your watch) when you finish each one." = "종목 사이에도 시간은 계속 갑니다. 한 종목이 끝나면 다음을 누르세요 (워치는 왼쪽으로 밀기).";
 "Grades are SPLITS8's own guide, not an official HYROX result." = "등급은 SPLITS8 자체 기준이며 HYROX 공식 기록이 아닙니다.";
 "The full race order for time: a 1 km run before each of the 8 stations." = "실제 레이스 순서 그대로 시간을 잽니다. 스테이션 8개마다 앞에 1 km 러닝이 있어요.";

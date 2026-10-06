@@ -377,19 +377,16 @@ private struct InfoRow: View {
 }
 
 struct PFTInfoSheet: View {
-    let store = Store.shared
     @Environment(\.dismiss) private var dismiss
 
     private var rows: [(String, String, String)] {
-        let kg: Int = PFT.wallBallKg(store.div)
-        let wb: String = String(localized: "100 reps with a \(kg) kg ball (6 kg men · 4 kg women).")
         return [
             ("run", "Run", "1000 m. Outdoors, or on a treadmill at 2% incline."),
             ("burpeeBroadJump", "Burpee Broad Jumps", "50 reps."),
             ("sandbagLunges", "Stationary Lunges", "100 reps, no weight."),
             ("row", "Row", "1000 m."),
             ("pushUp", "Hand-Release Push-Ups", "30 reps. Lift your hands off the floor at the bottom."),
-            ("wallBalls", "Wall Balls", wb),
+            ("wallBalls", "Wall Balls", "100 reps. 6 kg ball for men, 4 kg for women."),
         ]
     }
 

@@ -288,7 +288,7 @@ struct HomeView: View {
         let meters: Double = recs.map { Self.runDistance(of: $0) }.reduce(0, +)
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                statCell("Workouts", "\(recs.count)", String(localized: "unit.workouts", defaultValue: ""))
+                statCell("Workouts", "\(recs.count)", Fm.isKorean ? "unit.workouts".l10n : "")
                 statCell("Time", Self.hmText(secs), "h")
             }
             HStack(alignment: .top, spacing: 12) {

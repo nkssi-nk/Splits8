@@ -230,12 +230,14 @@ struct DetailView: View {
                 Label8(Fm.wdmy.string(from: rec.date))
                 if let f = rec.flag { FlagPill(flag: f) }
             }
-            LargeTitle(text: rec.title, top: 10)
-                .fixedSize(horizontal: false, vertical: true)
+            if rec.mode != .pft {        // PFT 는 제목이 위 알약과 같아서 큰 제목을 뺌
+                LargeTitle(text: rec.title, top: 10)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             // 오전 7:02 – 8:21 · 성수동, 서울
             Text(timePlace(rec))
                 .font(F.t(F.sub)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
-                .padding(.top, 6)
+                .padding(.top, rec.mode == .pft ? 10 : 6)
                 .accessibilityIdentifier("detail.timePlace")
             if let f = rec.flag {
                 Text(f == .incomplete ? LocalizedStringKey("Ended early, so it doesn't count toward your PB.")

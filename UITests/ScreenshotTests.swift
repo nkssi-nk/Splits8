@@ -419,9 +419,18 @@ final class ScreenshotTests: XCTestCase {
         tab("Race")
         app.swipeUp(); app.swipeUp()
         tapContaining("vs goal")
-        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-        from.press(forDuration: 0.1, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -352)),
-                   withVelocity: .slow, thenHoldForDuration: 0.4)
+        // "HEART RATE" 글자가 화면 위쪽(약 100pt)에 올 때까지 조금씩 끌어 맞춤 (한 번에 길게 끌면 거의 안 움직였음 — 화면 확인 #20)
+        let hr = app.staticTexts["HEART RATE"]
+        if hr.waitForExistence(timeout: 3) {
+            let mid = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+            for _ in 0..<14 {
+                let d: CGFloat = hr.frame.minY - 100
+                if abs(d) < 18 { break }
+                let step: CGFloat = max(-170, min(170, d))
+                mid.press(forDuration: 0.05, thenDragTo: mid.withOffset(CGVector(dx: 0, dy: -step)))
+                usleep(700_000)
+            }
+        }
         shot("ST_detail_charts")
         for _ in 0..<3 { app.swipeDown() }
         // 공유: 앱 첫 화면 사진 + 연기 (옅게 · 짙게) — 표는 중간 크기 + 아이콘 모양
@@ -429,11 +438,11 @@ final class ScreenshotTests: XCTestCase {
         shot("ST_share_splash_gradient")
         app.swipeUp()
         id("share.smoke.light")
-        app.swipeDown()
+        app.swipeDown(); app.swipeDown()
         shot("ST_share_splash_haze_light")
         app.swipeUp()
         id("share.smoke.strong")
-        app.swipeDown()
+        app.swipeDown(); app.swipeDown()
         shot("ST_share_splash_haze_heavy")
         tap("Post 4:5")
         shot("ST_share_splash_post")

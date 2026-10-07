@@ -212,9 +212,10 @@ struct WLive: View {
         return VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Icon8(cur.icon, m.icon, tint: curTint)
+                // 지금 하는 구간의 시간은 노랑 (전체 시간은 흰색) — 아이폰 기록 화면과 같게. 손목을 내렸을 때는 회색
                 Text(Fm.t(el))
                     .font(F.num(m.seg)).tracking(-0.01 * m.seg)
-                    .foregroundStyle(fg)
+                    .foregroundStyle(aod ? C.text3 : C.accent)
                     .lineLimit(1).minimumScaleFactor(0.7)
             }
             .frame(height: m.icon)

@@ -113,10 +113,9 @@ struct HomeView: View {
                         .accessibilityIdentifier("home.dday")
                 }
                 .padding(.vertical, 16).padding(.horizontal, 18)
-                .background { raceCardBg(near: isNear(ev.date)) }
-                // 대회 7일 전부터: 홈에 들어올 때마다 테두리에 빛이 한 바퀴 (프로필 빛에 이어서). 대회 당일은 천천히 계속
-                .modifier(BorderLight(light: C.accent, radius: 20, mode: raceLight(ev.date),
-                                      delay: store.pftGrade == .gold ? 2.0 : 0.3))
+                .background { raceCardBg(stage: raceStage(ev.date)) }
+                // 대회 30일 전부터 테두리에 빛이 계속 돎. 가까울수록 밝고 빠르게, 당일은 두 줄기 (프로필 빛에 이어서 시작)
+                .modifier(raceLight(raceStage(ev.date)))
                 .contentShape(Rectangle())
             }
             .buttonStyle(Press())
@@ -519,25 +518,39 @@ struct HomeView: View {
         let cal = Calendar.current
         return cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: cal.startOfDay(for: d)).day ?? -1
     }
-    /// 대회가 0~7일 남았으면 노란 강조 카드 (시안 v4: 그라데이션 + 노란 테두리 0.38 + 은은한 노란 그림자)
-    private func isNear(_ d: Date) -> Bool {
+    /// 대회 카드 단계: 0 = 31일 넘게 남음(또는 지남) · 1 = D-30~11 · 2 = D-10~8 · 3 = D-7~1 · 4 = D-DAY
+    private func raceStage(_ d: Date) -> Int {
         let n: Int = daysLeft(d)
-        return n >= 0 && n <= 7
+        if n < 0 || n > 30 { return 0 }
+        if n == 0 { return 4 }
+        if n <= 7 { return 3 }
+        if n <= 10 { return 2 }
+        return 1
     }
-    /// 대회 카드 테두리의 도는 빛: D-7 ~ D-1 은 한 바퀴씩, D-DAY 는 계속, 그 밖에는 없음
-    private func raceLight(_ d: Date) -> BorderLight.Mode {
-        guard isNear(d) else { return .off }
-        return daysLeft(d) == 0 ? .loop : .once
+    /// 대회 카드 테두리의 도는 빛 (계속 돎). 1: 아주 옅게 12초 · 2: 중간 9초 · 3: 밝게 6초 · 4: 두 줄기 4초
+    private func raceLight(_ stage: Int) -> BorderLight {
+        let intensity: [Double] = [0, 0.38, 0.65, 1, 1]
+        let lap: [Double] = [6, 12, 9, 6, 4]
+        let i: Int = min(max(stage, 0), 4)
+        return BorderLight(light: C.accent, radius: 20, mode: i == 0 ? .off : .loop,
+                           delay: store.pftGrade == .gold ? 2.0 : 0.3,
+                           intensity: intensity[i], lap: lap[i], double: i == 4)
     }
-    @ViewBuilder private func raceCardBg(near: Bool) -> some View {
+    /// 카드 바탕: 0 · 1 보통 / 2 노란 기운 살짝 / 3 노란 강조 (시안 v4) / 4 가장 진하게
+    @ViewBuilder private func raceCardBg(stage: Int) -> some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-        if near {
+        let y: Color = Color(red: 1, green: 230 / 255, blue: 0)
+        if stage >= 2 {
+            let fill: Double = stage == 2 ? 0.07 : (stage == 3 ? 0.20 : 0.30)
+            let from: Double = stage == 4 ? 0.1 : 0.3
+            let line: Double = stage == 2 ? 0.20 : (stage == 3 ? 0.38 : 0.55)
+            let glow: Double = stage == 2 ? 0 : (stage == 3 ? 0.14 : 0.24)
             shape
-                .fill(LinearGradient(stops: [.init(color: Color.white.opacity(0.05), location: 0.3),
-                                             .init(color: Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.20), location: 1)],
+                .fill(LinearGradient(stops: [.init(color: Color.white.opacity(0.05), location: from),
+                                             .init(color: y.opacity(fill), location: 1)],
                                      startPoint: .leading, endPoint: .trailing))
-                .overlay(shape.strokeBorder(Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.38), lineWidth: 1))
-                .shadow(color: Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.14), radius: 14, y: 8)
+                .overlay(shape.strokeBorder(y.opacity(line), lineWidth: 1))
+                .shadow(color: y.opacity(glow), radius: stage == 4 ? 16 : 14, y: 8)
         } else {
             shape
                 .fill(C.card)

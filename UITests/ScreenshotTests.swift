@@ -388,7 +388,7 @@ final class ScreenshotTests: XCTestCase {
         id("nav.left")
         // 링크로 받은 트레이닝: splits8://t?d=…  → "Add this training?" → Add → 목록에 추가
         if #available(iOS 16.4, *) {
-            let link = "splits8://t?d=1.eyJuIjoiTGluayBUZXN0IiwicSI6WyJydW46MUtNIiwic2xlZFB1c2giLCJydW46MUtNIiwid2FsbEJhbGxzIl0sInMiOjJ9"
+            let link = "splits8://t?d=1.eyJuIjoiU2F0dXJkYXkgU2Vzc2lvbiIsInEiOlsicnVuOjFLTSIsInNsZWRQdXNoIiwicnVuOjFLTSIsIndhbGxCYWxscyJdLCJzIjoyfQ"
             if let u = URL(string: link) { XCUIDevice.shared.system.open(u) }
             sleep(3)
             // 시스템이 "앱에서 열까요?" 를 물으면 Open
@@ -403,6 +403,43 @@ final class ScreenshotTests: XCTestCase {
                 shot("F8_link_added")
             }
         }
+    }
+
+    // MARK: 8. 대회 카드 단계 (남은 날에 따라 바탕이 달라짐) + 스토어 스크린샷용 화면
+
+    func test8_race_stages_store() {
+        // 대회 카드 바탕: D-20 보통 · D-9 노란 기운 살짝 · D-DAY 가장 진하게 (D-3 은 test7 의 F1). 도는 빛은 사진으로는 한 순간만 보임
+        for days in [20, 9, 0] {
+            launch(onboarded: true, extra: ["--friends", "--racedays=\(days)"])
+            shot("R_home_race_d\(days)")
+            app.terminate()
+        }
+        // 기록 상세 그래프: 위의 노란 버튼이 잘려 보이지 않는 자리까지만 올림
+        launch(onboarded: true, extra: ["--sharephoto=splash"])
+        tab("Race")
+        app.swipeUp(); app.swipeUp()
+        tapContaining("vs goal")
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+        from.press(forDuration: 0.1, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -352)),
+                   withVelocity: .slow, thenHoldForDuration: 0.4)
+        shot("ST_detail_charts")
+        for _ in 0..<3 { app.swipeDown() }
+        // 공유: 앱 첫 화면 사진 + 연기 (옅게 · 짙게) — 표는 중간 크기 + 아이콘 모양
+        tap("Share with photo")
+        shot("ST_share_splash_gradient")
+        app.swipeUp()
+        id("share.smoke.light")
+        app.swipeDown()
+        shot("ST_share_splash_haze_light")
+        app.swipeUp()
+        id("share.smoke.strong")
+        app.swipeDown()
+        shot("ST_share_splash_haze_heavy")
+        tap("Post 4:5")
+        shot("ST_share_splash_post")
+        tap("Story 9:16")
+        tap("Block")
+        shot("ST_share_block")
     }
 
     // MARK: 6. 아이폰으로 기록: 3 · 2 · 1 → 진행 → 넘기기 → 되돌리기

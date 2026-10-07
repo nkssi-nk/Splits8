@@ -381,19 +381,23 @@ struct PhoneLiveMetrics {
     var totalFont: CGFloat { 76 * k }
     var segFont: CGFloat { 64 * k }
     var icon: CGFloat { 52 * k }
-    var nameFont: CGFloat { 24 * min(k, 1.08) }
-    var detailFont: CGFloat { 15 * min(k, 1.08) }
-    var nextFont: CGFloat { 24 * min(k, 1.08) }
-    var nextIcon: CGFloat { 30 * min(k, 1.08) }
-    var nextLabel: CGFloat { 15 * min(k, 1.08) }
+    // 빌드 21 (시안 A-1): 지금 종목 이름 · NEXT 줄은 키우고, Next 버튼은 70% 로 줄여 위로 올림
+    var nameFont: CGFloat { 28 * min(k, 1.08) }
+    var detailFont: CGFloat { 16 * min(k, 1.08) }
+    var nextFont: CGFloat { 27 * min(k, 1.08) }
+    var nextIcon: CGFloat { 34 * min(k, 1.08) }
+    var nextLabel: CGFloat { 16.5 * min(k, 1.08) }
     var top: CGFloat { 24 * k }
-    var segTop: CGFloat { 30 * k }
+    var segTop: CGFloat { 36 * k }
+    var nameTop: CGFloat { 10 * k }
     var dividerTop: CGFloat { 26 * k }
-    var buttonH: CGFloat { max(80, min(104, 96 * k)) }
-    var buttonFont: CGFloat { 26 * min(k, 1.08) }
-    var pillH: CGFloat { max(54, min(68, 64 * k)) }
+    var buttonH: CGFloat { max(58, min(74, 66 * k)) }
+    var buttonFont: CGFloat { 22 * min(k, 1.08) }
+    var pillH: CGFloat { max(46, min(58, 53 * k)) }
+    /// Next 버튼과 아래 세 버튼(End · Undo · Pause) 사이
+    var pillGap: CGFloat { 27 * k }
     /// 아래 버튼 묶음(Next · End · Undo · Pause) 밑의 여백 — 버튼들이 화면 맨 아래에 붙지 않고 손이 닿기 쉬운 높이로 올라옴
-    var bottom: CGFloat { 52 * k }
+    var bottom: CGFloat { 90 * k }
 }
 
 // MARK: - 화면
@@ -453,7 +457,7 @@ struct PhoneLiveView: View {
                 undoPill(m)
                 pausePill(m)
             }
-            .padding(.top, 16 * m.k)
+            .padding(.top, m.pillGap)
             .padding(.bottom, m.bottom)
         }
         .padding(.horizontal, 20)
@@ -498,7 +502,7 @@ struct PhoneLiveView: View {
             .padding(.top, m.segTop)
             Text(cur.name)
                 .font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-                .padding(.top, 8 * m.k)
+                .padding(.top, m.nameTop)
             Text(detailLine)
                 .font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb)
                 .lineLimit(1).minimumScaleFactor(0.7)
@@ -556,8 +560,8 @@ struct PhoneLiveView: View {
     private func endPill(_ m: PhoneLiveMetrics) -> some View {
         Button { askEnd = true } label: {
             HStack(spacing: 7) {
-                Image(systemName: "stop.fill").font(.system(size: 14, weight: .semibold))
-                Text("End").font(F.t(16, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName: "stop.fill").font(.system(size: 13, weight: .semibold))
+                Text("End").font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(C.bad)
             .frame(maxWidth: .infinity).frame(height: m.pillH)
@@ -572,8 +576,8 @@ struct PhoneLiveView: View {
     private func pausePill(_ m: PhoneLiveMetrics) -> some View {
         Button { eng.togglePause() } label: {
             HStack(spacing: 7) {
-                Image(systemName: eng.running ? "pause.fill" : "play.fill").font(.system(size: 14, weight: .semibold))
-                Text(eng.running ? "Pause" : "Resume").font(F.t(16, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName: eng.running ? "pause.fill" : "play.fill").font(.system(size: 13, weight: .semibold))
+                Text(eng.running ? "Pause" : "Resume").font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(eng.running ? Color.white : C.accent)
             .frame(maxWidth: .infinity).frame(height: m.pillH)
@@ -589,8 +593,8 @@ struct PhoneLiveView: View {
         let on: Bool = eng.canUndo
         return Button { undo() } label: {
             HStack(spacing: 7) {
-                Image(systemName: "arrow.uturn.backward").font(.system(size: 14, weight: .semibold))
-                Text("Undo").font(F.t(16, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName: "arrow.uturn.backward").font(.system(size: 13, weight: .semibold))
+                Text("Undo").font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(on ? Color.white : C.text3)
             .frame(maxWidth: .infinity).frame(height: m.pillH)

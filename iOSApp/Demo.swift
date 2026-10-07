@@ -7,8 +7,12 @@ enum Demo {
     static var onboarded: Bool { CommandLine.arguments.contains("--onboarded") }
     /// 화면 확인용: 가입한 상태 + 친구 순위표 예시 (서버에는 가지 않음)
     static var friendsOn: Bool { enabled && CommandLine.arguments.contains("--friends") }
-    /// 화면 확인용: 대회가 3일 뒤 (홈 대회 카드 · D-3)
-    static var raceNear: Bool { enabled && CommandLine.arguments.contains("--racenear") }
+    /// 화면 확인용: 대회가 3일 뒤 (홈 대회 카드 · D-3). `--racedays=20` 처럼 남은 날을 정할 수도 있음
+    static var raceNear: Bool { enabled && (CommandLine.arguments.contains("--racenear") || raceDays != nil) }
+    static var raceDays: Int? {
+        guard enabled, let a = CommandLine.arguments.first(where: { $0.hasPrefix("--racedays=") }) else { return nil }
+        return Int(a.dropFirst("--racedays=".count))
+    }
 
     static func settings(_ s: inout Settings) {
         s.hasOnboarded = onboarded
@@ -21,7 +25,7 @@ enum Demo {
             var e = RaceEvent()
             e.name = "HYROX Incheon"
             e.loc = "Songdo Convensia"
-            e.date = Calendar.current.date(byAdding: .day, value: 3, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+            e.date = Calendar.current.date(byAdding: .day, value: raceDays ?? 3, to: Calendar.current.startOfDay(for: Date())) ?? Date()
             s.event = e
         }
         if friendsOn {

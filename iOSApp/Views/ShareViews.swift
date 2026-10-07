@@ -144,17 +144,19 @@ struct ShareCard: View {
         .clipped()
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
+        // 공유 그림은 아이폰의 "볼드체 텍스트" 설정과 상관없이 누가 만들어도 같은 굵기 (빌드 21)
+        .environment(\.legibilityWeight, .regular)
     }
 
     // MARK: 공통
 
-    /// 스테이션 이름 + 옆에 작은 사양 (50M · 152KG). 자리가 모자라면 사양이 먼저 줄어듦
+    /// 스테이션 이름 + 옆에 작은 사양 (50M · 152KG). 자리가 모자라면 사양이 먼저 줄어듦. 사양도 이름과 같은 색 (빌드 21)
     private func nameCell(_ p: ShareData.Pair, size: CGFloat, color: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Text(p.sn).font(F.t(size, .medium)).foregroundStyle(color).lineLimit(1)
                 .layoutPriority(1)
             if !p.spec.isEmpty {
-                Text(p.spec).font(F.num(max(8, size - 3.5), .medium)).foregroundStyle(color.opacity(0.5))
+                Text(p.spec).font(F.num(max(8, size - 3.5), .medium)).foregroundStyle(color)
                     .lineLimit(1).minimumScaleFactor(0.75)
             }
         }
@@ -265,8 +267,10 @@ struct ShareCard: View {
         if mid && !bot { m *= 1 - ease((y - 0.62) / 0.18) }
         if bot {
             // 어두워지기 시작하는 곳 → 완전히 어두워지는 곳 (Story 는 화면 높이의 30% → 74%)
-            let b0: Double = mid ? 0.60 : (post ? 0.22 : 0.30)
-            let b1: Double = mid ? 0.78 : (post ? 0.60 : 0.74)
+            // 빌드 21: 표가 커진 만큼(tableGrow) 위에서 시작 — 큰 시간 · 날짜 줄 뒤가 전처럼 어둡게
+            let g: Double = tableGrow
+            let b0: Double = mid ? max(0.40, 0.60 - g) : (post ? 0.22 : max(0.04, 0.30 - g))
+            let b1: Double = mid ? max(0.58, 0.78 - g) : (post ? 0.60 : max(0.42, 0.74 - g))
             // 가운데 짙기 위에 이어서 올림 (둘 중 큰 값을 고르면 만나는 자리가 꺾여 띠로 보임)
             m = m + (1 - m) * ease((y - b0) / (b1 - b0))
         }
@@ -288,7 +292,7 @@ struct ShareCard: View {
     private var posterPhotoH: CGFloat {
         if smokeOn || !gradient || !occupied(2) { return h }
         if occupied(1) { return h * 0.80 }
-        return h * (post ? 0.62 : 0.76)
+        return h * (post ? 0.62 : CGFloat(max(0.44, 0.76 - tableGrow)))
     }
 
     private var poster: some View {
@@ -518,36 +522,70 @@ struct ShareCard: View {
         }
     }
 
-    // grid 20px | 1fr | 40px | 40px, column-gap 8 (아이콘 없음)
+    // 빌드 21: 아이콘 18 | "1. 이름" | (빈칸) | 사양 | RUN | STN, column-gap 8 — 풀 시뮬 안내 창과 같은 모양.
+    // Story 는 글자 13 · 줄 28 (전에는 11 · 23). 줄이 많으면(트레이닝 여러 세트) 카드 안에 들어가게 줄 높이를 줄임
+
+    /// Poster 표의 줄 높이: Story 8줄이면 28, Post 8줄이면 19. 줄이 많으면 남는 높이를 나눠 씀
+    private var tableRowH: CGFloat {
+        let n: CGFloat = CGFloat(max(1, d.pairs.count))
+        let room: CGFloat = post ? 164 : 343
+        let fit: CGFloat = (room / n).rounded(.down)
+        return post ? min(19, max(10, fit)) : min(28, max(14, fit))
+    }
+    /// 줄 높이에 맞춘 글자 크기 (Story 13 까지, Post 10 까지)
+    private var tableFont: CGFloat {
+        let r: CGFloat = tableRowH
+        return post ? min(10, max(7, r * 0.53)) : min(13, max(8, r * 0.48))
+    }
+    /// Story 에서 아래 자리의 표가 빌드 20(204pt)보다 커진 만큼 (카드 높이에 대한 비율)
+    private var tableGrow: Double {
+        guard !post, showSplits, !d.pairs.isEmpty, layout.table == 2 else { return 0 }
+        let tableH: CGFloat = CGFloat(d.pairs.count) * tableRowH + 20
+        return Double(max(0, tableH - 204) / 640)
+    }
+
     private var posterTable: some View {
-        let size: CGFloat = post ? 10 : 11
-        let rowH: CGFloat = post ? 19 : 23
+        let rowH: CGFloat = tableRowH
+        let size: CGFloat = tableFont
+        let numW: CGFloat = size > 11.5 ? 44 : 40
         return VStack(spacing: 0) {
             HStack(alignment: .bottom, spacing: 8) {
-                Color.clear.frame(width: 20, height: 1)
+                Color.clear.frame(width: 18, height: 1)
                 tinyLabel("STATION", color: tc).frame(maxWidth: .infinity, alignment: .leading)
-                tinyLabel("RUN", color: tc).frame(width: 40, alignment: .trailing)
-                tinyLabel("STN", color: tc).frame(width: 40, alignment: .trailing)
+                tinyLabel("RUN", color: tc).frame(width: numW, alignment: .trailing)
+                tinyLabel("STN", color: tc).frame(width: numW, alignment: .trailing)
             }
             .padding(.bottom, 6)
             .overlay(alignment: .bottom) { Rectangle().fill(tcLine).frame(height: 1) }
             ForEach(d.pairs.indices, id: \.self) { i in
-                posterRow(d.pairs[i], size: size, last: i == d.pairs.count - 1)
+                posterRow(d.pairs[i], index: i, size: size, rowH: rowH, numW: numW, last: i == d.pairs.count - 1)
                     .frame(height: rowH)
             }
         }
     }
 
-    private func posterRow(_ p: ShareData.Pair, size: CGFloat, last: Bool) -> some View {
+    private func posterRow(_ p: ShareData.Pair, index: Int, size: CGFloat, rowH: CGFloat, numW: CGFloat,
+                           last: Bool) -> some View {
         let line: Color = textBlack ? Color.black.opacity(0.10) : Color.white.opacity(0.07)
+        let name: String = p.sn.isEmpty ? "Run" : p.sn
+        let icon: CGFloat = max(8, min(17, min(size + 4, rowH - 3)))
         return HStack(spacing: 8) {
-            Text(p.no).font(F.num(10, .semibold)).foregroundStyle(acc)
-                .frame(width: 20, alignment: .leading)
-            nameCell(p, size: size, color: tc)
-            Text(p.rt).font(F.num(size, .medium)).foregroundStyle(tc).lineLimit(1)
-                .frame(width: 40, alignment: .trailing)
-            Text(p.st).font(F.num(size, .semibold)).foregroundStyle(tc).lineLimit(1)
-                .frame(width: 40, alignment: .trailing)
+            Icon8(p.icon, icon, acc)
+                .frame(width: 18)
+            // 이름과 사양은 글자 밑줄(baseline)을 맞춤
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(verbatim: "\(index + 1). \(name)").font(F.t(size, .medium)).foregroundStyle(tc).lineLimit(1)
+                    .layoutPriority(1)
+                Spacer(minLength: 0)
+                if !p.spec.isEmpty {
+                    Text(p.spec).font(F.num(max(8, size - 3.5), .medium)).foregroundStyle(tc)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
+            }
+            Text(p.rt).font(F.num(size, .medium)).foregroundStyle(tc).lineLimit(1).minimumScaleFactor(0.8)
+                .frame(width: numW, alignment: .trailing)
+            Text(p.st).font(F.num(size, .semibold)).foregroundStyle(tc).lineLimit(1).minimumScaleFactor(0.8)
+                .frame(width: numW, alignment: .trailing)
         }
         .frame(maxHeight: .infinity)
         .overlay(alignment: .bottom) {
@@ -1046,7 +1084,14 @@ struct ShareView: View {
         .padding(.horizontal, 16)
         .photosPicker(isPresented: $showPicker, selection: $pick, matching: .images)
         .onAppear {
-            if photo == nil && CommandLine.arguments.contains("--sharephoto") { photo = Self.demoPhoto(); mono = false }
+            // --sharephoto=splash: 앱 첫 화면 사진 (스토어 스크린샷용) / --sharephoto: 글자가 읽히는지 보는 복잡한 그림
+            if photo == nil {
+                if CommandLine.arguments.contains("--sharephoto=splash") {
+                    photo = UIImage(named: "splash") ?? Self.demoPhoto(); mono = false
+                } else if CommandLine.arguments.contains("--sharephoto") {
+                    photo = Self.demoPhoto(); mono = false
+                }
+            }
         }
         .alert("Couldn't save", isPresented: Binding(get: { saveFail != nil }, set: { if !$0 { saveFail = nil } })) {
             Button("Open Settings") {

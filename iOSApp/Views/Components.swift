@@ -790,7 +790,8 @@ struct HorizontalPan: UIGestureRecognizerRepresentable {
 // MARK: - 테두리를 따라 도는 빛
 
 /// 카드 테두리를 따라 밝은 빛이 도는 효과.
-/// once = 화면에 나타날 때마다 한 바퀴 돌고 멈춤 / loop = 천천히 계속 / off = 빛 없음(테두리만).
+/// once = 화면에 나타날 때마다 한 바퀴 돌고 멈춤 / loop = 계속 / off = 빛 없음(테두리만).
+/// loop 일 때는 밝기(intensity) · 한 바퀴 시간(lap) · 빛 두 줄기(double)를 정할 수 있음 (대회 카드가 남은 날에 따라 씀).
 /// "동작 줄이기"를 켠 사람에게는 빛이 돌지 않음
 struct BorderLight: ViewModifier {
     enum Mode: Equatable { case off, once, loop }
@@ -803,6 +804,12 @@ struct BorderLight: ViewModifier {
     /// 시작을 늦춤 (위 카드의 빛이 끝날 즈음 이어서 돌게)
     var delay: Double = 0
     var lineWidth: CGFloat = 1.5
+    /// loop 의 빛 밝기 (0~1)
+    var intensity: Double = 1
+    /// loop 의 한 바퀴 시간 (초)
+    var lap: Double = 6
+    /// loop 에서 빛 두 줄기가 마주 돎
+    var double: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -828,13 +835,7 @@ struct BorderLight: ViewModifier {
                     GeometryReader { g in
                         let side: CGFloat = max(1, hypot(g.size.width, g.size.height))
                         // 한 구간만 밝은 원뿔 그라데이션을 돌리고, 테두리 모양으로 잘라 냄
-                        AngularGradient(stops: [.init(color: light.opacity(0), location: 0),
-                                                .init(color: light.opacity(0), location: 0.70),
-                                                .init(color: light.opacity(0.55), location: 0.86),
-                                                .init(color: light, location: 0.955),
-                                                .init(color: Color.white, location: 0.985),
-                                                .init(color: light.opacity(0), location: 1)],
-                                        center: .center)
+                        AngularGradient(stops: beamStops, center: .center)
                             .frame(width: side, height: side)
                             .rotationEffect(.degrees(angle))
                             .position(x: g.size.width / 2, y: g.size.height / 2)
@@ -846,7 +847,22 @@ struct BorderLight: ViewModifier {
             }
             .onAppear { start() }
             .onChange(of: mode) { _, _ in start() }
+            .onChange(of: lap) { _, _ in start() }
+            .onChange(of: intensity) { _, _ in start() }
             .onChange(of: scenePhase) { _, p in if p == .active { start() } }
+    }
+
+    /// 빛 한 줄기 = 원의 뒤쪽 30% (꼬리가 길고 머리가 흼). 두 줄기면 반대편에 하나 더
+    private var beamStops: [Gradient.Stop] {
+        func beam(_ at: Double) -> [Gradient.Stop] {
+            [.init(color: light.opacity(0), location: at),
+             .init(color: light.opacity(0.55), location: at + 0.16),
+             .init(color: light, location: at + 0.255),
+             .init(color: Color.white, location: at + 0.285),
+             .init(color: light.opacity(0), location: at + 0.30)]
+        }
+        let head: [Gradient.Stop] = [.init(color: light.opacity(0), location: 0)]
+        return double ? head + beam(0.20) + beam(0.70) : head + beam(0.70)
     }
 
     private func start() {
@@ -858,13 +874,18 @@ struct BorderLight: ViewModifier {
         var t = Transaction()
         t.disablesAnimations = true
         withTransaction(t) { angle = -90; shine = 0 }
+        // 화면 확인(자동 테스트): 끝없이 도는 빛은 테스트가 "화면이 멈출 때"를 기다리느라 느려지므로, 한 자리에 세워 둠
+        if Demo.enabled && m == .loop {
+            withTransaction(t) { angle = 20; shine = intensity }
+            return
+        }
         // 앱을 막 켰을 때는 가운데 로고가 화면을 가리고 있으므로(약 1.7초) 그 뒤에 시작
         let logo: Double = Demo.enabled ? 0 : max(0, 1.8 - Date().timeIntervalSince(BorderLight.launched))
         DispatchQueue.main.asyncAfter(deadline: .now() + (delay + logo + 0.05)) {
             guard mine == run else { return }
             if m == .loop {
-                withAnimation(.easeOut(duration: 0.4)) { shine = 1 }
-                withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) { angle = 270 }
+                withAnimation(.easeOut(duration: 0.4)) { shine = intensity }
+                withAnimation(.linear(duration: max(1, lap)).repeatForever(autoreverses: false)) { angle = 270 }
             } else {
                 withAnimation(.easeOut(duration: 0.25)) { shine = 1 }
                 withAnimation(.easeInOut(duration: 2.6)) { angle = 270 }

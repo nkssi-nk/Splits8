@@ -1,25 +1,29 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - I5 Settings (위 고정 바: SPLITS8 · Settings)
 
 struct SettingsView: View {
     let store = Store.shared
     let r = Router.shared
+    /// 백업 파일 고르기 · 결과 안내 · 로그아웃 확인
+    @State private var importing = false
+    @State private var backupMessage: String?
+    @State private var confirmSignOut = false
 
     var body: some View {
         VStack(spacing: 10) {
             profileCard
             VStack(spacing: 0) {
-                SettingRow(title: "Running", value: RunModes.name(store.settings.runMode)) { r.go(.setRun) }
+                // 구간 목표는 Race 탭의 "Split targets" 한 곳에서만 고침 (빌드 20)
+                SettingRow(title: "Running", value: RunModes.name(store.settings.runMode), last: true) { r.go(.setRun) }
                     .accessibilityIdentifier("settings.running")
-                SettingRow(title: "Split goals", value: Fm.t(store.settings.goals.reduce(0, +)), numeric: true, last: true) { r.go(.setGoals) }
-                    .accessibilityIdentifier("settings.goals")
             }
             .card8()
 
             SectionLabel(text: "FRIENDS", top: 14)
             VStack(spacing: 0) {
-                SettingRow(title: "Friends", value: friendsValue, last: true) { r.go(.friends) }
+                SettingRow(title: "Friends", value: friendsValue, last: true) { r.friendsFrom = .settings; r.go(.friends) }
                     .accessibilityIdentifier("settings.friends")
             }
             .card8()
@@ -37,6 +41,8 @@ struct SettingsView: View {
             languageSection
 
             Group {
+                themeSection
+
                 SectionLabel(text: "DEVICE", top: 14)
                 deviceCard
 
@@ -51,8 +57,90 @@ struct SettingsView: View {
                 }
                 .card8()
             }
+
+            Group {
+                dataSection
+                if store.signedIn { signOutSection }
+            }
         }
         .padding(.horizontal, 16)
+        .fileImporter(isPresented: $importing, allowedContentTypes: [UTType.json]) { result in
+            restore(result)
+        }
+        .alert("Backup", isPresented: Binding(get: { backupMessage != nil }, set: { if !$0 { backupMessage = nil } })) {
+            Button("OK", role: .cancel) { backupMessage = nil }
+        } message: {
+            Text(backupMessage ?? "")
+        }
+        .confirmationDialog("Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+            Button("Sign out", role: .destructive) { Task { await store.signOut() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your records stay on this iPhone.")
+        }
+    }
+
+    // MARK: 기록 백업 (파일로 내보내기 · 가져오기)
+
+    private var dataSection: some View {
+        VStack(spacing: 10) {
+            SectionLabel(text: "DATA", top: 14)
+            VStack(spacing: 0) {
+                SettingRow(title: "Back up records", value: String(localized: "\(store.records.count) records")) { backUp() }
+                    .accessibilityIdentifier("settings.backup")
+                SettingRow(title: "Restore from backup", value: "", last: true) { importing = true }
+                    .accessibilityIdentifier("settings.restore")
+            }
+            .card8()
+            Note8(text: "Records are kept only on this iPhone and are deleted with the app. Save a backup file to Files or iCloud Drive before you delete the app or change phones.")
+        }
+    }
+
+    private func backUp() {
+        guard let url = store.exportBackup() else {
+            backupMessage = String(localized: "Couldn't make the backup file. Please try again.")
+            return
+        }
+        ShareSheet.present([url])
+    }
+
+    private func restore(_ result: Result<URL, Error>) {
+        guard case .success(let url) = result else { return }
+        let scoped: Bool = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else {
+            backupMessage = String(localized: "Couldn't open the file. If it's in iCloud, wait for it to download and try again.")
+            return
+        }
+        guard let added = store.importBackup(data) else {
+            backupMessage = String(localized: "This file isn't a SPLITS8 backup.")
+            return
+        }
+        if added.records == 0 && added.programs == 0 {
+            backupMessage = String(localized: "Nothing new to restore. Everything in this file is already here.")
+        } else {
+            backupMessage = String(localized: "Restored \(added.records) records and \(added.programs) trainings.")
+        }
+    }
+
+    // MARK: 로그아웃 (프로필 화면 맨 아래에도 있지만 찾기 쉽게 설정 맨 아래에도 둠)
+
+    private var signOutSection: some View {
+        VStack(spacing: 10) {
+            SectionLabel(text: "ACCOUNT", top: 14)
+            Button { confirmSignOut = true } label: {
+                HStack(spacing: 12) {
+                    Text("Sign out").font(F.t(17)).foregroundStyle(.white)
+                    Spacer(minLength: 8)
+                    Text(verbatim: "@" + (store.settings.nickname ?? "")).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
+                }
+                .padding(.vertical, 14).padding(.horizontal, 18)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .card8()
+            .accessibilityIdentifier("settings.signout")
+        }
     }
 
     private func openWeb(_ s: String) {
@@ -74,6 +162,34 @@ struct SettingsView: View {
         }
         .alert("Restart the app to apply the language.", isPresented: $askRestart) {
             Button("OK", role: .cancel) {}
+        }
+    }
+
+    // MARK: 테마 (화면 뒤에 비치는 빛의 색. 노란 버튼 · 로고는 그대로) — 워치 화면도 같은 색을 따름
+
+    private var themeSection: some View {
+        VStack(spacing: 10) {
+            SectionLabel(text: "THEME", top: 14)
+            HStack(spacing: 8) {
+                Text("Glow color").font(F.t(17)).lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                GlowSwatches(selected: store.settings.glow, idPrefix: "settings.theme") { t in
+                    store.settings.glow = t
+                }
+            }
+            .padding(.vertical, 8).padding(.horizontal, 18)
+            .card8()
+            // 고른 색이 이 줄에 은은하게 비침 (설정 화면의 배경 빛은 흰색이라 여기서 바로 보이게)
+            .overlay {
+                let t: GlowTheme = store.settings.glow
+                LinearGradient(stops: [.init(color: Color(hex: t.hex, alpha: 0), location: 0),
+                                       .init(color: Color(hex: t.hex, alpha: min(0.3, 0.16 * t.gain)), location: 1)],
+                               startPoint: .leading, endPoint: .trailing)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .allowsHitTesting(false)
+            }
+            .animation(.easeInOut(duration: 0.3), value: store.settings.glow)
+            Note8(text: "Changes the glow behind each screen. Yellow buttons and the logo stay the same.")
         }
     }
 
@@ -143,9 +259,9 @@ struct SettingsView: View {
         .padding(.bottom, 10)
     }
 
-    /// Open Men · Photo · division · heart rate (· Not signed up)
+    /// Open Men (· Not signed up)
     private func profileSub(_ signed: Bool) -> String {
-        var parts: [String] = [store.div.name, "Photo · division · heart rate".l10n]
+        var parts: [String] = [store.div.name]
         if !signed { parts.append("Not signed up".l10n) }
         return parts.joined(separator: " · ")
     }
@@ -297,7 +413,7 @@ struct SetHrView: View {
     }
 }
 
-// MARK: - I5b Split goals (위 고정 바: ‹ Settings · Split goals)
+// MARK: - I5b Split goals (위 고정 바: ‹ Race · Split goals) — Race 탭의 "Split targets" 에서 들어옴
 
 struct SetGoalsView: View {
     let store = Store.shared
@@ -322,7 +438,7 @@ struct SetGoalsView: View {
             .lineLimit(1)
             .padding(.horizontal, 4).padding(.bottom, 6)
             VStack(spacing: 0) {
-                Text("Used as split targets in Full Simulation and Race. Adjust in 5-second steps.")
+                Text("Used as split targets in Race, and in Full Simulation when Compare with is set to Goal. Adjust in 5-second steps.")
                     .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(13 * 0.45 - 3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)

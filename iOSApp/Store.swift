@@ -9,7 +9,14 @@ import UserNotifications
 final class Store: NSObject, WCSessionDelegate {
     static let shared = Store()
 
-    var settings = Settings() { didSet { persist("settings") } }
+    var settings = Settings() {
+        didSet {
+            GlowTheme.current = settings.glow
+            persist("settings")
+            // 디비전을 바꾸면 서버 프로필에도 알림 (다른 기기에 로그인했을 때 같은 디비전이 되게)
+            if !loading, !Demo.enabled, oldValue.division != settings.division, signedIn { Task { await syncProfile() } }
+        }
+    }
     var programs: [Program] = [] { didSet { persist("programs") } }
     private(set) var records: [Record] = []
     var friends: [Friend] = [] { didSet { persist("friends") } }
@@ -55,14 +62,33 @@ final class Store: NSObject, WCSessionDelegate {
             records = Demo.records()
             friends = []
             plans = []
+            if Demo.friendsOn { leaderboard = Demo.leaderboard() }
         }
-        if sb.session == nil && settings.nickname != nil { settings.nickname = nil }   // 세션이 없으면 로그아웃 상태
+        if sb.session == nil && settings.nickname != nil && !Demo.friendsOn { settings.nickname = nil }   // 세션이 없으면 로그아웃 상태
+        GlowTheme.current = settings.glow
         loading = false
+        // 빌드 19 까지는 디비전을 바꿔도 서버에 알리지 않았음 → 이 기기의 디비전을 한 번 올려 둠
+        // (안 그러면 다른 기기에 로그인할 때 서버의 옛 디비전이 내려와 덮어씀)
+        let pushKey = "profile.pushed.v1"
+        if !Demo.enabled && signedIn && !UserDefaults.standard.bool(forKey: pushKey) {
+            Task {
+                await syncProfile()
+                UserDefaults.standard.set(true, forKey: pushKey)
+            }
+        }
+        // 빌드 19 까지는 대회 출발 시간이 기본값 09:00 으로 들어가 있었음 → 한 번만 비움 (모르는 시간을 아는 것처럼 보이지 않게)
+        let timeKey = "event.time.optional.v1"
+        if !UserDefaults.standard.bool(forKey: timeKey) {
+            if !Demo.enabled && settings.event.time == "09:00" { settings.event.time = "" }
+            UserDefaults.standard.set(true, forKey: timeKey)
+        }
     }
 
     var div: Division { settings.div }
     var friend: Friend? { friends.first { $0.id == settings.friendId } }
-    var signedIn: Bool { settings.signedIn && sb.session != nil }
+    var signedIn: Bool { settings.signedIn && (sb.session != nil || Demo.friendsOn) }
+    /// 내 계정 id (순위표에서 "나" 줄을 찾을 때). 화면 확인용 예시에서는 예시 id
+    var myId: String? { Demo.friendsOn ? "demo.me" : sb.userId }
 
     private func persist(_ what: String) {
         guard !loading, !Demo.enabled else { return }
@@ -188,6 +214,35 @@ final class Store: NSObject, WCSessionDelegate {
         if signedIn { Task { try? await sb.upload(r) } }
     }
 
+    // MARK: 백업 파일 (서버를 쓰지 않음 — 파일 하나로 내보내고 다시 가져옴)
+
+    /// 기록 · 트레이닝을 임시 파일로 만듦 → 공유 시트로 "파일에 저장" 등
+    func exportBackup() -> URL? {
+        let b = BackupFile(exportedAt: Date(), records: records, programs: programs)
+        guard let d = b.data() else { return nil }
+        let url: URL = FileManager.default.temporaryDirectory.appendingPathComponent(BackupFile.fileName(Date()))
+        do { try d.write(to: url, options: .atomic) } catch { return nil }
+        return url
+    }
+
+    /// 백업 파일에서 가져오기: 이미 있는 것은 건너뛰고 없는 기록 · 트레이닝만 더함.
+    /// (더한 기록 수, 더한 트레이닝 수) · SPLITS8 백업 파일이 아니면 nil
+    func importBackup(_ data: Data) -> (records: Int, programs: Int)? {
+        guard let b = BackupFile.read(data) else { return nil }
+        let have: Set<UUID> = Set(records.map(\.id))
+        let fresh: [Record] = b.records.filter { !have.contains($0.id) }
+        let mergedR: ([Record], Int) = BackupFile.merge(b.records, into: records)
+        let mergedP: ([Program], Int) = BackupFile.merge(b.programs, into: programs, limit: Program.freeLimit)
+        if mergedR.1 > 0 {
+            records = mergedR.0
+            if !Demo.enabled { JSONStore.save(records, "records.json") }
+        }
+        if mergedP.1 > 0 { programs = mergedP.0 }
+        pushToWatch()
+        if signedIn && !fresh.isEmpty { Task { for r in fresh { try? await sb.upload(r) } } }
+        return (mergedR.1, mergedP.1)
+    }
+
     /// 기록의 더블 파트너 바꾸기 (nil = 빼기). 이 기기에만 저장.
     func updatePartner(_ id: UUID, _ nick: String?) {
         guard let i = records.firstIndex(where: { $0.id == id }) else { return }
@@ -202,6 +257,8 @@ final class Store: NSObject, WCSessionDelegate {
         if signedIn { Task { try? await sb.deleteRecord(r.id) } }
     }
 
+    /// 가장 최근 Full Simulation (정상 기록만) — "Compare with: Last" 의 기준
+    var simLast: Record? { records(.sim).filter { $0.counts && $0.splits16 != nil }.max { $0.date < $1.date } }
     /// 최고 Full Simulation
     /// (미완료·확인 필요 기록은 빼고)
     var simBest: Record? { records(.sim).filter { $0.counts && $0.splits16 != nil }.min { $0.total < $1.total } }
@@ -303,7 +360,7 @@ final class Store: NSObject, WCSessionDelegate {
         } else {
             try? FileManager.default.removeItem(at: url)
             avatarUrl = nil
-            if signedIn { Task { await syncProfile() } }
+            if signedIn { Task { await syncProfile(clearAvatar: true) } }
         }
     }
 
@@ -321,20 +378,55 @@ final class Store: NSObject, WCSessionDelegate {
 
     // MARK: 계정 (Supabase)
 
-    /// 로그인 끝난 뒤: 프로필 읽기. 닉네임이 있으면 바로 로그인 상태, 없으면 nil 반환 (닉네임 만들기로)
-    @discardableResult
-    func loadProfile() async -> RemoteProfile? {
-        guard let p = try? await sb.myProfile() else { return nil }
-        if let n = p.nickname {
-            var s = settings
-            s.nickname = n
-            s.email = sb.session?.email ?? s.email
-            s.visibility = p.visibility ?? s.visibility
-            settings = s
-            avatarUrl = p.avatar_url
-            await refreshSocial()
+    /// 로그인 뒤 프로필을 읽은 결과
+    enum ProfileLoad {
+        /// 서버에 닉네임이 있음 → 이 기기에 그대로 가져옴 (닉네임 · 공개 범위 · 디비전 · 프로필 사진)
+        case found
+        /// 서버에 아직 프로필(닉네임)이 없음 → 닉네임 만들기로
+        case none
+        /// 읽지 못함 (네트워크 등). 닉네임이 없는 것으로 보면 안 됨
+        case failed(String)
+    }
+
+    /// 로그인 끝난 뒤: 프로필 읽기.
+    /// 빌드 19 까지는 "읽기 실패"와 "프로필 없음"을 구분하지 못해, 이미 닉네임이 있는 계정인데도 닉네임을 다시 만들라고 나올 수 있었음.
+    /// 실패하면 한 번 더 해 보고, 그래도 안 되면 .failed
+    func loadProfile() async -> ProfileLoad {
+        var message: String = ""
+        for attempt in 0..<2 {
+            do {
+                let found: RemoteProfile? = try await sb.myProfile()
+                guard let p = found, let n = p.nickname, !n.isEmpty else { return .none }
+                await applyRemote(p, nickname: n)
+                return .found
+            } catch {
+                message = error.localizedDescription
+                if attempt == 0 { try? await Task.sleep(nanoseconds: 700_000_000) }
+            }
         }
-        return p
+        return .failed(message)
+    }
+
+    /// 서버 프로필을 이 기기에 적용 (같은 계정으로 다른 기기에 로그인했을 때 같은 모습이 되게)
+    private func applyRemote(_ p: RemoteProfile, nickname n: String) async {
+        avatarUrl = p.avatar_url          // settings 보다 먼저 (디비전이 바뀌면 바로 서버에 다시 알리므로)
+        var s = settings
+        s.nickname = n
+        s.email = sb.session?.email ?? s.email
+        s.visibility = p.visibility ?? s.visibility
+        if let name = p.division, let d = Division.all.first(where: { $0.name == name }) { s.division = d.key }
+        settings = s
+        if photo == nil, let u = p.avatar_url { await downloadAvatar(u) }
+        await refreshSocial()
+    }
+
+    /// 서버에 있는 내 프로필 사진을 이 기기로 받음 (다시 올리지는 않음)
+    private func downloadAvatar(_ s: String) async {
+        guard s.hasPrefix(Config.supabaseURL), let u = URL(string: s) else { return }
+        guard let (d, resp) = try? await URLSession.shared.data(from: u) else { return }
+        guard (resp as? HTTPURLResponse)?.statusCode == 200, d.count <= 5_000_000, let img = UIImage(data: d) else { return }
+        try? d.write(to: JSONStore.url("avatar.jpg"), options: .atomic)
+        await MainActor.run { self.photo = img }
     }
 
     /// 닉네임 저장 (가입 마무리 · 변경)
@@ -349,9 +441,10 @@ final class Store: NSObject, WCSessionDelegate {
         await refreshSocial()
     }
 
-    func syncProfile() async {
+    func syncProfile(clearAvatar: Bool = false) async {
         guard signedIn else { return }
-        try? await sb.upsertProfile(nickname: nil, division: div.name, visibility: settings.visibility, avatarUrl: avatarUrl)
+        try? await sb.upsertProfile(nickname: nil, division: div.name, visibility: settings.visibility, avatarUrl: avatarUrl,
+                                    clearAvatar: clearAvatar)
     }
 
     private func syncAvatar(_ d: Data) async {
@@ -360,7 +453,7 @@ final class Store: NSObject, WCSessionDelegate {
 
     /// 친구 목록 · 순위표 · 대회 목록 새로 받기
     func refreshSocial() async {
-        guard signedIn else { return }
+        guard signedIn, !Demo.enabled else { return }
         if let rows = try? await sb.friends() {
             let sel = settings.friendId
             friends = rows.filter { ($0.status == "accepted" || $0.status == "pending") && !isBlocked($0.user_id) }.map {
@@ -373,6 +466,7 @@ final class Store: NSObject, WCSessionDelegate {
     }
 
     func refreshLeaderboard() async {
+        if Demo.enabled { return }          // 화면 확인용 예시는 서버에 가지 않음
         guard signedIn else { leaderboard = []; return }
         let kind = settings.lbTab == "stations" ? "station" : settings.lbTab
         let st = Station.all.firstIndex { $0.key == settings.lbStation } ?? 0
@@ -414,7 +508,8 @@ final class Store: NSObject, WCSessionDelegate {
         let pft = pftBest
         let ctx = WatchContext(settings: settings, programs: programs, friend: friend?.hasSplits == true ? friend : nil,
                                simBest: best?.splits16, simBestTotal: best?.total, segBests: segBests,
-                               pftBest: pft?.pftSplits, pftBestTotal: pft?.total)
+                               pftBest: pft?.pftSplits, pftBestTotal: pft?.total,
+                               simLast: simLast?.splits16)
         guard let d = try? JSONStore.enc.encode(ctx) else { return }
         try? WCSession.default.updateApplicationContext([SyncKey.context: d])
     }

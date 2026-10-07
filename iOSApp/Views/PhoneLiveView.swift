@@ -34,7 +34,8 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored private var segDists: [Double?] = []
 
     @ObservationIgnored private var settings = Settings()
-    @ObservationIgnored private var friend: Friend?
+    /// Full Sim 비교 이름 (시작할 때 정함: VS GOAL / VS LAST / VS 친구 / VS BEST)
+    @ObservationIgnored private var simWord = "VS BEST"
     /// PFT: 시작할 때 이미 최고 기록이 있었는지 (있으면 그 구간 시간이 목표)
     @ObservationIgnored private var hasPFTBest = false
 
@@ -107,12 +108,12 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    /// Full Simulation 목표 16개: 선택한 친구 → 내 최고 → 기본값
-    static func simTargets(_ store: Store) -> [Int] {
-        if let f = store.friend, f.hasSplits { return f.splits }
-        if let b = store.simBest?.splits16, b.count == 16 { return b }
-        return SeqBuilder.defaultTargets16
+    /// Full Simulation 목표 16개와 비교 이름: Full Sim 화면의 "Compare with" (Goal / Last / 친구) 를 따름
+    static func simPick(_ store: Store) -> (targets: [Int], word: String) {
+        SimTarget.pick(cmp: store.settings.simCmp, goals: store.settings.goals, last: store.simLast?.splits16,
+                       friend: store.friend?.splits, friendFirst: store.friend?.first, best: store.simBest?.splits16)
     }
+    static func simTargets(_ store: Store) -> [Int] { simPick(store).targets }
 
     static func title(mode: Mode, program: Program?, store: Store) -> String {
         switch mode {
@@ -131,7 +132,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         guard !active else { return }
         let store = Store.shared
         settings = store.settings
-        friend = store.friend?.hasSplits == true ? store.friend : nil
+        simWord = PhoneRunEngine.simPick(store).word
         hasPFTBest = store.pftBest != nil
         mode = req.mode
         title = PhoneRunEngine.title(mode: req.mode, program: req.program, store: store)
@@ -281,10 +282,10 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         return r
     }
 
-    /// VS GOAL / VS JIHO / VS BEST (워치와 같음)
+    /// VS GOAL / VS LAST / VS JIHO / VS BEST (워치와 같음)
     var deltaWord: String {
         if mode == .race { return "VS GOAL" }
-        if mode == .sim, let f = friend { return "VS " + f.first.uppercased() }
+        if mode == .sim { return simWord }
         return "VS BEST"
     }
 
@@ -382,15 +383,17 @@ struct PhoneLiveMetrics {
     var icon: CGFloat { 52 * k }
     var nameFont: CGFloat { 24 * min(k, 1.08) }
     var detailFont: CGFloat { 15 * min(k, 1.08) }
-    var nextFont: CGFloat { 18 * min(k, 1.06) }
-    var nextIcon: CGFloat { 24 * min(k, 1.06) }
+    var nextFont: CGFloat { 24 * min(k, 1.08) }
+    var nextIcon: CGFloat { 30 * min(k, 1.08) }
+    var nextLabel: CGFloat { 15 * min(k, 1.08) }
     var top: CGFloat { 24 * k }
     var segTop: CGFloat { 30 * k }
     var dividerTop: CGFloat { 26 * k }
     var buttonH: CGFloat { max(80, min(104, 96 * k)) }
     var buttonFont: CGFloat { 26 * min(k, 1.08) }
     var pillH: CGFloat { max(54, min(68, 64 * k)) }
-    var bottom: CGFloat { 16 * k }
+    /// 아래 버튼 묶음(Next · End · Undo · Pause) 밑의 여백 — 버튼들이 화면 맨 아래에 붙지 않고 손이 닿기 쉬운 높이로 올라옴
+    var bottom: CGFloat { 52 * k }
 }
 
 // MARK: - 화면
@@ -475,6 +478,8 @@ struct PhoneLiveView: View {
         let el: Int = eng.segEl(now)
         let tint: IconTint = cur.kind == .rox ? .mute : .yellow
         let timeColor: Color = eng.running ? .white : C.text2
+        // 지금 하는 구간의 시간은 노랑 (전체 시간은 흰색) — 운동 중에 두 숫자가 헷갈리지 않게
+        let segColor: Color = eng.running ? C.accent : C.text2
         return VStack(spacing: 0) {
             Text("TOTAL").font(F.t(12, .semibold)).tracking(0.12 * 12).foregroundStyle(C.text2)
             Text(Fm.t(eng.total(now)))
@@ -486,7 +491,8 @@ struct PhoneLiveView: View {
                 Icon8(cur.icon, m.icon, tint: tint)
                 Text(Fm.t(el))
                     .font(F.num(m.segFont)).tracking(-0.01 * m.segFont)
-                    .foregroundStyle(timeColor)
+                    .foregroundStyle(segColor)
+                    .accessibilityIdentifier("phone.seg")
                     .lineLimit(1).minimumScaleFactor(0.6)
             }
             .padding(.top, m.segTop)
@@ -520,8 +526,8 @@ struct PhoneLiveView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, m.dividerTop)
                 .padding(.bottom, 14 * m.k)
-            HStack(spacing: 10) {
-                Text("NEXT").font(F.t(13)).tracking(0.1 * 13).foregroundStyle(C.text2)
+            HStack(spacing: 12) {
+                Text("NEXT").font(F.t(m.nextLabel)).tracking(0.1 * m.nextLabel).foregroundStyle(C.text2)
                 if let nx = eng.nextSeg {
                     Icon8(nx.icon, m.nextIcon, tint: nx.kind == .rox ? .mute : .yellow)
                     Text(nx.name).font(F.t(m.nextFont, .semibold)).lineLimit(1)

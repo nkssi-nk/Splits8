@@ -7,6 +7,8 @@ struct FriendsView: View {
     let r = Router.shared
     @State private var query = ""
     @State private var hit: RemoteProfile?
+    /// 찾기 결과 안내: "" 없음 / searching / none / error
+    @State private var searchState = ""
     /// 차단 확인창에 띄울 사람
     @State private var blockAsk: BlockedUser?
     /// 메일 앱을 열 수 없을 때 주소 안내
@@ -15,11 +17,20 @@ struct FriendsView: View {
     var body: some View {
         VStack(spacing: 10) {
             if store.signedIn {
-                SearchField8(placeholder: "Search nickname", text: $query, prefix: "@")
+                // 이메일 전체 또는 닉네임 전체를 정확히 넣어야 나옴 (앞 글자만으로는 안 나옴 — 모르는 사람을 훑어볼 수 없게)
+                SearchField8(placeholder: "Email or nickname", text: $query)
+                    .keyboardType(.emailAddress)
                     .onChange(of: query) { _, v in search(v) }
                     .padding(.top, 4)
                     .accessibilityIdentifier("friends.search")
                 if let h = hit, let n = h.nickname { hitCard(h, n) }
+                else if searchState == "none" {
+                    Note8(text: "No one found. Enter the full email or the full nickname.", color: C.text2)
+                        .accessibilityIdentifier("friends.none")
+                } else if searchState == "error" {
+                    Note8(text: "Couldn't search right now. Check your connection and try again.", color: C.text2)
+                }
+                Note8(text: "Friends who signed up with Apple and hid their email can only be found by nickname.")
             } else {
                 signUpCard
             }
@@ -118,7 +129,7 @@ struct FriendsView: View {
     /// 가입 전: 설명 13 회색 + Sign up 노란 알약 (padding 14×18, margin-top 4)
     private var signUpCard: some View {
         HStack(spacing: 12) {
-            Text("Sign up to find friends by nickname and compare records.")
+            Text("Sign up to find friends by email or nickname and compare records.")
                 .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(13 * 0.45 - 3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -198,14 +209,37 @@ struct FriendsView: View {
         return f.div + " · " + tail
     }
 
+    /// 찾을 글자: 앞뒤 빈칸을 빼고 소문자로. 닉네임 앞의 @ 는 뺌 (이메일 안의 @ 는 그대로)
+    private static func clean(_ v: String) -> String {
+        let t: String = v.trimmingCharacters(in: .whitespaces).lowercased()
+        return t.hasPrefix("@") ? String(t.dropFirst()) : t
+    }
+    /// 이메일 모양이거나 닉네임 모양(3–16자)일 때만 서버에 물어봄
+    private static func searchable(_ q: String) -> Bool {
+        q.range(of: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", options: .regularExpression) != nil
+            || q.range(of: "^[a-z0-9_]{3,16}$", options: .regularExpression) != nil
+    }
+
     private func search(_ v: String) {
-        let q = v.lowercased().replacingOccurrences(of: "@", with: "")
-        guard q.count >= 2 else { hit = nil; return }
+        let q: String = Self.clean(v)
+        hit = nil
+        guard Self.searchable(q) else { searchState = ""; return }
+        searchState = "searching"
         Task {
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            guard q == query.lowercased().replacingOccurrences(of: "@", with: "") else { return }
-            let res = (try? await store.sb.searchProfiles(prefix: q)) ?? []
-            hit = res.first { $0.id != store.sb.userId && !store.isBlocked($0.id) }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard q == Self.clean(query) else { return }
+            let found: RemoteProfile?
+            do { found = try await store.sb.findUser(q) } catch {
+                // 못 찾은 것과 물어보지 못한 것(네트워크 등)을 구분
+                if q == Self.clean(query) { hit = nil; searchState = "error" }
+                return
+            }
+            guard q == Self.clean(query) else { return }
+            if let p = found, p.id != store.sb.userId, !store.isBlocked(p.id) {
+                hit = p; searchState = ""
+            } else {
+                hit = nil; searchState = "none"
+            }
         }
     }
 

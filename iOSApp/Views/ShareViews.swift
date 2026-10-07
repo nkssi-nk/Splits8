@@ -6,7 +6,7 @@ import Photos
 
 struct ShareData {
     struct Part { let t: Int; let run: Bool; let icon: String }
-    struct Pair { let no: String; let icon: String; let sn: String; let rt: String; let st: String }
+    struct Pair { let no: String; let icon: String; let sn: String; let rt: String; let st: String; var spec: String = "" }
     var badge = ""          // Race · Open Men
     var place = ""          // Incheon
     var divName = ""        // Open Men
@@ -14,6 +14,7 @@ struct ShareData {
     var total = ""          // 1:15:03
     var avgHR = ""          // 164
     var rox = ""            // 4:48
+    var hasRox = true       // 락스존을 재지 않은 기록이면 false → 카드에 아예 안 보임
     var kcal = ""           // 1,042
     var vsWord = ""         // VS GOAL
     var vsValue = ""        // −0:27
@@ -38,6 +39,7 @@ struct ShareData {
         total = Fm.t(r.total)
         avgHR = r.avgHR > 0 ? "\(r.avgHR)" : "--"
         rox = Fm.t(r.roxTotal)
+        hasRox = r.roxTotal > 0
         kcal = ShareData.kcalText(r.kcal)
         let v = store.vs(r)
         vsWord = v.word
@@ -50,7 +52,8 @@ struct ShareData {
                  icon: i < sts.count ? sts[i].icon : "run",
                  sn: i < sts.count ? ShareData.short(sts[i].name) : "",
                  rt: i < runs.count ? Fm.t(runs[i].time) : "",
-                 st: i < sts.count ? Fm.t(sts[i].time) : "")
+                 st: i < sts.count ? Fm.t(sts[i].time) : "",
+                 spec: i < sts.count ? ShareData.spec(sts[i].detail) : "")
         }
         seq = r.mainSegs.map { Part(t: $0.time, run: $0.kind == .run, icon: $0.icon) }
         runTotal = Fm.t(r.runTotal)
@@ -59,6 +62,15 @@ struct ShareData {
     }
 
     static func short(_ n: String) -> String { n == "Farmers Carry" ? "Farmers" : n }
+
+    /// 스테이션 이름 옆에 붙는 사양: "50M · 152KG" · "1K" · "100 REPS · 6KG". 사양이 아닌 말(INTERVAL 등)은 뺌
+    static func spec(_ detail: String) -> String {
+        let skip: Set<String> = ["INTERVAL", "TRANSITION", ""]
+        let parts: [String] = detail.components(separatedBy: " · ")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !skip.contains($0.uppercased()) && $0.lowercased() != "shared" }
+        return parts.prefix(2).joined(separator: " · ")
+    }
 
     /// 13 Sep 2026 — 공유 카드 전용 (영어 고정)
     static let cardDate: DateFormatter = {
@@ -95,13 +107,15 @@ struct ShareCard: View {
     var gradient = true
     /// "" 이면 닉네임 숨김 (@ 없이 넘김)
     var nick = ""
-    /// Smoke (Poster 만): 0 = 끔 · 0.6 = 옅게 · 1 = 짙게. 켜면 사진이 전체에 깔리고, 그라데이션·유리판 대신 연기가 글자 바탕이 됨
+    /// Haze (Poster 만. 코드 이름은 smoke): 0 = 끔 · 0.6 = 옅게 · 1 = 짙게. 켜면 사진이 전체에 깔리고, 그라데이션·유리판 대신 헤이즈가 글자 바탕이 됨
     var smoke: Double = 0
     /// Poster 글자 덩어리 자리 (끌어서 옮김)
     var layout = PosterLayout()
     /// 미리보기에서 끄는 중인 덩어리와 옮긴 거리
     var dragKey: String? = nil
     var dragOffset: CGSize = .zero
+    /// Block · Ticket 뒤에 비치는 빛의 색 (노란 로고 · 숫자는 그대로)
+    var glowTheme: GlowTheme = .yellow
 
     private var smokeOn: Bool { smoke > 0 }
     private var post: Bool { ratio == "post" }
@@ -134,16 +148,32 @@ struct ShareCard: View {
 
     // MARK: 공통
 
-    /// SPLITS8 워드마크 20, 자간 −0.03em. 검은 글자 모드면 전체 검정 (wordmark-black)
+    /// 스테이션 이름 + 옆에 작은 사양 (50M · 152KG). 자리가 모자라면 사양이 먼저 줄어듦
+    private func nameCell(_ p: ShareData.Pair, size: CGFloat, color: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(p.sn).font(F.t(size, .medium)).foregroundStyle(color).lineLimit(1)
+                .layoutPriority(1)
+            if !p.spec.isEmpty {
+                Text(p.spec).font(F.num(max(8, size - 3.5), .medium)).foregroundStyle(color.opacity(0.5))
+                    .lineLimit(1).minimumScaleFactor(0.75)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// SPLITS8 워드마크 20. 검은 글자 모드여도 8 은 항상 노랑
     private func mark(black: Bool, shadow: Bool = false) -> some View {
-        Wordmark(size: 20, eightColor: black ? Color.black : C.accent,
+        Wordmark(size: 20, eightColor: C.accent,
                  color: black ? Color.black : Color.white, tracking: -0.03)
             .shadow(color: shadow ? Color.black.opacity(0.5) : Color.clear, radius: 3, y: 1)
     }
 
     /// 노란 빛 radial-gradient(rx% ry% at cx% cy%, rgba(255,230,0,a), transparent 70%)
-    private func glow(_ a: Double, rx: CGFloat, ry: CGFloat, cx: CGFloat, cy: CGFloat) -> some View {
-        AmbientLayer(a: Ambient(hex: 0xFFE600, alpha: a, rx: rx, ry: ry, cx: cx, cy: cy))
+    /// themed = Block · Ticket 의 빛 (고른 색을 따름). Poster 의 빛은 항상 노랑
+    private func glow(_ a: Double, rx: CGFloat, ry: CGFloat, cx: CGFloat, cy: CGFloat, themed: Bool = false) -> some View {
+        let hex: UInt32 = themed ? glowTheme.hex : 0xFFE600
+        let alpha: Double = themed ? min(1, a * glowTheme.gain) : a
+        return AmbientLayer(a: Ambient(hex: hex, alpha: alpha, rx: rx, ry: ry, cx: cx, cy: cy))
     }
 
     /// 반투명 유리 (rgba 255 0.07 + inset 1px rgba 255 0.10)
@@ -219,40 +249,46 @@ struct ShareCard: View {
     }
 
     /// 검은 글자 = 흰 스크림, 흰 글자 = 검은 스크림. 글자가 있는 자리만 어둡게(밝게) 함.
-    /// 기본 배치(위: 로고, 아래: 시간·표)에서는 예전과 같은 모양
-    private var posterScrim: [Gradient.Stop] {
-        let c: Color = textBlack ? Color.white : Color.black
-        let top: Double = occupied(0) ? (textBlack ? 0.45 : 0.5) : 0
+    /// y(0 위 ~ 1 아래)에서의 짙기. 꺾이는 곳 없이 부드러운 곡선으로만 이어 붙임
+    /// (빌드 19: 직선 두 토막이라 꺾이는 자리가 띠로 보였고, 사진이 끝나는 자리도 선으로 보였음)
+    private func scrimAlpha(_ y: Double) -> Double {
+        func ease(_ t: Double) -> Double {
+            let u: Double = max(0, min(1, t))
+            return u * u * (3 - 2 * u)
+        }
+        let topA: Double = occupied(0) ? (textBlack ? 0.45 : 0.5) : 0
         let mid: Bool = occupied(1)
         let bot: Bool = occupied(2)
-        var st: [Gradient.Stop] = [.init(color: c.opacity(top), location: 0)]
-        if mid {
-            st.append(.init(color: c.opacity(top > 0 ? 0.25 : 0), location: 0.18))
-            st.append(.init(color: c.opacity(0.62), location: 0.32))
-            st.append(.init(color: c.opacity(0.62), location: 0.62))
-        } else {
-            st.append(.init(color: c.opacity(0), location: post ? 0.18 : 0.20))
-            st.append(.init(color: c.opacity(0), location: post ? 0.26 : 0.34))
-        }
+        var a: Double = topA * (1 - ease(y / 0.22))
+        // 가운데 자리: 0.62 까지 올라가 머무름 (아래에 글자가 없으면 다시 내려감)
+        var m: Double = mid ? 0.62 * ease((y - 0.16) / 0.16) : 0
+        if mid && !bot { m *= 1 - ease((y - 0.62) / 0.18) }
         if bot {
-            if mid {
-                st.append(.init(color: c.opacity(0.9), location: 0.68))
-                st.append(.init(color: c, location: 0.76))
-            } else {
-                st.append(.init(color: c.opacity(post ? 0.92 : 0.9), location: post ? 0.46 : 0.60))
-                st.append(.init(color: c, location: post ? 0.58 : 0.72))
-            }
-        } else {
-            st.append(.init(color: c.opacity(0), location: mid ? 0.80 : 0.90))
+            // 어두워지기 시작하는 곳 → 완전히 어두워지는 곳 (Story 는 화면 높이의 30% → 74%)
+            let b0: Double = mid ? 0.60 : (post ? 0.22 : 0.30)
+            let b1: Double = mid ? 0.78 : (post ? 0.60 : 0.74)
+            // 가운데 짙기 위에 이어서 올림 (둘 중 큰 값을 고르면 만나는 자리가 꺾여 띠로 보임)
+            m = m + (1 - m) * ease((y - b0) / (b1 - b0))
         }
-        return st
+        a = max(a, m)
+        return a
     }
 
-    /// 그라데이션일 때 아래에 글자가 있으면 사진은 위쪽만 (아래는 단색), 아니면 사진이 전체
+    private var posterScrim: [Gradient.Stop] {
+        let c: Color = textBlack ? Color.white : Color.black
+        let n: Int = 32
+        return (0...n).map { i in
+            let y: Double = Double(i) / Double(n)
+            return Gradient.Stop(color: c.opacity(scrimAlpha(y)), location: CGFloat(y))
+        }
+    }
+
+    /// 그라데이션일 때 아래에 글자가 있으면 사진은 위쪽만 (아래는 단색), 아니면 사진이 전체.
+    /// 사진은 그라데이션이 완전히 덮는 곳보다 조금 더 아래에서 끝남 → 사진 끝이 보이지 않음
     private var posterPhotoH: CGFloat {
         if smokeOn || !gradient || !occupied(2) { return h }
-        if occupied(1) { return h * 0.72 }
-        return h * (post ? 0.52 : 0.64)
+        if occupied(1) { return h * 0.80 }
+        return h * (post ? 0.62 : 0.76)
     }
 
     private var poster: some View {
@@ -273,11 +309,17 @@ struct ShareCard: View {
                         .allowsHitTesting(false)
                 }
                 FilmGrain(amount: 0.05 * smoke)
+                    .equatable()
                     .frame(width: 360, height: h)
                     .allowsHitTesting(false)
             } else {
                 if gradient {
                     LinearGradient(stops: posterScrim, startPoint: .top, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                    // 아주 옅은 입자: 어두운 그라데이션에 계단 같은 줄이 생기지 않게
+                    FilmGrain(amount: 0.02)
+                        .equatable()          // 값이 같으면 다시 그리지 않음 (덩어리를 끄는 동안 매번 그리지 않게)
+                        .frame(width: 360, height: h)
                         .allowsHitTesting(false)
                 }
                 glow(glowA, rx: 0.9, ry: 0.45, cx: 0.85, cy: 1.0)
@@ -290,14 +332,15 @@ struct ShareCard: View {
                 .backgroundPreferenceValue(PosterBlockAnchors.self) { anchors in
                     if smokeOn {
                         GeometryReader { g in
-                            ForEach(anchors.keys.sorted(), id: \.self) { k in
-                                if let a = anchors[k] {
-                                    let r: CGRect = g[a]
-                                    SmokePuff(dark: !textBlack, strength: smoke * (k == "head" ? 0.55 : 1),
-                                              bias: k == "time" ? layout.timeAlign : 1, seed: UInt64(k.count) &* 977 &+ 13)
-                                        .frame(width: r.width + 76, height: r.height + 64)
-                                        .position(x: r.midX, y: r.midY)
-                                }
+                            let bands: [HazeBand] = hazeBands(anchors.mapValues { g[$0] })
+                            ForEach(bands, id: \.slot) { b in
+                                let bh: CGFloat = max(1, b.bottom - b.top)
+                                SmokePuff(dark: !textBlack, strength: smoke * b.strength,
+                                          topFade: b.fadeTop / bh, bottomFade: b.fadeBottom / bh,
+                                          seed: UInt64(b.slot) &* 977 &+ 13)
+                                    .equatable()
+                                    .frame(width: 420, height: bh)
+                                    .position(x: 180, y: (b.top + b.bottom) / 2)
                             }
                         }
                         .allowsHitTesting(false)
@@ -306,6 +349,34 @@ struct ShareCard: View {
         }
         .frame(width: 360, height: h)
         .coordinateSpace(NamedCoordinateSpace.named(ShareCard.cardSpace))
+    }
+
+    /// 헤이즈가 깔리는 띠들. 같은 자리(0 위 · 1 가운데 · 2 아래)의 글자 덩어리를 한 띠로 묶고,
+    /// 글자 위아래로 멀리(카드 높이의 28%) 옅게 퍼지게 함. 맨 위 · 맨 아래 자리는 카드 끝까지 이어짐.
+    /// (빌드 19: 덩어리마다 글자 바로 뒤에만 짙어서 가장자리가 보였고, 정렬 쪽으로 쏠렸음)
+    private func hazeBands(_ rects: [String: CGRect]) -> [HazeBand] {
+        var out: [HazeBand] = []
+        for slot in 0...2 {
+            var keys: [String] = []
+            if layout.head == slot { keys.append("head") }
+            if layout.time == slot { keys.append("time") }
+            if layout.table == slot { keys.append("table") }
+            let present: [String] = keys.filter { rects[$0] != nil }
+            let rs: [CGRect] = present.compactMap { rects[$0] }
+            guard let first = rs.first else { continue }
+            let u: CGRect = rs.dropFirst().reduce(first) { $0.union($1) }
+            let onlyHead: Bool = present == ["head"]
+            let ext: CGFloat = h * (onlyHead ? 0.10 : 0.28)
+            let coreTop: CGFloat = u.minY - 10
+            let coreBottom: CGFloat = u.maxY + 10
+            out.append(HazeBand(slot: slot,
+                                top: slot == 0 ? -24 : coreTop - ext,
+                                bottom: slot == 2 ? h + 24 : coreBottom + ext,
+                                fadeTop: slot == 0 ? 0 : ext,
+                                fadeBottom: slot == 2 ? 0 : ext,
+                                strength: onlyHead ? 0.55 : 1))
+        }
+        return out
     }
 
     /// 연기를 켜면 사진을 영화처럼 조금 눌러 줌 (채도 ↓ · 대비 ↑)
@@ -384,7 +455,7 @@ struct ShareCard: View {
             big(d.total, post ? 64 : 76, track: -0.045, color: tc).padding(.top, 6)
             HStack(alignment: .top, spacing: 12) {
                 posterStat("AVG HR", d.avgHR, ha, fa)
-                posterStat("ROXZONE", d.rox, ha, fa)
+                if d.hasRox { posterStat("ROXZONE", d.rox, ha, fa) }
                 posterStat("KCAL", d.kcal, ha, fa)
             }
             .padding(.top, 14)
@@ -472,8 +543,7 @@ struct ShareCard: View {
         return HStack(spacing: 8) {
             Text(p.no).font(F.num(10, .semibold)).foregroundStyle(acc)
                 .frame(width: 20, alignment: .leading)
-            Text(p.sn).font(F.t(size, .medium)).foregroundStyle(tc).lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            nameCell(p, size: size, color: tc)
             Text(p.rt).font(F.num(size, .medium)).foregroundStyle(tc).lineLimit(1)
                 .frame(width: 40, alignment: .trailing)
             Text(p.st).font(F.num(size, .semibold)).foregroundStyle(tc).lineLimit(1)
@@ -498,10 +568,14 @@ struct ShareCard: View {
 
     private var ticket: some View {
         ZStack(alignment: .topLeading) {
-            glow(0.22, rx: 0.9, ry: 0.4, cx: 0.5, cy: 1.0)
+            glow(0.22, rx: 0.9, ry: 0.4, cx: 0.5, cy: 1.0, themed: true)
             VStack(spacing: 0) {
-                photoView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                // 칸 크기는 카드가 정하고 사진은 그 안에서만 채움.
+                // (사진을 바로 넣으면 "채우기" 크기가 칸 크기가 되어, 세로 사진이 카드보다 커지고 아래 판이 밀려 잘렸음 — 빌드 19)
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay { photoView() }
+                    .clipped()
                     .overlay(alignment: .topLeading) { mark(black: textBlack, shadow: !textBlack).padding(14) }
                     .overlay(alignment: .topTrailing) { ticketNick }
                     .clipShape(ticketTop)
@@ -569,8 +643,10 @@ struct ShareCard: View {
                     Text("RUN \(d.runTotal)")
                     Spacer(minLength: 4)
                     Text("STATIONS \(d.stationTotal)")
-                    Spacer(minLength: 4)
-                    Text("ROX \(d.rox)")
+                    if d.hasRox {
+                        Spacer(minLength: 4)
+                        Text("ROX \(d.rox)")
+                    }
                 }
                 .font(F.num(8, .semibold)).tracking(0.1 * 8).foregroundStyle(C.text3).lineLimit(1)
             }
@@ -580,7 +656,7 @@ struct ShareCard: View {
         .background {
             ZStack {
                 ShareCard.glass
-                glow(0.30, rx: 0.9, ry: 0.9, cx: 0.9, cy: 1.1)
+                glow(0.30, rx: 0.9, ry: 0.9, cx: 0.9, cy: 1.1, themed: true)
             }
         }
         .clipShape(ticketBottom)
@@ -607,8 +683,8 @@ struct ShareCard: View {
 
     private var block: some View {
         ZStack(alignment: .topLeading) {
-            glow(0.34, rx: 0.9, ry: 0.55, cx: 0.85, cy: 0)
-            glow(0.14, rx: 0.8, ry: 0.45, cx: 0, cy: 1.0)
+            glow(0.34, rx: 0.9, ry: 0.55, cx: 0.85, cy: 0, themed: true)
+            glow(0.14, rx: 0.8, ry: 0.45, cx: 0, cy: 1.0, themed: true)
             blockContent
                 .padding(24)
                 .frame(width: 360, height: h, alignment: .topLeading)
@@ -647,7 +723,7 @@ struct ShareCard: View {
             HStack(spacing: 6) {
                 blockTile(d.vsWord, d.vsValue, color: C.accent)
                 blockTile("AVG HR", d.avgHR, color: .white)
-                blockTile("ROXZONE", d.rox, color: .white)
+                if d.hasRox { blockTile("ROXZONE", d.rox, color: .white) }
             }
             .padding(.top, 14)
             if showSplits && !d.pairs.isEmpty {
@@ -697,8 +773,7 @@ struct ShareCard: View {
             Text(p.no).font(F.num(11, .semibold)).foregroundStyle(C.accent)
                 .frame(width: 20, alignment: .leading)
             Icon8(p.icon, 14, .white).opacity(0.9).frame(width: 16)
-            Text(p.sn).font(F.t(size, .medium)).lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            nameCell(p, size: size, color: .white)
             Text(p.rt).font(F.num(size, .medium)).foregroundStyle(Color.white.opacity(0.5)).lineLimit(1)
                 .frame(width: 40, alignment: .trailing)
             Text(p.st).font(F.num(num, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
@@ -752,12 +827,23 @@ struct SeededRandom: RandomNumberGenerator {
     mutating func bell() -> Double { (unit() + unit() + unit()) / 3 }
 }
 
-/// 글자 덩어리 뒤에 모이는 연기. dark = 어두운 연기(흰 글자용) / 밝은 연기(검은 글자용).
-/// bias = 연기가 몰리는 쪽 (0 왼쪽 · 1 가운데 · 2 오른쪽)
-struct SmokePuff: View {
+/// 헤이즈가 깔리는 띠 하나 (카드 좌표). fade = 그 쪽으로 엷어지는 길이, 0 이면 카드 끝까지 그대로
+struct HazeBand {
+    let slot: Int
+    let top: CGFloat
+    let bottom: CGFloat
+    let fadeTop: CGFloat
+    let fadeBottom: CGFloat
+    let strength: Double
+}
+
+/// 글자 뒤에 깔리는 헤이즈 띠. dark = 어두운 것(흰 글자용) / 밝은 것(검은 글자용).
+/// 가로로는 띠 전체를 고르게 덮고(바탕 한 겹 + 흩뿌린 뭉치), 세로로는 topFade · bottomFade(띠 높이 대비 0~1)만큼 서서히 엷어짐
+struct SmokePuff: View, Equatable {
     let dark: Bool
     let strength: Double
-    var bias: Int = 1
+    var topFade: CGFloat = 0
+    var bottomFade: CGFloat = 0
     var seed: UInt64 = 1
 
     var body: some View {
@@ -765,35 +851,59 @@ struct SmokePuff: View {
             var rng = SeededRandom(seed: seed)
             let color: Color = dark ? Color.black : Color.white
             let w: Double = Double(size.width), h: Double = Double(size.height)
-            let cx: Double = [0.36, 0.5, 0.64][max(0, min(2, bias))]
-            let count: Int = 26 + Int(w * h / 5200)
+            // 바탕: 띠 전체를 고르게 한 겹 (한쪽으로 쏠리지 않게)
+            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(color.opacity(0.58 * strength)))
+            // 결: 가로로 퍼진 뭉치를 고르게 흩뿌림
+            let count: Int = 14 + Int(w * h / 7000)
             for _ in 0..<count {
-                let x: Double = (cx + (rng.bell() - 0.5) * 1.5) * w
-                let y: Double = (0.5 + (rng.bell() - 0.5) * 1.3) * h
-                let r: Double = max(26, min(150, h * (0.32 + rng.unit() * 0.5)))
-                let rx: Double = r * (1.1 + rng.unit() * 0.9)
-                let a: Double = (0.10 + rng.unit() * 0.13) * strength
-                let rect = CGRect(x: x - rx, y: y - r, width: rx * 2, height: r * 2)
-                ctx.drawLayer { layer in
-                    // 가로로 퍼진 뭉치: 원 모양 그라데이션을 옆으로 늘림
-                    layer.translateBy(x: rect.midX, y: rect.midY)
-                    layer.scaleBy(x: rx / r, y: 1)
-                    let shade = GraphicsContext.Shading.radialGradient(
-                        Gradient(stops: [.init(color: color.opacity(a), location: 0),
-                                         .init(color: color.opacity(a * 0.55), location: 0.5),
-                                         .init(color: color.opacity(0), location: 1)]),
-                        center: .zero, startRadius: 0, endRadius: r)
-                    layer.fill(Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2)), with: shade)
-                }
+                let x: Double = (-0.1 + rng.unit() * 1.2) * w
+                let y: Double = (-0.05 + rng.unit() * 1.1) * h
+                let r: Double = 60 + rng.unit() * 70
+                let rx: Double = r * (1.2 + rng.unit() * 0.9)
+                let a: Double = (0.12 + rng.unit() * 0.13) * strength
+                var c = ctx
+                c.translateBy(x: x, y: y)
+                c.scaleBy(x: rx / r, y: 1)
+                let shade = GraphicsContext.Shading.radialGradient(
+                    Gradient(stops: [.init(color: color.opacity(a), location: 0),
+                                     .init(color: color.opacity(a * 0.55), location: 0.5),
+                                     .init(color: color.opacity(0), location: 1)]),
+                    center: .zero, startRadius: 0, endRadius: r)
+                c.fill(Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2)), with: shade)
             }
         }
         .blur(radius: 9)
-        // 가장자리는 저절로 사라지게 (네모난 끝이 보이지 않게)
+        // 위아래로 서서히 엷어지게 (끝이 뚝 끊기지 않게)
         .mask {
-            RoundedRectangle(cornerRadius: 46, style: .continuous)
-                .padding(20)
-                .blur(radius: 16)
+            LinearGradient(stops: Self.fadeStops(top: topFade, bottom: bottomFade), startPoint: .top, endPoint: .bottom)
         }
+    }
+
+    /// 0 → 1 (top 구간) · 1 유지 · 1 → 0 (bottom 구간). 곡선을 1.7제곱해 꼬리가 길고 옅게
+    static func fadeStops(top: CGFloat, bottom: CGFloat) -> [Gradient.Stop] {
+        let t: CGFloat = max(0, min(0.49, top))
+        let b: CGFloat = max(0, min(0.49, bottom))
+        let n: Int = 10
+        var st: [Gradient.Stop] = []
+        if t > 0.001 {
+            for i in 0...n {
+                let u: Double = Double(i) / Double(n)
+                let e: Double = u * u * (3 - 2 * u)
+                st.append(Gradient.Stop(color: Color.black.opacity(pow(e, 1.7)), location: t * CGFloat(u)))
+            }
+        } else {
+            st.append(Gradient.Stop(color: Color.black, location: 0))
+        }
+        if b > 0.001 {
+            for i in 0...n {
+                let u: Double = Double(i) / Double(n)
+                let e: Double = 1 - u * u * (3 - 2 * u)
+                st.append(Gradient.Stop(color: Color.black.opacity(pow(e, 1.7)), location: 1 - b + b * CGFloat(u)))
+            }
+        } else {
+            st.append(Gradient.Stop(color: Color.black, location: 1))
+        }
+        return st
     }
 }
 
@@ -827,7 +937,7 @@ struct SmokeHaze: View {
 }
 
 /// 필름 입자 (아주 옅은 흰·검은 점)
-struct FilmGrain: View {
+struct FilmGrain: View, Equatable {
     let amount: Double
 
     var body: some View {
@@ -859,6 +969,8 @@ struct ShareView: View {
     @State private var gradient = true         // Dark gradient
     @State private var nickOn = true           // Nickname
     @State private var pick: PhotosPickerItem?
+    @State private var showPicker = false      // 미리보기를 누르면 사진 고르기
+    @State private var glow: GlowTheme = Store.shared.settings.glow   // Block · Ticket 빛 색 (기본 = 앱 테마)
     @State private var photo: UIImage?
     @State private var saved = false
     @State private var mapOn = false           // 실외 러닝: 경로 지도를 배경으로
@@ -932,6 +1044,7 @@ struct ShareView: View {
             actionButtons
         }
         .padding(.horizontal, 16)
+        .photosPicker(isPresented: $showPicker, selection: $pick, matching: .images)
         .onAppear {
             if photo == nil && CommandLine.arguments.contains("--sharephoto") { photo = Self.demoPhoto(); mono = false }
         }
@@ -950,29 +1063,33 @@ struct ShareView: View {
         let scale: CGFloat = post ? 0.86 : 0.72
         let pw: CGFloat = post ? 310 : 259
         let ph: CGFloat = post ? 387 : 461
-        return PhotosPicker(selection: $pick, matching: .images) {
-            card(placeholder: true)
-                // 덩어리 자리를 카드 좌표로 받아 둠 (끌기 시작할 때 어느 덩어리인지 찾음)
-                .overlayPreferenceValue(PosterBlockAnchors.self) { anchors in
-                    GeometryReader { g in
-                        let rects: [String: CGRect] = anchors.mapValues { g[$0] }
-                        Color.clear
-                            .onAppear { if dragKey == nil { blockRects = rects } }
-                            .onChange(of: rects) { _, v in if dragKey == nil { blockRects = v } }
-                    }
-                    .allowsHitTesting(false)
+        // 버튼(PhotosPicker)으로 감싸지 않고 누름을 직접 받음.
+        // (빌드 19: 버튼 안에 "꾹 눌러 끌기"를 먼저 받게 넣었더니 Poster 에서 버튼 누름이 막혀 사진 고르기가 안 열렸음)
+        return card(placeholder: true)
+            // 덩어리 자리를 카드 좌표로 받아 둠 (끌기 시작할 때 어느 덩어리인지 찾음)
+            .overlayPreferenceValue(PosterBlockAnchors.self) { anchors in
+                GeometryReader { g in
+                    let rects: [String: CGRect] = anchors.mapValues { g[$0] }
+                    Color.clear
+                        .onAppear { if dragKey == nil { blockRects = rects } }
+                        .onChange(of: rects) { _, v in if dragKey == nil { blockRects = v } }
                 }
-                .scaleEffect(scale, anchor: .topLeading)
-                .frame(width: pw, height: ph, alignment: .topLeading)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color(hex: 0x262626)).padding(-1))
-                .contentShape(Rectangle())
-                // Poster: 글자 덩어리를 꾹 눌러 끌어서 옮김 (그냥 누르면 사진 고르기 · 쓸면 화면 넘기기)
-                .highPriorityGesture(blockDrag(scale: scale), including: variant == "poster" ? .all : .subviews)
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-        .accessibilityIdentifier("share.photo")
+                .allowsHitTesting(false)
+            }
+            .scaleEffect(scale, anchor: .topLeading)
+            .frame(width: pw, height: ph, alignment: .topLeading)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color(hex: 0x262626)).padding(-1))
+            .contentShape(Rectangle())
+            // 짧게 누르면 사진 고르기 (Block 은 사진을 쓰지 않는 모양이라 아무 일도 없음)
+            .onTapGesture { if variant != "block" { showPicker = true } }
+            // Poster: 글자 덩어리를 꾹 눌러 끌어서 옮김 (쓸면 화면 넘기기)
+            .gesture(blockDrag(scale: scale), including: variant == "poster" ? .all : .subviews)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Tap to choose a photo"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("share.photo")
+            .frame(maxWidth: .infinity)
         .onChange(of: mapOn) { _, on in
             if on, let rt = routeOf {
                 Task {
@@ -1123,9 +1240,19 @@ struct ShareView: View {
             }
             // Smoke: 사진 위에 연기를 겹쳐 영화 느낌 + 글자 바탕 (Poster). 켜면 그라데이션 대신 연기를 씀
             optionRow(last: false) {
-                Text("Smoke").font(F.t(15))
+                Text("Haze").font(F.t(15))
             } trailing: {
                 smokeSeg
+            }
+            // Glow: Block · Ticket 뒤에 비치는 빛의 색 (Poster 는 사진 · 그라데이션 · 헤이즈를 씀)
+            if variant != "poster" {
+                optionRow(last: false) {
+                    Text("Glow").font(F.t(15))
+                } trailing: {
+                    GlowSwatches(selected: glow, size: 22, spacing: 4, idPrefix: "share.glow") { t in
+                        withAnimation(.easeOut(duration: 0.2)) { glow = t }
+                    }
+                }
             }
             optionRow(last: true) {
                 nickLabel
@@ -1240,7 +1367,8 @@ struct ShareView: View {
         ShareCard(d: data, variant: variant, ratio: ratio, showSplits: splits, photo: photo,
                   placeholder: placeholder, textBlack: textColor == "black", mono: mono,
                   gradient: gradient, nick: shownNick, smoke: smokeValue, layout: layout,
-                  dragKey: placeholder ? dragKey : nil, dragOffset: placeholder ? dragOffset : .zero)
+                  dragKey: placeholder ? dragKey : nil, dragOffset: placeholder ? dragOffset : .zero,
+                  glowTheme: glow)
     }
 
     /// 360pt 너비 시안을 3배로 → 1080 너비

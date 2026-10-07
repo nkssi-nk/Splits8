@@ -74,6 +74,22 @@ final class ScreenshotTests: XCTestCase {
 
     private func swipeBack() { app.swipeDown() }
 
+    /// 요소가 위 고정 바 · 아래 탭 바에 가리지 않는 자리에 오도록 화면을 조금씩 끌어 옮김. 못 찾으면 false
+    private func reveal(_ i: String) -> Bool {
+        let e = element(i)
+        guard e.waitForExistence(timeout: 3) else { return false }
+        let win: CGRect = app.windows.firstMatch.frame
+        for _ in 0..<10 {
+            let f: CGRect = e.frame
+            if f.minY > win.minY + 130 && f.maxY < win.maxY - 130 { return true }
+            let mid = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let dy: CGFloat = f.minY <= win.minY + 130 ? 170 : -170
+            mid.press(forDuration: 0.05, thenDragTo: mid.withOffset(CGVector(dx: 0, dy: dy)))
+            usleep(500_000)
+        }
+        return e.exists
+    }
+
     // MARK: 0. 앱 켤 때 가운데 로고
     func test0_launchLogo() {
         app = XCUIApplication()
@@ -116,9 +132,14 @@ final class ScreenshotTests: XCTestCase {
         app.swipeUp()
         shot("I1h_home_prev_month_summary")
         app.swipeDown()
-        // 달력을 왼쪽으로 밀면 다음 달
-        let day = element("cal.day.15")
-        if day.waitForExistence(timeout: 3) { day.swipeLeft() }
+        // 달력을 왼쪽으로 밀면 다음 달 (날짜 한 칸에서 swipeLeft 는 거리가 짧아 안 넘어갔음 → 오른쪽 끝 칸에서 200pt 끌기)
+        let day = element("cal.day.19")
+        if day.waitForExistence(timeout: 3) {
+            let from = day.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let to = from.withOffset(CGVector(dx: -200, dy: 0))
+            from.press(forDuration: 0.05, thenDragTo: to)
+            sleep(1)
+        }
         shot("I1h_home_swiped_next_month")
         tap("Week")
         app.swipeUp()
@@ -129,7 +150,7 @@ final class ScreenshotTests: XCTestCase {
 
         tab("Training")
         shot("I1_training")
-        // 16구간 카드의 "+13" 을 눌러 펼침
+        // 16구간 카드의 더 보기 칸(겹꺾쇠 + 13)을 눌러 펼침
         let fullCard = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Full HYROX")).firstMatch
         if fullCard.waitForExistence(timeout: 3) {
             fullCard.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.76)).tap()
@@ -151,9 +172,18 @@ final class ScreenshotTests: XCTestCase {
         tab("Test")
         shot("I3p_test_pft")
         id("test.seg.sim")
-        shot("I3_full_simulation")
-        tap("WALL BALLS")
-        shot("I3_wall_balls")
+        shot("I3_full_simulation")          // 그래프 칩: 한 줄 + 오른쪽 겹꺾쇠
+        // 겹꺾쇠를 눌러 전부 펼침 → WALL BALLS 고름 → 다시 접으면 고른 칩이 한 줄 안에 보여야 함
+        if element("sim.chips.more").waitForExistence(timeout: 3) {
+            id("sim.chips.more")
+            shot("I3_sim_chips_open")
+            tap("WALL BALLS")
+            shot("I3_wall_balls")
+            id("sim.chips.more")
+            shot("I3_sim_chips_folded_wall_balls")
+        } else {
+            shot("I3_sim_no_chip_toggle")
+        }
         app.swipeUp()
         shot("I3_history")
         // 기록 6개 → 5개씩 두 쪽
@@ -174,6 +204,14 @@ final class ScreenshotTests: XCTestCase {
         tap("Runner")
         shot("I4g_goal_time_runner")
         id("nav.left")
+        // 구간 목표는 Race 탭의 "Split targets" 줄에서만 고침 (설정의 Split goals 줄은 없앰)
+        if element("race.splitTargets").waitForExistence(timeout: 3) {
+            id("race.splitTargets")
+            shot("I5b_split_goals")
+            back()
+        } else {
+            shot("I4_race_no_split_targets_row")
+        }
         app.swipeUp()
         shot("I4_race_bottom")
         app.swipeDown()
@@ -209,12 +247,24 @@ final class ScreenshotTests: XCTestCase {
         id("settings.running")
         shot("I5_running")
         back()
-        id("settings.goals")
-        shot("I5b_split_goals")
-        back()
         id("settings.friends")
         shot("I5f_friends")
         back()
+        // 맨 아래: 기록 백업 (DATA)
+        app.swipeUp(); app.swipeUp(); app.swipeUp()
+        shot("I5_settings_bottom_data")
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
+        // 테마: 배경 빛 색을 파랑으로 → 설정 화면과 홈 화면
+        if reveal("settings.theme.blue") {
+            id("settings.theme.blue")
+            shot("I5_settings_theme_blue")
+            tab("Home")
+            shot("I1h_home_theme_blue")
+            tab("Race")
+            shot("I4_race_theme_blue")
+        } else {
+            shot("I5_settings_no_theme_row")
+        }
     }
 
     // MARK: 3. 기록 상세 · 공유  — 시안 I6, I7, S1–S6
@@ -268,7 +318,91 @@ final class ScreenshotTests: XCTestCase {
         id("share.text.white")
         app.swipeDown()
         shot("I7_share_gradient_time_moved")
+        // Ticket: 사진이 있어도 아래 판이 잘리지 않는지 + 구간 기록을 껐다 켜도 그대로인지
+        tap("Ticket")
+        shot("I7_share_ticket_photo")
+        app.swipeUp()
+        id("share.splits")
+        app.swipeDown()
+        shot("I7_share_ticket_no_splits")
+        app.swipeUp()
+        id("share.splits")
+        app.swipeDown()
+        shot("I7_share_ticket_splits_again")
+        // Block: 빛 색 고르기 + 미리보기를 눌러도 사진 고르기가 뜨지 않음
+        tap("Block")
+        app.swipeUp()
+        if element("share.glow.blue").waitForExistence(timeout: 3) { id("share.glow.blue") }
+        app.swipeDown()
+        shot("I7_share_block_blue")
+        id("share.photo")
+        shot("I7_share_block_tap_nothing")
+        // Poster: 미리보기를 짧게 누르면 사진 고르기가 뜸 (맨 마지막에 확인 — 닫기에 실패해도 다른 화면에 영향이 없게)
+        tap("Poster")
+        id("share.photo")
+        sleep(2)
+        shotNow("I7_share_poster_picker_open")
+        let cancel = app.buttons["Cancel"]
+        if cancel.waitForExistence(timeout: 3) { cancel.tap() }
+    }
+
+    // MARK: 7. 가입한 상태 (예시) — 홈의 친구 순위표 · 대회가 가까울 때 · 로그아웃 줄 · 링크로 받은 트레이닝
+
+    func test7_friends_race_link() {
+        launch(onboarded: true, extra: ["--friends", "--racenear"])
+        shot("F1_home_race_d3")                     // 대회 카드 D-3 (출발 시간 없음)
+        for _ in 0..<6 { app.swipeUp() }
+        shot("F2_home_friends_leaderboard")         // Race 탭에서 옮겨 온 순위표
+        tap("Stations")
+        shot("F3_home_friends_stations_folded")     // 스테이션 칩: 한 줄 + 겹꺾쇠
+        if reveal("lb.chips.more") {
+            id("lb.chips.more")
+            shot("F3_home_friends_stations_open")
+        }
+        if reveal("race.addFriends") {
+            id("race.addFriends")
+            shot("F4_friends_from_home")            // 뒤로 = Home · 찾기 칸 "Email or nickname"
+            back()
+        }
+        for _ in 0..<6 { app.swipeDown() }
+        tab("Race")
+        shot("F5_race_no_friends_section")
+        tab("Settings")
+        shot("F6_settings_signed_in")
+        app.swipeUp(); app.swipeUp(); app.swipeUp()
+        shot("F6_settings_bottom_signout")
+        if reveal("settings.signout") {
+            id("settings.signout")
+            shot("F6_signout_confirm")
+            // 확인창 닫기: Cancel 이 있으면 누르고, 없으면(새 iOS 는 Cancel 을 안 보여 줄 수 있음) 창 밖을 누름
+            let cancel = app.buttons["Cancel"]
+            if cancel.waitForExistence(timeout: 2) { cancel.tap() }
+            else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap() }
+            sleep(1)
+        }
+        for _ in 0..<4 { app.swipeDown() }
+        // 트레이닝 수정 화면의 "Share link" 버튼
+        tab("Training")
+        tapContaining("Sled Intervals")
+        shot("F7_edit_training_share_link")
         id("nav.left")
+        // 링크로 받은 트레이닝: splits8://t?d=…  → "Add this training?" → Add → 목록에 추가
+        if #available(iOS 16.4, *) {
+            let link = "splits8://t?d=1.eyJuIjoiTGluayBUZXN0IiwicSI6WyJydW46MUtNIiwic2xlZFB1c2giLCJydW46MUtNIiwid2FsbEJhbGxzIl0sInMiOjJ9"
+            if let u = URL(string: link) { XCUIDevice.shared.system.open(u) }
+            sleep(3)
+            // 시스템이 "앱에서 열까요?" 를 물으면 Open
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let open = springboard.buttons["Open"]
+            if open.waitForExistence(timeout: 2) { open.tap(); sleep(2) }
+            shot("F8_link_add_alert")
+            let add = app.alerts.buttons["Add"]
+            if add.waitForExistence(timeout: 3) {
+                add.tap()
+                sleep(1)
+                shot("F8_link_added")
+            }
+        }
     }
 
     // MARK: 6. 아이폰으로 기록: 3 · 2 · 1 → 진행 → 넘기기 → 되돌리기

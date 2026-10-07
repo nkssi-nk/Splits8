@@ -575,7 +575,7 @@ struct WConfirm: View {
                 .multilineTextAlignment(.center).lineLimit(2)
             Text(small).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
             Text(goal).font(F.num(30)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 8)
-            Text(mode == .race ? "GOAL" : "BEST").font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+            Text(goalWord.l10n).font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -599,10 +599,16 @@ struct WConfirm: View {
         return store.settings.div.name + " · " + "8 runs · 8 stations".l10n
     }
 
+    /// Full Sim: 이번에 겨룰 기준의 합계 시간 (아이폰 Full Sim 화면의 "Compare with" 를 따름 — 구간 목표와 같은 기준)
     private var goal: String {
         if mode == .race { return Fm.t(store.settings.goalTime) }
-        if let b = store.ctx.simBestTotal { return Fm.t(b) }
         return Fm.t(seq.map(\.target).reduce(0, +))
+    }
+    /// GOAL / VS LAST / VS JIHO / VS BEST
+    private var goalWord: String {
+        if mode == .race { return "GOAL" }
+        let w: String = store.simPick.word
+        return w == "VS GOAL" ? "GOAL" : w
     }
 
     private func start() {

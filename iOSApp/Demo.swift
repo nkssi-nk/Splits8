@@ -5,6 +5,10 @@ import Foundation
 enum Demo {
     static var enabled: Bool { CommandLine.arguments.contains("--demo") }
     static var onboarded: Bool { CommandLine.arguments.contains("--onboarded") }
+    /// 화면 확인용: 가입한 상태 + 친구 순위표 예시 (서버에는 가지 않음)
+    static var friendsOn: Bool { enabled && CommandLine.arguments.contains("--friends") }
+    /// 화면 확인용: 대회가 3일 뒤 (홈 대회 카드 · D-3)
+    static var raceNear: Bool { enabled && CommandLine.arguments.contains("--racenear") }
 
     static func settings(_ s: inout Settings) {
         s.hasOnboarded = onboarded
@@ -13,6 +17,26 @@ enum Demo {
         s.goalTime = 4320
         s.goals = Defaults.goals
         s.event = RaceEvent()      // 시안 I1h · I4 처럼 "대회 없음" 상태
+        if raceNear {
+            var e = RaceEvent()
+            e.name = "HYROX Incheon"
+            e.loc = "Songdo Convensia"
+            e.date = Calendar.current.date(byAdding: .day, value: 3, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+            s.event = e
+        }
+        if friendsOn {
+            s.nickname = "nkssi"
+            s.email = "you@example.com"
+            s.signMethod = "Email code"
+        }
+    }
+
+    /// 친구 순위표 예시 (--friends)
+    static func leaderboard() -> [LBRow] {
+        [LBRow(user_id: "demo.1", nickname: "jiho", division: "Open Men", avatar_url: nil, t: 4388),
+         LBRow(user_id: "demo.me", nickname: "nkssi", division: "Open Men", avatar_url: nil, t: 4565),
+         LBRow(user_id: "demo.2", nickname: "minseo", division: "Open Women", avatar_url: nil, t: 4712),
+         LBRow(user_id: "demo.3", nickname: "taeyang", division: "Pro Men", avatar_url: nil, t: 4930)]
     }
 
     /// 기본 카드 2장 + 16구간짜리 한 장 (아이콘 한 줄 + "+13" 모양 확인용)

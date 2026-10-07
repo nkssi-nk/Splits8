@@ -153,9 +153,9 @@ struct ProgramCard: View {
                 chip(it)
             }
             if collapsed {
-                moreChip("+\(n - (Self.perRow - 1))")
+                moreChip(n - (Self.perRow - 1))
             } else if long {
-                moreChip("Less".l10n)
+                moreChip(nil)
             }
         }
     }
@@ -199,16 +199,67 @@ struct ProgramCard: View {
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    /// 점선 칩 ("+13" / "Less"). 카드 전체 누름(편집)보다 먼저 받음
-    private func moreChip(_ text: String) -> some View {
+    /// 더 보기 칩: 접힌 상태 = 아래 겹꺾쇠 + 남은 개수("︾ 13"), 펼친 상태 = 위 겹꺾쇠만. 가는 실선 테두리.
+    /// (빌드 19 의 "+13" 은 더하기·점선이라 "추가"처럼 읽혔음.) 카드 전체 누름(편집)보다 먼저 받음
+    private func moreChip(_ more: Int?) -> some View {
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-        return Text(verbatim: text).font(F.t(12, .semibold)).foregroundStyle(C.aeb).lineLimit(1).minimumScaleFactor(0.8)
-            .frame(maxWidth: .infinity).frame(height: 34)
-            .overlay(shape.strokeBorder(Color.white.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
-            .contentShape(Rectangle())
-            .highPriorityGesture(TapGesture().onEnded { onMore() })
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier("training.more")
+        return HStack(spacing: 6) {
+            DoubleChevron(up: more == nil)
+                .stroke(C.aeb, style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
+                .frame(width: 10, height: 11)
+            if let more {
+                Text(verbatim: "\(more)").font(F.num(12, .semibold)).foregroundStyle(C.aeb).lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity).frame(height: 34)
+        .overlay(shape.strokeBorder(Color.white.opacity(0.16), lineWidth: 1))
+        .contentShape(Rectangle())
+        .highPriorityGesture(TapGesture().onEnded { onMore() })
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: more.map { "+\($0)" } ?? "Less".l10n))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("training.more")
+    }
+}
+
+/// "Share link": 저장된 트레이닝을 링크 하나로 보냄. 받은 사람이 링크를 열면 홈페이지에서 "SPLITS8에서 열기" 로 자기 앱에 추가
+struct ShareTrainingButton: View {
+    let program: Program
+
+    var body: some View {
+        Button {
+            if let u = ProgramLink.webURL(program) { ShareSheet.present([u]) }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "link").font(.system(size: 13, weight: .semibold))
+                Text("Share link").font(F.t(14, .semibold)).lineLimit(1)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14).frame(height: 36)
+            .background(Color.white.opacity(0.10), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(Press(scale: 0.96))
+        .fixedSize()
+        .accessibilityIdentifier("builder.shareLink")
+    }
+}
+
+/// 겹꺾쇠 두 줄 (아래로 ︾ / 위로 ︽). 선으로 그려 씀
+struct DoubleChevron: Shape {
+    var up: Bool = false
+
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let w: CGFloat = r.width, h: CGFloat = r.height
+        for k in 0..<2 {
+            let top: CGFloat = r.minY + h * (k == 0 ? 0.06 : 0.52)
+            let bottom: CGFloat = top + h * 0.42
+            p.move(to: CGPoint(x: r.minX, y: up ? bottom : top))
+            p.addLine(to: CGPoint(x: r.minX + w / 2, y: up ? top : bottom))
+            p.addLine(to: CGPoint(x: r.maxX, y: up ? bottom : top))
+        }
+        return p
     }
 }
 
@@ -306,8 +357,15 @@ struct BuilderView: View {
                 .accessibilityIdentifier("builder.name")
 
             if let id = r.editId, let prog = store.programs.first(where: { $0.id == id }) {
-                StartOnPhoneButton(mode: .training, program: prog)   // 저장된 트레이닝을 아이폰으로 바로 시작
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                HStack(spacing: 8) {
+                    // 링크로 보내기 (친구가 아니어도 받을 수 있음 · 서버를 거치지 않음)
+                    // 고치는 중(아직 저장 안 함)에는 숨김 — 링크에는 저장된 내용이 들어가므로
+                    if ProgramLink.canShare(prog) && r.draftSeq == prog.seq && r.draftSets == prog.sets {
+                        ShareTrainingButton(program: prog)
+                    }
+                    Spacer(minLength: 0)
+                    StartOnPhoneButton(mode: .training, program: prog)   // 저장된 트레이닝을 아이폰으로 바로 시작
+                }
             }
 
             runSection

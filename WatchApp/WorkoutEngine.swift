@@ -18,6 +18,9 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var runKm = 0              // 0 = 자유 러닝
     /// PFT: 시작할 때 이미 최고 기록이 있었는지 (있으면 그 구간 시간이 목표 → 끝 화면에 최고 기록 대비 표시)
     @ObservationIgnored private var hasPFTBest = false
+    /// Full Sim 비교 이름 (시작할 때 정함: VS GOAL / VS LAST / VS 친구 / VS BEST)
+    @ObservationIgnored private var simWordAtStart: String?
+    private var simWord: String { simWordAtStart ?? WatchStore.shared.simPick.word }
     @ObservationIgnored private var outdoorRun = false
     var isHIIT: Bool { kind == "hiit" }
     var isRunKind: Bool { kind == "run" }
@@ -178,6 +181,7 @@ final class WorkoutEngine: NSObject {
         outdoorRun = isRunKind && !(program?.indoor ?? true)
         hasPFTBest = mode == .pft && WatchStore.shared.ctx.pftBest?.count == PFT.items.count
         place = nil; routePts = []; lastRouteLoc = nil
+        simWordAtStart = mode == .sim ? WatchStore.shared.simPick.word : nil
         self.mode = mode
         self.title = title
         self.sets = sets
@@ -541,10 +545,10 @@ final class WorkoutEngine: NSObject {
         active = true
     }
 
-    /// VS GOAL / VS JIHO / VS BEST
+    /// VS GOAL / VS LAST / VS JIHO / VS BEST
     var deltaWord: String {
         if mode == .race { return "VS GOAL" }
-        if mode == .sim, let f = WatchStore.shared.ctx.friend { return "VS " + f.first.uppercased() }
+        if mode == .sim { return simWord }
         return "VS BEST"
     }
 

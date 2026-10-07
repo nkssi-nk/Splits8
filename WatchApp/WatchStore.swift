@@ -18,6 +18,7 @@ final class WatchStore: NSObject, WCSessionDelegate {
             ?? WatchContext(settings: Settings(), programs: Program.presets(), friend: nil,
                             simBest: nil, simBestTotal: nil, segBests: [:])
         super.init()
+        GlowTheme.current = ctx.settings.glow
         quickSaved = JSONStore.load([Program].self, quickFile) ?? []
     }
 
@@ -31,7 +32,7 @@ final class WatchStore: NSObject, WCSessionDelegate {
     }
 
     /// 화면 캡처용 샘플 (--shot)
-    func demoLoad(_ c: WatchContext) { ctx = c }
+    func demoLoad(_ c: WatchContext) { GlowTheme.current = c.settings.glow; ctx = c }
 
     func activate() {
         guard WCSession.isSupported() else { return }
@@ -59,12 +60,12 @@ final class WatchStore: NSObject, WCSessionDelegate {
 
     // MARK: 구간 목표
 
-    /// Full Simulation 목표 16개: 선택한 친구 → 내 최고 → 기본값
-    var simTargets: [Int] {
-        if let f = ctx.friend, f.splits.count == 16 { return f.splits }
-        if let b = ctx.simBest, b.count == 16 { return b }
-        return SeqBuilder.defaultTargets16
+    /// Full Simulation 목표 16개와 비교 이름: 아이폰 Full Sim 화면의 "Compare with" (Goal / Last / 친구) 를 따름
+    var simPick: (targets: [Int], word: String) {
+        SimTarget.pick(cmp: ctx.settings.simCmp, goals: ctx.settings.goals, last: ctx.simLast,
+                       friend: ctx.friend?.splits, friendFirst: ctx.friend?.first, best: ctx.simBest)
     }
+    var simTargets: [Int] { simPick.targets }
 
     func seq(mode: Mode, program: Program?) -> [Seg] {
         let s = ctx.settings
@@ -90,6 +91,7 @@ final class WatchStore: NSObject, WCSessionDelegate {
         guard let d = c[SyncKey.context] as? Data,
               let v = try? JSONStore.dec.decode(WatchContext.self, from: d) else { return }
         DispatchQueue.main.async {
+            GlowTheme.current = v.settings.glow      // 아이폰에서 고른 배경 빛 색 (화면보다 먼저 넣어 둠)
             self.ctx = v
             JSONStore.save(v, self.ctxFile)
             WorkoutEngine.shared.settings = v.settings

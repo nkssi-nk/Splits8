@@ -342,14 +342,145 @@ struct Program: Codable, Hashable, Identifiable {
     }
 }
 
+// MARK: - 트레이닝 링크 공유
+
+/// 트레이닝 구성을 링크 글자에 담아 보냄 (서버 없이). 받은 쪽은 홈페이지의 작은 페이지에서 "SPLITS8 에서 열기"를 눌러 앱에 추가.
+/// 링크 = base + "#" + token,  앱 전용 주소 = splits8://t?d=token,  token = "1." + base64url(JSON)
+/// JSON: {"n": 이름, "s": 세트 수, "q": ["run:1KM", "sledPush", …]}  — HIIT · 러닝 카드는 보내지 않음(하이록스 트레이닝만)
+enum ProgramLink {
+    static let base = "https://nkssi-nk.github.io/splits8/t.html"
+    static let scheme = "splits8"
+    static let maxName = 40
+    static let maxSeq = 16
+    static let maxSets = 20
+
+    private struct Payload: Codable {
+        var n: String
+        var s: Int
+        var q: [String]
+    }
+
+    static func canShare(_ p: Program) -> Bool { !p.isOpen && !p.seq.isEmpty }
+
+    static func token(_ p: Program) -> String? {
+        guard canShare(p) else { return nil }
+        let q: [String] = p.seq.prefix(maxSeq).map { $0.icon == "run" ? "run:" + ($0.run ?? "1KM") : $0.icon }
+        let pay = Payload(n: String(p.name.prefix(maxName)), s: max(1, min(maxSets, p.sets)), q: q)
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys]
+        guard let d = try? enc.encode(pay) else { return nil }
+        let b64: String = d.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        return "1." + b64
+    }
+
+    static func webURL(_ p: Program) -> URL? {
+        guard let t = token(p) else { return nil }
+        return URL(string: base + "#" + t)
+    }
+
+    /// 받은 글자에서 트레이닝을 만듦. 모르는 종목·이상한 값이 하나라도 있으면 nil (남이 만든 글자라 엄격하게 확인)
+    static func program(from token: String) -> Program? {
+        guard token.hasPrefix("1."), token.count <= 4000 else { return nil }
+        var b64: String = String(token.dropFirst(2))
+            .replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while b64.count % 4 != 0 { b64 += "=" }
+        guard let d = Data(base64Encoded: b64), let pay = try? JSONDecoder().decode(Payload.self, from: d) else { return nil }
+        guard !pay.q.isEmpty, pay.q.count <= maxSeq, pay.s >= 1, pay.s <= maxSets else { return nil }
+        var seq: [ProgItem] = []
+        for x in pay.q {
+            if x.hasPrefix("run:") {
+                let label: String = String(x.dropFirst(4))
+                guard Defaults.runs.contains(label) else { return nil }
+                seq.append(ProgItem(icon: "run", run: label))
+            } else {
+                guard Station.of(x) != nil else { return nil }
+                seq.append(ProgItem(icon: x))
+            }
+        }
+        // 이름: 줄바꿈·조종 글자를 빼고 길이를 자름. 비면 기본 이름
+        let cleaned: String = String(pay.n.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) && !CharacterSet.newlines.contains($0) }
+            .map { Character($0) })
+        let name: String = String(cleaned.trimmingCharacters(in: .whitespaces).prefix(maxName))
+        return Program(id: "s." + UUID().uuidString.prefix(8).lowercased(), name: name.isEmpty ? "Shared training" : name,
+                       sets: pay.s, seq: seq)
+    }
+
+    /// splits8://t?d=token  또는  https://…/t.html#token  에서 token 꺼내기
+    static func token(from url: URL) -> String? {
+        if url.scheme?.lowercased() == scheme {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            return items.first { $0.name == "d" }?.value
+        }
+        if let f = url.fragment, f.hasPrefix("1.") { return f }
+        return nil
+    }
+}
+
+// MARK: - 기록 백업 파일
+
+/// 기록 · 트레이닝을 파일 하나로 내보내고 다시 가져옴 (앱을 지웠다 깔거나 기기를 바꿀 때). 서버를 쓰지 않음
+struct BackupFile: Codable {
+    var app: String = "SPLITS8"
+    var version: Int = 1
+    var exportedAt: Date
+    var records: [Record]
+    var programs: [Program]
+
+    static func fileName(_ date: Date) -> String { "SPLITS8-backup-" + Fm.ymd.string(from: date) + ".json" }
+
+    func data() -> Data? {
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        return try? enc.encode(self)
+    }
+
+    static func read(_ data: Data) -> BackupFile? {
+        guard data.count <= 60_000_000 else { return nil }
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        guard let b = try? dec.decode(BackupFile.self, from: data), b.app == "SPLITS8" else { return nil }
+        return b
+    }
+
+    /// 가져오기: 이미 있는 기록(같은 id)은 건너뛰고 없는 것만 더함. (합친 목록, 새로 더한 개수)
+    static func merge(_ incoming: [Record], into current: [Record]) -> ([Record], Int) {
+        var ids: Set<UUID> = Set(current.map(\.id))
+        var out: [Record] = current
+        var added: Int = 0
+        for r in incoming where !ids.contains(r.id) {
+            ids.insert(r.id)
+            out.append(r)
+            added += 1
+        }
+        return (out, added)
+    }
+
+    /// 트레이닝: 같은 id 는 건너뛰고, 전체가 limit 을 넘지 않는 만큼만 더함. (합친 목록, 더한 개수)
+    static func merge(_ incoming: [Program], into current: [Program], limit: Int) -> ([Program], Int) {
+        var ids: Set<String> = Set(current.map(\.id))
+        var out: [Program] = current
+        var added: Int = 0
+        for p in incoming where !ids.contains(p.id) {
+            if out.count >= limit { break }
+            ids.insert(p.id)
+            out.append(p)
+            added += 1
+        }
+        return (out, added)
+    }
+}
+
 // MARK: - 대회
 
 struct RaceEvent: Codable, Hashable {
     var name: String = ""
     var loc: String = ""
     var date: Date = Fm.ymd.date(from: "2026-09-13") ?? Date()
-    var time: String = "09:00"
+    /// 출발 시각 "HH:mm". 비어 있으면 아직 모름 (티켓에는 날짜만 있고, 출발 시간은 보통 대회장에서 등록할 때 나옴)
+    var time: String = ""
     var dateEnd: Date? = nil
+    var hasTime: Bool { time.split(separator: ":").compactMap { Int($0) }.count == 2 }
     var isSet: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 }
 
@@ -424,6 +555,18 @@ struct SegResult: Codable, Hashable {
     var reps: Int? = nil
 }
 
+/// 스키 · 로잉 · 월볼 횟수 요약 (기록 화면 카드용). 워치가 팔 움직임으로 센 값이라 참고용
+struct RepSummary: Equatable {
+    let icon: String        // skiErg / row / wallBalls
+    let count: Int          // 그 종목 횟수 합 (세트로 여러 번 나오면 모두 더함)
+    let seconds: Int        // 그 종목 시간 합
+    /// 분당 횟수 (스키 · 로잉 머신 화면의 SPM 과 같은 단위)
+    var perMin: Int {
+        guard seconds > 0 else { return 0 }
+        return Int((Double(count) * 60 / Double(seconds)).rounded())
+    }
+}
+
 /// 경로 한 점 (위도·경도)
 struct RoutePt: Codable, Hashable {
     var a: Double   // latitude
@@ -495,6 +638,50 @@ struct Record: Codable, Hashable, Identifiable {
     }
 }
 
+// MARK: - 배경 빛 색 (테마)
+
+/// 화면 뒤에 비치는 빛의 색. 빛만 바뀌고 노란 강조색(버튼 · 로고 · 고른 탭)은 그대로.
+/// 공유 그림 Block · Ticket 의 빛 색도 같은 목록을 씀
+enum GlowTheme: String, CaseIterable, Codable, Hashable {
+    case yellow, orange, red, blue, purple, white
+
+    var hex: UInt32 {
+        switch self {
+        case .yellow: return 0xFFE600
+        case .orange: return 0xFF8C1A
+        case .red: return 0xFF453A
+        case .blue: return 0x338CFF
+        case .purple: return 0xBF5AF2
+        case .white: return 0xFFFFFF
+        }
+    }
+
+    /// 같은 세기로 보이게 하는 보정 (파랑 · 보라는 같은 값이면 노랑보다 어둡게 보임, 흰색은 더 밝게 보임)
+    var gain: Double {
+        switch self {
+        case .blue: return 1.3
+        case .purple: return 1.2
+        case .red: return 1.1
+        case .white: return 0.8
+        default: return 1
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .yellow: return "Yellow"
+        case .orange: return "Orange"
+        case .red: return "Red"
+        case .blue: return "Blue"
+        case .purple: return "Purple"
+        case .white: return "White"
+        }
+    }
+
+    /// 지금 앱에 적용된 색 (아이폰은 Store, 워치는 WatchStore 가 설정이 바뀔 때 넣음)
+    static var current: GlowTheme = .yellow
+}
+
 // MARK: - 설정 (아이폰이 원본, 워치로 전달)
 
 struct Settings: Codable, Hashable {
@@ -538,6 +725,13 @@ struct Settings: Codable, Hashable {
     var blocked: [BlockedUser] {
         get { blockedOpt ?? [] }
         set { blockedOpt = newValue.isEmpty ? nil : newValue }
+    }
+
+    // 배경 빛 색 (설정 > Theme). 노랑이 기본 — 예전 저장 파일과 호환되도록 옵셔널, 노랑이면 비워 둠
+    var themeOpt: String? = nil
+    var glow: GlowTheme {
+        get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }
+        set { themeOpt = newValue == .yellow ? nil : newValue.rawValue }
     }
 
     var signedIn: Bool { nickname != nil }
@@ -655,6 +849,26 @@ struct WatchContext: Codable {
     var segBests: [String: Int]   // 트레이닝 구간별 최고
     var pftBest: [Int]? = nil     // 최고 PFT 6구간 (예전 저장 파일엔 없음)
     var pftBestTotal: Int? = nil
+    var simLast: [Int]? = nil     // 가장 최근 Full Simulation 16구간 ("Compare with: Last" 일 때 목표)
+}
+
+/// Full Simulation 을 할 때 구간 목표 16개와 비교 이름. Full Sim 화면의 "Compare with" 를 그대로 따름
+/// (예전에는 친구 → 내 최고 → 기본값 순서라 "Goal" 을 골라도 목표가 쓰이지 않았음)
+enum SimTarget {
+    static func ok(_ a: [Int]?) -> [Int]? { (a?.count == 16) ? a : nil }
+
+    /// cmp: goal / last / friend. 고른 기준의 기록이 없으면 마지막 기록 → 내 최고 → 기본값
+    static func pick(cmp: String, goals: [Int], last: [Int]?, friend: [Int]?, friendFirst: String?,
+                     best: [Int]?) -> (targets: [Int], word: String) {
+        if cmp == "goal" { return (ok(goals) ?? Defaults.goals, "VS GOAL") }
+        if cmp == "friend", let f = ok(friend) {
+            let n: String = (friendFirst ?? "").uppercased()
+            return (f, n.isEmpty ? "VS FRIEND" : "VS " + n)
+        }
+        if let l = ok(last) { return (l, "VS LAST") }
+        if let b = ok(best) { return (b, "VS BEST") }
+        return (SeqBuilder.defaultTargets16, "VS BEST")
+    }
 }
 
 enum SyncKey {
@@ -731,6 +945,21 @@ enum RecordFlag: String {
     case check          // 말이 안 되게 빠름 (세계기록보다 훨씬 빠르거나 탭 실수)
 
     var label: String { self == .incomplete ? "Incomplete" : "Check" }
+}
+
+extension Record {
+    /// 횟수가 기록된 종목만 (스키 → 로잉 → 월볼 순서). 운동에 없거나 아이폰으로 기록했으면 빈 목록
+    var repSummaries: [RepSummary] {
+        var out: [RepSummary] = []
+        for k in ["skiErg", "row", "wallBalls"] {
+            let ss: [SegResult] = segs.filter { $0.icon == k && ($0.reps ?? 0) > 0 }
+            if ss.isEmpty { continue }
+            let c: Int = ss.map { $0.reps ?? 0 }.reduce(0, +)
+            let t: Int = ss.map(\.time).reduce(0, +)
+            out.append(RepSummary(icon: k, count: c, seconds: t))
+        }
+        return out
+    }
 }
 
 extension Record {

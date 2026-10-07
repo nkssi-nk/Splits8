@@ -26,6 +26,8 @@ struct HistoryCalendar: View {
 
     /// 달력을 옆으로 미는 중 (손가락이 움직인 거리)
     @State private var dragX: CGFloat = 0
+    /// 달이 넘어가는 방향: 1 = 다음 달(새 달이 오른쪽에서 들어옴), -1 = 지난 달(왼쪽에서 들어옴)
+    @State private var slideDir: Int = 1
 
     private enum DayMark { case empty, filled([Color]), ring(Color), race }
 
@@ -93,9 +95,16 @@ struct HistoryCalendar: View {
         VStack(spacing: 0) {
             monthHeader
             weekdayRow.padding(.bottom, 6)
-            grid
-                .offset(x: dragX * 0.35)
-                .opacity(1 - min(0.5, Double(abs(dragX)) / 300))
+            // 달이 넘어가면 숫자판이 옆으로 밀려 나가고 새 달이 반대쪽에서 들어옴 (끄는 동안은 손가락을 따라감)
+            ZStack(alignment: .top) {
+                grid
+                    .id(month)
+                    .transition(slide(CGFloat(1)))
+            }
+            .frame(maxWidth: .infinity)
+            .offset(x: dragX * 0.6)
+            .opacity(1 - min(0.5, Double(abs(dragX)) / 300))
+            .clipped()
             legend.padding(.top, 10)
         }
         .padding(.top, 14).padding(.horizontal, 14).padding(.bottom, 10)
@@ -114,13 +123,26 @@ struct HistoryCalendar: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("cal.prev")
             Spacer(minLength: 0)
-            Text(Self.monthFmt.string(from: month)).font(F.t(17, .semibold)).lineLimit(1)
+            ZStack {
+                Text(Self.monthFmt.string(from: month)).font(F.t(17, .semibold)).lineLimit(1)
+                    .id(month)
+                    .transition(slide(CGFloat(0.12)))
+            }
+            .accessibilityIdentifier("cal.month")
             Spacer(minLength: 0)
             Button { shift(1) } label: { arrow("chevron.right") }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("cal.next")
         }
         .padding(.bottom, 10)
+    }
+
+    /// 넘어가는 방향에 맞춘 들어옴·나감. amount 1 = 칸 너비만큼(숫자판), 그보다 작으면 살짝만(달 이름)
+    private func slide(_ amount: CGFloat) -> AnyTransition {
+        let d: CGFloat = slideDir >= 0 ? 1 : -1
+        let w: CGFloat = 330 * amount
+        return .asymmetric(insertion: .offset(x: d * w).combined(with: .opacity),
+                           removal: .offset(x: -d * w).combined(with: .opacity))
     }
 
     private func arrow(_ name: String) -> some View {
@@ -305,9 +327,14 @@ struct HistoryCalendar: View {
     private func shift(_ by: Int) {
         guard let m = cal.date(byAdding: .month, value: by, to: month) else { return }
         let start: Date = Self.monthStart(m)
-        withAnimation(.easeOut(duration: 0.2)) {
-            month = start
-            selected = nil            // 달을 넘기면 고른 날짜를 풂
+        // 방향을 먼저 알려 두고(나가는 달이 그 방향으로 나가도록), 다음 차례에 달을 바꿈
+        slideDir = by >= 0 ? 1 : -1
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            withAnimation(.snappy(duration: 0.32)) {
+                month = start
+                selected = nil            // 달을 넘기면 고른 날짜를 풂
+            }
         }
     }
 
@@ -373,7 +400,7 @@ struct HistoryCalendar: View {
                 Glyph("i_race", 14, Self.raceColor)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ev.name).font(F.t(15, .semibold)).lineLimit(1)
-                    Text("Race day · \(ev.time)").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                    Text("Race day").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Chevron8()

@@ -64,6 +64,8 @@ private struct DetailTile {
     let unit: String
     let color: Color
     let unitColor: Color
+    /// 제목 줄 오른쪽의 작은 두 번째 값 (횟수 카드: 총 횟수 또는 분당). 없으면 ""
+    var sub: String = ""
 }
 
 struct DetailView: View {
@@ -240,8 +242,8 @@ struct DetailView: View {
                 .padding(.top, rec.mode == .pft ? 10 : 6)
                 .accessibilityIdentifier("detail.timePlace")
             if let f = rec.flag {
-                Text(f == .incomplete ? LocalizedStringKey("Ended early, so it doesn't count toward your PB.")
-                                      : LocalizedStringKey("Faster than seems possible, so it doesn't count toward your PB. A tap may have been missed."))
+                Text(f == .incomplete ? LocalizedStringKey("Ended early, so it isn't counted as a complete result.")
+                                      : LocalizedStringKey("This looks too fast to be a valid result. A tap may have been missed."))
                     .font(F.t(13)).foregroundStyle(C.text2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
@@ -278,22 +280,49 @@ struct DetailView: View {
             DetailTile(label: "MAX HR", value: rec.maxHR > 0 ? "\(rec.maxHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "CALORIES", value: grouped(rec.kcal), unit: "KCAL", color: .white, unitColor: C.text2),
             DetailTile(label: "RUN PACE", value: pace, unit: "/KM", color: .white, unitColor: C.text2),
-        ]
+        ] + repTiles(rec)
+    }
+
+    /// 스키 · 로잉 · 월볼 횟수 카드 (워치로 기록해 횟수가 있을 때만).
+    /// 스키 · 로잉: 큰 숫자 = 분당 횟수(SPM), 작은 숫자 = 총 횟수 / 월볼: 큰 숫자 = 개수, 작은 숫자 = 분당
+    private func repTiles(_ rec: Record) -> [DetailTile] {
+        rec.repSummaries.map { s in
+            if s.icon == "wallBalls" {
+                return DetailTile(label: "WALL BALLS", value: "\(s.count)", unit: "REPS".l10n, color: .white, unitColor: C.text2,
+                                  sub: "\(s.perMin) " + "/MIN".l10n)
+            }
+            return DetailTile(label: s.icon == "skiErg" ? "SKIERG" : "ROW", value: "\(s.perMin)", unit: "SPM".l10n,
+                              color: .white, unitColor: C.text2, sub: "\(s.count) " + "STROKES".l10n)
+        }
     }
 
     private func tilesGrid(_ rec: Record) -> some View {
         let items: [DetailTile] = tiles(rec)
         let cols: [GridItem] = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
-        return LazyVGrid(columns: cols, spacing: 10) {
-            ForEach(items.indices, id: \.self) { i in
-                tileView(items[i])
+        return VStack(spacing: 8) {
+            LazyVGrid(columns: cols, spacing: 10) {
+                ForEach(items.indices, id: \.self) { i in
+                    tileView(items[i])
+                }
+            }
+            // 횟수 카드가 있으면 짐작한 값이라는 안내 한 줄
+            if !rec.repSummaries.isEmpty {
+                Note8(text: "Counts are estimated from wrist motion.")
+                    .accessibilityIdentifier("detail.repNote")
             }
         }
     }
 
     private func tileView(_ t: DetailTile) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label8(t.label)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Label8(t.label)
+                if !t.sub.isEmpty {
+                    Spacer(minLength: 2)
+                    Text(verbatim: t.sub).font(F.num(11, .semibold)).tracking(0.06 * 11).foregroundStyle(C.aeb)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
+            }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(t.value).font(F.num(28)).tracking(-0.03 * 28).foregroundStyle(t.color)
                     .lineLimit(1).minimumScaleFactor(0.6)
@@ -629,9 +658,9 @@ struct DetailView: View {
         let d = s.time - s.target
         let first: String = s.kind == .run ? "\(Fm.t(rec.pace(s))) /KM" : s.detail
         let bpm: String = s.hr.map { String($0) } ?? "--"
-        // 스키 · 로잉 · 월볼: 워치가 팔 움직임으로 센 횟수를 참고용으로 덧붙임 ("≈" = 짐작값)
+        // 스키 · 로잉 · 월볼: 워치가 팔 움직임으로 센 횟수를 참고용으로 덧붙임 ("~" = 짐작값, 한국어 "약")
         let reps: String = s.reps.map { n in
-            " · " + (s.icon == "wallBalls" ? String(localized: "≈ \(n) reps") : String(localized: "≈ \(n) strokes"))
+            " · " + (s.icon == "wallBalls" ? String(localized: "~\(n) reps") : String(localized: "~\(n) strokes"))
         } ?? ""
         let sub = "\(first) · \(bpm) BPM" + reps
         return HStack(spacing: 12) {

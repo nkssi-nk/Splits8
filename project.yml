@@ -56,6 +56,11 @@ targets:
         NSHealthUpdateUsageDescription: Splits8 saves your workouts to the Health app.
         NSPhotoLibraryAddUsageDescription: Splits8 saves share images to your photo library.
         LSApplicationQueriesSchemes: [instagram-stories]
+        # 링크로 받은 트레이닝 열기: splits8://t?d=…  (홈페이지 t.html 의 "SPLITS8에서 열기" 버튼)
+        CFBundleURLTypes:
+          - CFBundleURLName: $(APP_BUNDLE_ID)
+            CFBundleTypeRole: Editor
+            CFBundleURLSchemes: [splits8]
         NSLocationWhenInUseUsageDescription: Splits8 uses your location to measure pace and distance on outdoor runs.
     entitlements:
       path: Resources/iOS/Splits8.entitlements

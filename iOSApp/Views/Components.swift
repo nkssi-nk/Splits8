@@ -343,6 +343,9 @@ struct Toggle8: View {
         .animation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.2), value: on)
         .contentShape(Capsule())
         .onTapGesture { on.toggle() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(Text(on ? "On" : "Off"))
     }
 }
 
@@ -448,6 +451,109 @@ struct Flow: Layout {
             s.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(z))
             x += z.width + spacing; row = max(row, z.height)
         }
+    }
+}
+
+/// 칩을 한 줄만 보여 주는 배치: 앞에서부터 들어가는 만큼 놓고, 고른 칩(pinned)은 항상 보이게 함.
+/// 못 들어간 칩은 화면 오른쪽 밖 멀리 둠 (바깥에서 .clipped()) — 오른쪽 reserve 만큼은 겹꺾쇠 자리로 비워 둠
+struct OneRow: Layout {
+    var spacing: CGFloat = 6
+    var reserve: CGFloat = 0
+    var pinned: Int? = nil
+
+    /// 한 줄에 보일 칩 번호 (왼쪽부터 놓을 순서)
+    static func fit(widths: [CGFloat], room: CGFloat, spacing: CGFloat, pinned: Int?) -> [Int] {
+        var x: CGFloat = 0
+        var shown: [Int] = []
+        for (i, w) in widths.enumerated() {
+            let need: CGFloat = (shown.isEmpty ? 0 : spacing) + w
+            if x + need > room { break }
+            x += need
+            shown.append(i)
+        }
+        if let p = pinned, widths.indices.contains(p), !shown.contains(p) {
+            // 고른 칩이 안 보이면 뒤에서부터 빼서 자리를 만듦
+            while !shown.isEmpty && x + spacing + widths[p] > room {
+                let last: Int = shown.removeLast()
+                x -= widths[last] + (shown.isEmpty ? 0 : spacing)
+            }
+            shown.append(p)
+        }
+        if shown.isEmpty && !widths.isEmpty { shown = [pinned.flatMap { widths.indices.contains($0) ? $0 : nil } ?? 0] }
+        return shown
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes: [CGSize] = subviews.map { $0.sizeThatFits(.unspecified) }
+        let h: CGFloat = sizes.map(\.height).max() ?? 0
+        let all: CGFloat = sizes.map(\.width).reduce(0, +) + spacing * CGFloat(max(0, sizes.count - 1)) + reserve
+        let w: CGFloat = proposal.width ?? all
+        return CGSize(width: w.isFinite ? w : all, height: h)
+    }
+
+    func placeSubviews(in b: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes: [CGSize] = subviews.map { $0.sizeThatFits(.unspecified) }
+        let shown: [Int] = OneRow.fit(widths: sizes.map(\.width), room: b.width - reserve, spacing: spacing, pinned: pinned)
+        var x: CGFloat = b.minX
+        for i in shown {
+            subviews[i].place(at: CGPoint(x: x, y: b.minY), proposal: ProposedViewSize(sizes[i]))
+            x += sizes[i].width + spacing
+        }
+        for i in subviews.indices where !shown.contains(i) {
+            subviews[i].place(at: CGPoint(x: b.maxX + 3000, y: b.minY), proposal: ProposedViewSize(sizes[i]))
+        }
+    }
+}
+
+/// 칩 묶음: 접으면 한 줄 + 오른쪽 겹꺾쇠(︾), 겹꺾쇠를 누르면 전부 펼쳐지고 끝에 ︽ 가 붙음.
+/// 접힌 상태에서도 고른 칩(pinned)은 항상 보임
+struct FoldChips<Content: View>: View {
+    var spacing: CGFloat = 6
+    /// 칩 높이 (겹꺾쇠 칸도 같은 높이)
+    var height: CGFloat = 34
+    var radius: CGFloat = 10
+    var pinned: Int? = nil
+    var id: String = "chips.more"
+    @Binding var open: Bool
+    @ViewBuilder var content: () -> Content
+
+    private var toggleW: CGFloat { height + 6 }
+
+    var body: some View {
+        Group {
+            if open {
+                Flow(spacing: spacing) {
+                    content()
+                    toggle
+                }
+            } else {
+                OneRow(spacing: spacing, reserve: toggleW + spacing, pinned: pinned) {
+                    content()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
+                .overlay(alignment: .trailing) { toggle }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var toggle: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.easeOut(duration: 0.2)) { open.toggle() }
+        } label: {
+            DoubleChevron(up: open)
+                .stroke(C.aeb, style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
+                .frame(width: 10, height: 11)
+                .frame(width: toggleW, height: height)
+                .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.16), lineWidth: 1))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(open ? "Less" : "More"))
+        .accessibilityIdentifier(id)
     }
 }
 
@@ -678,6 +784,151 @@ struct HorizontalPan: UIGestureRecognizerRepresentable {
             let v: CGPoint = p.velocity(in: p.view)
             return abs(v.x) > abs(v.y)
         }
+    }
+}
+
+// MARK: - 테두리를 따라 도는 빛
+
+/// 카드 테두리를 따라 밝은 빛이 도는 효과.
+/// once = 화면에 나타날 때마다 한 바퀴 돌고 멈춤 / loop = 천천히 계속 / off = 빛 없음(테두리만).
+/// "동작 줄이기"를 켠 사람에게는 빛이 돌지 않음
+struct BorderLight: ViewModifier {
+    enum Mode: Equatable { case off, once, loop }
+
+    /// 고정 테두리 (nil 이면 따로 그리지 않음 — 카드가 이미 테두리를 그렸을 때)
+    var border: AnyShapeStyle? = nil
+    let light: Color
+    var radius: CGFloat = 20
+    var mode: Mode
+    /// 시작을 늦춤 (위 카드의 빛이 끝날 즈음 이어서 돌게)
+    var delay: Double = 0
+    var lineWidth: CGFloat = 1.5
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var angle: Double = -90
+    @State private var shine: Double = 0
+    /// 예약해 둔 시작이 낡았는지 확인하는 번호 (다시 시작하면 올라감)
+    @State private var run: Int = 0
+
+    private var moving: Bool { mode != .off && !reduceMotion }
+    /// 앱을 켠 때 (이 값을 처음 읽는 때 = 홈 화면을 처음 그릴 때)
+    static let launched = Date()
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return content
+            .overlay {
+                if let border {
+                    shape.strokeBorder(border, lineWidth: lineWidth).allowsHitTesting(false)
+                }
+            }
+            .overlay {
+                if moving {
+                    GeometryReader { g in
+                        let side: CGFloat = max(1, hypot(g.size.width, g.size.height))
+                        // 한 구간만 밝은 원뿔 그라데이션을 돌리고, 테두리 모양으로 잘라 냄
+                        AngularGradient(stops: [.init(color: light.opacity(0), location: 0),
+                                                .init(color: light.opacity(0), location: 0.70),
+                                                .init(color: light.opacity(0.55), location: 0.86),
+                                                .init(color: light, location: 0.955),
+                                                .init(color: Color.white, location: 0.985),
+                                                .init(color: light.opacity(0), location: 1)],
+                                        center: .center)
+                            .frame(width: side, height: side)
+                            .rotationEffect(.degrees(angle))
+                            .position(x: g.size.width / 2, y: g.size.height / 2)
+                    }
+                    .mask { shape.strokeBorder(lineWidth: lineWidth) }
+                    .opacity(shine)
+                    .allowsHitTesting(false)
+                }
+            }
+            .onAppear { start() }
+            .onChange(of: mode) { _, _ in start() }
+            .onChange(of: scenePhase) { _, p in if p == .active { start() } }
+    }
+
+    private func start() {
+        guard moving else { return }
+        run += 1
+        let mine: Int = run
+        let m: Mode = mode
+        // 처음 자리로 (움직임 없이)
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) { angle = -90; shine = 0 }
+        // 앱을 막 켰을 때는 가운데 로고가 화면을 가리고 있으므로(약 1.7초) 그 뒤에 시작
+        let logo: Double = Demo.enabled ? 0 : max(0, 1.8 - Date().timeIntervalSince(BorderLight.launched))
+        DispatchQueue.main.asyncAfter(deadline: .now() + (delay + logo + 0.05)) {
+            guard mine == run else { return }
+            if m == .loop {
+                withAnimation(.easeOut(duration: 0.4)) { shine = 1 }
+                withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) { angle = 270 }
+            } else {
+                withAnimation(.easeOut(duration: 0.25)) { shine = 1 }
+                withAnimation(.easeInOut(duration: 2.6)) { angle = 270 }
+                withAnimation(.easeOut(duration: 0.5).delay(2.2)) { shine = 0 }
+            }
+        }
+    }
+}
+
+extension PFTGrade {
+    /// 등급 색 테두리 (왼쪽 위가 진하고 오른쪽 아래로 옅어짐) — PFT 기록 카드와 홈 프로필 카드가 같이 씀
+    var borderStyle: AnyShapeStyle {
+        AnyShapeStyle(LinearGradient(stops: [.init(color: Color(hex: hex1, alpha: 0.9), location: 0),
+                                             .init(color: Color(hex: hex2, alpha: 0.25), location: 0.45),
+                                             .init(color: Color.white.opacity(0.08), location: 1)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+    }
+}
+
+/// 홈 프로필 카드: PFT 등급이 있으면 그 색 테두리. 골드는 홈에 들어올 때마다 빛이 테두리를 한 바퀴 돎
+struct GradeBorder: ViewModifier {
+    let grade: PFTGrade?
+
+    func body(content: Content) -> some View {
+        if let g = grade {
+            content.modifier(BorderLight(border: g.borderStyle, light: Color(hex: g.hex1), radius: 20,
+                                         mode: g == .gold ? BorderLight.Mode.once : BorderLight.Mode.off))
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - 빛 색 고르기
+
+/// 배경 빛 색 동그라미 6개 (고른 것은 흰 테두리). 설정 > Theme 와 공유 그림 Block · Ticket 의 Glow 에 같이 씀
+struct GlowSwatches: View {
+    let selected: GlowTheme
+    var size: CGFloat = 24
+    var spacing: CGFloat = 6
+    var idPrefix: String = "glow"
+    let onPick: (GlowTheme) -> Void
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            ForEach(GlowTheme.allCases, id: \.self) { t in
+                swatch(t)
+            }
+        }
+    }
+
+    private func swatch(_ t: GlowTheme) -> some View {
+        let on: Bool = t == selected
+        return Button { onPick(t) } label: {
+            Circle().fill(Color(hex: t.hex))
+                .frame(width: size, height: size)
+                .padding(4)
+                .overlay(Circle().strokeBorder(on ? Color.white : Color.white.opacity(0.14), lineWidth: on ? 2 : 1))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(t.label.l10n))
+        .accessibilityAddTraits(on ? AccessibilityTraits.isSelected : AccessibilityTraits())
+        .accessibilityIdentifier(idPrefix + "." + t.rawValue)
     }
 }
 

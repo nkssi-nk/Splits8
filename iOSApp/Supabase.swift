@@ -147,11 +147,14 @@ final class Supabase {
         return (String(data: d, encoding: .utf8) ?? "") == "true"
     }
 
-    func upsertProfile(nickname: String?, division: String, visibility: String, avatarUrl: String?) async throws {
+    /// avatarUrl 이 nil 이면 서버의 사진 주소는 건드리지 않음. 사진을 지울 때만 clearAvatar = true
+    /// (빌드 19 까지는 nil 이면 항상 지웠는데, 앱을 다시 켠 뒤에는 주소를 기억하지 못해 공개 범위만 바꿔도 서버 사진이 지워질 수 있었음)
+    func upsertProfile(nickname: String?, division: String, visibility: String, avatarUrl: String?,
+                       clearAvatar: Bool = false) async throws {
         guard let id = userId else { throw SBError.noSession }
         var b: [String: Any] = ["id": id, "division": division, "visibility": visibility]
         if let nickname { b["nickname"] = nickname }
-        if let avatarUrl { b["avatar_url"] = avatarUrl } else { b["avatar_url"] = NSNull() }
+        if let avatarUrl { b["avatar_url"] = avatarUrl } else if clearAvatar { b["avatar_url"] = NSNull() }
         _ = try await request("/rest/v1/profiles", method: "POST", body: b,
                               headers: ["Prefer": "resolution=merge-duplicates,return=minimal"])
     }
@@ -167,10 +170,19 @@ final class Supabase {
 
     // MARK: 친구
 
-    func searchProfiles(prefix: String) async throws -> [RemoteProfile] {
-        let q = prefix.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? prefix
-        let d = try await request("/rest/v1/profiles?nickname=like.\(q)*&select=id,nickname,division,avatar_url&limit=5")
-        return try decode([RemoteProfile].self, d)
+    /// 친구 찾기: 이메일 전체 또는 닉네임 전체가 정확히 맞는 한 사람만 (앞 글자만으로 찾는 건 없앰 — 모르는 사람이 훑어볼 수 없게).
+    /// 서버 함수 find_user 를 씀. 아직 서버에 그 함수가 없으면(404) 닉네임이 정확히 같은 사람만 찾음
+    func findUser(_ query: String) async throws -> RemoteProfile? {
+        let q: String = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return nil }
+        do {
+            let d = try await request("/rest/v1/rpc/find_user", method: "POST", body: ["q": q])
+            return try decode([RemoteProfile].self, d).first
+        } catch SBError.http(404, _) {
+            guard q.range(of: "^[a-z0-9_]{3,16}$", options: .regularExpression) != nil else { return nil }
+            let d = try await request("/rest/v1/profiles?nickname=eq.\(q)&select=id,nickname,division,avatar_url&limit=1")
+            return try decode([RemoteProfile].self, d).first
+        }
     }
 
     func addFriend(_ otherId: String) async throws {

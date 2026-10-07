@@ -7,6 +7,8 @@ struct SimView: View {
     let r = Router.shared
     @State private var metric = "total"
     @State private var info = false
+    /// 그래프 칩: 접으면 한 줄, 겹꺾쇠를 누르면 전부
+    @State private var chipsOpen = false
     fileprivate struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
     private static let stationMetrics: [(String, String, String)] = [
         ("skiErg", "SKIERG", "SkiErg"), ("sledPush", "SLED PUSH", "Sled Push"), ("sledPull", "SLED PULL", "Sled Pull"),
@@ -96,6 +98,8 @@ struct SimView: View {
             graphCard
             bestCard
             settingsCard
+            // "풀 시뮬 목표는 어디서 정하나요?" → 여기 Compare with 가 운동 중 구간 목표도 정함
+            Note8(text: "Compare with also sets your split targets during a Full Simulation: Goal uses your Race split targets, Last uses your latest Full Sim.")
             StartOnPhoneButton(mode: .sim)          // 워치 없이 아이폰으로 기록
                 .frame(maxWidth: .infinity, alignment: .trailing)
             if let f = Fatigue.analyze(store.records(.sim).filter(\.counts)) {
@@ -132,7 +136,8 @@ struct SimView: View {
     }
 
     private var metricChips: some View {
-        Flow(spacing: 6) {
+        FoldChips(spacing: 6, height: 30, radius: 8, pinned: Self.metrics.firstIndex { $0.key == metric },
+                  id: "sim.chips.more", open: $chipsOpen) {
             ForEach(Self.metrics, id: \.key) { c in
                 let on = metric == c.key
                 Button { withAnimation(.easeOut(duration: 0.2)) { metric = c.key } } label: {
@@ -342,8 +347,7 @@ struct RaceView: View {
             rowsCard
             StartOnPhoneButton(mode: .race)
                 .frame(maxWidth: .infinity, alignment: .trailing)
-            SectionLabel(text: "FRIENDS", top: 20)
-            if store.signedIn { RaceLeaderboard() } else { signUpCard }
+            // 친구 순위표는 홈의 FRIENDS 로 옮김 (빌드 20)
             history
         }
         .padding(.horizontal, 16)
@@ -443,18 +447,21 @@ struct RaceView: View {
         .rowLine(true)
     }
 
-    private var targetSource: String {
-        store.settings.tgtSrc == "friend" ? (store.friend?.first ?? "Auto") : "Auto"
+    /// 16 막대 (40 높이, gap 3) · 러닝 #2C2C2E · 스테이션 노랑 · 높이 = 목표/335
+    /// 누르면 구간별 목표 고치는 화면 (목표는 여기 한 곳에서만 — 설정의 "Split goals" 줄은 없앰)
+    private var splitTargets: some View {
+        Button { r.go(.setGoals) } label: { splitTargetsLabel }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("race.splitTargets")
     }
 
-    /// 16 막대 (40 높이, gap 3) · 러닝 #2C2C2E · 스테이션 노랑 · 높이 = 목표/335
-    private var splitTargets: some View {
+    private var splitTargetsLabel: some View {
         let goals: [Int] = store.settings.goals
         return VStack(spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Split targets").font(F.t(17))
                 Spacer()
-                Text(targetSource.l10n).font(F.t(13, .semibold)).foregroundStyle(C.accent)
+                Text("Edit".l10n + " ›").font(F.t(17)).foregroundStyle(C.text2)
             }
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(goals.enumerated()), id: \.offset) { i, t in
@@ -466,39 +473,7 @@ struct RaceView: View {
             .frame(height: 40, alignment: .bottom)
         }
         .padding(.top, 14).padding(.horizontal, 18).padding(.bottom, 16)
-    }
-
-    // MARK: FRIENDS (가입 전)
-
-    private static let ghosts: [(String, Color)] = [("J", C.accent), ("M", C.good), ("T", Color(hex: 0x0A84FF))]
-
-    private var signUpCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: -12) {
-                ForEach(Array(Self.ghosts.enumerated()), id: \.offset) { _, g in
-                    Text(g.0).font(F.t(13, .semibold)).foregroundStyle(.black)
-                        .frame(width: 34, height: 34).background(g.1, in: Circle())
-                        .padding(2).background(Color(hex: 0x0A0A0A), in: Circle())
-                }
-            }
-            .padding(-2)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Compare rankings with friends").font(F.t(17, .semibold))
-                Text("Add friends by nickname to see rankings for Full Sim, races and each station.")
-                    .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Button { r.toAuth(from: .race) } label: {
-                Text("Sign up · 30 sec").font(F.t(15, .semibold)).foregroundStyle(.black)
-                    .frame(maxWidth: .infinity).frame(height: 46)
-                    .yellowFill(14)
-            }
-            .buttonStyle(Press())
-            .accessibilityIdentifier("race.signup")
-        }
-        .padding(.vertical, 20).padding(.horizontal, 18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card8()
+        .contentShape(Rectangle())
     }
 
     // MARK: HISTORY
@@ -525,11 +500,13 @@ struct RaceView: View {
     }
 }
 
-// MARK: - Race › FRIENDS 순위표 (가입 후)
+// MARK: - Home › FRIENDS 순위표 (가입 후) — 빌드 19 까지는 Race 탭에 있었음
 
 struct RaceLeaderboard: View {
     let store = Store.shared
     let r = Router.shared
+    /// 스테이션 칩: 접으면 한 줄, 겹꺾쇠를 누르면 전부
+    @State private var chipsOpen = false
 
     private static let stations: [(String, String)] = [
         ("skiErg", "SkiErg"), ("sledPush", "Sled Push"), ("sledPull", "Sled Pull"), ("burpeeBroadJump", "BBJ"),
@@ -545,7 +522,7 @@ struct RaceLeaderboard: View {
             if store.settings.lbTab == "stations" { stationChips }
             captionRow
             rowsCard
-            Button { r.go(.friends) } label: {
+            Button { r.friendsFrom = .home; r.go(.friends) } label: {
                 Text("+ Add friends").font(F.t(15, .semibold)).foregroundStyle(C.accent)
                     .frame(maxWidth: .infinity).padding(6).contentShape(Rectangle())
             }
@@ -556,7 +533,8 @@ struct RaceLeaderboard: View {
     }
 
     private var stationChips: some View {
-        Flow(spacing: 6) {
+        FoldChips(spacing: 6, height: 34, radius: 17, pinned: Self.stations.firstIndex { $0.0 == store.settings.lbStation },
+                  id: "lb.chips.more", open: $chipsOpen) {
             ForEach(Self.stations.indices, id: \.self) { i in
                 let st = Self.stations[i]
                 let on = store.settings.lbStation == st.0
@@ -608,7 +586,7 @@ struct RaceLeaderboard: View {
 
     private var rowsCard: some View {
         let rows: [LBRow] = store.leaderboard
-        let meT: Int? = rows.first { $0.user_id == store.sb.userId }?.t
+        let meT: Int? = rows.first { $0.user_id == store.myId }?.t
         return VStack(spacing: 0) {
             if rows.isEmpty {
                 Text("No records yet. Finish a Full Simulation once and it will show up here.")
@@ -623,7 +601,7 @@ struct RaceLeaderboard: View {
     }
 
     private func lbRow(_ i: Int, _ row: LBRow, meT: Int?, last: Bool) -> some View {
-        let me: Bool = row.user_id == store.sb.userId
+        let me: Bool = row.user_id == store.myId
         return Button { open(row) } label: {
             HStack(spacing: 12) {
                 Text("\(i + 1)").font(F.num(17)).foregroundStyle(i == 0 ? C.accent : Color.white)
@@ -654,7 +632,7 @@ struct RaceLeaderboard: View {
 
     /// 친구를 누르면 Full Simulation 에서 그 친구와 비교
     private func open(_ row: LBRow) {
-        guard row.user_id != store.sb.userId else { return }
+        guard row.user_id != store.myId else { return }
         guard let f = store.friends.first(where: { $0.id == row.user_id }) else { return }
         var s = store.settings
         s.friendId = f.id

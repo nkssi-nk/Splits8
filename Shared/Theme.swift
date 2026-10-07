@@ -99,7 +99,7 @@ struct Label8: View {
 
 /// SPLITS8 로고 — 글꼴로 그리지 않고 시안 로고 이미지를 씀 (v4: 8이 세로로 갈라진 모양)
 /// 높이 = 예전 글자 크기 × 0.83. 원본 비율 1677 × 331.
-/// 검은 글자 → wordmark-black, 8도 흰색 → wordmark-white, 기본(흰 SPLITS + 노란 8) → wordmark-yellow
+/// 검은 글자 + 검은 8 → wordmark-black, 검은 글자 + 노란 8 → 두 그림을 이어 붙임, 8도 흰색 → wordmark-white, 기본(흰 SPLITS + 노란 8) → wordmark-yellow
 struct Wordmark: View {
     var size: CGFloat
     var eightColor: Color = C.accent
@@ -112,14 +112,34 @@ struct Wordmark: View {
         if eightColor == C.accent { return "wordmark-yellow" }
         return "wordmark-white"
     }
+    /// 그림 너비에서 8 이 시작하는 자리 (원본 1677 가운데 1361 — S 와 8 사이 빈칸의 가운데)
+    private static let eightAt: CGFloat = 1361.0 / 1677.0
+
     var body: some View {
         let h: CGFloat = size * 0.83
-        Image(imageName)
+        let w: CGFloat = h * 1677 / 331
+        if color == Color.black && eightColor == C.accent {
+            // 검은 SPLITS + 노란 8: 두 그림을 8 앞에서 잘라 이어 붙임
+            ZStack {
+                piece("wordmark-black", w, h)
+                    .mask(alignment: .leading) { Rectangle().frame(width: w * Wordmark.eightAt) }
+                piece("wordmark-yellow", w, h)
+                    .mask(alignment: .trailing) { Rectangle().frame(width: w * (1 - Wordmark.eightAt)) }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("SPLITS8")
+        } else {
+            piece(imageName, w, h)
+                .accessibilityLabel("SPLITS8")
+        }
+    }
+
+    private func piece(_ name: String, _ w: CGFloat, _ h: CGFloat) -> some View {
+        Image(name)
             .resizable()
             .interpolation(.high)
             .scaledToFit()
-            .frame(width: h * 1677 / 331, height: h)
-            .accessibilityLabel("SPLITS8")
+            .frame(width: w, height: h)
     }
 }
 
@@ -134,8 +154,10 @@ struct Ambient: Equatable {
     var linear: Bool = false         // linear-gradient(180deg, color, transparent 40%)
 
     static let none = Ambient(hex: 0, alpha: 0, rx: 1, ry: 1, cx: 0.5, cy: 0.5)
+    /// 화면 배경 빛: 색은 설정의 테마(GlowTheme)를 따름. 기본은 노랑
     static func y(_ a: Double, _ rx: CGFloat, _ ry: CGFloat, _ cx: CGFloat, _ cy: CGFloat) -> Ambient {
-        Ambient(hex: 0xFFE600, alpha: a, rx: rx, ry: ry, cx: cx, cy: cy)
+        let t: GlowTheme = GlowTheme.current
+        return Ambient(hex: t.hex, alpha: min(1, a * t.gain), rx: rx, ry: ry, cx: cx, cy: cy)
     }
 }
 

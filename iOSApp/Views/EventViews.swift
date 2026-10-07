@@ -193,6 +193,7 @@ struct SetEventView: View {
         return (p.count > 0 ? p[0] : 9, p.count > 1 ? p[1] : 0)
     }
     private var timeLabel: String {
+        guard ev.hasTime else { return "Not set".l10n }
         let (h, m) = hm
         return HomeView.hm12(String(format: "%02d:%02d", h, m))     // 9:00 AM (한국어: 오전 9:00)
     }
@@ -203,21 +204,32 @@ struct SetEventView: View {
         let pm = hh >= 12
         let h12 = hh % 12 == 0 ? 12 : hh % 12
         return VStack(spacing: 12) {
-            Seg8(items: [("AM", "AM"), ("PM", "PM")], selected: pm ? "PM" : "AM") { setTime((h12 % 12) + ($0 == "PM" ? 12 : 0), mi) }
+            // 시간이 아직 없으면 아무 칸도 고른 것처럼 보이지 않게
+            Seg8(items: [("AM", "AM"), ("PM", "PM")], selected: ev.hasTime ? (pm ? "PM" : "AM") : "") { setTime((h12 % 12) + ($0 == "PM" ? 12 : 0), mi) }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 6), spacing: 6) {
                 ForEach(1...12, id: \.self) { h in
-                    cell("\(h)", on: h == h12) { setTime((h % 12) + (pm ? 12 : 0), mi) }
+                    cell("\(h)", on: ev.hasTime && h == h12) { setTime((h % 12) + (pm ? 12 : 0), mi) }
                 }
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 6) {
                 ForEach([0, 15, 30, 45], id: \.self) { m in
-                    cell(":" + String(format: "%02d", m), on: m == mi) { setTime(hh, m) }
+                    cell(":" + String(format: "%02d", m), on: ev.hasTime && m == mi) { setTime(hh, m) }
                 }
             }
-            Text("Pick the wave start time on your ticket. 15-minute steps.").font(F.t(13)).foregroundStyle(C.text3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 2)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("Optional. Start times are usually given at check-in.").font(F.t(13)).foregroundStyle(C.text3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                if ev.hasTime {
+                    Button { set { $0.time = "" } } label: {
+                        Text("Clear").font(F.t(13, .semibold)).foregroundStyle(C.accent)
+                            .frame(minHeight: 28).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("ev.time.clear")
+                }
+            }
+            .padding(.horizontal, 2)
         }
         .padding(.top, 12).padding(.horizontal, 14).padding(.bottom, 14)
     }

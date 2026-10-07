@@ -116,6 +116,29 @@ language sql stable security definer set search_path = public as $$
   select not exists (select 1 from public.profiles where nickname = lower(n) and id <> coalesce(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid));
 $$;
 
+-- 친구 찾기 (빌드 20): 이메일 전체 또는 닉네임 전체가 정확히 맞는 한 사람만 돌려줌.
+-- 앞 글자만으로 찾는 기능은 없음 (모르는 사람을 훑어볼 수 없게). 로그인한 사람만 쓸 수 있고, 이메일 자체는 돌려주지 않음.
+-- 기록을 "나만 보기"로 둔 사람은 찾아지지 않음 (프로필 읽기 규칙과 같음).
+-- Apple 로 가입하면서 이메일을 가린 사람은 가입 이메일이 가려진 주소라서 닉네임으로만 찾아짐.
+create or replace function public.find_user(q text)
+returns table (id uuid, nickname text, division text, avatar_url text)
+language sql stable security definer set search_path = public as $$
+  select p.id, p.nickname, coalesce(p.division, ''), p.avatar_url
+  from public.profiles p
+  left join auth.users u on u.id = p.id
+  where auth.uid() is not null
+    and p.id <> auth.uid()
+    and p.nickname is not null
+    and p.visibility <> 'private'
+    and length(btrim(q)) between 3 and 254
+    and (p.nickname = lower(btrim(q)) or lower(u.email) = lower(btrim(q)))
+  order by (p.nickname = lower(btrim(q))) desc
+  limit 1;
+$$;
+revoke all on function public.find_user(text) from public;
+revoke all on function public.find_user(text) from anon;
+grant execute on function public.find_user(text) to authenticated;
+
 -- 친구 추가: 상대가 이미 나를 추가했으면 바로 accepted, 아니면 pending
 create or replace function public.add_friend(other uuid) returns void
 language plpgsql security definer set search_path = public as $$

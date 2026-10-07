@@ -67,6 +67,8 @@ struct HomeView: View {
         }
         .padding(.vertical, 14).padding(.horizontal, 16)
         .card8()
+        // PFT 등급 색 테두리 (골드는 홈에 들어올 때마다 빛이 한 바퀴)
+        .modifier(GradeBorder(grade: store.pftGrade))
         .accessibilityIdentifier("home.profile")
     }
 
@@ -92,7 +94,7 @@ struct HomeView: View {
         .accessibilityIdentifier("home.profileBest")
     }
 
-    // 다음 대회: 왼쪽 3줄 (이름 20/600 · 장소·날짜·시간 13 · "Division · 체급" 13), 오른쪽에는 D-day 만 (34/600 노랑, 세로 가운데)
+    // 다음 대회: 왼쪽 3줄 (이름 20/600 · 장소·날짜·시간 13 · "Division · 디비전 이름" 13), 오른쪽에는 D-day 만 (34/600 노랑, 세로 가운데)
     @ViewBuilder private var nextRace: some View {
         let ev = store.settings.event
         if ev.isSet {
@@ -112,6 +114,9 @@ struct HomeView: View {
                 }
                 .padding(.vertical, 16).padding(.horizontal, 18)
                 .background { raceCardBg(near: isNear(ev.date)) }
+                // 대회 7일 전부터: 홈에 들어올 때마다 테두리에 빛이 한 바퀴 (프로필 빛에 이어서). 대회 당일은 천천히 계속
+                .modifier(BorderLight(light: C.accent, radius: 20, mode: raceLight(ev.date),
+                                      delay: store.pftGrade == .gold ? 2.0 : 0.3))
                 .contentShape(Rectangle())
             }
             .buttonStyle(Press())
@@ -208,7 +213,7 @@ struct HomeView: View {
         }
     }
 
-    // 친구: 가입 전 카드 / 순위 3줄
+    // 친구: 가입 전 카드 / 가입 후 순위표 (Full Sim · Race · Stations) — 빌드 19 까지는 Race 탭에 있던 것
     @ViewBuilder private var friends: some View {
         if !store.signedIn {
             HStack(spacing: 12) {
@@ -221,27 +226,7 @@ struct HomeView: View {
             .padding(.vertical, 16).padding(.horizontal, 18)
             .card8()
         } else {
-            let rows = Array(store.leaderboard.sorted { $0.t < $1.t }.prefix(3))
-            VStack(spacing: 0) {
-                if rows.isEmpty {
-                    Text("No friend records yet").font(F.t(13)).foregroundStyle(C.text2)
-                        .frame(maxWidth: .infinity).frame(minHeight: 52)
-                }
-                ForEach(Array(rows.enumerated()), id: \.element.id) { i, x in
-                    let me = x.nickname == store.settings.nickname
-                    HStack(spacing: 12) {
-                        Text("\(i + 1)").font(F.num(15)).foregroundStyle(i == 0 ? C.accent : .white).frame(width: 22, alignment: .leading)
-                        Text("@" + x.nickname + (me ? " (you)".l10n : "")).font(F.t(15, me ? .semibold : .medium))
-                            .foregroundStyle(me ? C.accent : .white).lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(Fm.t(x.t)).font(F.num(17)).tracking(-0.34)
-                    }
-                    .padding(.horizontal, 18).frame(minHeight: 52)
-                    .background(me ? Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.08) : .clear)
-                    .rowLine(i < rows.count - 1)
-                }
-            }
-            .card8()
+            RaceLeaderboard()
         }
     }
 
@@ -529,11 +514,20 @@ struct HomeView: View {
         .accessibilityIdentifier("home.upcoming." + x.id)
     }
 
+    /// 대회까지 남은 날 (오늘 = 0, 지났으면 음수)
+    private func daysLeft(_ d: Date) -> Int {
+        let cal = Calendar.current
+        return cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: cal.startOfDay(for: d)).day ?? -1
+    }
     /// 대회가 0~7일 남았으면 노란 강조 카드 (시안 v4: 그라데이션 + 노란 테두리 0.38 + 은은한 노란 그림자)
     private func isNear(_ d: Date) -> Bool {
-        let cal = Calendar.current
-        let n: Int = cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: cal.startOfDay(for: d)).day ?? -1
+        let n: Int = daysLeft(d)
         return n >= 0 && n <= 7
+    }
+    /// 대회 카드 테두리의 도는 빛: D-7 ~ D-1 은 한 바퀴씩, D-DAY 는 계속, 그 밖에는 없음
+    private func raceLight(_ d: Date) -> BorderLight.Mode {
+        guard isNear(d) else { return .off }
+        return daysLeft(d) == 0 ? .loop : .once
     }
     @ViewBuilder private func raceCardBg(near: Bool) -> some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -553,7 +547,8 @@ struct HomeView: View {
 
     // 장소 · 13 Sep · 9:00 AM
     private func eventSub(_ ev: RaceEvent) -> String {
-        [ev.loc, Fm.dm.string(from: ev.date), Self.hm12(ev.time)].filter { !$0.isEmpty }.joined(separator: " · ")
+        // 장소 · 날짜 (출발 시간은 넣지 않음: 대회장에 가야 알 수 있고, 넣으면 작은 화면에서 줄이 잘림)
+        [ev.loc, Fm.dm.string(from: ev.date)].filter { !$0.isEmpty }.joined(separator: " · ")
     }
     static func hm12(_ t: String) -> String {
         let p = t.split(separator: ":").compactMap { Int($0) }

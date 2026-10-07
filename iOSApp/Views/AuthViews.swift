@@ -179,8 +179,14 @@ struct AuthView: View {
     }
 
     private func finish() async {
-        if let p = await store.loadProfile(), p.nickname != nil { r.go(r.authReturn) }
-        else { r.nickDraft = ""; r.go(.nick) }
+        switch await store.loadProfile() {
+        case .found: r.go(r.authReturn)
+        case .none: r.nickDraft = ""; r.go(.nick)
+        case .failed:
+            // 로그인은 됐지만 프로필을 못 읽음 → 닉네임 만들기로 보내지 않고 다시 해 보게 함
+            await store.sb.signOut()
+            self.error = String(localized: "Signed in, but we couldn't load your profile. Check your connection and try again.")
+        }
     }
 }
 
@@ -219,6 +225,8 @@ struct CodeView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var resent = false
+    /// 코드 확인까지는 끝났는지 (그 뒤 프로필 읽기만 다시 할 때 씀)
+    @State private var verified = false
     @FocusState private var focus: Bool
 
     private var emailShown: String { r.email.isEmpty ? "you@example.com" : r.email }
@@ -286,7 +294,7 @@ struct CodeView: View {
     }
 
     private func resend() {
-        Task { try? await store.sb.sendCode(email: r.email); r.code = ""; resent = true }
+        Task { try? await store.sb.sendCode(email: r.email); r.code = ""; resent = true; verified = false }
     }
 
     private func verify() {
@@ -294,11 +302,19 @@ struct CodeView: View {
         busy = true; error = nil
         Task {
             do {
-                try await store.sb.verify(email: r.email, code: r.code)
+                // 코드는 한 번만 쓸 수 있음 → 이미 확인됐으면(프로필 읽기만 실패했던 경우) 다시 확인하지 않음
+                if !verified {
+                    try await store.sb.verify(email: r.email, code: r.code)
+                    verified = true
+                }
                 store.settings.signMethod = "Email code"
                 store.settings.email = r.email
-                if let p = await store.loadProfile(), p.nickname != nil { r.go(r.authReturn) }
-                else { r.nickDraft = ""; r.go(.nick) }
+                switch await store.loadProfile() {
+                case .found: r.go(r.authReturn)
+                case .none: r.nickDraft = ""; r.go(.nick)
+                case .failed:
+                    self.error = String(localized: "Signed in, but we couldn't load your profile. Check your connection and try again.")
+                }
             } catch { self.error = String(localized: "That code doesn't match. Please check and try again.") }
             busy = false
         }
@@ -312,6 +328,8 @@ struct NickView: View {
     @Bindable var r = Router.shared
     @State private var taken = false
     @State private var checking = false
+    /// 서버에 물어보지 못함 (네트워크 등) → "사용할 수 있어요"라고 하지 않음
+    @State private var checkFailed = false
     @State private var busy = false
     @State private var error: String?
 
@@ -319,7 +337,7 @@ struct NickView: View {
     private var valid: Bool { nd.range(of: "^[a-z0-9_]{3,16}$", options: .regularExpression) != nil }
     /// 욕설 · 운영자 사칭 같은 쓸 수 없는 말이 들어 있는지
     private var clean: Bool { NickFilter.allowed(nd) }
-    private var ok: Bool { valid && clean && !taken && !checking }
+    private var ok: Bool { valid && clean && !taken && !checking && !checkFailed }
     private var editing: Bool { store.settings.nickname != nil }
 
     private var ring: Color { nd.isEmpty ? C.cardBorder : ok ? C.good.opacity(0.6) : C.bad.opacity(0.6) }
@@ -384,12 +402,14 @@ struct NickView: View {
         if !valid { return String(localized: "3–16 characters: lowercase letters, numbers and _ only") }
         if !clean { return String(localized: "Please choose a different nickname") }
         if checking { return String(localized: "Checking…") }
+        if checkFailed { return String(localized: "Couldn't check this nickname. Check your connection and type it again.") }
         return String(localized: "@\(nd) is available")
     }
 
     /// 입력이 멈추고 0.3초 뒤 서버에서 사용 가능 여부 확인
     private func check(_ n: String) {
         taken = false
+        checkFailed = false
         guard n.range(of: "^[a-z0-9_]{3,16}$", options: .regularExpression) != nil, n != store.settings.nickname else {
             checking = false; return
         }
@@ -397,7 +417,7 @@ struct NickView: View {
         Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard n == r.nickDraft else { return }
-            if let a = try? await store.sb.nicknameAvailable(n) { taken = !a }
+            if let a = try? await store.sb.nicknameAvailable(n) { taken = !a } else { checkFailed = true }
             checking = false
         }
     }

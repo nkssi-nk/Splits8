@@ -10,6 +10,8 @@ struct Splits8App: App {
             LaunchGate {
                 PhoneRoot()
             }
+            // 링크로 받은 트레이닝 (splits8://t?d=…)
+            .onOpenURL { Router.shared.handle(url: $0) }
             .preferredColorScheme(.dark)
             .tint(C.accent)
         }
@@ -78,6 +80,37 @@ final class Router {
     /// Division · 심박 화면을 어디서 열었는지 (돌아갈 곳)
     var subFrom: Scr = .account
     var setDivFrom: Scr { get { subFrom } set { subFrom = newValue } }
+    /// Friends 화면을 어디서 열었는지: 홈의 순위표(+ Add friends) 또는 설정
+    var friendsFrom: Scr = .settings
+
+    // 링크로 받은 트레이닝 (nil 이면 닫힘) · 읽을 수 없는 링크 · 5개가 꽉 참
+    var incoming: Program? = nil
+    var linkError = false
+    var linkFull = false
+
+    /// splits8://t?d=…  로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함
+    func handle(url: URL) {
+        guard url.scheme?.lowercased() == ProgramLink.scheme, url.host?.lowercased() == "t" else { return }
+        guard let token = ProgramLink.token(from: url), let p = ProgramLink.program(from: token) else {
+            linkError = true
+            return
+        }
+        incoming = p
+    }
+
+    /// 받은 트레이닝을 내 목록에 더함 (확인창에서 Add 를 눌렀을 때)
+    func addIncoming(_ p: Program) {
+        incoming = nil
+        let store = Store.shared
+        guard store.programs.count < Program.freeLimit else {
+            // 확인창이 닫힌 뒤에 띄움 (닫히는 중에 바로 띄우면 안 뜰 때가 있음)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.linkFull = true }
+            return
+        }
+        store.save(p)
+        // 처음 안내 화면 · 운동 중에는 화면을 옮기지 않음
+        if store.settings.hasOnboarded && scr != .phoneLive && scr != .builder { go(.training) }
+    }
 
     // 계정
     var authReturn: Scr = .training     // 가입 끝나면 돌아갈 화면
@@ -227,7 +260,11 @@ final class Router {
     var barBack: (label: String, action: () -> Void)? {
         switch scr {
         case .findEvent: return ("Race event", { self.go(.setEvent) })
-        case .account, .setGoals, .setRun, .friends: return ("Settings", { self.go(.settings) })
+        case .account, .setRun: return ("Settings", { self.go(.settings) })
+        case .setGoals: return ("Race", { self.go(.race) })
+        case .friends:
+            let home: Bool = friendsFrom == .home
+            return (home ? "Home" : "Settings", { self.go(home ? .home : .settings) })
         case .setDiv, .setHr:
             let to = subFrom == scr ? Scr.account : subFrom
             return (subBackLabel, { self.go(to) })
@@ -236,10 +273,60 @@ final class Router {
     }
 }
 
+// MARK: - 링크로 받은 트레이닝 확인창
+
+/// "이 트레이닝을 추가할까요?" · 읽을 수 없는 링크 · 5개가 꽉 찼을 때
+struct IncomingTrainingAlerts: ViewModifier {
+    @Bindable var r = Router.shared
+
+    func body(content: Content) -> some View {
+        content
+            .alert("Add this training?", isPresented: Binding(get: { r.incoming != nil }, set: { if !$0 { r.incoming = nil } }),
+                   presenting: r.incoming) { p in
+                Button("Add") { r.addIncoming(p) }
+                Button("Cancel", role: .cancel) { r.incoming = nil }
+            } message: { p in
+                Text(IncomingTrainingAlerts.summary(p))
+            }
+            .alert("This training link can't be read", isPresented: $r.linkError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("The link may be cut off. Ask for it again.")
+            }
+            .alert("You can save up to \(Program.freeLimit) trainings", isPresented: $r.linkFull) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Delete one to make a new training.")
+            }
+    }
+
+    /// "Leg day\n8 segments × 2 sets"
+    static func summary(_ p: Program) -> String {
+        p.name + "\n" + String(localized: "\(p.seq.count) segments × \(p.sets) sets")
+    }
+}
+
 // MARK: - 화면별 배경 빛
 
+/// 배경 빛 자리를 앱을 켤 때마다 조금씩 다르게 (좌우 · 위아래 · 크기). 화면 확인용(--demo)에서는 늘 같은 자리
+enum GlowDrift {
+    static let dx: CGFloat = Demo.enabled ? 0 : CGFloat.random(in: -0.22...0.22)
+    static let dy: CGFloat = Demo.enabled ? 0 : CGFloat.random(in: -0.03...0.07)
+    static let scale: CGFloat = Demo.enabled ? 1 : CGFloat.random(in: 0.94...1.10)
+}
+
 extension Scr {
+    /// 화면 배경 빛 (자리는 켤 때마다 조금 다름 — GlowDrift)
     var ambient: Ambient {
+        var a: Ambient = baseAmbient
+        if a == Ambient.none || a.linear { return a }
+        a.cx += GlowDrift.dx
+        a.cy += GlowDrift.dy
+        a.rx *= GlowDrift.scale
+        return a
+    }
+
+    var baseAmbient: Ambient {
         switch self {
         case .training: return .y(0.26, 1.2, 0.5, 0.5, 0)
         case .home: return .y(0.24, 1.3, 0.55, 0.5, 0)
@@ -273,8 +360,9 @@ extension Scr {
         case .home: return .home
         case .training, .builder: return .training
         case .sim: return .sim
-        case .race, .setEvent, .findEvent: return .race
-        case .settings, .setHr, .setGoals, .setDiv, .friends, .setRun, .account: return .settings
+        case .race, .setEvent, .findEvent, .setGoals: return .race
+        case .friends: return Router.shared.friendsFrom == .home ? .home : .settings
+        case .settings, .setHr, .setDiv, .setRun, .account: return .settings
         default: return nil
         }
     }
@@ -300,14 +388,17 @@ struct PhoneRoot: View {
     private var edgeBack: (() -> Void)? { r.backAction ?? r.barBack?.action }
 
     var body: some View {
-        ZStack {
+        let theme: GlowTheme = Store.shared.settings.glow
+        return ZStack {
             Color.black.ignoresSafeArea()
             ZStack {
                 ForEach([r.scr], id: \.self) { s in
-                    AmbientLayer(a: s.ambient).transition(.opacity)
+                    // 테마(배경 빛 색)가 바뀌면 다시 그려 서서히 바뀜
+                    AmbientLayer(a: s.ambient).id(theme).transition(.opacity)
                 }
             }
             .animation(.easeInOut(duration: 0.5), value: r.scr)
+            .animation(.easeInOut(duration: 0.5), value: theme)
 
             // 나가는 화면은 바로 없앰 (사라지는 중인 화면이 남아 터치를 가로막지 않게), 들어오는 화면만 부드럽게
             screen
@@ -349,7 +440,7 @@ struct PhoneRoot: View {
             .allowsHitTesting(false)
 
             if r.scr.showsTabs {
-                // 탭 바 뒤로 지나가는 내용이 탭 글자와 겹쳐 보이지 않게: 화면 맨 아래 띠가 아래로 갈수록 흐려지고 어두워짐
+                // 탭 바 뒤로 지나가는 내용이 탭 글자와 겹쳐도 읽히게: 화면 맨 아래 띠가 아래로 갈수록 살짝 어두워짐
                 TabFade()
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .ignoresSafeArea(edges: .bottom)
@@ -390,6 +481,7 @@ struct PhoneRoot: View {
                     .preferredColorScheme(.dark)
             }
         }
+        .modifier(IncomingTrainingAlerts())
     }
 
     @ViewBuilder private var screen: some View {
@@ -449,17 +541,21 @@ struct Scroll8<Content: View>: View {
     }
 }
 
-/// iOS 18+: 스크롤 위치(맨 위 = 0)를 스크롤 뷰에서 직접 받아 탭 바 접기/펴기에 씀
+/// iOS 18+: 스크롤 위치(맨 위 = 0)와 "손가락으로 끄는 중인지"를 스크롤 뷰에서 직접 받아 탭 바 접기/펴기에 씀
 private struct ScrollTrack: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
-            content.onScrollGeometryChange(for: CGFloat.self) { g in
-                // 맨 아래에서 튕겨 돌아오는 움직임은 "위로 올림"으로 치지 않도록 끝 위치에서 자름
-                let end: CGFloat = max(0, g.contentSize.height + g.contentInsets.top + g.contentInsets.bottom - g.containerSize.height)
-                return min(g.contentOffset.y + g.contentInsets.top, end)
-            } action: { _, y in
-                TabBarScroll.shared.update(y)
-            }
+            content
+                .onScrollGeometryChange(for: CGFloat.self) { g in
+                    // 끝을 넘어 당겨진 만큼(고무줄처럼 늘어난 부분)은 세지 않음 — 짧은 화면에서 접혔다 펴지지 않게
+                    let end: CGFloat = max(0, g.contentSize.height + g.contentInsets.top + g.contentInsets.bottom - g.containerSize.height)
+                    return min(g.contentOffset.y + g.contentInsets.top, end)
+                } action: { _, y in
+                    TabBarScroll.shared.update(y)
+                }
+                .onScrollPhaseChange { _, phase in
+                    TabBarScroll.shared.dragging(phase == .interacting)
+                }
         } else {
             content
         }
@@ -472,22 +568,42 @@ struct ScrollY8: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
-/// 아래 탭 바 접기/펴기: 내용을 아래로 읽어 내려가면(손가락을 위로) 아이콘만, 다시 위로 올리면(손가락을 아래로) 글자까지 펼침
+/// 아래 탭 바 접기/펴기: 내용을 아래로 읽어 내려가면(손가락을 위로) 아이콘만, 다시 위로 분명히 되돌리면(손가락을 아래로) 글자까지 펼침.
+/// 손가락으로 끄는 동안에만 방향을 읽음 — 손을 뗀 뒤의 미끄러짐과 끝에서 튕겨 돌아오는 움직임은 무시
+/// (빌드 19: 그 움직임이 "위로 올림"으로 읽혀 접혔다가 스프링처럼 바로 펴졌음)
 @Observable
 final class TabBarScroll {
     static let shared = TabBarScroll()
     var compact = false
     @ObservationIgnored private var last: CGFloat = 0
+    @ObservationIgnored private var now: CGFloat = 0
+    /// iOS 18+ 에서 끄는 중인지 알려 주기 시작하면 true (그 전 OS 는 항상 방향을 읽음)
+    @ObservationIgnored private var phaseAware = false
+    @ObservationIgnored private var isDragging = false
+
+    /// 접기: 아래로 8pt / 펴기: 위로 30pt 이상 되돌렸을 때만
+    private static let foldBy: CGFloat = 8
+    private static let unfoldBy: CGFloat = 30
+
+    func dragging(_ on: Bool) {
+        phaseAware = true
+        if on && !isDragging { last = now }      // 끌기 시작한 자리부터 다시 잼
+        // 손을 뗄 때 한 번 더 봄: 짧게 튕겨 올린 경우(손가락은 30pt 를 못 갔지만 위로 올리려던 것)에도 펼침
+        if !on && isDragging && now >= 24 && now - last < -12 { set(false); last = now }
+        isDragging = on
+    }
 
     func update(_ y: CGFloat) {
+        now = y
         if y < 24 {                       // 맨 위 근처에서는 항상 펼침
             set(false); last = y; return
         }
+        if phaseAware && !isDragging { return }
         let d: CGFloat = y - last
-        if d > 8 { set(true); last = y }       // 아래로 읽어 내려감 → 접기
-        else if d < -8 { set(false); last = y } // 위로 되돌아감 → 펼치기
+        if d > Self.foldBy { set(true); last = y }             // 아래로 읽어 내려감 → 접기
+        else if d < -Self.unfoldBy { set(false); last = y }    // 위로 분명히 되돌림 → 펼치기
     }
-    func reset() { last = 0; set(false) }
+    func reset() { last = 0; now = 0; isDragging = false; set(false) }
     private func set(_ v: Bool) {
         guard v != compact else { return }
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { compact = v }
@@ -639,8 +755,7 @@ struct TabBar8: View {
     var body: some View {
         if #available(iOS 26.0, *) {
             row
-                // 유리 밑에 약한 흐림을 한 겹 (뒤 글자가 그대로 비치지 않게, 유리 느낌은 남게)
-                .background(Capsule().fill(.ultraThinMaterial).opacity(0.55))
+                // 유리가 뒤 내용을 직접 비추게 둠 (밑에 흐림 판을 깔면 유리 느낌이 사라졌음 — 빌드 19)
                 .glassEffect(.regular.tint(Color(hex: 0x161616, alpha: 0.12)), in: Capsule())
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
@@ -654,23 +769,17 @@ struct TabBar8: View {
     }
 }
 
-/// 화면 맨 아래 띠: 아래로 갈수록 흐려지고 어두워짐 (탭 바 뒤로 지나가는 내용용). 누르는 것은 막지 않음
+/// 화면 맨 아래 띠: 아래로 갈수록 살짝 어두워짐 (탭 바와 겹친 글자가 읽히게). 흐리게 하지는 않음 — 유리 느낌을 살리려고.
+/// 누르는 것은 막지 않음
 struct TabFade: View {
     var body: some View {
-        ZStack {
-            Rectangle().fill(.ultraThinMaterial)
-                .mask(LinearGradient(stops: [.init(color: .black.opacity(0), location: 0),
-                                             .init(color: .black.opacity(0.85), location: 0.55),
-                                             .init(color: .black, location: 1)],
-                                     startPoint: .top, endPoint: .bottom))
-            LinearGradient(stops: [.init(color: .black.opacity(0), location: 0),
-                                   .init(color: .black.opacity(0.45), location: 0.55),
-                                   .init(color: .black.opacity(0.78), location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-        }
-        .frame(height: 132)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        LinearGradient(stops: [.init(color: .black.opacity(0), location: 0),
+                               .init(color: .black.opacity(0.16), location: 0.5),
+                               .init(color: .black.opacity(0.32), location: 1)],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(height: 96)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 

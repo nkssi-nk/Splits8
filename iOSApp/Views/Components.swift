@@ -385,11 +385,14 @@ struct SettingRow: View {
     let value: String
     var numeric = false
     var last = false
+    /// 받은 친구 요청처럼 확인할 개수 (0 이면 안 보임)
+    var badge: Int = 0
     let action: () -> Void
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Text(title.l10n).font(F.t(17)).frame(maxWidth: .infinity, alignment: .leading)
+                CountBadge(n: badge)
                 Text(value.l10n).font(numeric ? F.num(15, .regular) : F.t(15)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
                 Chevron8()
             }

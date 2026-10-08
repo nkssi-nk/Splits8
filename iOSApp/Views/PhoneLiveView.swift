@@ -711,7 +711,8 @@ struct PhoneLiveView: View {
         // addPhoneRecord 가 source = "phone" 을 붙여 저장 → 저장된 것으로 상세 열기
         var shown = rec
         shown.source = "phone"
-        r.open(shown, from: from)
+        // 기록 상세 위로 "수고했어요" 카드 (51번)
+        r.showFinish(shown, from: from)
     }
 
     private func discard() {

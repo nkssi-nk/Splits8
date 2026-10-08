@@ -558,4 +558,75 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.buttons["training.new"].waitForExistence(timeout: 3), "Save 가 안 눌림")
         shot("S_after_save")
     }
+
+    // MARK: 9. 빌드 22 (1.1.0) — 운동 끝 카드 · 기록 분석 · 친구 요청 · 워치 실시간 · 위젯
+
+    func test9_build22() {
+        // 51 운동 끝 카드: 최고 기록(금색) · 확인 필요 · PFT · 트레이닝
+        for k in ["sim", "check", "pft", "training"] {
+            launch(onboarded: true, extra: ["--finish=\(k)"])
+            sleep(3)
+            shot("B51_finish_\(k)")
+            if k == "sim" {
+                id("finish.done")
+                shot("B55_detail_insights_sim")      // 카드를 닫으면 바로 그 기록 화면 (Insights 카드)
+            }
+            app.terminate()
+        }
+        // 55 기록 분석: PFT · 트레이닝 기록 화면
+        launch(onboarded: true)
+        tab("Test")
+        tapContaining("21:48")
+        shot("B55_detail_insights_pft")
+        app.terminate()
+        launch(onboarded: true)
+        tab("Training")
+        app.swipeUp()
+        let hist = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "30:22")).firstMatch
+        if hist.waitForExistence(timeout: 3) {
+            hist.tap(); sleep(1)
+            shot("B55_detail_insights_training")
+            app.swipeUp()
+            shot("B56_training_splits_vs_best")
+        }
+        app.terminate()
+        // 49 친구 요청: 받은 요청 · 보낸 요청 · 배지
+        launch(onboarded: true, extra: ["--friends"])
+        for _ in 0..<6 { app.swipeUp() }
+        shot("B49_home_friends_badge")
+        for _ in 0..<6 { app.swipeDown() }
+        tab("Settings")
+        shot("B49_settings_badge")
+        id("settings.friends")
+        shot("B49_friends_requests")
+        app.swipeUp()
+        shot("B49_friends_sent")
+        app.swipeDown()
+        if element("friends.accept").waitForExistence(timeout: 3) {
+            id("friends.accept")
+            shot("B49_friends_after_accept")
+        }
+        back()
+        app.swipeUp()
+        shot("B52_settings_show_on_iphone")
+        app.terminate()
+        // 52 워치 운동을 아이폰에서: 실시간 · 넘김 · 끊김
+        launch(onboarded: true, extra: ["--mirror"])
+        shot("B52_watch_live")
+        id("watchLive.next")
+        shot("B52_watch_live_after_next")
+        id("watchLive.pause")
+        shot("B52_watch_live_paused")
+        app.terminate()
+        launch(onboarded: true, extra: ["--mirror", "--mirrorlost"])
+        shot("B52_watch_live_reconnecting")
+        app.terminate()
+        // 53 위젯 · 잠금 화면 · 다이내믹 아일랜드 미리보기
+        launch(onboarded: true, extra: ["--widgets"])
+        shot("B53_widgets_1")
+        app.swipeUp()
+        shot("B53_widgets_2")
+        app.swipeUp(); app.swipeUp()
+        shot("B53_widgets_3")
+    }
 }

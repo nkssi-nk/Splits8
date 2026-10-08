@@ -37,7 +37,7 @@ struct HomeView: View {
                 }
                 .card8()
             }
-            SectionLabel(text: "FRIENDS")
+            friendsHeader
             friends
         }
         .padding(.top, 6)
@@ -213,6 +213,30 @@ struct HomeView: View {
     }
 
     // 친구: 가입 전 카드 / 가입 후 순위표 (Full Sim · Race · Stations) — 빌드 19 까지는 Race 탭에 있던 것
+    /// FRIENDS 제목 + 받은 요청이 있으면 "요청 2" 노란 알약 (누르면 친구 화면)
+    private var friendsHeader: some View {
+        HStack(alignment: .center, spacing: 8) {
+            SectionText("FRIENDS")
+            Spacer(minLength: 0)
+            let n: Int = store.signedIn ? store.incoming.count : 0
+            if n > 0 {
+                Button { r.friendsFrom = .home; r.go(.friends) } label: {
+                    HStack(spacing: 6) {
+                        Text(String(localized: "\(n) requests")).font(F.t(13, .semibold)).foregroundStyle(.black).lineLimit(1)
+                        Chevron8(color: .black)
+                    }
+                    .padding(.horizontal, 12).frame(height: 28)
+                    .background(C.accent, in: Capsule())
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(Press(scale: 0.96))
+                .accessibilityIdentifier("home.friendRequests")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 14).padding(.horizontal, 4)
+    }
+
     @ViewBuilder private var friends: some View {
         if !store.signedIn {
             HStack(spacing: 12) {

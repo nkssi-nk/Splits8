@@ -3,6 +3,7 @@ import WatchConnectivity
 import Observation
 import UIKit
 import UserNotifications
+import WidgetKit
 
 /// 아이폰 저장소: 설정·프로그램·기록·친구 + 워치 동기화 + 계정(선택)
 @Observable
@@ -31,6 +32,10 @@ final class Store: NSObject, WCSessionDelegate {
     /// 서버에서 받은 순위표 · 친구 요청 상태
     var leaderboard: [LBRow] = []
     var requested: Set<String> = []
+    /// 친구 요청 (빌드 22): 받은 요청은 수락해야 친구가 되고, 그 뒤에만 서로 기록이 보임
+    var requests: [FriendReq] = []
+    var incoming: [FriendReq] { requests.filter(\.incoming) }
+    var outgoing: [FriendReq] { requests.filter { !$0.incoming } }
     var lastError: String?
 
     private(set) var watchPaired = false
@@ -62,7 +67,11 @@ final class Store: NSObject, WCSessionDelegate {
             records = Demo.records()
             friends = []
             plans = []
-            if Demo.friendsOn { leaderboard = Demo.leaderboard() }
+            if Demo.friendsOn {
+                leaderboard = Demo.leaderboard()
+                friends = Demo.friends()
+                requests = Demo.requests()
+            }
         }
         if sb.session == nil && settings.nickname != nil && !Demo.friendsOn { settings.nickname = nil }   // 세션이 없으면 로그아웃 상태
         GlowTheme.current = settings.glow
@@ -288,7 +297,7 @@ final class Store: NSObject, WCSessionDelegate {
     var segBests: [String: Int] {
         var b: [String: Int] = [:]
         for r in records where r.mode == .training && r.counts {
-            for s in r.segs {
+            for s in r.segs where s.kind != .rox && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.time) {
                 let k = SegKey.of(icon: s.icon, detail: s.detail)
                 b[k] = min(b[k] ?? .max, s.time)
             }
@@ -340,7 +349,34 @@ final class Store: NSObject, WCSessionDelegate {
         friends.removeAll { $0.id == id }
         leaderboard.removeAll { $0.user_id == id }
         requested.remove(id)
+        requests.removeAll { $0.id == id }
         if signedIn { Task { try? await sb.removeFriend(id) } }
+    }
+
+    // MARK: 친구 요청 (빌드 22)
+
+    /// 받은 요청 수락 / 거절
+    func respond(_ q: FriendReq, accept: Bool) {
+        requests.removeAll { $0.id == q.id }
+        if accept && !friends.contains(where: { $0.id == q.id }) {
+            friends.append(Friend(id: q.id, name: q.name, div: q.div, date: "", splits: [], avatarUrl: q.avatarUrl))
+        }
+        guard !Demo.enabled else { return }
+        Task {
+            try? await sb.respondFriend(q.id, accept: accept)
+            await refreshSocial()
+        }
+    }
+
+    /// 보낸 요청 취소
+    func cancelRequest(_ q: FriendReq) {
+        requests.removeAll { $0.id == q.id }
+        requested.remove(q.id)
+        guard !Demo.enabled else { return }
+        Task {
+            try? await sb.removeFriend(q.id)
+            await refreshSocial()
+        }
     }
 
     func unblock(_ id: String) {
@@ -456,10 +492,43 @@ final class Store: NSObject, WCSessionDelegate {
         guard signedIn, !Demo.enabled else { return }
         if let rows = try? await sb.friends() {
             let sel = settings.friendId
-            friends = rows.filter { ($0.status == "accepted" || $0.status == "pending") && !isBlocked($0.user_id) }.map {
-                Friend(id: $0.user_id, name: $0.nickname, div: $0.division, date: $0.best_date ?? "",
-                       splits: $0.splits ?? [], avatarUrl: $0.avatar_url)
+            let links: [FriendLink]? = try? await sb.friendLinks()
+            let me: String = sb.userId ?? ""
+            // 같은 사람이 두 줄로 올 수 있음 (서로 추가) → 한 사람당 하나, 수락된 쪽 우선
+            var seen: [String: FriendRow] = [:]
+            var order: [String] = []
+            for x in rows where !isBlocked(x.user_id) {
+                if let old = seen[x.user_id] {
+                    if old.status != "accepted" && x.status == "accepted" { seen[x.user_id] = x }
+                    else if old.splits == nil && x.splits != nil && x.status == old.status { seen[x.user_id] = x }
+                } else { seen[x.user_id] = x; order.append(x.user_id) }
             }
+            var fs: [Friend] = []
+            var rq: [FriendReq] = []
+            for id in order {
+                guard let x = seen[id] else { continue }
+                let accepted: Bool = x.status == "accepted" || (links?.contains {
+                    $0.status == "accepted" && (($0.requester == id && $0.addressee == me) || ($0.requester == me && $0.addressee == id))
+                } ?? false)
+                if accepted {
+                    fs.append(Friend(id: id, name: x.nickname, div: x.division, date: x.best_date ?? "",
+                                     splits: x.splits ?? [], avatarUrl: x.avatar_url))
+                    continue
+                }
+                // 요청 방향: 친구 줄에서 판단 → 서버가 알려 준 값 → 모르면 보낸 요청으로 봄
+                let incoming: Bool
+                if let links {
+                    let sent = links.contains { $0.requester == me && $0.addressee == id }
+                    let got = links.contains { $0.requester == id && $0.addressee == me }
+                    incoming = got && !sent
+                } else {
+                    incoming = x.direction == "incoming"
+                }
+                rq.append(FriendReq(id: id, name: x.nickname, div: x.division, avatarUrl: x.avatar_url, incoming: incoming))
+            }
+            friends = fs
+            requests = rq
+            requested = requested.filter { r in !fs.contains { $0.id == r } }
             if let sel, !friends.contains(where: { $0.id == sel }) { settings.friendId = nil }
         }
         await refreshLeaderboard()
@@ -487,6 +556,7 @@ final class Store: NSObject, WCSessionDelegate {
         leaderboard = []
         friends = []
         requested = []
+        requests = []
     }
 
     func deleteAccount() async {
@@ -503,6 +573,7 @@ final class Store: NSObject, WCSessionDelegate {
     }
 
     func pushToWatch() {
+        publishWidgets()
         guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return }
         let best = simBest
         let pft = pftBest
@@ -512,6 +583,14 @@ final class Store: NSObject, WCSessionDelegate {
                                simLast: simLast?.splits16)
         guard let d = try? JSONStore.enc.encode(ctx) else { return }
         try? WCSession.default.updateApplicationContext([SyncKey.context: d])
+    }
+
+    /// 53번: 위젯이 읽는 요약을 공용 폴더에 쓰고, 바뀌었으면 위젯 새로 고침
+    func publishWidgets() {
+        guard !loading, !Demo.enabled else { return }
+        let best: Int? = [simBest?.total, raceBest?.total].compactMap { $0 }.min()
+        let snap = WidgetSnap.make(records: records.filter(\.counts), settings: settings, best: best)
+        if snap.save() { WidgetCenter.shared.reloadAllTimelines() }
     }
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
@@ -524,7 +603,11 @@ final class Store: NSObject, WCSessionDelegate {
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         if let d = userInfo[SyncKey.record] as? Data, let r = try? JSONStore.dec.decode(Record.self, from: d) {
-            DispatchQueue.main.async { self.add(r) }
+            DispatchQueue.main.async {
+                let fresh: Bool = !self.records.contains { $0.id == r.id }
+                self.add(r)
+                if fresh { Router.shared.queueFinish(r) }      // 운동 끝 카드 (51번)
+            }
         }
         if let d = userInfo[SyncKey.quick] as? Data, let p = try? JSONStore.dec.decode(Program.self, from: d) {
             DispatchQueue.main.async { if !self.programs.contains(where: { $0.id == p.id }) { self.programs.insert(p, at: 0) } }

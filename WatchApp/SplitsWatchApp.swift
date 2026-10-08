@@ -539,7 +539,7 @@ struct WConfirm: View {
             Icon8(s.icon, 14, tint: .yellow)
             Text(s.name).font(F.t(14)).lineLimit(1).minimumScaleFactor(0.85)
             Spacer(minLength: 0)
-            Text(Fm.t(s.target)).font(F.num(14, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
+            Text(s.target > 0 ? Fm.t(s.target) : "–").font(F.num(14, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85)
         }
         .padding(.vertical, 5).padding(.horizontal, 4)
         .overlay(alignment: .bottom) { Rectangle().fill(Color(hex: 0x161616)).frame(height: 1) }

@@ -71,3 +71,47 @@
 "Undo" = "되돌리기";
 "Tap to cancel" = "누르면 취소";
 "VS FRIEND" = "친구 대비";
+
+
+/* build 22 · finish messages (51) */
+"Saved. A few splits look off." = "저장했어요. 확인이 필요한 구간이 있어요.";
+"Ended early. All the way next time." = "중간에 끝냈어요. 다음엔 끝까지 가 봐요!";
+"Your first record. Welcome to SPLITS8." = "첫 기록이에요. 환영해요!";
+"Day one. Every split counts from here." = "오늘이 1일 차예요. 여기서부터 쌓여요.";
+"Goal beaten by %@. Great race." = "목표보다 %@ 빨라요. 멋진 레이스였어요!";
+"Race done. You did it." = "대회 완주! 정말 해냈어요.";
+"That's a race in the books." = "오늘의 레이스, 끝까지 달렸어요.";
+"New personal best!" = "최고 기록이에요!";
+"Faster than ever. −%@." = "지금까지 중 가장 빨라요. −%@";
+"All 16 splits. Your first full sim." = "16구간을 모두 끝냈어요. 첫 풀 시뮬 완주!";
+"New best on %@." = "%@ 최고 기록이에요!";
+"%@ faster than last time." = "지난번보다 %@ 빨라졌어요.";
+"%lld km done." = "%lldkm 완주했어요!";
+"%lld rounds. Strong finish." = "%lld라운드! 끝까지 강했어요.";
+"%lld days to race day. Stay sharp." = "대회까지 %lld일. 컨디션 잘 챙겨요!";
+"Welcome back." = "다시 왔네요. 반가워요!";
+"Good to see you again." = "오랜만이에요. 다시 시작해요.";
+"%lld days in a row. Keep it going." = "%lld일 연속이에요. 이 흐름 그대로!";
+"Workout %lld this week." = "이번 주 %lld번째 운동이에요.";
+"Early start. Nice work." = "이른 아침부터 수고했어요!";
+"Late session done. Rest well." = "늦게까지 수고했어요. 푹 쉬어요.";
+"Over an hour. Serious work." = "1시간 넘게 했어요. 대단해요!";
+"That was a tough one." = "정말 힘든 운동이었어요. 수고했어요!";
+"You pushed hard today." = "오늘 제대로 몰아붙였어요.";
+"Nice work." = "수고했어요!";
+"Another one in the books." = "오늘도 기록 하나를 남겼어요.";
+"Good start." = "가볍게 시작했어요.";
+"Short, but it counts." = "짧아도 기록은 남아요.";
+"Gold on your first try. Impressive." = "첫 도전에 골드라니, 대단해요!";
+"Silver on your first try. Strong start." = "첫 도전에 실버! 출발이 좋아요.";
+"Bronze on your first try. Not bad at all." = "브론즈 달성했어요. 첫 도전치고 나쁘지 않아요.";
+"Gold. Well earned." = "드디어 골드! 축하해요.";
+"Up to %@. Gold is next." = "%@로 올라갔어요. 다음은 골드!";
+"%@ — just %llds from %@." = "%1$@예요. %3$@까지 %2$lld초!";
+"Still %@, but %@ faster." = "아직 %1$@지만 %2$@ 빨라졌어요.";
+"Gold again. Consistent." = "또 골드! 꾸준해요.";
+"%@ this time. Every test counts." = "이번엔 %@예요. 다음엔 다시 올라가요.";
+"%@. Nice work." = "%@예요. 수고했어요!";
+"Gold" = "골드";
+"Silver" = "실버";
+"Bronze" = "브론즈";

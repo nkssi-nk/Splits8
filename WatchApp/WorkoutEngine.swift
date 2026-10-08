@@ -92,6 +92,12 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var paceBuzzed: Set<Int> = []     // 목표 초과 진동을 이미 울린 구간
     @ObservationIgnored private var tickTimer: Timer?
 
+    // 아이폰에 같이 보여 주기 (52번 · HealthKit 운동 미러링)
+    @ObservationIgnored private var mirroring = false
+    @ObservationIgnored private var liveTicks = 0
+    /// 운동 중에 아이폰과 끊김 → 30초마다 다시 이어 봄
+    @ObservationIgnored private var mirrorLost = false
+
     // MARK: 권한
 
     func requestAuthorization() {
@@ -196,6 +202,7 @@ final class WorkoutEngine: NSObject {
         let now = Date()
         startDate = now; segStart = now
         lastZone = 0; lastZoneBuzz = .distantPast; paceBuzzed = []
+        mirroring = false; mirrorLost = false; liveTicks = 0
         active = true
         startTick()
         repCounter.start(icon: cur.icon)
@@ -220,6 +227,18 @@ final class WorkoutEngine: NSObject {
             session = s; builder = b
             s.startActivity(with: now)
             b.beginCollection(withStart: now) { _, _ in }
+            // 설정 › Device › Show on iPhone 이 켜져 있으면 아이폰에 같이 보여 줌 (아이폰 앱이 뒤에서 켜짐)
+            if settings.mirror {
+                Task { @MainActor in
+                    do {
+                        try await s.startMirroringToCompanionDevice()
+                        self.mirroring = true
+                        self.pushLive()
+                    } catch {
+                        self.mirroring = false
+                    }
+                }
+            }
         }
         if buzz { WKInterfaceDevice.current().play(.start) }
         startPlaceAndRoute()
@@ -307,6 +326,7 @@ final class WorkoutEngine: NSObject {
             repCounter.start(icon: cur.icon)
             // 다음 구간 알림: .click 은 너무 약해서 운동 중에는 느껴지지 않음
             WKInterfaceDevice.current().play(.notification)
+            pushLive()
         }
     }
 
@@ -339,6 +359,7 @@ final class WorkoutEngine: NSObject {
         repCounter.start(icon: cur.icon, base: u.reps ?? 0)
         if !running { repCounter.setPaused(true) }
         WKInterfaceDevice.current().play(.directionDown)
+        pushLive()
     }
 
     /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
@@ -365,6 +386,7 @@ final class WorkoutEngine: NSObject {
             segDistStart = distance
             advanceCount += 1
             WKInterfaceDevice.current().play(.notification)
+            pushLive()
         }
     }
 
@@ -380,6 +402,7 @@ final class WorkoutEngine: NSObject {
             session?.resume()
             repCounter.setPaused(false)
         }
+        pushLive()
     }
 
     /// End: 현재 구간까지 기록하고 끝냄
@@ -416,6 +439,18 @@ final class WorkoutEngine: NSObject {
 
     /// 1초마다: Race · Full Sim 에서 현재 구간이 목표 시간을 넘으면 그 구간에서 한 번만 .retry
     private func tick() {
+        // 아이폰에 5초마다 심박 · 칼로리 · 시간 맞추기
+        liveTicks += 1
+        if mirroring && liveTicks % 5 == 0 { pushLive() }
+        if mirrorLost && active && !finished && liveTicks % 30 == 0, let s = session {
+            Task { @MainActor in
+                if (try? await s.startMirroringToCompanionDevice()) != nil {
+                    self.mirrorLost = false
+                    self.mirroring = true
+                    self.pushLive()
+                }
+            }
+        }
         guard active, !finished, running else { return }
         guard settings.hapticPace, mode == .race || mode == .sim else { return }
         let c: Seg = cur
@@ -478,6 +513,9 @@ final class WorkoutEngine: NSObject {
         let r = makeRecord(complete: complete)
         lastRecord = r
         finished = true
+        pushLive()                      // 아이폰: "Apple Watch 에 저장 중…" → 기록이 도착하면 카드
+        mirroring = false
+        mirrorLost = false
         WatchStore.shared.send(r)
         WKInterfaceDevice.current().play(.success)
 
@@ -545,6 +583,34 @@ final class WorkoutEngine: NSObject {
         active = true
     }
 
+    // MARK: 아이폰에 같이 보여 주기 (52번)
+
+    /// 지금 상태를 아이폰으로 (미러링 중일 때만)
+    func pushLive() {
+        guard mirroring, let s = session else { return }
+        let now = Date()
+        let hasTarget: Bool = kind == nil && seq.contains { $0.target > 0 }
+        let st = LiveState(mode: mode, title: title, seq: seq, idx: idx, splits: splits, segElapsed: segEl(now),
+                           running: running, hr: Int(hr.rounded()), kcal: Int(kcal.rounded()), zone: hr > 0 ? zone : 0,
+                           canUndo: canUndo, finished: finished, vsWord: deltaWord,
+                           delta: hasTarget ? delta(now) : nil, open: growsOpen, autoSplit: isRunKind && !(distance <= 0 && !outdoorRun))
+        guard let d = LivePacket(state: st).data() else { return }
+        s.sendToRemoteWorkoutSession(data: d) { _, _ in }
+    }
+
+    /// 아이폰에서 누른 버튼
+    fileprivate func gotCommand(_ c: LiveCommand) {
+        guard active, !finished else { return }
+        switch c {
+        case .next: advance()
+        case .undo: undo()
+        case .pause: if running { togglePause() }
+        case .resume: if !running { togglePause() }
+        case .end: endNow()
+        }
+        pushLive()
+    }
+
     /// VS GOAL / VS LAST / VS JIHO / VS BEST
     var deltaWord: String {
         if mode == .race { return "VS GOAL" }
@@ -579,6 +645,22 @@ extension WorkoutEngine: HKWorkoutSessionDelegate {
     func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState,
                         from fromState: HKWorkoutSessionState, date: Date) {}
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {}
+
+    /// 아이폰에서 보낸 버튼 (Next · Undo · Pause · Resume · End)
+    func workoutSession(_ workoutSession: HKWorkoutSession, didReceiveDataFromRemoteWorkoutSession data: [Data]) {
+        for d in data {
+            guard let c = LivePacket.read(d)?.command else { continue }
+            DispatchQueue.main.async { self.gotCommand(c) }
+        }
+    }
+
+    /// 아이폰과 연결이 끊김: 워치 혼자 계속 (다시 이어지지 않으면 끝까지 워치 기록만)
+    func workoutSession(_ workoutSession: HKWorkoutSession, didDisconnectFromRemoteDeviceWithError error: Error?) {
+        DispatchQueue.main.async {
+            if self.mirroring && self.active && !self.finished { self.mirrorLost = true }
+            self.mirroring = false
+        }
+    }
 }
 
 extension WorkoutEngine: HKLiveWorkoutBuilderDelegate {

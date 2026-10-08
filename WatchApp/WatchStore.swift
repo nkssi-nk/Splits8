@@ -1,6 +1,7 @@
 import Foundation
 import WatchConnectivity
 import Observation
+import WidgetKit
 
 /// 워치 저장소: 아이폰에서 받은 설정·프로그램·친구, 워치에서 만든 Quick training
 @Observable
@@ -95,6 +96,9 @@ final class WatchStore: NSObject, WCSessionDelegate {
             self.ctx = v
             JSONStore.save(v, self.ctxFile)
             WorkoutEngine.shared.settings = v.settings
+            // 53번: 워치 컴플리케이션(D-day)이 읽는 요약
+            let snap = WidgetSnap.make(records: [], settings: v.settings, best: v.simBestTotal)
+            if snap.save() { WidgetCenter.shared.reloadAllTimelines() }
         }
     }
 }

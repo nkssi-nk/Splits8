@@ -35,6 +35,8 @@ struct FriendsView: View {
                 signUpCard
             }
 
+            requestsSection
+
             Note8(text: "The selected friend's records are used as the Full Simulation comparison and as Training split targets.", color: C.text2)
                 .padding(.bottom, 4)
             if !store.friends.isEmpty {
@@ -46,6 +48,7 @@ struct FriendsView: View {
                 .card8()
             }
             Note8(text: "Tap to compare · Tap again to clear · VS is against your best")
+            sentSection
             blockedSection
         }
         .padding(.horizontal, 16)
@@ -99,6 +102,79 @@ struct FriendsView: View {
         UIApplication.shared.open(u) { ok in if !ok { mailFail = true } }
     }
 
+    // MARK: 친구 요청 (빌드 22) — 수락해야 친구가 되고, 그 뒤에만 서로 기록이 보임
+
+    /// 받은 요청: Accept (노랑) · Decline (흰 0.12)
+    @ViewBuilder private var requestsSection: some View {
+        let list: [FriendReq] = store.incoming
+        if store.signedIn && !list.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                SectionText("REQUESTS")
+                CountBadge(n: list.count)
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 14).padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, q in
+                    HStack(spacing: 12) {
+                        FriendAvatar(url: q.avatarUrl, ini: String(q.name.prefix(1)).uppercased(), size: 34)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("@" + q.name).font(F.t(15, .semibold)).lineLimit(1)
+                            Text(q.div).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        pill("Decline", yellow: false) { withAnimation(.easeOut(duration: 0.2)) { store.respond(q, accept: false) } }
+                            .accessibilityIdentifier("friends.decline")
+                        pill("Accept", yellow: true) { withAnimation(.easeOut(duration: 0.2)) { store.respond(q, accept: true) } }
+                            .accessibilityIdentifier("friends.accept")
+                    }
+                    .padding(.vertical, 12).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+            Note8(text: "Records are shared only after you accept.")
+        }
+    }
+
+    /// 보낸 요청: 상대가 수락할 때까지 기다림 · Cancel 로 취소
+    @ViewBuilder private var sentSection: some View {
+        let list: [FriendReq] = store.outgoing
+        if store.signedIn && !list.isEmpty {
+            SectionLabel(text: "SENT", top: 14)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, q in
+                    HStack(spacing: 12) {
+                        FriendAvatar(url: q.avatarUrl, ini: String(q.name.prefix(1)).uppercased(), size: 34)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("@" + q.name).font(F.t(15, .semibold)).lineLimit(1)
+                            Text(q.div + " · " + "Requested".l10n).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        pill("Cancel", yellow: false) { withAnimation(.easeOut(duration: 0.2)) { store.cancelRequest(q) } }
+                            .accessibilityIdentifier("friends.cancelRequest")
+                    }
+                    .padding(.vertical, 12).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+            Note8(text: "They'll see your request in Friends. Records are shared once they accept.")
+        }
+    }
+
+    /// 32 높이 알약 버튼
+    private func pill(_ title: String, yellow: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title.l10n).font(F.t(13, .semibold))
+                .foregroundStyle(yellow ? Color.black : .white)
+                .padding(.horizontal, 14).frame(height: 32)
+                .background(yellow ? C.accent : Color.white.opacity(0.12), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(Press(scale: 0.96))
+    }
+
     /// 차단한 사람 목록 (Unblock 으로 풂)
     @ViewBuilder private var blockedSection: some View {
         let list: [BlockedUser] = store.settings.blocked
@@ -143,7 +219,11 @@ struct FriendsView: View {
 
     /// 검색 결과: 34 원 · @닉네임 15/600 · 체급 13 · Add (32 높이 노랑) / Requested (흰 0.12, 회색)
     private func hitCard(_ h: RemoteProfile, _ n: String) -> some View {
-        let req = store.requested.contains(h.id) || store.friends.contains { $0.id == h.id }
+        let isFriend: Bool = store.friends.contains { $0.id == h.id }
+        let got: FriendReq? = store.incoming.first { $0.id == h.id }
+        let req = store.requested.contains(h.id) || isFriend || store.outgoing.contains { $0.id == h.id }
+        let title: String = got != nil ? "Accept" : isFriend ? "Friends" : req ? "Requested" : "Add"
+        let yellow: Bool = got != nil || !req
         return HStack(spacing: 12) {
             FriendAvatar(url: h.avatar_url, ini: String(n.prefix(1)).uppercased(), size: 34)
                 .photoTap(h.avatar_url.map { PhotoItem(url: $0, title: "@" + n, sub: h.division ?? "") })
@@ -152,15 +232,15 @@ struct FriendsView: View {
                 Text(h.division ?? "").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button { add(h) } label: {
-                Text(req ? "Requested" : "Add").font(F.t(13, .semibold))
-                    .foregroundStyle(req ? C.text2 : Color.black)
+            Button { if let got { store.respond(got, accept: true) } else { add(h) } } label: {
+                Text(title.l10n).font(F.t(13, .semibold))
+                    .foregroundStyle(yellow ? Color.black : C.text2)
                     .padding(.horizontal, 14).frame(height: 32)
-                    .background(req ? Color.white.opacity(0.12) : C.accent, in: Capsule())
+                    .background(yellow ? C.accent : Color.white.opacity(0.12), in: Capsule())
                     .contentShape(Capsule())
             }
             .buttonStyle(Press(scale: 0.96))
-            .disabled(req)
+            .disabled(got == nil && req)
             .accessibilityIdentifier("friends.add")
             moreMenu(id: h.id, name: n)
         }
@@ -248,6 +328,20 @@ struct FriendsView: View {
         Task {
             try? await store.sb.addFriend(p.id)
             await store.refreshSocial()
+        }
+    }
+}
+
+/// 받은 친구 요청 개수 (노란 동그라미, 검은 숫자)
+struct CountBadge: View {
+    let n: Int
+    var body: some View {
+        if n > 0 {
+            Text("\(n)").font(F.num(12, .semibold)).foregroundStyle(.black)
+                .padding(.horizontal, 6).frame(minWidth: 20, minHeight: 20)
+                .background(C.accent, in: Capsule())
+                .fixedSize()
+                .accessibilityIdentifier("friends.badge")
         }
     }
 }

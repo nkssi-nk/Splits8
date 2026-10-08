@@ -35,6 +35,24 @@ struct FriendRow: Codable {
     var best_date: String?
     var splits: [Int]?
     var status: String
+    /// 빌드 22 서버: incoming(받은 요청) / outgoing(보낸 요청) / mutual. 예전 서버엔 없음
+    var direction: String? = nil
+}
+
+/// friendships 표 한 줄 (본인과 관련된 줄만 읽힘)
+struct FriendLink: Codable {
+    var requester: String
+    var addressee: String
+    var status: String
+}
+
+/// 친구 요청 (받은 것 · 보낸 것)
+struct FriendReq: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var div: String
+    var avatarUrl: String?
+    var incoming: Bool
 }
 
 enum SBError: LocalizedError {
@@ -187,6 +205,22 @@ final class Supabase {
 
     func addFriend(_ otherId: String) async throws {
         _ = try await request("/rest/v1/rpc/add_friend", method: "POST", body: ["other": otherId])
+    }
+
+    /// 받은 요청에 답하기. 빌드 22 서버 함수 respond_friend 가 아직 없으면(404)
+    /// 수락 = add_friend(서로 추가하면 바로 친구), 거절 = 줄 지우기
+    func respondFriend(_ otherId: String, accept: Bool) async throws {
+        do {
+            _ = try await request("/rest/v1/rpc/respond_friend", method: "POST", body: ["other": otherId, "accept": accept])
+        } catch SBError.http(404, _) {
+            if accept { try await addFriend(otherId) } else { try await removeFriend(otherId) }
+        }
+    }
+
+    /// 나와 관련된 친구 줄 (누가 누구에게 요청했는지 알기 위해)
+    func friendLinks() async throws -> [FriendLink] {
+        let d = try await request("/rest/v1/friendships?select=requester,addressee,status")
+        return try decode([FriendLink].self, d)
     }
 
     /// 친구 끊기 (차단할 때): 두 사람 사이의 친구·요청 줄을 양쪽 방향 모두 지움 (서버 삭제 규칙: 당사자만)

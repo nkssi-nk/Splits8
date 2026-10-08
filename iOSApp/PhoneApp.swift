@@ -4,7 +4,19 @@ import Observation
 
 @main
 struct Splits8App: App {
-    init() { Store.shared.activate() }
+    init() {
+        Store.shared.activate()
+        WatchMirror.shared.setUp()          // 52번: 워치가 운동을 아이폰에 같이 보여 줄 때
+        if Demo.enabled && CommandLine.arguments.contains("--mirror") {
+            WatchMirror.shared.demoStart()
+            Router.shared.scr = .watchLive
+        }
+        if Demo.enabled && CommandLine.arguments.contains("--widgets") { Router.shared.scr = .widgets }
+        if Demo.enabled, let a = CommandLine.arguments.first(where: { $0.hasPrefix("--finish=") }) {
+            let kind = String(a.dropFirst("--finish=".count))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { Demo.showFinish(kind) }
+        }
+    }
     var body: some Scene {
         WindowGroup {
             LaunchGate {
@@ -47,6 +59,8 @@ enum Scr: String {
     case auth, code, nick, findEvent, account
     case detail, share
     case phoneLive          // 워치 없이 아이폰으로 기록 (PhoneLiveView)
+    case watchLive          // 워치 운동을 아이폰에서 같이 보기 (52번 · WatchLiveView)
+    case widgets            // 화면 확인용: 위젯 · 잠금 화면 미리보기 (--demo 에서만)
 }
 
 /// 운동 예약 시트 요청 (달력 날짜 / 홈 UPCOMING 에서 엶)
@@ -150,6 +164,12 @@ final class Router {
     func openPlan(date: Date, mode: Mode = .training, existing: PlannedWorkout? = nil) {
         planRequest = PlanRequest(date: date, mode: mode, existing: existing)
     }
+
+    // 운동 끝 카드 (51번): 지금 띄운 기록 · 앱이 뒤에 있을 때 도착해 기다리는 워치 기록
+    var finish: Record? = nil
+    var pendingFinish: Record? = nil
+    /// 워치 운동을 아이폰에 같이 보여 주는 중 (52번)
+    var liveMirror = false
 
     // 사진 크게 보기 (nil 이면 닫힘)
     var photoView: PhotoItem? = nil
@@ -352,6 +372,7 @@ extension Scr {
         case .account: return .y(0.18, 1.2, 0.5, 0.5, 0)
         case .splash: return .none
         case .phoneLive: return .y(0.18, 1.3, 0.5, 0.5, 0)
+        case .watchLive, .widgets: return .none
         }
     }
 
@@ -382,6 +403,7 @@ extension Scr {
 
 struct PhoneRoot: View {
     let r = Router.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var edgeDrag: CGFloat = 0
 
     /// 왼쪽 끝에서 밀어 뒤로: 화면 안 ‹/Cancel 이 등록한 동작, 없으면 고정 바의 뒤로
@@ -481,6 +503,19 @@ struct PhoneRoot: View {
                     .preferredColorScheme(.dark)
             }
         }
+        .sheet(item: Binding(get: { r.finish }, set: { r.finish = $0 })) { rec in
+            FinishSheet(rec: rec)
+                .presentationDetents([.height(440), .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(hex: 0x1C1C1E))
+                .preferredColorScheme(.dark)
+        }
+        .onChange(of: scenePhase) { _, p in
+            if p == .active {
+                WatchMirror.shared.appBecameActive()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { r.flushFinish() }
+            }
+        }
         .modifier(IncomingTrainingAlerts())
     }
 
@@ -510,6 +545,8 @@ struct PhoneRoot: View {
         case .detail: Scroll8 { DetailView() }
         case .share: Scroll8(bottom: 40) { ShareView() }
         case .phoneLive: PhoneLiveView()
+        case .watchLive: WatchLiveView()
+        case .widgets: Scroll8(bottom: 40) { WidgetPreviewView() }
         }
     }
 }

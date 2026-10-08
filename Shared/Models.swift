@@ -19,7 +19,10 @@ struct Division: Codable, Hashable {
         Division(key: "dblWP", name: "Doubles Women Pro", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: " · shared"),
         Division(key: "dblX", name: "Doubles Mixed", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: " · shared"),
     ]
-    static func of(_ key: String) -> Division { all.first { $0.key == key } ?? all[0] }
+    /// 키("openM") 또는 이름("Open Men") 둘 다 받음 — 기록에는 이름이 저장돼 있음
+    static func of(_ key: String) -> Division {
+        all.first { $0.key == key } ?? all.first { $0.name.caseInsensitiveCompare(key) == .orderedSame } ?? all[0]
+    }
 
     /// Push 152 · Pull 103 · FC 2×24 · SB 20 · WB 6KG
     var spec: String { "Push \(push) · Pull \(pull) · FC 2×\(fc) · SB \(sb) · WB \(wb)KG" }
@@ -729,6 +732,8 @@ struct Settings: Codable, Hashable {
 
     // 배경 빛 색 (설정 > Theme). 노랑이 기본 — 예전 저장 파일과 호환되도록 옵셔널, 노랑이면 비워 둠
     var themeOpt: String? = nil
+    /// 워치 운동을 아이폰에 같이 보여 주기 (빌드 22). nil = 켬 — Settings.mirror (LiveSync.swift)
+    var mirrorOpt: Bool? = nil
     var glow: GlowTheme {
         get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }
         set { themeOpt = newValue == .yellow ? nil : newValue.rawValue }
@@ -826,8 +831,9 @@ enum SeqBuilder {
             for it in p.seq {
                 let d = it.detail(div)
                 let key = SegKey.of(icon: it.icon, detail: d)
+                // 최고 기록이 아직 없으면 0 (= 비교 안 함). 예전에는 기본 목표와 비교해서 헷갈렸음
                 o.append(Seg(icon: it.icon, name: it.name(), detail: d, kind: it.icon == "run" ? .run : .st,
-                             target: bests[key] ?? defaultTarget(icon: it.icon, detail: d)))
+                             target: bests[key] ?? 0))
             }
         }
         return o
@@ -835,7 +841,19 @@ enum SeqBuilder {
 }
 
 enum SegKey {
-    static func of(icon: String, detail: String) -> String { icon == "run" ? "run|\(detail)" : icon }
+    /// 러닝은 거리, 스테이션은 무게·거리까지 넣어 구분 (예: "sledPush|50M · 152KG")
+    static func of(icon: String, detail: String) -> String { "\(icon)|\(detail)" }
+
+    /// 최고 기록으로 써도 되는 시간인지 (너무 빠른 시험용 탭은 빼기)
+    /// 러닝: 1KM 2:30 기준으로 거리 비례 · 스테이션: 30초 · 인터벌: 제외
+    static func plausible(icon: String, detail: String, time: Int) -> Bool {
+        if icon == "hiit" { return false }
+        if icon == "run" {
+            let m = runMeters(detail)
+            return Double(time) >= Double(Record.minRun) * m / 1000
+        }
+        return time >= Record.minStation
+    }
 }
 
 // MARK: - 아이폰 → 워치

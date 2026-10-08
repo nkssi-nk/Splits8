@@ -103,6 +103,9 @@ struct DetailView: View {
             }
             if rec.mode == .pft { pftCard(rec) }
             tilesGrid(rec)
+            // 55번: 이 기록의 숫자로 고른 분석 2~4줄
+            let ins: [Insight] = Insights.make(rec, store: store)
+            if !ins.isEmpty { InsightsCard(items: ins) }
             if showsPartner(rec) {
                 SectionLabel(text: "PARTNER", top: 20)
                 partnerRow(rec)
@@ -124,7 +127,14 @@ struct DetailView: View {
             }
             Group {
                 // SPLITS 라벨: margin 20px 4px 0
-                SectionLabel(text: "SPLITS", top: 20)
+                HStack(alignment: .firstTextBaseline) {
+                    SectionText("SPLITS")
+                    Spacer(minLength: 8)
+                    if rec.mode == .training {
+                        Text("vs your best").font(F.t(11, .medium)).foregroundStyle(C.text3).lineLimit(1)
+                    }
+                }
+                .padding(.top, 20).padding(.horizontal, 4)
                 splits(rec)
             }
 
@@ -655,6 +665,9 @@ struct DetailView: View {
     }
 
     private func splitRow(_ rec: Record, _ s: SegResult, last: Bool) -> some View {
+        // 트레이닝: 그 구간 내 최고 기록과 비교. 최고 기록이 없었거나(0) 예전 잘못된 값이면 비교 안 함
+        let showDelta: Bool = rec.mode != .training
+            || (s.target > 0 && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.target))
         let d = s.time - s.target
         let first: String = s.kind == .run ? "\(Fm.t(rec.pace(s))) /KM" : s.detail
         let bpm: String = s.hr.map { String($0) } ?? "--"
@@ -673,7 +686,8 @@ struct DetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
                 Text(Fm.t(s.time)).font(F.num(17)).tracking(-0.01 * 17).lineLimit(1)
-                Text(Fm.d(d)).font(F.num(11)).foregroundStyle(deltaColor(d)).lineLimit(1)
+                Text(showDelta ? Fm.d(d) : "–").font(F.num(11))
+                    .foregroundStyle(showDelta ? deltaColor(d) : C.text3).lineLimit(1)
             }
             .fixedSize()
         }

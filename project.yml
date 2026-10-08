@@ -13,7 +13,7 @@ options:
 settings:
   base:
     APP_BUNDLE_ID: com.nkssi.splits8
-    MARKETING_VERSION: "1.0.0"
+    MARKETING_VERSION: "1.1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic
@@ -27,6 +27,7 @@ targets:
     sources:
       - path: iOSApp
       - path: Shared
+      - path: WidgetUI          # 위젯 · 잠금 화면 모양 (앱 안 화면 확인용 미리보기에도 씀)
       - path: Resources/iOS
         excludes: ["PrivacyInfo.xcprivacy"]
       # 개인정보 사용 명세 파일 (앱 묶음 안에 리소스로 들어가야 함)
@@ -62,13 +63,20 @@ targets:
             CFBundleTypeRole: Editor
             CFBundleURLSchemes: [splits8]
         NSLocationWhenInUseUsageDescription: Splits8 uses your location to measure pace and distance on outdoor runs.
+        # 빌드 22: 워치 운동을 잠금 화면 · 다이내믹 아일랜드에 (Live Activity) + 워치 운동 미러링을 뒤에서 받기
+        NSSupportsLiveActivities: true
+        UIBackgroundModes: [workout-processing]
     entitlements:
       path: Resources/iOS/Splits8.entitlements
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
         com.apple.developer.applesignin: [Default]
+        com.apple.security.application-groups: [group.com.nkssi.splits8]
     dependencies:
+      - target: Splits8Widgets
+        embed: true
+        codeSign: true
       - target: Splits8Watch
         embed: true
         codeSign: true
@@ -114,6 +122,67 @@ targets:
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
+        com.apple.security.application-groups: [group.com.nkssi.splits8]
+    dependencies:
+      - target: Splits8WatchWidgets
+        embed: true
+        codeSign: true
+
+  # 빌드 22 · 아이폰 위젯 (다음 대회 D-day · 이번 주) + 잠금 화면 실시간 표시 (Live Activity)
+  Splits8Widgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: WidgetUI
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).widgets
+        CODE_SIGN_ENTITLEMENTS: Resources/Widgets/Splits8Widgets.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+    info:
+      path: Resources/Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Splits8
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, ko]
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Resources/Widgets/Splits8Widgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.nkssi.splits8]
+
+  # 빌드 22 · 워치 컴플리케이션 (다음 대회 D-day)
+  Splits8WatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: WatchWidgets
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).watchkitapp.widgets
+        CODE_SIGN_ENTITLEMENTS: Resources/WatchWidgets/Splits8WatchWidgets.entitlements
+        SKIP_INSTALL: YES
+    info:
+      path: Resources/WatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Splits8
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, ko]
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Resources/WatchWidgets/Splits8WatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.nkssi.splits8]
 
   Splits8UITests:
     type: bundle.ui-testing

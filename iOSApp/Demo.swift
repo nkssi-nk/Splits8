@@ -43,6 +43,40 @@ enum Demo {
          LBRow(user_id: "demo.3", nickname: "taeyang", division: "Pro Men", avatar_url: nil, t: 4930)]
     }
 
+    /// 친구 예시 (--friends): 수락된 친구 2명
+    static func friends() -> [Friend] {
+        [Friend(id: "demo.1", name: "jiho", div: "Open Men", date: "20 Sep 2026",
+                splits: Defaults.goals.map { max(30, $0 - 8) }),
+         Friend(id: "demo.2", name: "minseo", div: "Open Women", date: "", splits: [])]
+    }
+
+    /// 친구 요청 예시 (--friends): 받은 요청 1 · 보낸 요청 1
+    static func requests() -> [FriendReq] {
+        [FriendReq(id: "demo.4", name: "hana", div: "Open Women", avatarUrl: nil, incoming: true),
+         FriendReq(id: "demo.5", name: "woojin", div: "Pro Men", avatarUrl: nil, incoming: false)]
+    }
+
+    /// 화면 확인용: 운동 끝 카드 (--finish=sim / pft / training / check)
+    static func showFinish(_ kind: String) {
+        let store = Store.shared
+        let r = Router.shared
+        var rec: Record?
+        switch kind {
+        case "pft": rec = store.records(.pft).first
+        case "training": rec = store.records(.training).first
+        case "check":
+            if var x = store.records(.sim).first {
+                x.id = UUID()
+                x.date = Date()
+                if let i = x.segs.firstIndex(where: { $0.kind == .st }) { x.segs[i].time = 9 }
+                rec = x
+            }
+        default: rec = store.records(.sim).first
+        }
+        guard let rec else { return }
+        r.showFinish(rec, from: rec.mode == .training ? .training : rec.mode == .race ? .race : .sim)
+    }
+
     /// 기본 카드 2장 + 16구간짜리 한 장 (아이콘 한 줄 + "+13" 모양 확인용)
     static func programs() -> [Program] {
         let full: [ProgItem] = Station.all.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0.key)] }

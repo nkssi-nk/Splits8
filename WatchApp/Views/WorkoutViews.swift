@@ -547,7 +547,12 @@ struct WSummary: View {
             AmbientLayer(a: Ambient(hex: 0x30D158, alpha: 0.18, rx: 1.2, ry: 0.6, cx: 0.5, cy: -0.1))
             // 위 34 는 시계 줄: 내용은 그 아래에서만 움직임 (위로 밀어도 시계와 겹치지 않게)
             VStack(spacing: 0) {
-                Color.clear.frame(height: 34)
+                // 시계 줄 왼쪽에 모드 이름 (51번: 멘트는 그 아래 노랑)
+                Text(engine.lastRecord.map { $0.mode == .training ? $0.title : $0.mode.name.l10n } ?? "")
+                    .font(F.t(13, .semibold)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16).padding(.trailing, WClock.reserve)
+                    .frame(height: 34, alignment: .bottom)
                 ScrollView {
                     if let r = engine.lastRecord {
                         VStack(spacing: 10) {
@@ -569,7 +574,11 @@ struct WSummary: View {
         let tg: Int = r.vsTarget ?? r.total
         let showVs: Bool = r.vsTarget != nil
         return VStack(spacing: 0) {
-            Text(String(localized: "\(r.mode.name.l10n) complete")).font(F.t(13, .semibold)).foregroundStyle(C.accent).lineLimit(1).minimumScaleFactor(0.85)
+            // 51번: "수고했어요" 류 한 줄 (워치가 아는 것만으로 고름)
+            Text(cheer(r).line).font(F.t(14, .semibold)).foregroundStyle(C.accent)
+                .multilineTextAlignment(.center).lineLimit(3).minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("w.cheer")
             Text(Fm.t(r.total)).font(F.num(32)).tracking(-0.96)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .padding(.top, 4)
@@ -588,6 +597,32 @@ struct WSummary: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)
+    }
+
+    /// 워치가 아는 것: 내 최고 Full Sim · 최고 PFT · 레이스 목표 · 대회 날짜 · 심박
+    private func cheer(_ r: Record) -> Cheer {
+        let ctx = WatchStore.shared.ctx
+        var x = CheerInput(mode: r.mode, title: r.title, total: r.total, complete: r.isComplete,
+                           check: r.flag == .check, start: r.date, end: r.end, seed: CheerPicker.seed(r.id))
+        x.isHIIT = r.isHIIT
+        x.isRun = r.isRunKind
+        x.hiitRounds = r.isHIIT ? r.segs.count : 0
+        x.runKm = r.runs.map { $0.dist ?? runMeters($0.detail) }.reduce(0, +) / 1000
+        x.hiShare = CheerPicker.hiShare(r.hr, settings: ctx.settings)
+        if r.mode == .race, let g = r.goal ?? r.vsTarget { x.goalDelta = r.total - g }
+        if r.mode == .sim, let b = ctx.simBestTotal, r.total < b, r.counts { x.pbDelta = r.total - b }
+        if r.mode == .sim && ctx.simBestTotal == nil && r.splits16 != nil { x.firstFullSim = true }
+        if r.mode == .pft {
+            x.pftPrevBest = ctx.pftBestTotal ?? ctx.pftBest.map { $0.reduce(0, +) }
+            x.pftEverGold = (x.pftPrevBest ?? .max) < PFT.goldLimit
+        }
+        let ev = ctx.settings.event
+        if ev.isSet {
+            let cal = Calendar.current
+            let d = cal.dateComponents([.day], from: cal.startOfDay(for: r.date), to: cal.startOfDay(for: ev.date)).day ?? -1
+            if d >= 0 { x.daysToRace = d }
+        }
+        return CheerPicker.pick(x)
     }
 
     private func stats(_ r: Record) -> some View {

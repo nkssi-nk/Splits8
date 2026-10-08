@@ -23,7 +23,7 @@ struct SettingsView: View {
 
             SectionLabel(text: "FRIENDS", top: 14)
             VStack(spacing: 0) {
-                SettingRow(title: "Friends", value: friendsValue, last: true) { r.friendsFrom = .settings; r.go(.friends) }
+                SettingRow(title: "Friends", value: friendsValue, last: true, badge: store.incoming.count) { r.friendsFrom = .settings; r.go(.friends) }
                     .accessibilityIdentifier("settings.friends")
             }
             .card8()
@@ -44,7 +44,13 @@ struct SettingsView: View {
                 themeSection
 
                 SectionLabel(text: "DEVICE", top: 14)
-                deviceCard
+                VStack(spacing: 0) {
+                    deviceCard
+                    hapticRow("Show on iPhone", sub: "Watch workouts, live", on: mirrorBinding, last: true)
+                        .accessibilityIdentifier("settings.mirror")
+                }
+                .card8()
+                Note8(text: "Shows your watch workout on this iPhone and on the Lock Screen while you train. You can control it from either device.")
 
                 SectionLabel(text: "ABOUT", top: 14)
                 VStack(spacing: 0) {
@@ -285,8 +291,13 @@ struct SettingsView: View {
             .fixedSize()
         }
         .padding(.vertical, 14).padding(.horizontal, 18)
-        .card8()
+        .rowLine(true)
         .accessibilityIdentifier("settings.device")
+    }
+
+    /// 52번: 워치 운동을 아이폰 화면 · 잠금 화면에 같이 보여 주기 (기본 켬)
+    private var mirrorBinding: Binding<Bool> {
+        Binding(get: { store.settings.mirror }, set: { store.settings.mirror = $0 })
     }
 }
 

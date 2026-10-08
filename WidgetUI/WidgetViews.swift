@@ -187,7 +187,8 @@ struct WeekMediumView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
                     Text("THIS WEEK".l10n).font(F.t(11, .semibold)).tracking(0.9).foregroundStyle(C.text2)
-                    Text(range).font(F.t(11)).foregroundStyle(C.text3)
+                        .lineLimit(1).fixedSize()
+                    Text(range).font(F.t(11)).foregroundStyle(C.text3).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 6)
                 HStack(alignment: .top, spacing: 18) {

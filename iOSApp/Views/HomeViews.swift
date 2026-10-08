@@ -222,7 +222,7 @@ struct HomeView: View {
             if n > 0 {
                 Button { r.friendsFrom = .home; r.go(.friends) } label: {
                     HStack(spacing: 6) {
-                        Text(String(localized: "\(n) requests")).font(F.t(13, .semibold)).foregroundStyle(.black).lineLimit(1)
+                        Text(n == 1 ? String(localized: "1 request") : String(localized: "\(n) requests")).font(F.t(13, .semibold)).foregroundStyle(.black).lineLimit(1)
                         Chevron8(color: .black)
                     }
                     .padding(.horizontal, 12).frame(height: 28)

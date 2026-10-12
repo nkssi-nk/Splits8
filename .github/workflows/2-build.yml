@@ -5,7 +5,7 @@ name: 2. 빌드 + TestFlight 업로드
 on:
   push:
     branches: [main]
-    paths-ignore: ['**.md']
+    paths-ignore: ['**.md', 'android/**', '.github/workflows/a1-android.yml']
   workflow_dispatch:
 
 concurrency:

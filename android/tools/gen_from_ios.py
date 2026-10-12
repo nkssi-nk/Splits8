@@ -5,7 +5,8 @@
 
 만드는 것
   - L10nKo.kt : Resources/iOS·Watch/ko.lproj/Localizable.strings → 한국어 표
-  - Bench.kt  : Shared/Benchmarks.swift 의 중간값 표 (HyroxBench)
+  - BenchData.kt : Shared/Benchmarks.swift 의 중간값 표 (HyroxBench)
+  - 그림       : Resources/iOS/Assets.xcassets → app/res/drawable-nodpi + IconRes.kt
 
 아이폰 문구나 표가 바뀌면 이 스크립트를 다시 돌리면 됨.
 """
@@ -120,9 +121,55 @@ def gen_bench():
     return {k: len(tables[k]) for k in want}
 
 
+def res_name(ios: str) -> str:
+    """아이폰 그림 이름 → 안드로이드 이름 (소문자 · 밑줄): i_chevL → i_chev_l, wordmark-black → wordmark_black"""
+    s = re.sub(r"(?<=[a-z0-9])([A-Z])", r"_\1", ios).replace("-", "_")
+    return s.lower()
+
+
+def gen_images():
+    """Resources/iOS/Assets.xcassets 의 그림을 app 의 drawable-nodpi 로 복사하고 이름 표(IconRes.kt)를 만듦"""
+    import json
+    import shutil
+    src = os.path.join(ROOT, "Resources/iOS/Assets.xcassets")
+    dst = os.path.join(ROOT, "android/app/src/main/res/drawable-nodpi")
+    os.makedirs(dst, exist_ok=True)
+    names = []
+    for d in sorted(os.listdir(src)):
+        if not d.endswith(".imageset"):
+            continue
+        ios = d[: -len(".imageset")]
+        files = [f for f in os.listdir(os.path.join(src, d)) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+        if not files:
+            continue
+        f = max(files, key=lambda x: os.path.getsize(os.path.join(src, d, x)))
+        ext = os.path.splitext(f)[1].lower().replace(".jpeg", ".jpg")
+        rn = res_name(ios)
+        shutil.copyfile(os.path.join(src, d, f), os.path.join(dst, rn + ext))
+        names.append((ios, rn))
+    lines = [
+        "// 자동 생성 — 직접 고치지 말 것. android/tools/gen_from_ios.py",
+        "// 아이폰 그림 이름(\"skiErg\", \"i_chevL\") → 안드로이드 그림 번호",
+        "package com.nkssi.splits8.ui",
+        "",
+        "import com.nkssi.splits8.R",
+        "",
+        "object IconRes {",
+        "    private val map: Map<String, Int> = mapOf(",
+    ]
+    for ios, rn in names:
+        lines.append("        %s to R.drawable.%s," % (kstr(ios), rn))
+    lines += ["    )", "", "    /** 없으면 null */", "    fun of(name: String): Int? = map[name]", "}"]
+    out = os.path.join(ROOT, "android/app/src/main/kotlin/com/nkssi/splits8/ui/IconRes.kt")
+    with open(out, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    return len(names)
+
+
 if __name__ == "__main__":
     n = gen_l10n()
     b = gen_bench()
     print("L10nKo:", n, "entries")
     print("Bench rows:", b)
+    print("Images:", gen_images())
     sys.exit(0)

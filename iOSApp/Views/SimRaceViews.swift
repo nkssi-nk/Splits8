@@ -97,6 +97,7 @@ struct SimView: View {
             }
             graphCard
             bestCard
+            PredictCard()
             settingsCard
             // "풀 시뮬 목표는 어디서 정하나요?" → 여기 Compare with 가 운동 중 구간 목표도 정함
             Note8(text: "Compare with also sets your split targets during a Full Simulation: Goal uses your Race split targets, Last uses your latest Full Sim.")
@@ -341,9 +342,11 @@ struct RaceView: View {
     let store = Store.shared
     let r = Router.shared
     @State private var goalSheet = false
+    @State private var dblSheet = false          // 더블 구간 나누기 (빌드 23)
     var body: some View {
         VStack(spacing: 10) {
             goalCard
+            PredictCard()
             rowsCard
             StartOnPhoneButton(mode: .race)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -352,6 +355,7 @@ struct RaceView: View {
         }
         .padding(.horizontal, 16)
         .sheet(isPresented: $goalSheet) { GoalTimeSheet().presentationDetents([.height(GoalTimeSheet.height)]) }
+        .sheet(isPresented: $dblSheet) { DoublesPlanSheet() }
     }
 
     // MARK: GOAL 카드 (padding 20/18/18, gap 18)
@@ -422,10 +426,19 @@ struct RaceView: View {
         return e.isSet ? "\(e.name) · \(Fm.wdmy.string(from: e.date)) ›" : "Not set".l10n + " ›"
     }
 
+    /// 더블 구간 나누기 줄의 값: 반반이면 50:50, 고쳤으면 Custom
+    private var doublesValue: String {
+        (store.settings.doublesPlan?.isDefault ?? true) ? "50:50 ›" : "Custom".l10n + " ›"
+    }
+
     private var rowsCard: some View {
         VStack(spacing: 0) {
             row("Event", value: eventValue) { r.go(.setEvent) }
             row("Division", value: "\(store.div.name) ›") { r.sub(.setDiv, from: .race) }
+            // 더블일 때만: 파트너와 스테이션 나누기 계획 (빌드 23)
+            if store.settings.division.hasPrefix("dbl") {
+                row("Doubles plan", value: doublesValue) { dblSheet = true }
+            }
             row("Goal time", value: Fm.t(store.settings.goalTime) + " ›", numeric: true) { goalSheet = true }
             splitTargets
         }
@@ -686,7 +699,8 @@ struct GoalTimeSheet: View {
     /// 내 최고 풀 시뮬레이션이 있을 때만 "My best" 를 보여 줌
     private var styles: [String] { GoalSplit.styles.filter { $0 != "best" || bestSplits != nil } }
     private var preview: [Int] {
-        GoalSplit.split(total: max(600, total), style: style, current: store.settings.goals, best: bestSplits)
+        GoalSplit.split(total: max(600, total), style: style, current: store.settings.goals, best: bestSplits,
+                        division: store.settings.division)
     }
 
     var body: some View {
@@ -740,7 +754,8 @@ struct GoalTimeSheet: View {
     private func save() {
         guard total > 600 else { dismiss(); return }
         var st = store.settings
-        st.goals = GoalSplit.split(total: total, style: style, current: st.goals, best: bestSplits)
+        st.goals = GoalSplit.split(total: total, style: style, current: st.goals, best: bestSplits,
+                                   division: st.division)
         st.goalTime = total
         store.settings = st
         dismiss()

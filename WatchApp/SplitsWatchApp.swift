@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import WatchKit
 
 @main
 struct Splits8WatchApp: App {
@@ -14,20 +15,36 @@ struct Splits8WatchApp: App {
     }
 }
 
-enum WScreen { case home, programs, quick, confirm }
+enum WScreen: Hashable { case home, programs, quick, confirm }
 
 /// 워치 화면 이동 상태
+/// 58번: 워치 기본 화면 넘기기(NavigationStack) — 왼쪽 끝에서 밀면 뒤로, 왼쪽 위 기본 ‹ 버튼
 @Observable
 final class WNav {
     static let shared = WNav()
-    var screen: WScreen = .home
+    /// 첫 화면 위에 쌓인 화면들 (비면 첫 화면)
+    var path: [WScreen] = []
     var mode: Mode = .race
     var program: Program?
     var quick: [ProgItem] = []
+
+    /// 예전 코드와 같은 쓰임: 지금 맨 위 화면. 넣으면 그 화면까지의 길을 만들어 줌
+    /// (모드를 먼저 정한 다음 screen 을 넣을 것 — 확인 화면 앞에 트레이닝 목록을 둘지 모드로 정함)
+    var screen: WScreen {
+        get { path.last ?? .home }
+        set {
+            switch newValue {
+            case .home: path = []
+            case .programs: path = [.programs]
+            case .quick: path = [.programs, .quick]
+            case .confirm: path = mode == .training ? [.programs, .confirm] : [.confirm]
+            }
+        }
+    }
 }
 
 struct WRoot: View {
-    let nav = WNav.shared
+    @Bindable var nav = WNav.shared
     let engine = WorkoutEngine.shared
 
     var body: some View {
@@ -40,15 +57,33 @@ struct WRoot: View {
             } else if let n = engine.countdown {
                 WCountdown(n: n)
             } else {
-                switch nav.screen {
-                case .home: WHome()
-                case .programs: WPrograms()
-                case .quick: WQuick()
-                case .confirm: WConfirm()
+                NavigationStack(path: $nav.path) {
+                    WHome()
+                        .navigationDestination(for: WScreen.self) { sc in
+                            switch sc {
+                            case .home: WHome()
+                            case .programs: WPrograms()
+                            case .quick: WQuick()
+                            case .confirm: WConfirm()
+                            }
+                        }
                 }
             }
         }
     }
+}
+
+/// 넘어간 화면의 바탕 (워치 기본 내비게이션 바탕 자리에 노란 빛)
+struct WNavBG: ViewModifier {
+    let a: Ambient
+    func body(content: Content) -> some View {
+        content.containerBackground(for: .navigation) {
+            ZStack { Color.black; AmbientLayer(a: a) }
+        }
+    }
+}
+extension View {
+    func wNavBG(_ a: Ambient) -> some View { modifier(WNavBG(a: a)) }
 }
 
 // MARK: - 시작 전 3 · 2 · 1
@@ -179,7 +214,8 @@ struct WHome: View {
     let nav = WNav.shared
 
     var body: some View {
-        NavigationStack {
+        // 57번: 카드 4개를 화면 세로 가운데에 둠. 화면에 다 들어가도 끌면 따라오고 놓으면 제자리(스프링)
+        GeometryReader { g in
             ScrollView {
                 VStack(spacing: 6) {
                     ForEach(Mode.allCases) { m in
@@ -188,20 +224,17 @@ struct WHome: View {
                             .accessibilityIdentifier("w.mode." + m.rawValue)
                     }
                 }
-                .padding(.horizontal, 12).padding(.top, 2).padding(.bottom, 16)
+                .padding(.horizontal, 12).padding(.vertical, 4)
+                .frame(maxWidth: .infinity, minHeight: g.size.height, alignment: .center)
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Wordmark(size: 12)
-                }
-            }
-            .containerBackground(for: .navigation) {
-                ZStack {
-                    Color.black
-                    AmbientLayer(a: Ambient.y(0.22, 0.9, 0.4, 0.5, -0.06))
-                }
+            .scrollBounceBehavior(.always)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Wordmark(size: 12)
             }
         }
+        .wNavBG(Ambient.y(0.22, 0.9, 0.4, 0.5, -0.06))
     }
 
     @ViewBuilder
@@ -214,9 +247,11 @@ struct WHome: View {
             .frame(width: 22, height: 22)
             .fixedSize()
         } else {
+            // ▶ 는 9 → 12 (동그라미 22 그대로). 세모는 정가운데면 왼쪽으로 쏠려 보여서 오른쪽으로 1pt
             ZStack {
                 Circle().fill(C.accent)
-                Icon8("i_play", 9, .black)
+                Icon8("i_play", 12, .black)
+                    .offset(x: 1)
             }
             .frame(width: 22, height: 22)
             .fixedSize()
@@ -253,29 +288,22 @@ struct WPrograms: View {
     let nav = WNav.shared
 
     var body: some View {
-        ZStack {
-            AmbientLayer(a: Ambient.y(0.16, 0.7, 0.45, 1.0, 0))
-            VStack(spacing: 0) {
-                WBackHeader(title: "Training", back: { nav.screen = .home })
-                    .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 8)
-                ScrollView {
-                    VStack(spacing: 6) {
-                        quickCard
-                        ForEach(store.programs) { p in
-                            Button { nav.program = p; nav.screen = .confirm } label: { programCard(p) }
-                                .buttonStyle(.plain)
-                        }
-                        Text("Edit names on iPhone")
-                            .font(F.t(12)).foregroundStyle(C.text3)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                    }
-                    .padding(.horizontal, 16)
+        ScrollView {
+            VStack(spacing: 6) {
+                quickCard
+                ForEach(store.programs) { p in
+                    Button { nav.program = p; nav.screen = .confirm } label: { programCard(p) }
+                        .buttonStyle(.plain)
                 }
+                Text("Edit names on iPhone")
+                    .font(F.t(12)).foregroundStyle(C.text3)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
             }
-            .padding(.top, 18).padding(.bottom, 12)
+            .padding(.horizontal, 12).padding(.bottom, 8)
         }
-        .ignoresSafeArea()
+        .navigationTitle(Text("Training".l10n))
+        .wNavBG(Ambient.y(0.16, 0.7, 0.45, 1.0, 0))
     }
 
     private var quickCard: some View {
@@ -309,78 +337,101 @@ struct WPrograms: View {
 struct WQuick: View {
     let store = WatchStore.shared
     let nav = WNav.shared
-    private let maxSegs = 16   // 트레이닝 세트 최대 16구간 (오너 지정, 디자인의 8 대신)
+    private let maxSegs = 16   // 트레이닝 세트 최대 16구간 (오너 지정)
+    private let gap: CGFloat = 5
     private let cols: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 5), count: 4)
+    /// 59번: 누르면 1초쯤 뜨는 "＋ Sled Push · 3번째"
+    @State private var toast: String?
+    @State private var toastID = 0
 
     var body: some View {
-        ZStack {
-            AmbientLayer(a: Ambient.y(0.16, 0.7, 0.45, 0, 0))
-            VStack(spacing: 0) {
-                header
-                ScrollView {
-                    VStack(spacing: 6) {
-                        runGrid
-                        stationGrid
-                        sequence
-                    }
-                    .padding(.horizontal, 16)
+        // 59번: 첫 화면 = 러닝 4칸 + 스테이션 8칸이 화면을 꽉 채움. 쌓인 구간 · 지우기 · 시작은 스크롤하면 나옴
+        GeometryReader { g in
+            let h: CGFloat = max(120, g.size.height - 4)
+            let runH: CGFloat = (h * 0.2).rounded()
+            let stH: CGFloat = ((h - runH - gap * 2) / 2).rounded(.down)
+            ScrollView {
+                VStack(spacing: gap) {
+                    runGrid(runH)
+                    stationGrid(stH)
+                    below
+                        .padding(.top, 10)
                 }
-                if !nav.quick.isEmpty { startButton }
+                .padding(.horizontal, 10).padding(.bottom, 8)
             }
-            .padding(.top, 18).padding(.bottom, 10)
+            .overlay(alignment: .bottom) { toastView }
         }
-        .ignoresSafeArea()
-    }
-
-    private var header: some View {
-        WBackHeader(title: "Quick training", back: { nav.screen = .programs }) {
-            if !nav.quick.isEmpty {
-                Button("Clear") { nav.quick = [] }
-                    .buttonStyle(.plain)
-                    .font(F.t(13, .semibold)).foregroundStyle(C.bad)
-            }
-        }
-        .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 6)
+        .navigationTitle(Text("Quick training".l10n))
+        .wNavBG(Ambient.y(0.16, 0.7, 0.45, 0, 0))
     }
 
     private func add(_ q: ProgItem) {
-        guard nav.quick.count < maxSegs else { return }
+        guard nav.quick.count < maxSegs else {
+            WKInterfaceDevice.current().play(.failure)
+            show(String(format: "Max %lld segments".l10n, maxSegs))
+            return
+        }
         nav.quick.append(q)
+        WKInterfaceDevice.current().play(.click)
+        show("＋ " + chipLabel(q, full: true) + " · " + String(format: "No. %lld".l10n, nav.quick.count))
     }
 
-    private var runGrid: some View {
-        LazyVGrid(columns: cols, spacing: 5) {
+    private func show(_ t: String) {
+        toastID += 1
+        let id = toastID
+        withAnimation(.easeOut(duration: 0.12)) { toast = t }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+            if id == toastID { withAnimation(.easeIn(duration: 0.2)) { toast = nil } }
+        }
+    }
+
+    @ViewBuilder
+    private var toastView: some View {
+        if let t = toast {
+            Text(t).font(F.t(13, .semibold)).foregroundStyle(.black)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .padding(.horizontal, 10).frame(height: 26)
+                .background(C.accent, in: Capsule())
+                .padding(.bottom, 4)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("w.quickToast")
+        }
+    }
+
+    private func runGrid(_ hgt: CGFloat) -> some View {
+        LazyVGrid(columns: cols, spacing: gap) {
             ForEach(Defaults.runs, id: \.self) { r in
                 Button { add(ProgItem(icon: "run", run: r)) } label: {
-                    Text(r).font(F.t(13, .semibold)).lineLimit(1).minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity).frame(height: 30)
-                        .wCard(9)
+                    Text(r).font(F.t(14, .semibold)).lineLimit(1).minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity).frame(height: hgt)
+                        .wCard(10)
                 }
                 .buttonStyle(.plain)
             }
         }
     }
 
-    /// 4×2 — 아이콘·이름은 디자인(15 / 6.5pt)보다 크게: 20 / 8pt, 높이 44
-    private var stationGrid: some View {
-        LazyVGrid(columns: cols, spacing: 5) {
+    /// 4×2 — 칸 높이는 화면에 맞춰 계산, 아이콘은 칸 높이의 45% (최대 30)
+    private func stationGrid(_ hgt: CGFloat) -> some View {
+        let icon: CGFloat = min(30, max(20, (hgt * 0.45).rounded()))
+        return LazyVGrid(columns: cols, spacing: gap) {
             ForEach(Station.all, id: \.key) { s in
-                Button { add(ProgItem(icon: s.key)) } label: { stationTile(s) }
-                    .buttonStyle(.plain)
+                Button { add(ProgItem(icon: s.key)) } label: {
+                    VStack(spacing: 3) {
+                        Icon8(s.key, icon, tint: .yellow)
+                        Text(shortName(s.name))
+                            .font(F.t(12, .semibold)).foregroundStyle(C.text2)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                            .padding(.horizontal, 1)
+                    }
+                    .frame(maxWidth: .infinity).frame(height: hgt)
+                    .wCard(10)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("w.quick." + s.key)
             }
         }
-    }
-
-    private func stationTile(_ s: Station) -> some View {
-        VStack(spacing: 2) {
-            Icon8(s.key, 20, tint: .yellow)
-            Text(shortName(s.name))
-                .font(F.t(12, .semibold)).foregroundStyle(C.text2)
-                .lineLimit(1).minimumScaleFactor(0.75)
-                .padding(.horizontal, 1)
-        }
-        .frame(maxWidth: .infinity).frame(height: 44)
-        .wCard(9)
     }
 
     private func shortName(_ n: String) -> String {
@@ -388,17 +439,39 @@ struct WQuick: View {
             .replacingOccurrences(of: "Wall Balls", with: "Wall Ball")
     }
 
-    private var sequence: some View {
-        WFlow(spacing: 3) {
-            if nav.quick.isEmpty {
-                Text("Tap to add").font(F.t(12)).foregroundStyle(C.text3)
+    /// 스크롤하면 나오는 부분: 쌓인 구간 · 마지막 지우기 · 모두 지우기 · 시작
+    private var below: some View {
+        VStack(spacing: 8) {
+            WFlow(spacing: 3) {
+                if nav.quick.isEmpty {
+                    Text("Tap to add").font(F.t(12)).foregroundStyle(C.text3)
+                }
+                ForEach(Array(nav.quick.enumerated()), id: \.offset) { _, q in
+                    chip(q)
+                }
             }
-            ForEach(Array(nav.quick.enumerated()), id: \.offset) { _, q in
-                chip(q)
+            .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+
+            if !nav.quick.isEmpty {
+                HStack(spacing: 6) {
+                    smallButton("Remove last") { _ = nav.quick.popLast(); WKInterfaceDevice.current().play(.click) }
+                        .accessibilityIdentifier("w.quickUndo")
+                    smallButton("Clear all") { nav.quick = []; WKInterfaceDevice.current().play(.click) }
+                        .accessibilityIdentifier("w.quickClear")
+                }
+                startButton
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
-        .padding(.vertical, 2)
+    }
+
+    private func smallButton(_ t: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(t.l10n).font(F.t(13, .semibold)).foregroundStyle(C.bad)
+                .lineLimit(1).minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity).frame(height: 32)
+                .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private func chip(_ q: ProgItem) -> some View {
@@ -410,24 +483,25 @@ struct WQuick: View {
         .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 
+    /// 60번: "시작 · 3구간" (16 은 다 찼을 때만 안내)
     private var startButton: some View {
         Button {
             let p = store.saveQuick(nav.quick)
             nav.program = p; nav.quick = []; nav.screen = .confirm
         } label: {
-            Text("Start · \(nav.quick.count)/\(maxSegs) segments")
+            Text("Start · \(nav.quick.count) segments")
                 .font(F.t(16, .semibold)).foregroundStyle(.black)
                 .lineLimit(1).minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity).frame(height: 34)
+                .frame(maxWidth: .infinity).frame(height: 36)
                 .background(C.accent, in: Capsule())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16).padding(.top, 4)
         .accessibilityIdentifier("w.quickStart")
     }
 
-    private func chipLabel(_ q: ProgItem) -> String {
+    private func chipLabel(_ q: ProgItem, full: Bool = false) -> String {
         if q.icon == "run" { return q.run ?? "1KM" }
+        if full { return q.name() }
         return q.name().replacingOccurrences(of: "Farmers Carry", with: "FC")
             .replacingOccurrences(of: "Wall Balls", with: "WB")
             .replacingOccurrences(of: "Sled Push", with: "Push")
@@ -449,14 +523,7 @@ struct WConfirm: View {
     private var noEvent: Bool { mode == .race && !ev.isSet }
 
     var body: some View {
-        ZStack {
-            AmbientLayer(a: Ambient.y(0.22, 1.1, 0.5, 0.5, 1.08))
-            VStack(spacing: 0) {
-                WBackHeader(title: mode == .training ? program.name : mode.name, back: {
-                    nav.screen = .home; nav.program = nil
-                })
-                .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 2)
-
+        VStack(spacing: 0) {
                 if mode == .training && program.isOpen {
                     openInfo
                 } else if mode == .pft {
@@ -470,15 +537,15 @@ struct WConfirm: View {
                 }
 
                 if !noEvent { startButton }
-            }
-            .padding(.top, 18).padding(.bottom, 12)
         }
-        .ignoresSafeArea()
+        .padding(.bottom, 4)
+        .navigationTitle(Text((mode == .training ? program.name : mode.name).l10n))
+        .wNavBG(Ambient.y(0.22, 1.1, 0.5, 0.5, 1.08))
     }
 
     private var trainingList: some View {
         VStack(spacing: 0) {
-            Text(String(localized: "\(seq.count) segments") + " · " + setsLabel)
+            Text(String(format: "%lld segments".l10n, seq.count) + " · " + setsLabel)
                 .font(F.t(13, .medium)).foregroundStyle(C.text2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20).padding(.bottom, 8)
@@ -531,7 +598,7 @@ struct WConfirm: View {
 
     /// 1 set / 3 sets
     private var setsLabel: String {
-        program.sets == 1 ? String(localized: "1 set") : String(localized: "\(program.sets) sets")
+        program.sets == 1 ? "1 set".l10n : String(format: "%lld sets".l10n, program.sets)
     }
 
     private func previewRow(_ s: Seg) -> some View {
@@ -588,7 +655,7 @@ struct WConfirm: View {
                 .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 16)
+        .padding(.horizontal, 14).padding(.top, 6)
         .accessibilityIdentifier("w.start")
     }
 

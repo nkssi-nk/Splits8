@@ -180,8 +180,8 @@ struct AuthView: View {
 
     private func finish() async {
         switch await store.loadProfile() {
-        case .found: r.go(r.authReturn)
-        case .none: r.nickDraft = ""; r.go(.nick)
+        case .found: r.afterSignIn(newAccount: false)
+        case .none: r.afterSignIn(newAccount: true)
         case .failed:
             // 로그인은 됐지만 프로필을 못 읽음 → 닉네임 만들기로 보내지 않고 다시 해 보게 함
             await store.sb.signOut()
@@ -310,8 +310,8 @@ struct CodeView: View {
                 store.settings.signMethod = "Email code"
                 store.settings.email = r.email
                 switch await store.loadProfile() {
-                case .found: r.go(r.authReturn)
-                case .none: r.nickDraft = ""; r.go(.nick)
+                case .found: r.afterSignIn(newAccount: false)
+                case .none: r.afterSignIn(newAccount: true)
                 case .failed:
                     self.error = String(localized: "Signed in, but we couldn't load your profile. Check your connection and try again.")
                 }
@@ -449,6 +449,7 @@ struct AccountView: View {
             photoBlock
             SectionLabel(text: "ATHLETE", top: 14)
             athleteCard
+            ProfileAboutCard()          // 빌드 23: 성별 · 키/몸무게 · 태어난 해 · 대회 경험
             if store.signedIn { accountBlock } else { signUpCard }
         }
         .padding(.horizontal, 16)

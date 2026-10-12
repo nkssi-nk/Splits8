@@ -18,6 +18,16 @@ struct RemoteProfile: Codable {
     var visibility: String?
 }
 
+/// 빌드 23: 본인만 읽고 쓰는 프로필 (profile_private 표 · 친구에게도 안 보임)
+struct PrivateProfile: Codable {
+    var sex: String? = nil
+    var height_cm: Int? = nil
+    var weight_kg: Double? = nil
+    var birth_year: Int? = nil
+    var raced: Bool? = nil
+    var race_division: String? = nil
+}
+
 struct LBRow: Codable, Identifiable {
     var user_id: String
     var nickname: String
@@ -146,6 +156,12 @@ final class Supabase {
         session = nil
     }
 
+    /// 빌드 23: 다른 기기에서 로그인해서 이 기기만 로그아웃할 때.
+    /// 서버에 logout 을 보내지 않음 (보통 logout 은 모든 기기의 로그인을 끊어서, 새로 로그인한 기기까지 끊길 수 있음)
+    func dropSession() {
+        session = nil
+    }
+
     /// 계정 삭제 (SQL 함수 delete_account) — 서버의 프로필·친구·기록이 지워짐
     func deleteAccount() async throws {
         _ = try await request("/rest/v1/rpc/delete_account", method: "POST", body: [:])
@@ -175,6 +191,48 @@ final class Supabase {
         if let avatarUrl { b["avatar_url"] = avatarUrl } else if clearAvatar { b["avatar_url"] = NSNull() }
         _ = try await request("/rest/v1/profiles", method: "POST", body: b,
                               headers: ["Prefer": "resolution=merge-duplicates,return=minimal"])
+    }
+
+    // MARK: 본인만 보는 프로필 (빌드 23 · supabase/build23_profile.sql)
+
+    /// 서버에 아직 표가 없으면(404) nil
+    func myPrivate() async throws -> PrivateProfile? {
+        guard let id = userId else { throw SBError.noSession }
+        do {
+            let d = try await request("/rest/v1/profile_private?id=eq.\(id)&select=sex,height_cm,weight_kg,birth_year,raced,race_division")
+            return try decode([PrivateProfile].self, d).first
+        } catch SBError.http(404, _) {
+            return nil
+        }
+    }
+
+    /// 값이 nil 이면 서버에서도 비움 (사용자가 지운 값이 남지 않게)
+    func upsertPrivate(_ p: PrivateProfile) async throws {
+        guard let id = userId else { throw SBError.noSession }
+        func v(_ x: Any?) -> Any { x ?? NSNull() }
+        let b: [String: Any] = ["id": id,
+                                "sex": v(p.sex),
+                                "height_cm": v(p.height_cm),
+                                "weight_kg": v(p.weight_kg),
+                                "birth_year": v(p.birth_year),
+                                "raced": v(p.raced),
+                                "race_division": v(p.race_division)]
+        _ = try await request("/rest/v1/profile_private", method: "POST", body: b,
+                              headers: ["Prefer": "resolution=merge-duplicates,return=minimal"])
+    }
+
+    // MARK: 한 기기만 로그인 (빌드 23)
+
+    /// 이 기기를 "지금 로그인한 기기"로 서버에 적음 (SQL 함수 claim_device)
+    func claimDevice(_ dev: String) async throws {
+        _ = try await request("/rest/v1/rpc/claim_device", method: "POST", body: ["dev": dev])
+    }
+
+    /// 서버에 적힌 "지금 로그인한 기기" (없으면 nil)
+    func activeDevice() async throws -> String? {
+        let d = try await request("/rest/v1/rpc/active_device", method: "POST", body: [:])
+        let v = try? JSONSerialization.jsonObject(with: d, options: [.fragmentsAllowed])
+        return v as? String
     }
 
     /// 아바타 올리기 → 공개 URL

@@ -468,6 +468,104 @@ enum Insights {
                 }
             }
         }
+        // 62번: 러닝 카드 기록만의 분석 (오르막 · 칼로리 · 케이던스 · 페이스 유지)
+        if r.mode == .training && r.isRunKind { o += runMode(r) }
+        return o
+    }
+
+    // MARK: 62번 · 러닝 카드 (오르막 · 칼로리 · 케이던스 · 후반 페이스)
+    //
+    // 묶음: "elev" 오르막 · "kcal" 칼로리 · "cad" 케이던스 · "run2" 후반 페이스 (기존 3번 '마지막 km 가장 빠름'과 같은 묶음)
+
+    // swiftlint:disable:next function_body_length cyclomatic_complexity
+    private static func runMode(_ r: Record) -> [Insight] {
+        var o: [Insight] = []
+        // 1 km 가까이 뛴 구간만 (마지막 짧은 구간은 페이스가 튐)
+        let kms: [(i: Int, s: SegResult)] = r.runs.enumerated()
+            .filter { ($0.element.dist ?? runMeters($0.element.detail)) >= 500 }
+            .map { (i: $0.offset, s: $0.element) }
+        let avg: Int? = r.avgKmPace
+
+        // ── 오르막 ──
+        if let total = r.ascent {
+            let climbs: [(i: Int, s: SegResult, up: Double)] = kms.compactMap { k in k.s.up.map { u in (i: k.i, s: k.s, up: u) } }
+            if let top = climbs.max(by: { $0.up < $1.up }), top.up >= 10, let avg {
+                // 43 가장 많이 오른 km 와 그 km 페이스 (평균 대비)
+                let d: Int = r.pace(top.s) - avg
+                let up: Int = Int(top.up.rounded())
+                if d >= minDiff {
+                    o.append(Insight(id: 43, group: "elev", score: d >= 15 ? trend : info + 1, mark: .down,
+                                     text: String(localized: "Biggest climb: [y]km \(top.i + 1)[/y] (+\(up) m) — [r]\(d)s slower[/r] than your average km.")))
+                } else {
+                    o.append(Insight(id: 43, group: "elev", score: up >= 15 ? trend : info + 1, mark: .up,
+                                     text: String(localized: "Biggest climb: [y]km \(top.i + 1)[/y] (+\(up) m) — and you [g]held your pace[/g].")))
+                }
+            }
+            // 44 가장 빠른 km 가 내리막이었음
+            if let cl = RunMetrics.segClimbs(r.route, splits: r.segs.map(\.time)), cl.count == r.segs.count, kms.count >= 3 {
+                let runIdx: [Int] = r.segs.indices.filter { r.segs[$0].kind == .run }   // runs[n] → segs 번호
+                if let f = kms.min(by: { r.pace($0.s) < r.pace($1.s) }), runIdx.indices.contains(f.i) {
+                    let down: Int = Int(cl[runIdx[f.i]].down.rounded())
+                    if down >= 10 {
+                        o.append(Insight(id: 44, group: "elev", score: info, mark: .info,
+                                         text: String(localized: "Your fastest km, [y]km \(f.i + 1)[/y], was mostly downhill (−\(down) m).")))
+                    }
+                }
+            }
+            // 45 오른 높이 합계
+            let t: Int = Int(total.rounded())
+            if t >= 10 {
+                o.append(Insight(id: 45, group: "elev", score: info - 1, mark: .up,
+                                 text: String(localized: "[y]+\(t) m[/y] of climbing on this run.")))
+            }
+        }
+
+        // ── 칼로리 (워치 기록만) ──
+        let km: Double = r.runDistance / 1000
+        if r.kcal > 0 && km >= 1 && r.total > 0 {
+            let perKm: Int = Int((Double(r.kcal) / km).rounded())
+            let perHour: Int = Int((Double(r.kcal) * 3600 / Double(r.total)).rounded())
+            o.append(Insight(id: 46, group: "kcal", score: info - 1, mark: .info,
+                             text: String(localized: "[y]\(perKm) kcal[/y] per km · \(perHour) kcal per hour.")))
+        }
+
+        // ── 케이던스 ──
+        let cads: [Int] = kms.compactMap { $0.s.cad }
+        if cads.count >= 3 {
+            let third: Int = max(1, cads.count / 3)
+            let early: Int = cads.prefix(third).reduce(0, +) / third
+            let late: Int = cads.suffix(third).reduce(0, +) / third
+            if early - late >= 5 {
+                // 48 후반에 걸음이 느려짐 (지쳤다는 신호)
+                o.append(Insight(id: 48, group: "cad", score: trend, mark: .down,
+                                 text: String(localized: "Cadence dropped [r]\(early - late) spm[/r] in the last third (\(early) → \(late))."),
+                                 tip: String(localized: "Quick, short steps help when your legs get tired.")))
+            }
+        }
+        if let c = r.cadence {
+            // 47 평균 케이던스
+            o.append(Insight(id: 47, group: "cad", score: info - 1, mark: .info,
+                             text: String(localized: "Average cadence: [y]\(c) spm[/y].")))
+        }
+
+        // ── 후반 페이스 (반으로 나눠 비교) ──
+        if kms.count >= 4 {
+            let ps: [Int] = kms.map { r.pace($0.s) }
+            let h: Int = ps.count / 2
+            let first: Int = ps.prefix(h).reduce(0, +) / h
+            let second: Int = ps.suffix(ps.count - h).reduce(0, +) / (ps.count - h)
+            let d: Int = second - first
+            if d <= -minDiff {
+                o.append(Insight(id: 49, group: "run2", score: trend, mark: .up,
+                                 text: String(localized: "[g]Negative split[/g] — your second half was \(-d)s/km faster.")))
+            } else if d < minDiff {
+                o.append(Insight(id: 49, group: "run2", score: info, mark: .even,
+                                 text: String(localized: "You held your pace — both halves within [g]\(abs(d))s/km[/g].")))
+            } else if d >= 15 {
+                o.append(Insight(id: 49, group: "run2", score: info, mark: .down,
+                                 text: String(localized: "Your second half was [r]\(d)s/km slower[/r] than the first.")))
+            }
+        }
         return o
     }
 

@@ -31,12 +31,12 @@ enum WatchDemo {
         let preset = Program.presets()[0]
 
         switch name {
-        case "programs": nav.screen = .programs; nav.mode = .training
-        case "quick": nav.screen = .quick; nav.mode = .training
-        case "confirm_training": nav.screen = .confirm; nav.mode = .training; nav.program = preset
-        case "confirm_race": nav.screen = .confirm; nav.mode = .race
-        case "confirm_sim": nav.screen = .confirm; nav.mode = .sim
-        case "confirm_pft": nav.screen = .confirm; nav.mode = .pft
+        case "programs": nav.mode = .training; nav.screen = .programs
+        case "quick": nav.mode = .training; nav.screen = .quick
+        case "confirm_training": nav.mode = .training; nav.program = preset; nav.screen = .confirm
+        case "confirm_race": nav.mode = .race; nav.screen = .confirm
+        case "confirm_sim": nav.mode = .sim; nav.screen = .confirm
+        case "confirm_pft": nav.mode = .pft; nav.screen = .confirm
         case "pft_live":
             let seq = PFT.seq(div: s.div, targets: ctx.pftBest)
             engine.demoRun(mode: .pft, title: PFT.title, seq: seq, idx: 5, elapsed: 134, hr: 171, done: false)

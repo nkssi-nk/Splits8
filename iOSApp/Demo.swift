@@ -64,6 +64,7 @@ enum Demo {
         switch kind {
         case "pft": rec = store.records(.pft).first
         case "training": rec = store.records(.training).first
+        case "run": rec = store.records(.training).first { $0.isRunKind }      // --demorun 과 같이
         case "check":
             if var x = store.records(.sim).first {
                 x.id = UUID()
@@ -141,6 +142,8 @@ enum Demo {
         out.append(training("Sled Intervals", "2026-09-24", 1822))
         out.append(training("Wall Ball Run", "2026-09-21", 2410))
         out.append(training("Sled Intervals", "2026-09-17", 1875))
+        // 62번: 러닝 카드 기록 (경로 높이 · 시간 · 케이던스). 다른 화면 숫자가 바뀌지 않게 `--demorun` 일 때만
+        if CommandLine.arguments.contains("--demorun") { out.append(runRecord()) }
         // PFT (Gold · Silver · Bronze 하나씩). `--nopft` 로 켜면 뺌 (처음 화면 확인용)
         if !CommandLine.arguments.contains("--nopft") {
             let base6: [Int] = [262, 236, 188, 245, 82, 295]       // 21:48
@@ -167,5 +170,50 @@ enum Demo {
             out.append(pft("2026-08-16", 1655))
         }
         return out
+    }
+
+    /// 62번 화면 확인용 러닝 기록: 공원 1 km 한 바퀴 코스를 6바퀴 (서울숲 근처).
+    /// 한쪽에 작은 언덕(4번째 km 는 조금 더 높게) · km 마다 페이스와 케이던스가 조금씩 다름 · 후반 케이던스가 떨어짐
+    static func runRecord() -> Record {
+        let lat0: Double = 37.5444, lon0: Double = 127.0374
+        let radius: Double = 1000 / (2 * .pi)                     // 한 바퀴 1 km
+        let kx: Double = 111_320 * cos(lat0 * .pi / 180)
+        let paces: [Int] = [298, 292, 295, 309, 290, 284]        // km 별 초 (4번째 km 가 언덕)
+        let cads: [Int] = [174, 175, 173, 168, 166, 165]
+        let hills: [Double] = [8, 8, 8, 15, 8, 8]
+        var route: [RoutePt] = []
+        var segs: [SegResult] = []
+        var t: Double = 0
+        for k in 0..<6 {
+            let n: Int = 100                                   // 10 m 마다 한 점
+            for j in 0..<n {
+                let ang: Double = Double(j) / Double(n) * 2 * .pi
+                let x: Double = radius * sin(ang), y: Double = radius - radius * cos(ang)
+                // 언덕: 바퀴 앞쪽 절반에서 올랐다가 내려옴 + 작은 흔들림
+                let hill: Double = ang < .pi ? hills[k] * sin(ang) : 0
+                let h: Double = 24 + hill + sin(Double(j) * 1.7) * 0.6
+                // 오르막에서는 느리게, 내리막에서는 빠르게 (같은 km 평균 페이스는 유지)
+                let slope: Double = ang < .pi ? cos(ang) : 0
+                let dt: Double = Double(paces[k]) / Double(n) * (1 + 0.18 * slope)
+                route.append(RoutePt(a: lat0 + y / 111_320, o: lon0 + x / kx, h: h, t: Int(t.rounded())))
+                t += dt
+            }
+            segs.append(SegResult(icon: "run", name: "KM \(k + 1)", detail: "1KM", kind: .run, time: paces[k], target: 0,
+                                  hr: 152 + k * 3, dist: 1000, cad: cads[k]))
+        }
+        if let first = route.first { route.append(RoutePt(a: first.a, o: first.o, h: first.h, t: Int(t.rounded()))) }
+        let total: Int = paces.reduce(0, +)
+        let start: Date = (Fm.ymd.date(from: "2026-09-27") ?? Date()).addingTimeInterval(7 * 3600 + 300)
+        var r = Record(mode: .training, title: "Easy 6K", sets: 1, date: start, total: total, segs: segs,
+                       hr: (0...30).map { HRPoint(t: $0 * total / 30, b: 138 + min(22, $0 * 2) + ($0 % 4) * 2) },
+                       kcal: 402, avgHR: 156, maxHR: 171, division: "openM", goal: nil, vsWord: "VS BEST", vsTarget: nil,
+                       complete: true)
+        r.kind = "run"
+        r.place = "Seongsu-dong, Seoul"
+        r.route = route
+        // 오르막 · 구간 오르막 · 보폭은 실제 기록과 같은 계산으로 (걸음 = 케이던스 × 시간)
+        let steps: [Double?] = segs.map { Double($0.cad ?? 0) * Double($0.time) / 60 }
+        RunMetrics.fill(&r, segSteps: steps, strideHK: nil)
+        return r
     }
 }

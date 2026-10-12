@@ -53,7 +53,8 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         # 권한 문구: 영어 기본, 한국어는 Resources/iOS/ko.lproj/InfoPlist.strings
-        NSHealthShareUsageDescription: Splits8 reads Health data to show your workouts and heart rate.
+        # 빌드 23: 가입 프로필을 미리 채우려고 키 · 몸무게 · 성별 · 생년월일도 읽음
+        NSHealthShareUsageDescription: Splits8 reads Health data to show your workouts and heart rate, and to fill in your height, weight, sex and birth year for your profile.
         NSHealthUpdateUsageDescription: Splits8 saves your workouts to the Health app.
         NSPhotoLibraryAddUsageDescription: Splits8 saves share images to your photo library.
         LSApplicationQueriesSchemes: [instagram-stories]
@@ -63,6 +64,8 @@ targets:
             CFBundleTypeRole: Editor
             CFBundleURLSchemes: [splits8]
         NSLocationWhenInUseUsageDescription: Splits8 uses your location to measure pace and distance on outdoor runs.
+        # 빌드 23 (62번): 아이폰으로 기록하는 러닝의 걸음 수 → 케이던스
+        NSMotionUsageDescription: Splits8 uses motion data to count your steps and show your running cadence.
         # 빌드 22: 워치 운동을 잠금 화면 · 다이내믹 아일랜드에 (Live Activity) + 워치 운동 미러링을 뒤에서 받기
         NSSupportsLiveActivities: true
         UIBackgroundModes: [workout-processing]

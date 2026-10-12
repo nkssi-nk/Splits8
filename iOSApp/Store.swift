@@ -37,6 +37,12 @@ final class Store: NSObject, WCSessionDelegate {
     var incoming: [FriendReq] { requests.filter(\.incoming) }
     var outgoing: [FriendReq] { requests.filter { !$0.incoming } }
     var lastError: String?
+    /// 빌드 23: 같은 계정이 다른 기기에서 로그인해서 이 기기가 로그아웃됨 → 안내창
+    var signedOutElsewhere = false
+    /// 이 기기를 서버에 적는 중 (그동안은 기기 확인을 하지 않음)
+    @ObservationIgnored private var claiming = false
+    /// 워치로 보내기가 실패함 → 워치 상태가 바뀔 때 다시 보냄
+    @ObservationIgnored private var watchPushFailed = false
 
     private(set) var watchPaired = false
     private(set) var watchInstalled = false
@@ -48,6 +54,10 @@ final class Store: NSObject, WCSessionDelegate {
     override init() {
         super.init()
         settings = JSONStore.load(Settings.self, "settings.json") ?? Settings()
+        // 63번: 이미 앱 안에서 언어를 골라 둔 경우도 워치로 보내지게 (설정 > 언어 값과 맞춤)
+        let picked: String? = UserDefaults.standard.string(forKey: "appLanguage")
+        let lang: String? = (picked == "ko" || picked == "en") ? picked : nil
+        if settings.lang != lang { settings.lang = lang }
         programs = JSONStore.load([Program].self, "programs.json") ?? Program.presets()
         records = JSONStore.load([Record].self, "records.json") ?? []
         friends = JSONStore.load([Friend].self, "friends.json") ?? []
@@ -280,6 +290,8 @@ final class Store: NSObject, WCSessionDelegate {
     /// 비교할 기록이 2개 이상일 때만 표시 (하나뿐이면 PB 표시 없음). 저장·삭제하면 자동으로 다시 계산됨.
     func isPB(_ r: Record) -> Bool {
         guard r.counts, !r.isHIIT else { return false }      // HIIT 는 PB 없음
+        // 64번: 트레이닝은 전체 시간 PB 안 셈(빨리 끝내면 PB 가 되는 건 의미 없음). 러닝은 정해진 거리 PB
+        if r.mode == .training { return r.isRunKind && !runPBs(r).isEmpty }
         let same: [Record] = pbGroup(r)
         guard same.count >= 2, let best = same.min(by: { $0.total < $1.total }) else { return false }
         return best.id == r.id
@@ -427,11 +439,15 @@ final class Store: NSObject, WCSessionDelegate {
     /// 로그인 끝난 뒤: 프로필 읽기.
     /// 빌드 19 까지는 "읽기 실패"와 "프로필 없음"을 구분하지 못해, 이미 닉네임이 있는 계정인데도 닉네임을 다시 만들라고 나올 수 있었음.
     /// 실패하면 한 번 더 해 보고, 그래도 안 되면 .failed
+    @MainActor
     func loadProfile() async -> ProfileLoad {
+        // 빌드 23: 새로 로그인한 이 기기를 "지금 기기"로 서버에 적음 → 예전 기기는 다음 확인 때 로그아웃
+        await claimThisDevice(fresh: true)
         var message: String = ""
         for attempt in 0..<2 {
             do {
                 let found: RemoteProfile? = try await sb.myProfile()
+                await loadPrivate()
                 guard let p = found, let n = p.nickname, !n.isEmpty else { return .none }
                 await applyRemote(p, nickname: n)
                 return .found
@@ -444,6 +460,7 @@ final class Store: NSObject, WCSessionDelegate {
     }
 
     /// 서버 프로필을 이 기기에 적용 (같은 계정으로 다른 기기에 로그인했을 때 같은 모습이 되게)
+    @MainActor
     private func applyRemote(_ p: RemoteProfile, nickname n: String) async {
         avatarUrl = p.avatar_url          // settings 보다 먼저 (디비전이 바뀌면 바로 서버에 다시 알리므로)
         var s = settings
@@ -466,6 +483,7 @@ final class Store: NSObject, WCSessionDelegate {
     }
 
     /// 닉네임 저장 (가입 마무리 · 변경)
+    @MainActor
     func saveNickname(_ n: String) async throws {
         try await sb.upsertProfile(nickname: n, division: div.name, visibility: settings.visibility, avatarUrl: avatarUrl)
         var s = settings
@@ -483,11 +501,13 @@ final class Store: NSObject, WCSessionDelegate {
                                     clearAvatar: clearAvatar)
     }
 
+    @MainActor
     private func syncAvatar(_ d: Data) async {
         if let u = try? await sb.uploadAvatar(d) { avatarUrl = u; await syncProfile() }
     }
 
     /// 친구 목록 · 순위표 · 대회 목록 새로 받기
+    @MainActor
     func refreshSocial() async {
         guard signedIn, !Demo.enabled else { return }
         if let rows = try? await sb.friends() {
@@ -534,6 +554,7 @@ final class Store: NSObject, WCSessionDelegate {
         await refreshLeaderboard()
     }
 
+    @MainActor
     func refreshLeaderboard() async {
         if Demo.enabled { return }          // 화면 확인용 예시는 서버에 가지 않음
         guard signedIn else { leaderboard = []; return }
@@ -544,12 +565,20 @@ final class Store: NSObject, WCSessionDelegate {
         }
     }
 
+    @MainActor
     func refreshEvents() async {
         if let e = try? await sb.events(), !e.isEmpty { events = e }
     }
 
+    @MainActor
     func signOut() async {
         await sb.signOut()
+        clearLocalAccount()
+    }
+
+    /// 로그아웃 뒤 이 기기에서 계정 정보만 지움. 기록 · 트레이닝 · 설정(프로필 포함)은 그대로 남음
+    @MainActor
+    private func clearLocalAccount() {
         var s = settings
         s.nickname = nil; s.email = nil; s.signMethod = nil
         settings = s
@@ -557,6 +586,113 @@ final class Store: NSObject, WCSessionDelegate {
         friends = []
         requested = []
         requests = []
+        UserDefaults.standard.removeObject(forKey: Store.deviceKey)
+        UserDefaults.standard.removeObject(forKey: Store.deviceClaimedKey)
+    }
+
+    // MARK: 한 기기만 로그인 (빌드 23)
+
+    static let deviceKey = "session.device.v1"
+    static let deviceClaimedKey = "session.device.claimed.v1"
+
+    /// 이 기기를 서버에 "지금 로그인한 기기"로 적음.
+    /// fresh = 방금 로그인함 → 새 기기 id 를 만듦. 서버에 아직 함수가 없거나(404) 네트워크가 안 되면 다음 확인 때 다시 함
+    @MainActor
+    func claimThisDevice(fresh: Bool) async {
+        guard !Demo.enabled, sb.session != nil else { return }
+        let ud = UserDefaults.standard
+        var dev: String = ud.string(forKey: Store.deviceKey) ?? ""
+        if fresh || dev.isEmpty {
+            dev = UUID().uuidString.lowercased()
+            ud.set(dev, forKey: Store.deviceKey)
+            ud.set(false, forKey: Store.deviceClaimedKey)
+        }
+        claiming = true
+        defer { claiming = false }
+        do {
+            try await sb.claimDevice(dev)
+            ud.set(true, forKey: Store.deviceClaimedKey)
+        } catch {}
+    }
+
+    /// 앱이 앞에 올 때 · 켜져 있는 동안 몇 분마다: 서버의 "지금 기기"가 이 기기와 다르면 이 기기만 로그아웃
+    @MainActor
+    func checkDevice() async {
+        guard !Demo.enabled, signedIn, sb.session != nil, !claiming else { return }
+        let ud = UserDefaults.standard
+        let local: String? = ud.string(forKey: Store.deviceKey)
+        // 이 기기를 아직 서버에 적지 못했으면(이번 업데이트 전부터 로그인해 있던 기기 · 지난번 실패) 먼저 적어 봄
+        // 서버 함수가 아직 없거나(404) 네트워크 문제 → 아무것도 안 함
+        let server: String?
+        do { server = try await sb.activeDevice() } catch { return }
+        guard let local else {
+            // 업데이트 전부터 로그인해 있던 기기: 아직 아무 기기도 없으면 이 기기가 자리를 잡고,
+            // 그사이 다른 기기가 먼저 잡았으면 이 기기 로그아웃
+            if server == nil { await claimThisDevice(fresh: false) } else { kickOut() }
+            return
+        }
+        // 이 기기에서 로그인했지만 서버에 적지 못했음(지난번 네트워크 실패 등).
+        // 그사이 다른 기기가 자리를 잡았으면 "나중에 로그인한 기기가 이김"을 지키려고 이 기기가 로그아웃
+        if !ud.bool(forKey: Store.deviceClaimedKey) {
+            if let server, server != local { kickOut() } else { await claimThisDevice(fresh: false) }
+            return
+        }
+        guard let server else { await claimThisDevice(fresh: false); return }   // 서버 값이 비어 있음 → 다시 적음
+        if server != local { kickOut() }
+    }
+
+    /// 다른 기기 로그인으로 이 기기만 로그아웃 (서버의 다른 기기 로그인은 건드리지 않음). 기록은 이 기기에 그대로
+    @MainActor
+    private func kickOut() {
+        guard signedIn else { return }
+        sb.dropSession()
+        clearLocalAccount()
+        signedOutElsewhere = true
+    }
+
+    // MARK: 가입 프로필 (빌드 23 · 본인만 보는 값)
+
+    /// 서버의 본인 프로필을 이 기기에 가져옴. 이 기기에 이미 있는 값은 서버 값이 있을 때만 바꿈
+    @MainActor
+    func loadPrivate() async {
+        guard !Demo.enabled, sb.session != nil, let p = try? await sb.myPrivate() else { return }
+        guard p.sex != nil || p.birth_year != nil || p.raced != nil || p.height_cm != nil || p.weight_kg != nil else { return }
+        var s = settings
+        s.sex = p.sex ?? s.sex
+        s.heightCm = p.height_cm ?? s.heightCm
+        s.weightKg = p.weight_kg ?? s.weightKg
+        s.birthYear = p.birth_year ?? s.birthYear
+        s.raced = p.raced ?? s.raced
+        s.raceDivision = p.race_division ?? s.raceDivision
+        s.profileDone = true            // 다른 기기에서 이미 답함 → 다시 묻지 않음
+        settings = s
+    }
+
+    /// 이 기기의 프로필을 서버에 올림 (로그인했을 때만)
+    func syncPrivate() async {
+        guard !Demo.enabled, sb.session != nil else { return }
+        let s = settings
+        try? await sb.upsertPrivate(PrivateProfile(sex: s.sex, height_cm: s.heightCm, weight_kg: s.weightKg,
+                                                   birth_year: s.birthYear, raced: s.raced, race_division: s.raceDivision))
+    }
+
+    /// 프로필 단계 저장: 직접 고른 디비전이 없으면 대회 디비전(없으면 성별)으로 앱 디비전도 맞춤.
+    /// 태어난 해가 있으면 심박 계산용 나이도 맞춤
+    func saveProfile(_ s0: Settings) {
+        var s = s0
+        if s.divPicked != true, s.division == "openM" {
+            if let key = s.raceDivision, Division.all.contains(where: { $0.key == key }) {
+                s.division = key
+            } else if s.sex == "W" {
+                s.division = "openW"
+            }
+        }
+        if let y = s.birthYear {
+            let age: Int = Calendar.current.component(.year, from: Date()) - y
+            if (10...100).contains(age) { s.age = age }
+        }
+        settings = s
+        Task { await syncPrivate() }
     }
 
     func deleteAccount() async {
@@ -582,7 +718,13 @@ final class Store: NSObject, WCSessionDelegate {
                                pftBest: pft?.pftSplits, pftBestTotal: pft?.total,
                                simLast: simLast?.splits16)
         guard let d = try? JSONStore.enc.encode(ctx) else { return }
-        try? WCSession.default.updateApplicationContext([SyncKey.context: d])
+        do {
+            try WCSession.default.updateApplicationContext([SyncKey.context: d])
+            watchPushFailed = false
+        } catch {
+            // 보내지 못함 (세션 문제 등) → 워치 상태가 바뀔 때 다시 보냄
+            watchPushFailed = true
+        }
     }
 
     /// 53번: 위젯이 읽는 요약을 공용 폴더에 쓰고, 바뀌었으면 위젯 새로 고침
@@ -598,7 +740,13 @@ final class Store: NSObject, WCSessionDelegate {
     }
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
-    func sessionWatchStateDidChange(_ session: WCSession) { DispatchQueue.main.async { self.status(session) } }
+    func sessionWatchStateDidChange(_ session: WCSession) {
+        DispatchQueue.main.async {
+            self.status(session)
+            // 지난번에 워치로 못 보낸 것이 있으면 다시 보냄
+            if self.watchPushFailed { self.pushToWatch() }
+        }
+    }
     func sessionReachabilityDidChange(_ session: WCSession) { DispatchQueue.main.async { self.status(session) } }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
@@ -609,9 +757,8 @@ final class Store: NSObject, WCSessionDelegate {
                 if fresh { Router.shared.queueFinish(r) }      // 운동 끝 카드 (51번)
             }
         }
-        if let d = userInfo[SyncKey.quick] as? Data, let p = try? JSONStore.dec.decode(Program.self, from: d) {
-            DispatchQueue.main.async { if !self.programs.contains(where: { $0.id == p.id }) { self.programs.insert(p, at: 0) } }
-        }
+        // 63번: 예전 워치 앱이 보내는 Quick 은 트레이닝 목록에 넣지 않음 (목록이 계속 늘어나던 원인)
+        _ = userInfo[SyncKey.quick]
     }
 
     private func status(_ s: WCSession) {

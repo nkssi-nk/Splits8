@@ -207,6 +207,7 @@ struct SettingsView: View {
         } else {
             UserDefaults.standard.set([k], forKey: "AppleLanguages")
         }
+        store.settings.lang = k == "system" ? nil : k   // 63번: 워치도 같은 언어로 (워치 앱을 다시 열면 적용)
         askRestart = true
     }
 

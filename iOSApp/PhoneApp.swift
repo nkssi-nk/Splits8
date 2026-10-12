@@ -57,6 +57,7 @@ enum Scr: String {
     case home, training, builder, sim, race, settings
     case setHr, setDiv, setRun, setGoals, setEvent, friends
     case auth, code, nick, findEvent, account
+    case profileSetup       // 빌드 23: 가입 프로필 (성별 · 키/몸무게 · 태어난 해 · 대회 경험) — ProfileViews.swift
     case detail, share
     case phoneLive          // 워치 없이 아이폰으로 기록 (PhoneLiveView)
     case watchLive          // 워치 운동을 아이폰에서 같이 보기 (52번 · WatchLiveView)
@@ -132,6 +133,10 @@ final class Router {
     var email = ""
     var code = ""
     var nickDraft = ""
+    /// 빌드 23 가입 프로필: 시작 단계(1~4) · 끝나면 갈 화면 · 프로필 화면에서 한 항목만 고치는 중인지
+    var profileStep = 1
+    var profileNext: Scr = .home
+    var profileEdit = false
 
     // 대회 편집
     var evDraft: RaceEvent? = nil
@@ -368,6 +373,7 @@ extension Scr {
         case .auth: return .y(0.22, 1.2, 0.55, 0.5, 0)
         case .code: return .y(0.18, 1.2, 0.55, 0.5, 0.2)
         case .nick: return Ambient(hex: 0x30D158, alpha: 0.14, rx: 1.2, ry: 0.55, cx: 0.5, cy: 0.2)
+        case .profileSetup: return .y(0.20, 1.2, 0.55, 0.5, 0.2)
         case .findEvent: return .y(0.22, 1.3, 0.5, 0.5, 0)
         case .account: return .y(0.18, 1.2, 0.5, 0.5, 0)
         case .splash: return .none
@@ -517,6 +523,23 @@ struct PhoneRoot: View {
             }
         }
         .modifier(IncomingTrainingAlerts())
+        // 빌드 23: 앱이 앞에 있는 동안 — 다른 기기 로그인 확인(3분마다) · 업데이트 뒤 프로필 한 번 묻기
+        .task(id: scenePhase == .active) {
+            guard scenePhase == .active, !Demo.enabled else { return }
+            await Store.shared.checkDevice()
+            await r.askProfileIfNeeded()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 180_000_000_000)
+                if Task.isCancelled { break }
+                await Store.shared.checkDevice()
+            }
+        }
+        .alert("Signed out because this account signed in on another device.",
+               isPresented: Binding(get: { Store.shared.signedOutElsewhere }, set: { Store.shared.signedOutElsewhere = $0 })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your records stay on this iPhone. Sign in again to use friends and leaderboards here.")
+        }
     }
 
     @ViewBuilder private var screen: some View {
@@ -540,6 +563,7 @@ struct PhoneRoot: View {
         case .auth: AuthView()
         case .code: CodeView()
         case .nick: NickView()
+        case .profileSetup: ProfileSetupView()
         case .findEvent: Scroll8 { FindEventView() }
         case .account: Scroll8 { AccountView() }
         case .detail: Scroll8 { DetailView() }

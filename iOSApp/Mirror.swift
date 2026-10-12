@@ -29,8 +29,12 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
     private(set) var ended = false
     /// 한동안 소식이 없음 (워치와 끊김)
     private(set) var reconnecting = false
+    /// 워치에서 버림(Discard): finished 를 한 번도 못 받고 세션이 끝남 → 기록이 안 오니 바로 홈으로
+    private(set) var discarded = false
 
     @ObservationIgnored private var watchdog: Timer?
+    /// close 가 예약한 '홈으로 가기'를 새 미러링이 시작되면 무시하기 위한 세대 번호
+    @ObservationIgnored private var closeGen = 0
     @ObservationIgnored private var lastCard: LiveCardState?
     @ObservationIgnored private var lastCardAt = Date.distantPast
     #if canImport(ActivityKit)
@@ -46,11 +50,13 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
     }
 
     private func attach(_ s: HKWorkoutSession) {
+        closeGen += 1          // 지난 세션이 예약해 둔 '홈으로 가기'를 무시
         session = s
         s.delegate = self
         on = true
         ended = false
         reconnecting = false
+        discarded = false
         state = nil
         received = Date()
         startWatchdog()
@@ -111,11 +117,16 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
         session = nil
         on = false
         ended = true
+        // finished 를 한 번도 못 받고 끝남 = 워치에서 버림 → 기록을 기다리지 않고 바로 홈으로
+        discarded = state?.finished != true
         endActivity()
         let r = Router.shared
         r.liveMirror = false
-        // 기록이 15초 안에 안 오면 (워치에서 Discard 등) 홈으로
-        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+        // 끝난 뒤: 버렸으면 1.5초, 저장 중이면 기록이 15초 안에 안 올 때 홈으로.
+        // 그 사이 새 미러링이 시작되면(closeGen 이 바뀜) 이 예약은 무시
+        let g = closeGen
+        DispatchQueue.main.asyncAfter(deadline: .now() + (discarded ? 1.5 : 15)) {
+            guard g == self.closeGen else { return }
             if r.scr == .watchLive && r.finish == nil { r.go(.home) }
         }
     }

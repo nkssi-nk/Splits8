@@ -56,7 +56,10 @@ struct WatchLiveView: View {
     private func content(_ st: LiveState, _ m: PhoneLiveMetrics) -> some View {
         VStack(spacing: 0) {
             header(st)
-            if st.finished || mirror.ended {
+            if mirror.discarded {
+                // 워치에서 버림: 기록이 안 오니 '저장 중…'을 보여 주지 않고 잠시 뒤 홈으로 감
+                Spacer()
+            } else if st.finished || mirror.ended {
                 saving
             } else {
                 TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
@@ -100,28 +103,52 @@ struct WatchLiveView: View {
         .padding(.top, 8)
     }
 
+    /// 64번: 맨 위 총 시간, 그 아래 '지금 구간 시간 | 지금 페이스(러닝) 또는 목표 대비(스테이션)'를 같은 크기로 가로에
     private func live(_ st: LiveState, _ m: PhoneLiveMetrics, now: Date) -> some View {
         let cur: Seg = st.cur ?? Seg(icon: "run", name: "Run", detail: "1KM", kind: .run, target: 0)
         let el: Int = st.segEl(now, received: mirror.received)
         let timeColor: Color = st.running ? .white : C.text2
+        let isRun: Bool = cur.icon == "run"
         return VStack(spacing: 0) {
             Text("TOTAL").font(F.t(12, .semibold)).tracking(0.12 * 12).foregroundStyle(C.text2)
             Text(Fm.t(st.total(now, received: mirror.received)))
                 .font(F.num(m.totalFont)).tracking(-0.02 * m.totalFont)
                 .foregroundStyle(timeColor).lineLimit(1).minimumScaleFactor(0.6)
                 .accessibilityIdentifier("watchLive.total")
-            HStack(spacing: 14 * m.k) {
-                Icon8(cur.icon, m.icon, tint: cur.kind == .rox ? .mute : .yellow)
-                Text(Fm.t(el)).font(F.num(m.segFont)).tracking(-0.01 * m.segFont)
-                    .foregroundStyle(st.running ? C.accent : C.text2).lineLimit(1).minimumScaleFactor(0.6)
+            HStack(spacing: 10) {
+                Icon8(cur.icon, m.icon * 0.7, tint: cur.kind == .rox ? .mute : .yellow)
+                Text(cur.name).font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
             }
-            .padding(.top, m.segTop * 0.7)
-            Text(cur.name).font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-                .padding(.top, m.nameTop)
-            Text(cur.detail).font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb).lineLimit(1)
-                .padding(.top, 4)
+            .padding(.top, m.segTop * 0.6)
+            HStack(alignment: .top, spacing: 0) {
+                LiveCol(label: "SPLIT", value: Fm.t(el), color: st.running ? C.accent : C.text2, size: m.segFont * 0.8)
+                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.segFont).padding(.top, 20)
+                if isRun {
+                    LiveCol(label: "PACE /KM", value: LivePace.text(el: el, dist: st.segDist), color: timeColor, size: m.segFont * 0.8)
+                } else if cur.target > 0 && cur.kind != .rox {
+                    let d: Int = el - cur.target
+                    LiveCol(label: st.vsWord, value: Fm.d(d), color: d <= 0 ? C.good : C.bad, size: m.segFont * 0.8)
+                } else {
+                    LiveCol(label: "", value: cur.detail, color: C.text2, size: m.nameFont)
+                }
+            }
+            .padding(.top, m.nameTop)
+            Text(isRun ? runLine(st, cur) : cur.detail).font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb).lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// "0.62 / 1.00 KM · 총 7.62 KM"
+    private func runLine(_ st: LiveState, _ cur: Seg) -> String {
+        let km: Double = runMeters(cur.detail) / 1000
+        guard let sd = st.segDist else { return cur.detail }
+        var s: String = String(format: "%.2f / %.2f KM", min(km, sd / 1000), km)
+        if st.open || st.mode == .training, let d = st.dist, d >= 10 {
+            s += " · " + String(localized: "Total \(String(format: "%.2f", d / 1000)) km")
+        }
+        return s
     }
 
     /// ♥ 165 BPM [Z4] · 286 KCAL
@@ -225,6 +252,26 @@ struct WatchLiveView: View {
             Spacer()
             GrayPill(title: "Home") { r.go(.home) }
                 .padding(.bottom, 60)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// 64번: 작은 이름표 + 큰 숫자 한 칸 (실시간 화면의 '구간 시간 | 페이스' 두 칸이 같은 크기)
+struct LiveCol: View {
+    let label: String
+    let value: String
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label.l10n).font(F.t(12, .semibold)).tracking(1).foregroundStyle(C.text3)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .frame(height: 16)
+            Text(value).font(F.num(size)).tracking(-0.01 * size)
+                .foregroundStyle(color)
+                .lineLimit(1).minimumScaleFactor(0.5)
         }
         .frame(maxWidth: .infinity)
     }

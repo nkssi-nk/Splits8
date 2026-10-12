@@ -112,6 +112,8 @@ extension Router {
 
     func flushFinish() {
         guard let rec = pendingFinish else { return }
+        // 기다리는 동안 오래된 기록이 됨 (queueFinish 와 같은 6시간 기준) → 카드 없이 조용히 버림
+        guard Date().timeIntervalSince(rec.end) < 6 * 3600 else { pendingFinish = nil; return }
         guard UIApplication.shared.applicationState == .active, finish == nil,
               scr.showsTabs || scr == .detail || scr == .watchLive else { return }
         pendingFinish = nil

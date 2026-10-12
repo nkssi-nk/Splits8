@@ -191,7 +191,7 @@ struct DivisionList: View {
 
     private func row(_ d: Division, last: Bool) -> some View {
         let on = store.settings.division == d.key
-        return Button { store.settings.division = d.key } label: {
+        return Button { store.settings.division = d.key; store.settings.divPicked = true } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(d.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white)
@@ -325,8 +325,10 @@ struct Onboarding3: View {
             return
         }
         let hs = HKHealthStore()
-        let read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned),
+        // 빌드 23: 키 · 몸무게 · 성별 · 생년월일도 읽음 (가입 프로필을 미리 채우는 데만 씀)
+        var read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned),
                                        HKQuantityType(.distanceWalkingRunning), HKObjectType.workoutType()]
+        read.formUnion(HealthProfile.readTypes)
         hs.requestAuthorization(toShare: [HKObjectType.workoutType()], read: read) { _, _ in
             DispatchQueue.main.async {
                 loc.requestWhenInUseAuthorization()

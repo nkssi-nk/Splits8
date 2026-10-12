@@ -459,7 +459,7 @@
 "Strong" = "근력형";
 "My best" = "내 기록";
 "Keeps the ratio of your current split goals." = "지금 구간 목표의 비율을 그대로 써요.";
-"An even mix of running and stations." = "러닝과 스테이션을 고르게 나눠요.";
+"Real race medians at your goal time." = "같은 완주 시간대 실제 대회 중간값대로 나눠요.";
 "Faster runs, a little more time on stations." = "러닝을 더 빠르게, 스테이션에 시간을 조금 더 줘요.";
 "Faster stations, a little more time on runs." = "스테이션을 더 빠르게, 러닝에 시간을 조금 더 줘요.";
 "Follows the ratio of your best Full Simulation." = "내 최고 풀 시뮬레이션의 비율을 따라가요.";
@@ -675,3 +675,86 @@
 "This week" = "이번 주";
 "Workouts, time and calories this week." = "이번 주 운동 횟수 · 시간 · 칼로리.";
 "1 request" = "요청 1";
+
+/* build23 */
+"SEGMENTS" = "구간 수";
+"HALF" = "하프";
+"MARATHON" = "풀코스";
+"SPLIT" = "구간";
+"PACE /KM" = "페이스 /KM";
+"Total %@ km" = "총 %@ km";
+
+/* build23 · 가입 프로필 · 한 기기 로그인 */
+"Signed out because this account signed in on another device." = "이 계정으로 다른 기기에서 로그인해서 이 기기는 로그아웃됐어요.";
+"Your records stay on this iPhone. Sign in again to use friends and leaderboards here." = "기록은 이 iPhone에 그대로 있어요. 여기서 친구 · 순위표를 쓰려면 다시 로그인하세요.";
+"Filled in from Apple Health. Change anything that isn't right." = "건강 앱에서 가져왔어요. 다른 부분이 있으면 고쳐 주세요.";
+"Skip" = "건너뛰기";
+"Not now" = "다음에";
+"Gender" = "성별";
+"Height and weight" = "키와 몸무게";
+"Birth year" = "태어난 해";
+"Race experience" = "대회 경험";
+"Sets your default division and lets you compare with athletes in the same category." = "기본 디비전을 정하고, 같은 부문 선수들과 비교하는 데 써요.";
+"Optional. Only you can see this." = "선택 사항이에요. 나만 볼 수 있어요.";
+"Used to compare you with your age group. Only you can see your birth year." = "같은 나이대와 비교하는 데 써요. 태어난 해는 나만 볼 수 있어요.";
+"Have you raced HYROX? We'll set your division to match." = "HYROX 대회에 나가 본 적 있나요? 나간 디비전에 맞춰 설정해 드려요.";
+"Men" = "남자";
+"Women" = "여자";
+"Yes" = "예";
+"No" = "아니요";
+"Individual" = "개인";
+"Doubles" = "더블";
+"Relay" = "릴레이";
+"Mixed" = "혼성";
+"HEIGHT" = "키";
+"WEIGHT" = "몸무게";
+"Age group" = "나이대";
+"FORMAT" = "종목";
+"TEAM" = "팀";
+"CATEGORY" = "부문";
+"ABOUT YOU" = "내 정보";
+"Height · Weight" = "키 · 몸무게";
+"Only you can see these. They're used for your division and age-group comparisons." = "나만 볼 수 있어요. 디비전과 나이대 비교에 써요.";
+
+/* build23 · 62번 러닝 기록 분석 */
+"AVG CADENCE" = "평균 케이던스";
+"STRIDE" = "보폭";
+"ASCENT" = "오르막";
+"ELEVATION" = "고도";
+"LAPS" = "바퀴";
+"SLOW" = "느림";
+"FAST" = "빠름";
+"%lld laps · avg %@ · fastest #%lld %@" = "%1$lld바퀴 · 평균 %2$@ · 가장 빠른 %3$lld번째 %4$@";
+"Biggest climb: [y]km %lld[/y] (+%lld m) — [r]%llds slower[/r] than your average km." = "가장 많이 오른 구간: [y]%1$lld km[/y] (+%2$lld m) — 평균보다 [r]%3$lld초 느렸어요[/r].";
+"Biggest climb: [y]km %lld[/y] (+%lld m) — and you [g]held your pace[/g]." = "가장 많이 오른 구간: [y]%1$lld km[/y] (+%2$lld m) — 그래도 [g]페이스를 지켰어요[/g].";
+"Your fastest km, [y]km %lld[/y], was mostly downhill (−%lld m)." = "가장 빨랐던 [y]%1$lld km[/y] 는 거의 내리막이었어요 (−%2$lld m).";
+"[y]+%lld m[/y] of climbing on this run." = "이번 러닝에서 [y]+%lld m[/y] 올랐어요.";
+"[y]%lld kcal[/y] per km · %lld kcal per hour." = "1km 에 [y]%1$lld kcal[/y] · 1시간에 %2$lld kcal.";
+"Cadence dropped [r]%lld spm[/r] in the last third (%lld → %lld)." = "마지막 1/3 에서 케이던스가 [r]%1$lld spm[/r] 줄었어요 (%2$lld → %3$lld).";
+"Quick, short steps help when your legs get tired." = "다리가 지칠 땐 짧고 빠른 걸음이 도움이 돼요.";
+"Average cadence: [y]%lld spm[/y]." = "평균 케이던스: [y]%lld spm[/y].";
+"[g]Negative split[/g] — your second half was %llds/km faster." = "[g]후반이 더 빨랐어요[/g] — 1km 에 %lld초 빨라졌어요.";
+"You held your pace — both halves within [g]%llds/km[/g]." = "페이스를 지켰어요 — 전반과 후반 차이 [g]1km 에 %lld초[/g].";
+"Your second half was [r]%llds/km slower[/r] than the first." = "후반이 전반보다 [r]1km 에 %lld초 느렸어요[/r].";
+
+/* build23 · 더블 구간 나누기 (Doubles plan) */
+"Doubles plan" = "더블 구간 나누기";
+"Custom" = "직접 설정";
+"Set how much of each station you take — your partner does the rest. 10% steps." = "스테이션마다 내가 맡을 몫을 정하세요 — 나머지는 파트너 몫이에요. 10% 단위.";
+"In Doubles, you run all 8 runs together. Only stations are split." = "더블에서 러닝 8개는 둘이 같이 뛰어요. 스테이션만 나눠요.";
+"Reset 50:50" = "반반으로 되돌리기";
+"Share as text" = "글로 공유";
+"You %lld m · Partner %lld m" = "나 %1$lld m · 파트너 %2$lld m";
+"You %lld · Partner %lld reps" = "나 %1$lld개 · 파트너 %2$lld개";
+"me %lld m / you %lld m" = "나 %1$lld m / 너 %2$lld m";
+"me %lld / you %lld reps" = "나 %1$lld개 / 너 %2$lld개";
+"SPLITS8 Doubles plan" = "SPLITS8 더블 구간 나누기";
+"Runs: together" = "러닝: 같이 뜁니다";
+
+/* build23 · 같은 기록대 선수 비교 · 예상 완주 시간 */
+"VS ATHLETES AT YOUR TIME" = "같은 기록대 선수들과 비교";
+"MEDIAN" = "중간값";
+"Run pace" = "러닝 페이스";
+"Worldwide medians (2025/26 season) at this finish time — not an official ranking." = "같은 완주 시간대 전 세계 기록(2025/26 시즌)의 중간값이에요. 공식 순위는 아니에요.";
+"PREDICTED FINISH" = "예상 완주 시간";
+"Estimated from your best segments in the last 90 days — not a guarantee." = "최근 90일 최고 구간 기록으로 짐작한 값이에요. 보장은 아니에요.";

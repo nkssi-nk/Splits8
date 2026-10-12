@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import CoreLocation
+import CoreMotion
 import Observation
 
 // MARK: - 워치 없이 아이폰으로 기록 (시안 ⑤)
@@ -44,6 +45,8 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored private var runKm = 0
     var isHIIT: Bool { kind == "hiit" }
     var isRunKind: Bool { kind == "run" }
+    /// 64번: GPS 로 잰 전체 거리(m) — 끝난 구간 + 지금 구간
+    var totalDist: Double { segDists.compactMap { $0 }.reduce(0, +) + segDist }
     /// 끝 없이 늘어나는 운동 (HIIT · 자유 러닝)
     var growsOpen: Bool { isHIIT || (isRunKind && runKm == 0) }
     /// GPS 러닝이 총거리를 다 뛰어서 저절로 끝났을 때 (화면이 받아서 저장)
@@ -53,6 +56,14 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored private var placeLookup: PlaceLookup?
     @ObservationIgnored private var routePts: [RoutePt] = []
     @ObservationIgnored private var lastRouteLoc: CLLocation?
+    // 62번 · 러닝 카드 걸음 수 (아이폰 모션 센서 · 케이던스용)
+    @ObservationIgnored private var pedometer: CMPedometer?
+    @ObservationIgnored private var steps: Double = 0          // 시작부터 걸음 (일시정지 중 걸음은 뺌)
+    @ObservationIgnored private var rawSteps: Double = 0       // 센서가 준 그대로
+    @ObservationIgnored private var pausedSteps: Double = 0    // 일시정지 동안 걸은 걸음 합
+    @ObservationIgnored private var pauseStepAt: Double = 0
+    @ObservationIgnored private var segStepStart: Double = 0
+    @ObservationIgnored private var segSteps: [Double?] = []
 
     // 잘못 넘김 되돌리기 (방금 넘긴 것 한 번만) — 워치와 같음
     private struct UndoPoint {
@@ -61,6 +72,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         let segPaused: Double
         let segDist: Double
         let grew: Bool
+        var segStepStart: Double = 0
     }
     @ObservationIgnored private var undoPoint: UndoPoint?
     private(set) var canUndo = false
@@ -149,6 +161,9 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         kind = req.mode == .training ? req.program?.kind : nil
         runKm = req.program?.runKm ?? 0
         autoDone = nil; place = nil; routePts = []; lastRouteLoc = nil
+        segSteps = Array(repeating: nil, count: seq.count)
+        steps = 0; rawSteps = 0; pausedSteps = 0; pauseStepAt = 0; segStepStart = 0
+        if isRunKind { startSteps(now) }
 
         if isRunKind {
             useGPS = !(req.program?.indoor ?? true)
@@ -169,6 +184,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         let n: Int = seq.count + 1
         seq.append(isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n))
         segDists.append(nil)
+        segSteps.append(nil)
     }
 
     /// 다음 구간 (HIIT·자유 러닝은 아직 순서에 없는 다음 라운드/km)
@@ -188,7 +204,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         if isRunKind && useGPS { return nil }            // GPS 러닝은 1km마다 저절로 넘어감
         let now = Date()
         let up = UndoPoint(idx: idx, segStart: segStart, segPaused: segPaused, segDist: segDist,
-                           grew: growsOpen && splits.count + 1 >= seq.count)
+                           grew: growsOpen && splits.count + 1 >= seq.count, segStepStart: segStepStart)
         closeSeg(now)
         if growsOpen && splits.count >= seq.count { growSeq() }
         if splits.count >= seq.count {
@@ -199,6 +215,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         idx = splits.count
         segStart = now; segPaused = 0
         segDist = 0
+        segStepStart = steps
         return nil
     }
 
@@ -209,14 +226,17 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         let newIdx: Int = idx
         splits.removeLast()
         if segDists.indices.contains(u.idx) { segDists[u.idx] = nil }
+        if segSteps.indices.contains(u.idx) { segSteps[u.idx] = nil }
         if u.grew, seq.count == newIdx + 1 {
             seq.removeLast()
             if segDists.count > seq.count { segDists.removeLast() }
+            if segSteps.count > seq.count { segSteps.removeLast() }
         }
         idx = u.idx
         segStart = u.segStart
         segPaused = u.segPaused + segPaused
         segDist = u.segDist + segDist
+        segStepStart = u.segStepStart
         undoPoint = nil
         canUndo = false
     }
@@ -225,10 +245,14 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         guard active, !finished else { return }
         if running {
             pauseAt = Date(); running = false
+            pauseStepAt = rawSteps
         } else {
             if let p = pauseAt { segPaused += Date().timeIntervalSince(p) }
             pauseAt = nil; running = true
             lastLoc = nil
+            // 62번: 일시정지 동안 걸은 걸음은 케이던스에서 뺌
+            pausedSteps += max(0, rawSteps - pauseStepAt)
+            steps = max(0, rawSteps - pausedSteps)
         }
     }
 
@@ -243,6 +267,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     /// End → Discard
     func discard() {
         stopGPS()
+        stopSteps()
         active = false; finished = true
     }
 
@@ -251,10 +276,15 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         if useGPS, cur.kind == .run, segDists.indices.contains(idx), segDist > 0 {
             segDists[idx] = segDist
         }
+        // 62번: 이 구간 걸음 수 (러닝 카드)
+        if isRunKind, cur.kind == .run, steps > segStepStart, segSteps.indices.contains(idx) {
+            segSteps[idx] = steps - segStepStart
+        }
     }
 
     private func finish(complete: Bool) -> Record {
         stopGPS()
+        stopSteps()
         undoPoint = nil; canUndo = false
         finished = true
         return makeRecord(complete: complete)
@@ -279,7 +309,33 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         r.place = place
         r.kind = kind
         if isRunKind && useGPS && routePts.count >= 2 { r.route = routePts }
+        // 62번: 러닝 카드 — 케이던스 · 보폭(GPS 거리 ÷ 걸음) · 오르막 (경로 높이로)
+        if isRunKind { RunMetrics.fill(&r, segSteps: segSteps, strideHK: nil) }
         return r
+    }
+
+    // MARK: 걸음 수 (62번 · 아이폰 모션 센서)
+
+    /// 운동 시작부터 걸음 수를 받음 (모션 권한은 처음 한 번 물어봄). 못 쓰는 기기면 조용히 건너뜀
+    private func startSteps(_ from: Date) {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+        let p = CMPedometer()
+        pedometer = p
+        p.startUpdates(from: from) { [weak self] data, _ in
+            guard let n = data?.numberOfSteps.doubleValue else { return }
+            DispatchQueue.main.async { self?.gotSteps(n) }
+        }
+    }
+
+    private func stopSteps() {
+        pedometer?.stopUpdates()
+        pedometer = nil
+    }
+
+    private func gotSteps(_ n: Double) {
+        guard active, !finished else { return }
+        rawSteps = n
+        if running { steps = max(0, n - pausedSteps) }
     }
 
     /// VS GOAL / VS LAST / VS JIHO / VS BEST (워치와 같음)
@@ -344,7 +400,9 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         if isRunKind {
             if lastRouteLoc == nil || loc.distance(from: lastRouteLoc!) >= 8 {
                 lastRouteLoc = loc
-                routePts.append(RoutePt(a: loc.coordinate.latitude, o: loc.coordinate.longitude))
+                // 62번: 높이(못 쟀으면 nil) · 시작부터 초(일시정지 뺀 시간, 구간 시간과 같은 시계)
+                let h: Double? = loc.verticalAccuracy > 0 ? loc.altitude : nil
+                routePts.append(RoutePt(a: loc.coordinate.latitude, o: loc.coordinate.longitude, h: h, t: total(loc.timestamp)))
             }
             autoSplitIfNeeded()
         }
@@ -364,6 +422,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         idx = splits.count
         segStart = now; segPaused = 0
         segDist = 0
+        segStepStart = steps
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
     }
 }
@@ -477,6 +536,7 @@ struct PhoneLiveView: View {
     }
 
     /// TOTAL · 큰 전체 시간 · [아이콘 구간 시간] · 이름 · 설명
+    /// 64번: 맨 위 총 시간, 그 아래 '지금 구간 시간 | 지금 페이스(러닝) 또는 목표 대비(스테이션)'를 같은 크기로 가로에
     private func live(_ m: PhoneLiveMetrics, now: Date) -> some View {
         let cur: Seg = eng.cur
         let el: Int = eng.segEl(now)
@@ -484,6 +544,7 @@ struct PhoneLiveView: View {
         let timeColor: Color = eng.running ? .white : C.text2
         // 지금 하는 구간의 시간은 노랑 (전체 시간은 흰색) — 운동 중에 두 숫자가 헷갈리지 않게
         let segColor: Color = eng.running ? C.accent : C.text2
+        let isRun: Bool = cur.kind == .run
         return VStack(spacing: 0) {
             Text("TOTAL").font(F.t(12, .semibold)).tracking(0.12 * 12).foregroundStyle(C.text2)
             Text(Fm.t(eng.total(now)))
@@ -491,22 +552,31 @@ struct PhoneLiveView: View {
                 .foregroundStyle(timeColor)
                 .lineLimit(1).minimumScaleFactor(0.6)
                 .accessibilityIdentifier("phone.total")
-            HStack(spacing: 14 * m.k) {
-                Icon8(cur.icon, m.icon, tint: tint)
-                Text(Fm.t(el))
-                    .font(F.num(m.segFont)).tracking(-0.01 * m.segFont)
-                    .foregroundStyle(segColor)
-                    .accessibilityIdentifier("phone.seg")
-                    .lineLimit(1).minimumScaleFactor(0.6)
+            HStack(spacing: 10) {
+                Icon8(cur.icon, m.icon * 0.7, tint: tint)
+                Text(cur.name)
+                    .font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
             }
-            .padding(.top, m.segTop)
-            Text(cur.name)
-                .font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-                .padding(.top, m.nameTop)
+            .padding(.top, m.segTop * 0.6)
+            HStack(alignment: .top, spacing: 0) {
+                LiveCol(label: "SPLIT", value: Fm.t(el), color: segColor, size: m.segFont * 0.8)
+                    .accessibilityIdentifier("phone.seg")
+                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.segFont).padding(.top, 20)
+                if isRun {
+                    LiveCol(label: "PACE /KM", value: LivePace.text(el: el, dist: eng.useGPS ? eng.segDist : nil),
+                            color: timeColor, size: m.segFont * 0.8)
+                } else if cur.target > 0 && cur.kind != .rox {
+                    let d: Int = el - cur.target
+                    LiveCol(label: eng.mode == .training ? "VS BEST" : "VS GOAL", value: Fm.d(d), color: d <= 0 ? C.good : C.bad, size: m.segFont * 0.8)
+                } else {
+                    LiveCol(label: "", value: cur.detail, color: C.text2, size: m.nameFont)
+                }
+            }
+            .padding(.top, m.nameTop)
             Text(detailLine)
                 .font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb)
                 .lineLimit(1).minimumScaleFactor(0.7)
-                .padding(.top, 4)
+                .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
     }
@@ -519,6 +589,9 @@ struct PhoneLiveView: View {
         if cur.kind == .run && eng.useGPS {
             let km: Double = eng.segDist / 1000
             head = String(format: "%.2f KM / ", km) + cur.detail
+        }
+        if cur.kind == .run && eng.useGPS && eng.isRunKind && eng.totalDist >= 10 {
+            return head + " · " + String(localized: "Total \(String(format: "%.2f", eng.totalDist / 1000)) km")
         }
         return head + " · \(eng.countNow) / \(eng.countTotal)"
     }

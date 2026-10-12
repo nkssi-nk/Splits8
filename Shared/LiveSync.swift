@@ -27,6 +27,9 @@ struct LiveState: Codable, Equatable {
     var open: Bool = false
     /// 실내/실외 러닝 1km 자동 넘김 (Next 버튼 대신 "Auto split")
     var autoSplit: Bool = false
+    /// 64번: 지금 구간에서 달린 거리(m) · 운동 전체 거리(m). 아이폰 화면의 페이스 계산용 (예전 워치 앱은 안 보냄 → nil)
+    var segDist: Double? = nil
+    var dist: Double? = nil
 
     var cur: Seg? { seq.indices.contains(idx) ? seq[idx] : seq.last }
     var nextSeg: Seg? { seq.indices.contains(idx + 1) ? seq[idx + 1] : nil }
@@ -56,5 +59,15 @@ extension Settings {
     var mirror: Bool {
         get { mirrorOpt ?? true }
         set { mirrorOpt = newValue ? nil : false }
+    }
+}
+
+/// 64번: "5:12" 처럼 1 km 페이스 글자 (거리가 10 m 미만이면 "–:––")
+enum LivePace {
+    static func text(el: Int, dist: Double?) -> String {
+        guard let dist, dist >= 10, el > 0 else { return "–:––" }
+        let p: Int = Int((Double(el) / (dist / 1000)).rounded())
+        guard p < 3600 else { return "–:––" }
+        return "\(p / 60):" + String(format: "%02d", p % 60)
     }
 }

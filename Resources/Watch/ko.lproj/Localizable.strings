@@ -22,7 +22,6 @@
 "Quick training" = "빠른 트레이닝";
 "Clear" = "지우기";
 "Tap to add" = "탭해서 추가";
-"Start · %lld/%lld segments" = "시작 · %lld/%lld구간";
 "%lld segments" = "%lld구간";
 "1 set" = "1세트";
 "%lld sets" = "%lld세트";
@@ -115,3 +114,19 @@
 "Gold" = "골드";
 "Silver" = "실버";
 "Bronze" = "브론즈";
+
+/* build23 */
+"Save & end" = "저장하고 끝내기";
+"Discard" = "버리기";
+"Cancel" = "취소";
+"Discard this workout?" = "이 운동을 버릴까요?";
+"It won't be saved here, on iPhone or in Health." = "워치 · 아이폰 · 건강 앱 어디에도 저장되지 않습니다.";
+"Start · %lld segments" = "시작 · %lld구간";
+"Max %lld segments" = "최대 %lld구간";
+"No. %lld" = "%lld번째";
+"Remove last" = "마지막 지우기";
+"Clear all" = "모두 지우기";
+"SPLIT" = "구간";
+"PACE" = "페이스";
+"PACE ≈" = "페이스 ≈";
+"Total %@ km" = "총 %@ km";

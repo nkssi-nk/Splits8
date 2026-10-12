@@ -120,6 +120,13 @@ object Router {
         detail = r; detailFrom = from; go(Scr.Detail)
     }
 
+    // 계정
+    var authReturn by mutableStateOf(Scr.Training)
+    var authMode by mutableStateOf("signup")
+    fun toAuth(from: Scr, mode: String = "signup") {
+        authReturn = from; authMode = mode; go(Scr.Auth)
+    }
+
     fun sub(s: Scr, from: Scr) {
         subFrom = from; go(s)
     }

@@ -46,6 +46,24 @@ class Shots {
     @Test fun splash() = shot("01_splash", s = Scr.Splash)
     @Test fun splashKo() = shot("01_splash_ko", "ko", Scr.Splash)
     @Test fun home() = shot("02_home", s = Scr.Home)
+
+    /** 예시 기록이 있는 홈 (아이폰 --demo --friends --racenear 와 같은 데이터). 화면 전체를 보려고 아주 긴 화면으로 */
+    private fun demoHome(name: String, lang: String, raceDays: Int?) {
+        val now = java.time.Instant.parse("2026-09-25T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true, raceDays = raceDays)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), Demo.records(o), Demo.friends(),
+            Demo.leaderboard(), Demo.requests(), "demo.me")
+        shot(name, lang, Scr.Home)
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2400dp-xxhdpi")
+    @Test fun homeDemoLong() = demoHome("05_home_demo_long", "en", 3)
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2400dp-xxhdpi")
+    @Test fun homeDemoLongKo() = demoHome("05_home_demo_long_ko", "ko", 3)
+
+    @Test fun homeDemo() = demoHome("06_home_demo", "en", 3)
     @Test fun trainingKo() = shot("03_training_ko", "ko", Scr.Training)
     @Test fun settings() = shot("04_settings", s = Scr.Settings)
 

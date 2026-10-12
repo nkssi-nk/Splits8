@@ -34,11 +34,12 @@ object Fm {
     fun ymdParse(s: String): Instant? = runCatching { LocalDate.parse(s, ymdF).atStartOfDay(zone).toInstant() }.getOrNull()
     fun hm(i: Instant): String = hmF.format(i.atZone(zone))
 
-    private fun df(en: String, ko: String, enLocale: Locale = Locale.UK): DateTimeFormatter =
+    /** 영어 날짜: 아이폰 en_GB 모양(일 · 월 순서)이지만 달 이름은 "Sep" (자바 en_GB 는 "Sept" 라서 ENGLISH 사용) */
+    private fun df(en: String, ko: String, enLocale: Locale = Locale.ENGLISH): DateTimeFormatter =
         if (L10n.isKorean) DateTimeFormatter.ofPattern(ko, Locale.KOREAN)
         else DateTimeFormatter.ofPattern(en, enLocale)
 
-    private fun fmt(i: Instant, en: String, ko: String, enLocale: Locale = Locale.UK) = df(en, ko, enLocale).format(i.atZone(zone))
+    private fun fmt(i: Instant, en: String, ko: String, enLocale: Locale = Locale.ENGLISH) = df(en, ko, enLocale).format(i.atZone(zone))
 
     /** Wed 24 Sep / 9월 24일 (수) */
     fun wdm(i: Instant) = fmt(i, "EEE dd MMM", "M월 d일 (E)")

@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -455,4 +456,25 @@ fun Modifier.doubleChevron(up: Boolean, color: Color = C.aeb, width: Dp = 10.dp,
 fun Modifier.strokeBorder(color: Color, radius: Dp, width: Dp = 1.dp): Modifier = drawBehind {
     val s = width.toPx()
     drawRoundRect(color, Offset(s / 2, s / 2), Size(size.width - s, size.height - s), CornerRadius(radius.toPx()), style = Stroke(s))
+}
+
+/**
+ * 카드 바깥으로만 번지는 빛 (아이폰 .shadow(color:) 처럼). 안드로이드 그림자는 반투명 카드 안까지 어둡게 비쳐서 직접 그림.
+ * radius = 번지는 거리, y = 아래로 내림
+ */
+fun Modifier.outerGlow(color: Color, corner: Dp, radius: Dp, y: Dp = 0.dp): Modifier = drawBehind {
+    val r = radius.toPx()
+    val dy = y.toPx()
+    val c = corner.toPx()
+    val card = androidx.compose.ui.graphics.Path().apply {
+        addRoundRect(androidx.compose.ui.geometry.RoundRect(0f, 0f, size.width, size.height, CornerRadius(c)))
+    }
+    clipPath(card, androidx.compose.ui.graphics.ClipOp.Difference) {
+        val steps = 10
+        for (k in steps downTo 1) {
+            val g = r * k / steps
+            drawRoundRect(color.copy(alpha = color.alpha * (1f - k.toFloat() / (steps + 1)) / steps * 2.2f),
+                Offset(-g, -g + dy), Size(size.width + g * 2, size.height + g * 2), CornerRadius(c + g))
+        }
+    }
 }

@@ -36,7 +36,7 @@ fun ComingScreen(title: String) {
 fun ScreenFor(s: Scr) {
     when (s) {
         Scr.Splash -> SplashView()
-        Scr.Home -> ComingScreen("Home")
+        Scr.Home -> HomeView()
         Scr.Training -> ComingScreen("Training")
         Scr.Sim -> ComingScreen("Test")
         Scr.Race -> ComingScreen("Race")

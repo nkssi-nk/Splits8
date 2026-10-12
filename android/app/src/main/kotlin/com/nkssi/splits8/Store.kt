@@ -40,6 +40,26 @@ object Store {
         private set
     var events by mutableStateOf(EventItem.bundled)
 
+    /** 서버에서 받은 순위표 · 친구 요청 (빌드 22: 받은 요청은 수락해야 친구) */
+    var leaderboard by mutableStateOf<List<LBRow>>(emptyList())
+    var requests by mutableStateOf<List<FriendReq>>(emptyList())
+    val incoming: List<FriendReq> get() = requests.filter { it.incoming }
+    val outgoing: List<FriendReq> get() = requests.filterNot { it.incoming }
+    /** 내 계정 id (순위표에서 "나" 줄 찾기). 화면 확인용 예시에서는 "demo.me" */
+    var myId by mutableStateOf<String?>(null)
+
+    /** 지금 시각 (화면 사진에서는 고정해서 늘 같은 화면이 나오게) */
+    var now: () -> java.time.Instant = { java.time.Instant.now() }
+    fun today(): java.time.LocalDate = now().atZone(com.nkssi.splits8.shared.Fm.zone).toLocalDate()
+
+    /** 화면에서만 쓰는 작은 기억 (홈 요약 주/월 등) — 아이폰 UserDefaults */
+    private var prefs: android.content.SharedPreferences? = null
+    private val memPrefs = HashMap<String, String>()
+    fun pref(key: String, def: String): String = if (demo) memPrefs[key] ?: def else prefs?.getString(key, def) ?: def
+    fun setPref(key: String, v: String) {
+        if (demo) memPrefs[key] = v else prefs?.edit()?.putString(key, v)?.apply()
+    }
+
     /** 기록 계산 (PB · 최고 · 비교 …). 기록 · 설정이 바뀌면 새로 만듦 */
     var book by mutableStateOf(RecordBook(emptyList(), Settings()))
         private set
@@ -50,6 +70,7 @@ object Store {
     fun init(context: Context) {
         if (dir != null) return
         dir = context.filesDir
+        prefs = context.getSharedPreferences("splits8", Context.MODE_PRIVATE)
         settings = load("settings.json", Settings.serializer()) ?: Settings()
         programs = load("programs.json", ListSerializer(Program.serializer())) ?: Program.presets()
         records = load("records.json", ListSerializer(Record.serializer())) ?: emptyList()
@@ -60,12 +81,22 @@ object Store {
     }
 
     /** 화면 확인용: 예시 데이터로 채움 (파일에 안 씀) */
-    fun useDemo(s: Settings, p: List<Program>, r: List<Record>, f: List<Friend> = emptyList()) {
+    fun useDemo(
+        s: Settings, p: List<Program>, r: List<Record>, f: List<Friend> = emptyList(),
+        lb: List<LBRow> = emptyList(), req: List<FriendReq> = emptyList(), me: String? = null,
+    ) {
         demo = true
         settings = s; programs = p; records = r; friends = f; plans = emptyList()
+        leaderboard = lb; requests = req; myId = me; memPrefs.clear()
         applyLang()
         rebuild()
     }
+
+    fun plans(on: java.time.LocalDate): List<PlannedWorkout> =
+        plans.filter { it.date.atZone(com.nkssi.splits8.shared.Fm.zone).toLocalDate() == on }
+
+    fun records(on: java.time.LocalDate): List<Record> =
+        records.filter { it.date.atZone(com.nkssi.splits8.shared.Fm.zone).toLocalDate() == on }.sortedByDescending { it.date }
 
     fun update(f: (Settings) -> Settings) {
         settings = f(settings)

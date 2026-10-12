@@ -142,3 +142,17 @@ class CompatTest {
         assertTrue(L10nKo.size > 600)
     }
 }
+
+/** shared 코드가 쓰는 모든 번역 열쇠가 아이폰 한국어 표에 있는지 (오타가 있으면 한국어 화면에 영어가 나옴) */
+class L10nKeysTest {
+    @Test fun allKeysExist() {
+        val dir = java.io.File("src/main/kotlin")
+        val re = Regex("""\b(?:L10n\.)?t\(\s*"((?:[^"\\]|\\.)*)"""")
+        val keys = dir.walkTopDown().filter { it.isFile && it.extension == "kt" && it.name != "L10nKo.kt" }
+            .flatMap { f -> re.findAll(f.readText()).map { it.groupValues[1].replace("\\\"", "\"").replace("\\$", "$") } }
+            .toSet()
+        val missing = keys.filter { L10nKo.get(it) == null }
+        assertTrue("열쇠 ${keys.size}개 중 한국어 표에 없음: $missing", missing.isEmpty())
+        assertTrue(keys.size > 100)
+    }
+}

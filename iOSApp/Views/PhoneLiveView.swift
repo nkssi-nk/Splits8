@@ -109,9 +109,9 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         switch mode {
         case .race:
             let g: [Int] = s.goals.count == 16 ? s.goals : Defaults.goals
-            return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: g)
+            return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: g, roxTarget: s.roxTarget)
         case .sim:
-            return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: simTargets(store))
+            return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: simTargets(store), roxTarget: s.roxTarget)
         case .pft:
             return PFT.seq(div: s.div, targets: store.pftBest?.pftSplits)
         case .training:

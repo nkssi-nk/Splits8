@@ -52,9 +52,9 @@ struct SimView: View {
         let g: [Int] = store.settings.goals
         let goalOf: Int
         switch metric {
-        case "total": goalOf = g.reduce(0, +) + 8 * Defaults.roxTarget
+        case "total": goalOf = g.reduce(0, +) + 8 * store.settings.roxTarget
         case "run": goalOf = runAvg(g)
-        case "rox": goalOf = 8 * Defaults.roxTarget
+        case "rox": goalOf = 8 * store.settings.roxTarget
         default:
             let k = (stIndex ?? 7) * 2 + 1
             goalOf = g.indices.contains(k) ? g[k] : 0
@@ -66,7 +66,7 @@ struct SimView: View {
             switch metric {
             case "total": return f.total
             case "run": return f.hasSplits ? runAvg(f.splits) : nil
-            case "rox": return 8 * Defaults.roxTarget
+            case "rox": return 8 * store.settings.roxTarget
             default: return f.hasSplits ? f.splits[(stIndex ?? 7) * 2 + 1] : nil
             }
         default: return prev
@@ -698,9 +698,11 @@ struct GoalTimeSheet: View {
     private var bestSplits: [Int]? { store.simBest?.splits16 }
     /// 내 최고 풀 시뮬레이션이 있을 때만 "My best" 를 보여 줌
     private var styles: [String] { GoalSplit.styles.filter { $0 != "best" || bestSplits != nil } }
+    /// 이동 목표: 그 시간대 실제 중간값 (대표님 결정 2026-10-12 — 30초 고정 대신)
+    private var roxEach: Int { HyroxBench.roxEach(goal: max(600, total), division: store.settings.division) }
     private var preview: [Int] {
         GoalSplit.split(total: max(600, total), style: style, current: store.settings.goals, best: bestSplits,
-                        division: store.settings.division)
+                        division: store.settings.division, rox: roxEach)
     }
 
     var body: some View {
@@ -754,8 +756,9 @@ struct GoalTimeSheet: View {
     private func save() {
         guard total > 600 else { dismiss(); return }
         var st = store.settings
+        st.roxGoal = roxEach
         st.goals = GoalSplit.split(total: total, style: style, current: st.goals, best: bestSplits,
-                                   division: st.division)
+                                   division: st.division, rox: roxEach)
         st.goalTime = total
         store.settings = st
         dismiss()

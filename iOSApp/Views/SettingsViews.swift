@@ -486,7 +486,7 @@ struct SetGoalsView: View {
         var s = store.settings
         guard s.goals.indices.contains(i) else { return }
         s.goals[i] = max(30, s.goals[i] + v)
-        s.goalTime = s.goals.reduce(0, +) + 8 * Defaults.roxTarget
+        s.goalTime = s.goals.reduce(0, +) + 8 * s.roxTarget
         store.settings = s
     }
 }

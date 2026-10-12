@@ -493,7 +493,7 @@ struct DetailView: View {
             ("Total", rec.total, f.total),
             ("Runs", rec.runTotal, frRuns),
             ("Stations", rec.stationTotal, frSt),
-            ("Roxzone", rec.roxTotal, 8 * Defaults.roxTarget),
+            ("Roxzone", rec.roxTotal, 8 * store.settings.roxTarget),
         ]
     }
 

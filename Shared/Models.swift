@@ -91,8 +91,8 @@ enum GoalSplit {
     /// 16칸 비율 (합은 아무 값이나 됨 — 나눌 때 맞춤).
     /// balanced · runner · strong 은 같은 완주 시간대 실제 중간값(HyroxBench)에서 출발
     static func weights(_ style: String, current: [Int], best: [Int]?,
-                        total: Int = Defaults.goalTime, division: String = "openM") -> [Double] {
-        let base: [Double] = HyroxBench.splits16(goal: total, division: division).map(Double.init)
+                        total: Int = Defaults.goalTime, division: String = "openM", rox: Int = Defaults.roxTarget) -> [Double] {
+        let base: [Double] = HyroxBench.splits16(goal: total, division: division, rox: rox).map(Double.init)
         // 러닝 칸만 4% 빠르게 (합을 다시 맞추면 스테이션이 그만큼 비례로 느긋해짐) — 근력형은 반대
         func tilt(run: Double, st: Double) -> [Double] {
             base.enumerated().map { $0.offset % 2 == 0 ? $0.element * run : $0.element * st }
@@ -111,10 +111,10 @@ enum GoalSplit {
     }
 
     /// 16칸 목표(초). 5초 단위, 칸마다 최소 30초, 합계 = (총 목표 − Roxzone) 을 5초 단위로 맞춘 값
-    static func split(total: Int, style: String, current: [Int], best: [Int]?, division: String = "openM") -> [Int] {
-        let w: [Double] = weights(style, current: current, best: best, total: total, division: division)
+    static func split(total: Int, style: String, current: [Int], best: [Int]?, division: String = "openM", rox: Int = Defaults.roxTarget) -> [Int] {
+        let w: [Double] = weights(style, current: current, best: best, total: total, division: division, rox: rox)
         let sumW: Double = max(1, w.reduce(0, +))
-        let raw: Int = max(16 * 30, total - 8 * Defaults.roxTarget)
+        let raw: Int = max(16 * 30, total - 8 * rox)
         let target: Int = Int((Double(raw) / 5).rounded()) * 5
         let exact: [Double] = w.map { $0 / sumW * Double(target) }
         var out: [Int] = exact.map { max(30, Int(($0 / 5).rounded()) * 5) }
@@ -752,6 +752,8 @@ struct Settings: Codable, Hashable {
     var mirrorOpt: Bool? = nil
     /// 63번: 아이폰 앱 안에서 고른 언어(ko / en). nil = 기기 언어를 따름 → 워치도 같은 언어로
     var lang: String? = nil
+    /// 이동(Roxzone) 1번 목표(초). nil = 예전 값 30초. 목표 시간으로 나눌 때 그 시간대 실제 중간값으로 채워짐
+    var roxGoal: Int? = nil
 
     // 빌드 23: 가입 프로필 (모두 선택 · 예전 저장 파일과 호환되도록 옵셔널, 비어 있으면 nil)
     /// 성별 "M" / "W"
@@ -775,6 +777,8 @@ struct Settings: Codable, Hashable {
         get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }
         set { themeOpt = newValue == .yellow ? nil : newValue.rawValue }
     }
+    /// 이동 목표 (없으면 30초)
+    var roxTarget: Int { roxGoal ?? Defaults.roxTarget }
 
     var signedIn: Bool { nickname != nil }
 
@@ -832,14 +836,14 @@ enum RunModes {
 
 enum SeqBuilder {
     /// Full Simulation / Race: Run i, Roxzone, Station, Roxzone … (마지막 스테이션 뒤 Roxzone 없음)
-    static func full(div: Division, rox: Bool, targets16: [Int]) -> [Seg] {
+    static func full(div: Division, rox: Bool, targets16: [Int], roxTarget: Int = Defaults.roxTarget) -> [Seg] {
         var o: [Seg] = []
         for i in 0..<8 {
             o.append(Seg(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, target: targets16[i * 2]))
-            if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: Defaults.roxTarget)) }
+            if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: roxTarget)) }
             let s = Station.all[i]
             o.append(Seg(icon: s.key, name: s.name, detail: s.detail(div), kind: .st, target: targets16[i * 2 + 1]))
-            if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: Defaults.roxTarget)) }
+            if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: roxTarget)) }
         }
         return o
     }

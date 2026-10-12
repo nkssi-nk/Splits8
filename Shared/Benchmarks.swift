@@ -230,17 +230,22 @@ enum HyroxBench {
         Int(row(for: divisionKey, finish: totalSec).rox.rounded())
     }
 
+    /// 같은 완주 시간대 Roxzone 1번 목표(초): 실제 중간값 ÷ 8, 5초 단위, 20초~2분 사이
+    static func roxEach(goal totalSec: Int, division: String) -> Int {
+        let each: Double = row(for: division, finish: totalSec).rox / 8
+        return min(120, max(20, Int((each / 5).rounded()) * 5))
+    }
+
     /// 목표 시간(Roxzone 포함)을 16칸 [Run1, St1, Run2, St2, …] 로 나눔.
-    /// 중간값의 비율은 그대로 두고, 16칸 합이 (목표 − 8 × 기본 Roxzone 30초) 가 되게 전체를 한 번만 늘리거나 줄임
-    /// — 실제 Roxzone 중간값과 앱의 고정 30초 목표의 차이도 이 비율 조정에 흡수됨
-    static func splits16(goal totalSec: Int, division: String) -> [Int] {
+    /// 중간값의 비율은 그대로 두고, 16칸 합이 (목표 − 8 × 이동 목표) 가 되게 전체를 한 번만 늘리거나 줄임
+    static func splits16(goal totalSec: Int, division: String, rox: Int = Defaults.roxTarget) -> [Int] {
         let r = row(for: division, finish: totalSec)
         var raw: [Double] = []
         for i in 0..<8 {
             raw.append(r.run)
             raw.append(r.st[i])
         }
-        let want: Double = Double(max(16 * 30, totalSec - 8 * Defaults.roxTarget))
+        let want: Double = Double(max(16 * 30, totalSec - 8 * rox))
         let sum: Double = max(1, raw.reduce(0, +))
         return raw.map { Int(($0 * want / sum).rounded()) }
     }

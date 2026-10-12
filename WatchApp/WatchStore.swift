@@ -106,8 +106,8 @@ final class WatchStore: NSObject, WCSessionDelegate {
     func seq(mode: Mode, program: Program?) -> [Seg] {
         let s = ctx.settings
         switch mode {
-        case .race: return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: s.goals.count == 16 ? s.goals : Defaults.goals)
-        case .sim: return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: simTargets)
+        case .race: return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: s.goals.count == 16 ? s.goals : Defaults.goals, roxTarget: s.roxTarget)
+        case .sim: return SeqBuilder.full(div: s.div, rox: s.roxAuto, targets16: simTargets, roxTarget: s.roxTarget)
         case .training: return SeqBuilder.training(program ?? Program.presets()[0], div: s.div, bests: ctx.segBests)
         case .pft: return PFT.seq(div: s.div, targets: ctx.pftBest)
         }

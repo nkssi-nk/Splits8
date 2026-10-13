@@ -308,6 +308,8 @@ fun DoublesPlanSheet() {
 @Composable
 fun SetEventView() {
     LaunchedEffect(Unit) { if (Router.evDraft == null) Router.evDraft = Store.settings.event }
+    // 서버의 대회 목록 (없거나 실패하면 앱에 들어 있는 목록)
+    LaunchedEffect(Unit) { com.nkssi.splits8.Cloud.refreshEvents() }
     val ev = Router.evDraft ?: Store.settings.event
     fun set(f: (RaceEvent) -> RaceEvent) { Router.evDraft = f(Router.evDraft ?: Store.settings.event) }
     var pick by remember { mutableStateOf<String?>(null) }
@@ -466,6 +468,8 @@ private fun TimeCell(t: String, on: Boolean, modifier: Modifier, tag: String, on
 @Composable
 fun FindEventView() {
     LaunchedEffect(Unit) { if (Router.evDraft == null) Router.evDraft = Store.settings.event }
+    // 서버의 대회 목록 (없거나 실패하면 앱에 들어 있는 목록)
+    LaunchedEffect(Unit) { com.nkssi.splits8.Cloud.refreshEvents() }
     var query by remember { mutableStateOf("") }
     var region by remember { mutableStateOf("all") }
     val q = query.trim().lowercase()

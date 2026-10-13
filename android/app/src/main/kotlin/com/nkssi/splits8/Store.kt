@@ -23,7 +23,7 @@ import java.io.File
 /**
  * 폰 저장소 (아이폰 Store.swift): 설정 · 트레이닝 · 기록 · 친구 · 예약.
  * 아이폰과 같은 파일 이름 · 같은 JSON 모양으로 앱 폴더에 저장.
- * 서버 · 워치 · 알림은 다음 단계에서 붙임.
+ * 서버(Supabase)와 맞추는 일은 Cloud 가 함. 워치 · 알림은 다음 단계에서 붙임.
  */
 object Store {
     private var dir: File? = null
@@ -51,7 +51,12 @@ object Store {
     /** 내 계정 id (순위표에서 "나" 줄 찾기). 화면 확인용 예시에서는 "demo.me" */
     var myId by mutableStateOf<String?>(null)
 
-    /** 내 프로필 사진 (앱 폴더 avatar.jpg, 720×720 정사각). 서버 올리기는 5단계 */
+    /** 서버에 올린 내 사진 주소 (없으면 null) */
+    var avatarUrl: String?
+        get() = pref("avatar.url", "").ifEmpty { null }
+        set(v) = setPref("avatar.url", v ?: "")
+
+    /** 내 프로필 사진 (앱 폴더 avatar.jpg, 720×720 정사각). 로그인했으면 서버에도 올림 */
     var photo by mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
         private set
 
@@ -72,7 +77,8 @@ object Store {
         private set
 
     val friend: Friend? get() = friends.firstOrNull { it.id == settings.friendId }
-    val signedIn: Boolean get() = settings.signedIn
+    /** 로그인함 = 닉네임이 있고 서버 로그인 정보도 있음 (예시 화면은 닉네임만) */
+    val signedIn: Boolean get() = settings.signedIn && (demo || Supabase.session != null)
 
     fun init(context: Context) {
         if (dir != null) return
@@ -84,8 +90,22 @@ object Store {
         friends = load("friends.json", ListSerializer(Friend.serializer())) ?: emptyList()
         plans = load("plans.json", ListSerializer(PlannedWorkout.serializer())) ?: emptyList()
         photo = runCatching { android.graphics.BitmapFactory.decodeFile(File(dir, "avatar.jpg").path)?.asImageBitmap() }.getOrNull()
+        // 서버 로그인 정보 (이 폰에만)
+        Supabase.session = runCatching { SplitsJson.decodeFromString(SbSession.serializer(), pref("sb.session", "")) }.getOrNull()
+        Supabase.onSession = { s -> setPref("sb.session", s?.let { SplitsJson.encodeToString(SbSession.serializer(), it) } ?: "") }
+        // 로그인 정보가 없으면 로그아웃 상태
+        if (Supabase.session == null && settings.nickname != null) settings = settings.copy(nickname = null)
         applyLang()
         rebuild()
+    }
+
+    /** 시험용: 예시 모드를 끄고 빈 저장소로 다시 시작 (시험 기기의 임시 폴더) */
+    fun resetForTest(context: Context) {
+        context.getSharedPreferences("splits8", Context.MODE_PRIVATE).edit().clear().commit()
+        context.filesDir.listFiles()?.forEach { it.delete() }
+        dir = null; demo = false
+        friends = emptyList(); requests = emptyList(); leaderboard = emptyList(); requested = emptySet(); myId = null
+        init(context)
     }
 
     /** 화면 확인용: 예시 데이터로 채움 (파일에 안 씀) */
@@ -108,10 +128,12 @@ object Store {
         records.filter { it.date.atZone(com.nkssi.splits8.shared.Fm.zone).toLocalDate() == on }.sortedByDescending { it.date }
 
     fun update(f: (Settings) -> Settings) {
+        val old = settings
         settings = f(settings)
         applyLang()
         rebuild()
         save("settings.json", Settings.serializer(), settings)
+        if (!demo) Cloud.settingsChanged(old, settings)
     }
 
     /** 트레이닝 저장 (같은 id 면 바꿈, 새것은 맨 위 — 아이폰과 같음) */
@@ -147,11 +169,12 @@ object Store {
     fun setTgtSrc(v: String) = update { it.copy(tgtSrc = v) }
 
     /** 사진 바꾸기 (null = 지우기). 가운데를 정사각으로 잘라 720×720 JPEG 로 저장 */
-    fun setPhoto(src: android.graphics.Bitmap?) {
+    fun setPhoto(src: android.graphics.Bitmap?, upload: Boolean = true) {
         val f = dir?.let { File(it, "avatar.jpg") }
         if (src == null) {
             photo = null
             if (!demo) f?.delete()
+            if (upload && Cloud.on) { avatarUrl = null; Cloud.launch { Cloud.syncProfile(clearAvatar = true) } }
             return
         }
         val side = minOf(src.width, src.height)
@@ -159,12 +182,32 @@ object Store {
         val out = android.graphics.Bitmap.createScaledBitmap(sq, 720, 720, true)
         photo = out.asImageBitmap()
         if (!demo && f != null) runCatching { f.outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) } }
+        if (upload && Cloud.on) photoJpeg()?.let { j -> Cloud.launch { Cloud.syncAvatar(j) } }
     }
 
-    /** 로그아웃: 이 기기에서 계정 정보만 지움. 기록 · 트레이닝 · 설정(프로필 포함)은 그대로 (서버 로그아웃은 5단계) */
+    /** 저장된 내 사진 (JPEG) */
+    fun photoJpeg(): ByteArray? = dir?.let { File(it, "avatar.jpg") }?.takeIf { it.exists() }?.let { runCatching { it.readBytes() }.getOrNull() }
+
+    /** 로그아웃: 서버 로그아웃 + 이 기기에서 계정 정보만 지움. 기록 · 트레이닝 · 설정(프로필 포함)은 그대로 */
     fun signOut() {
+        Cloud.signOut()
+        clearAccount()
+    }
+
+    /** 이 기기에서 계정 정보만 지움 */
+    fun clearAccount() {
         update { it.copy(nickname = null, email = null, signMethod = null) }
-        friends = emptyList(); leaderboard = emptyList(); requests = emptyList(); myId = null
+        friends = emptyList(); leaderboard = emptyList(); requests = emptyList(); myId = null; requested = emptySet()
+        save("friends.json", ListSerializer(Friend.serializer()), friends)
+    }
+
+    /** 서버에서 받은 친구 · 요청 (고른 친구가 없어졌으면 풂) */
+    fun setSocial(fs: List<Friend>, rq: List<FriendReq>) {
+        friends = fs
+        requests = rq
+        requested = requested.filter { r -> fs.none { it.id == r } }.toSet()
+        val sel = settings.friendId
+        if (sel != null && fs.none { it.id == sel }) update { it.copy(friendId = null) } else rebuild()
         save("friends.json", ListSerializer(Friend.serializer()), friends)
     }
 
@@ -237,7 +280,10 @@ object Store {
 
     /** 서버 일은 화면을 막지 않고 뒤에서 (실패해도 앱은 그대로 — 다음 새로고침 때 맞춰짐) */
     private fun socialCall(f: suspend () -> Unit) {
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main.immediate).launch { runCatching { f() } }
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main.immediate).launch {
+            runCatching { f() }
+            runCatching { Cloud.refreshSocial() }
+        }
     }
 
     /** 백업 파일 글자 (아이폰과 같은 모양) */
@@ -248,7 +294,11 @@ object Store {
         val b = com.nkssi.splits8.shared.BackupFile.read(text) ?: return null
         val (r, nr) = com.nkssi.splits8.shared.BackupFile.mergeRecords(b.records, records)
         val (p, np) = com.nkssi.splits8.shared.BackupFile.mergePrograms(b.programs, programs, Program.freeLimit)
-        if (nr > 0) { records = r; rebuild(); save("records.json", ListSerializer(Record.serializer()), records) }
+        if (nr > 0) {
+            val fresh = r.filter { x -> records.none { it.id.equals(x.id, ignoreCase = true) } }
+            records = r; rebuild(); save("records.json", ListSerializer(Record.serializer()), records)
+            fresh.forEach { Cloud.upload(it) }
+        }
         if (np > 0) { programs = p; save("programs.json", ListSerializer(Program.serializer()), programs) }
         return nr to np
     }
@@ -261,6 +311,7 @@ object Store {
         records = records + r
         rebuild()
         save("records.json", ListSerializer(Record.serializer()), records)
+        Cloud.upload(r)
     }
 
     /** 더블 파트너 닉네임 바꾸기 (null = 빼기). 기기에만 저장 */
@@ -276,6 +327,7 @@ object Store {
         records = records.filterNot { it.id == r.id }
         rebuild()
         save("records.json", ListSerializer(Record.serializer()), records)
+        Cloud.deleteRecord(r.id)
     }
 
     private fun rebuild() {

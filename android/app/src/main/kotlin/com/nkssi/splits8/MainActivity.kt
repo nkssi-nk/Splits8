@@ -22,6 +22,7 @@ import com.nkssi.splits8.screens.LaunchLogo
 import com.nkssi.splits8.screens.ScreenFor
 import com.nkssi.splits8.ui.PhoneRoot
 import kotlinx.coroutines.delay
+import androidx.lifecycle.repeatOnLifecycle
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +32,9 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         Store.init(applicationContext)
+        // 실제 서버 (Supabase). 시험에서는 가짜 서버를 넣음
+        if (Supabase.isConfigured) Accounts.api = SupabaseAccounts
+        GoogleSignIn.activity = java.lang.ref.WeakReference(this)
         if (savedInstanceState == null) Router.start()
         setContent { App(showLogo = savedInstanceState == null) }
     }
@@ -44,6 +48,26 @@ fun App(showLogo: Boolean = true) {
         if (logo) { delay(1300); logo = false }
     }
     val overlay = Router.ask != null || Router.bonus != null || Router.planRequest != null || Router.testInfo != null || Router.raceSheet != null || Router.userMenu != null || Router.partnerFor != null || Router.finish != null
+    // 앱이 앞에 있는 동안: 다른 기기 로그인 확인 (3분마다) · 친구 목록 새로 받기
+    val life = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(life) {
+        life.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            if (!Cloud.live) return@repeatOnLifecycle
+            Cloud.checkDevice()
+            Cloud.refreshSocial()
+            while (true) {
+                delay(180_000)
+                Cloud.checkDevice()
+            }
+        }
+    }
+    LaunchedEffect(Cloud.signedOutElsewhere) {
+        if (Cloud.signedOutElsewhere) {
+            Cloud.signedOutElsewhere = false
+            Router.ask = Ask("Signed out because this account signed in on another device.",
+                "Your records stay on this phone. Sign in again to use friends and leaderboards here.", cancel = null)
+        }
+    }
     BackHandler(enabled = overlay || (Router.scr != Scr.Home && Router.scr != Scr.Splash)) { Router.back() }
     Box(Modifier.fillMaxSize()) {
         PhoneRoot { s -> ScreenFor(s) }

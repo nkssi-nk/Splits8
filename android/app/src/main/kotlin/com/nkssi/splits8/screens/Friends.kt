@@ -82,6 +82,8 @@ private fun limitAsk() {
 
 @Composable
 fun FriendsView() {
+    // 열 때마다 친구 목록 · 요청 새로 받기
+    LaunchedEffect(Unit) { com.nkssi.splits8.Cloud.refreshSocial() }
     var query by remember { mutableStateOf("") }
     var hit by remember { mutableStateOf<RemoteProfile?>(null) }
     /** "" 없음 / searching / none / error */
@@ -151,7 +153,7 @@ private fun Requests() {
         list.forEachIndexed { i, q ->
             Row(Modifier.fillMaxWidth().rowLine(i < list.size - 1).padding(vertical = 12.dp, horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Avatar8(34.dp, q.name.take(1).uppercase())
+                Avatar8(34.dp, q.name.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(q.avatarUrl))
                 Column(Modifier.weight(1f)) {
                     T("@" + q.name, F.t(15, W600), maxLines = 1, translate = false)
                     T(q.div, F.t(13, color = C.text2), maxLines = 1, translate = false)
@@ -174,7 +176,7 @@ private fun Sent() {
         list.forEachIndexed { i, q ->
             Row(Modifier.fillMaxWidth().rowLine(i < list.size - 1).padding(vertical = 12.dp, horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Avatar8(34.dp, q.name.take(1).uppercase())
+                Avatar8(34.dp, q.name.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(q.avatarUrl))
                 Column(Modifier.weight(1f)) {
                     T("@" + q.name, F.t(15, W600), maxLines = 1, translate = false)
                     T(q.div + " · " + "Requested".l10n, F.t(13, color = C.text2), maxLines = 1, translate = false)
@@ -222,7 +224,7 @@ private fun HitCard(h: RemoteProfile, n: String) {
     val yellow = got != null || !req
     Row(Modifier.fillMaxWidth().card8().padding(vertical = 12.dp).padding(start = 18.dp, end = 6.dp).testTag("friends.hit"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Avatar8(34.dp, n.take(1).uppercase())
+        Avatar8(34.dp, n.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(h.avatarUrl))
         Column(Modifier.weight(1f)) {
             T("@$n", F.t(15, W600), maxLines = 1, translate = false)
             T(h.division ?: "", F.t(13, color = C.text2), maxLines = 1, translate = false)
@@ -245,7 +247,7 @@ private fun FriendRow(f: Friend, last: Boolean) {
         Row(Modifier.weight(1f).tap { if (f.hasSplits) Store.toggleFriend(f) }.testTag("friend." + f.name)
             .padding(vertical = 14.dp).padding(start = 18.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Avatar8(40.dp, f.ini)
+            Avatar8(40.dp, f.ini, photo = com.nkssi.splits8.RemoteImages.get(f.avatarUrl))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 T(f.name, F.t(17, if (on) W600 else W400), maxLines = 1, translate = false)
                 T(f.div + " · " + (if (f.hasSplits) f.date else "No Full Simulation record".l10n), F.t(13, color = C.text2), maxLines = 1, translate = false)

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +50,7 @@ private val lbStations = listOf(
 
 @Composable
 fun RaceLeaderboard() {
+    LaunchedEffect(Unit) { com.nkssi.splits8.Cloud.refreshLeaderboard() }
     val s = Store.settings
     var chipsOpen by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -109,7 +111,7 @@ private fun LbRow(i: Int, row: LBRow, me: Boolean, meT: Int?, last: Boolean) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         T("${i + 1}", F.num(17, color = if (i == 0) C.accent else Color.White), Modifier.width(22.dp), translate = false)
-        Avatar8(34.dp, row.nickname.take(1).uppercase(), bg = if (me) C.accent else C.control, fg = if (me) Color.Black else Color.White)
+        Avatar8(34.dp, row.nickname.take(1).uppercase(), photo = if (me) Store.photo else com.nkssi.splits8.RemoteImages.get(row.avatar_url), bg = if (me) C.accent else C.control, fg = if (me) Color.Black else Color.White)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             T(if (me) L10n.t("@%@ (you)", row.nickname) else "@${row.nickname}", F.t(15, if (me) W600 else W500, if (me) C.accent else Color.White),
                 maxLines = 1, translate = false)

@@ -45,7 +45,7 @@ interface AccountApi {
 }
 
 /** 서버의 공개 프로필 한 줄 (profiles 표) */
-data class RemoteProfile(val id: String, val nickname: String?, val division: String?, val avatarUrl: String? = null)
+data class RemoteProfile(val id: String, val nickname: String?, val division: String?, val avatarUrl: String? = null, val visibility: String? = null)
 
 enum class ProfileLoad { Found, None, Failed }
 

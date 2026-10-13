@@ -46,3 +46,9 @@
 
 /* 폰으로 기록 (아이폰 "iPhone · No HR") */
 "Phone · No HR" = "폰 · 심박 없음";
+
+/* 서버 (5단계) */
+"Your records stay on this phone. Sign in again to use friends and leaderboards here." = "기록은 이 폰에 그대로 남아요. 이 폰에서 친구와 순위표를 쓰려면 다시 로그인하세요.";
+"Google sign-in isn't set up yet. Please use email for now." = "구글 로그인은 아직 준비 중이에요. 지금은 이메일로 로그인해 주세요.";
+"Couldn't delete the account" = "계정을 삭제하지 못했어요";
+"Couldn't reach the server. Check your connection." = "서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.";

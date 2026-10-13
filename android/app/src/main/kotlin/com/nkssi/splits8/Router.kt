@@ -1,5 +1,7 @@
 package com.nkssi.splits8
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -186,8 +188,17 @@ object Router {
     }
 
     /** 계정 삭제 (서버에서 지움 — 5단계 서버 연결 때 붙임. 지금은 안내만) */
+    /** 계정 삭제 (서버의 프로필 · 친구 · 기록). 이 폰의 기록은 그대로 */
     fun deleteAccount() {
-        ask = Ask("Delete account", "Account deletion comes in a later Android build.", cancel = null)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main.immediate).launch {
+            try {
+                Cloud.deleteAccount()
+                Store.clearAccount()
+                go(Scr.Settings)
+            } catch (e: Exception) {
+                ask = Ask("Couldn't delete the account", e.message, cancel = null)
+            }
+        }
     }
 
     // 폰으로 기록

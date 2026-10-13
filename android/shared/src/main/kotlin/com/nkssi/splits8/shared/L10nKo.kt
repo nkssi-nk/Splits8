@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1516).apply {
+        HashMap<String, String>(1514).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -440,8 +440,7 @@ internal object L10nKo {
         m["Partner"] = "파트너"
         m["Pause"] = "일시정지"
         m["Personal best"] = "개인 최고 기록"
-        m["Phone recording comes in a later Android build."] = "폰으로 기록하기는 다음 안드로이드 빌드에 들어가요."
-        m["Photo sharing comes in the next Android build."] = "사진과 함께 공유는 다음 안드로이드 빌드에 들어가요."
+        m["Phone · No HR"] = "폰 · 심박 없음"
         m["Physical Fitness Test"] = "PFT 체력 테스트"
         m["Physical Fitness Test · six movements back to back, for time."] = "PFT 체력 테스트 · 6가지 종목을 이어서 하고 시간을 잽니다."
         m["Pick a nickname"] = "닉네임 정하기"
@@ -472,9 +471,9 @@ internal object L10nKo {
         m["RUN PACE"] = "러닝 페이스"
         m["Race"] = "레이스"
         m["Race day"] = "대회 날"
+        m["Race day · %@"] = "대회 날 · %@"
     }
     private fun part3(m: HashMap<String, String>) {
-        m["Race day · %@"] = "대회 날 · %@"
         m["Race done. You did it."] = "대회 완주! 정말 해냈어요."
         m["Race event"] = "대회"
         m["Race experience"] = "대회 경험"
@@ -624,9 +623,9 @@ internal object L10nKo {
         m["Tap Allow to pair"] = "허용을 누르면 연결돼요"
         m["Tap runs and stations above\nto add them here in order"] = "위에서 러닝과 스테이션을 누르면\n여기에 순서대로 쌓여요"
         m["Tap to add"] = "탭해서 추가"
+        m["Tap to cancel"] = "누르면 취소"
     }
     private fun part4(m: HashMap<String, String>) {
-        m["Tap to cancel"] = "누르면 취소"
         m["Tap to choose a photo"] = "탭해서 사진 고르기"
         m["Tap to compare · Tap again to clear · VS is against your best"] = "탭하면 비교 대상으로 선택 · 다시 탭하면 해제 · VS 값은 내 최고 기록 기준"
         m["Tell us what is wrong (nickname, photo or records):"] = "무엇이 문제인지 적어 주세요 (닉네임 · 사진 · 기록):"
@@ -776,9 +775,9 @@ internal object L10nKo {
         m["vs best"] = "최고 기록 대비"
         m["vs goal"] = "목표 대비"
         m["vs last"] = "지난 기록 대비"
+        m["vs your best"] = "내 최고 대비"
     }
     private fun part5(m: HashMap<String, String>) {
-        m["vs your best"] = "내 최고 대비"
         m["with @%@"] = "@%@ 함께"
         m["~%lld reps"] = "약 %lld회"
         m["~%lld strokes"] = "약 %lld회"

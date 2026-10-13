@@ -92,7 +92,11 @@ data class BonusRequest(val kind: String, val existing: Program? = null, val key
 /** 확인 창 (아이폰 .alert). destructive = 빨간 확인 단추 */
 data class Ask(
     val title: String, val message: String? = null, val ok: String = "OK", val cancel: String? = "Cancel",
-    val destructive: Boolean = false, val onOk: () -> Unit = {},
+    val destructive: Boolean = false,
+    /** 세 번째 단추 (빨강, 예: Discard). 있으면 단추를 세로로 쌓음 (아이폰 3단추 알림) */
+    val alt: String? = null, val onAlt: () -> Unit = {},
+    /** 맨 끝에 둠: Ask(...) { } 의 { } 가 이 동작이 되게 */
+    val onOk: () -> Unit = {},
 )
 
 /** 화면 이동 (아이폰 Router) */
@@ -186,9 +190,29 @@ object Router {
         ask = Ask("Delete account", "Account deletion comes in a later Android build.", cancel = null)
     }
 
-    /** 폰으로 기록 (4-3 단계에서 화면을 붙임. 지금은 안내만) */
+    // 폰으로 기록
+    var phoneRun by mutableStateOf<PhoneRunRequest?>(null)
+    /** 진행 중인 폰 기록 (화면이 다시 그려져도 이어지게 여기 둠) */
+    var phoneEngine = PhoneRunEngine()
+    /** 시험용: 3 · 2 · 1 없이 바로 시작 (아이폰 --nocount) */
+    var phoneNoCount = false
+
+    /** 시험용 시계 (ms) */
+    var phoneClock: () -> Long = { System.currentTimeMillis() }
+
     fun startOnPhone(mode: Mode, program: Program?) {
-        ask = Ask("Start on phone", "Phone recording comes in a later Android build.", cancel = null)
+        phoneEngine = PhoneRunEngine(phoneClock)
+        phoneRun = PhoneRunRequest(mode, program, scr)
+        go(Scr.PhoneLive)
+    }
+
+    /** 운동이 끝났을 때 카드 (기록 상세 위로 올라옴) */
+    var finish by mutableStateOf<Record?>(null)
+
+    /** 기록 상세를 열고 그 위에 카드를 올림 */
+    fun showFinish(rec: Record, from: Scr) {
+        open(rec, from)
+        finish = rec
     }
 
     fun start() {
@@ -322,6 +346,7 @@ object Router {
         if (raceSheet != null) { raceSheet = null; return true }
         if (userMenu != null) { userMenu = null; return true }
         if (partnerFor != null) { partnerFor = null; return true }
+        if (finish != null) { finish = null; return true }
         backAction?.let { it(); return true }
         barBack?.let { it.second(); return true }
         if (scr.showsTabs && scr != Scr.Home) { go(Scr.Home); return true }

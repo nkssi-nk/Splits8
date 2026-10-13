@@ -43,7 +43,7 @@ fun App(showLogo: Boolean = true) {
     LaunchedEffect(Unit) {
         if (logo) { delay(1300); logo = false }
     }
-    val overlay = Router.ask != null || Router.bonus != null || Router.planRequest != null || Router.testInfo != null || Router.raceSheet != null || Router.userMenu != null || Router.partnerFor != null
+    val overlay = Router.ask != null || Router.bonus != null || Router.planRequest != null || Router.testInfo != null || Router.raceSheet != null || Router.userMenu != null || Router.partnerFor != null || Router.finish != null
     BackHandler(enabled = overlay || (Router.scr != Scr.Home && Router.scr != Scr.Splash)) { Router.back() }
     Box(Modifier.fillMaxSize()) {
         PhoneRoot { s -> ScreenFor(s) }

@@ -253,6 +253,9 @@ object Store {
         return nr to np
     }
 
+    /** 폰으로 기록한 것 (source = "phone") */
+    fun addPhoneRecord(r: Record) = add(r.copy(source = "phone"))
+
     fun add(r: Record) {
         if (records.any { it.id.equals(r.id, ignoreCase = true) }) return
         records = records + r

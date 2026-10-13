@@ -81,6 +81,7 @@ fun Overlays() {
     }
     Sheet8(Router.userMenu, onClose = { Router.userMenu = null }) { u -> UserMenuSheet(u) }
     Sheet8(Router.partnerFor, onClose = { Router.partnerFor = null }) { id -> PartnerSheet(id) }
+    Sheet8(Router.finish, onClose = { Router.finish = null }) { rec -> FinishSheet(rec) }
     ToastHost()
     AskHost()
 }

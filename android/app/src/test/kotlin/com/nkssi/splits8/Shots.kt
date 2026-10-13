@@ -48,6 +48,7 @@ class Shots {
         Router.partnerFor = null; Router.detail = null
         com.nkssi.splits8.screens.ShareDemo.photo = null; com.nkssi.splits8.screens.ShareDemo.colorDemo = false
         com.nkssi.splits8.screens.ShareDebug.dryRun = false
+        Router.finish = null; Router.phoneNoCount = false; Router.phoneClock = { System.currentTimeMillis() }
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -341,6 +342,46 @@ class Shots {
     @Test fun shareRunMap() = demoShare("73_share_run_map", "en", run = true, photo = false) { tapTag("share.map") }
     @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
     @Test fun shareEmpty() = demoShare("74_share_empty", "en", photo = false)
+
+    // 폰으로 기록 (Full Sim 3번째 구간 Sled Push, 1:42 지남) · 3 2 1 · 끝 카드
+    private var pt = 1_790_000_000_000L
+    private fun demoPhone(name: String, lang: String, count: Boolean = false, pause: Boolean = false) {
+        val o = Demo.Opts()
+        Store.useDemo(Demo.settings(o, java.time.LocalDate.of(2026, 10, 5)), Demo.programs(), Demo.records(o))
+        Router.phoneClock = { pt }
+        Router.phoneNoCount = !count
+        Router.scr = Scr.Sim
+        L10n.lang = lang
+        Router.startOnPhone(com.nkssi.splits8.shared.Mode.Sim, null)
+        rule.setContent { PhoneRoot { ScreenFor(it) } }
+        rule.waitForIdle()
+        if (!count) {
+            val e = Router.phoneEngine
+            pt += 262_000; e.advance(); pt += 18_000; e.advance(); pt += 102_000
+            if (pause) e.togglePause()
+        }
+        rule.mainClock.advanceTimeBy(400)
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/$name.png")
+    }
+
+    @Test fun phoneLive() = demoPhone("75_phone_live", "en")
+    @Test fun phoneLiveKo() = demoPhone("75_phone_live_ko", "ko", pause = true)
+    @Test fun phoneCount() = demoPhone("76_phone_count", "en", count = true)
+
+    private fun demoFinish(name: String, lang: String, pick: (List<com.nkssi.splits8.shared.Record>) -> com.nkssi.splits8.shared.Record) {
+        val now = java.time.Instant.parse("2026-10-05T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), Demo.records(o) + Demo.runRecord(), Demo.friends(), me = "demo.me")
+        val rec = pick(Store.records)
+        Router.showFinish(rec, Scr.Race)
+        shot(name, lang, Scr.Detail)
+    }
+
+    @Test fun finishGold() = demoFinish("77_finish_pb", "en") { r -> r.filter { it.mode == com.nkssi.splits8.shared.Mode.Sim }.maxBy { it.date } }
+    @Test fun finishKo() = demoFinish("78_finish_ko", "ko") { r -> r.first { it.title == "Seoul" } }
+    @Test fun finishRun() = demoFinish("79_finish_run", "en") { r -> r.first { it.isRunKind } }
 
     @Test fun partnerSheet() {
         demoDetail("67_detail_partner", "en", { r -> r.first { it.title == "Incheon" } }, friend = true)

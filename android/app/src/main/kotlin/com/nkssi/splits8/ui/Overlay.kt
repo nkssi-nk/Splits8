@@ -108,6 +108,24 @@ fun AskHost() {
                     if (x.message != null) T(x.message, F.t(13, color = C.d1).copy(lineHeight = androidx.compose.ui.unit.TextUnit(18f, androidx.compose.ui.unit.TextUnitType.Sp)), align = TextAlign.Center)
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+                if (x.alt != null) {
+                    // 세 단추: 세로로 쌓음 (OK · 빨간 단추 · Cancel)
+                    val line = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f))
+                    Box(Modifier.fillMaxWidth().height(46.dp).tap { Router.ask = null; x.onOk() }.testTag("ask.ok"), contentAlignment = Alignment.Center) {
+                        T(x.ok, F.t(17, W600, C.accent), maxLines = 1)
+                    }
+                    Box(line)
+                    Box(Modifier.fillMaxWidth().height(46.dp).tap { Router.ask = null; x.onAlt() }.testTag("ask.alt"), contentAlignment = Alignment.Center) {
+                        T(x.alt, F.t(17, color = C.bad), maxLines = 1)
+                    }
+                    if (x.cancel != null) {
+                        Box(line)
+                        Box(Modifier.fillMaxWidth().height(46.dp).tap { Router.ask = null }.testTag("ask.cancel"), contentAlignment = Alignment.Center) {
+                            T(x.cancel, F.t(17, color = C.accent), maxLines = 1)
+                        }
+                    }
+                    return@Column
+                }
                 Row(Modifier.fillMaxWidth().height(46.dp)) {
                     if (x.cancel != null) {
                         Box(Modifier.weight(1f).fillMaxHeight().tap { Router.ask = null }.testTag("ask.cancel"), contentAlignment = Alignment.Center) {

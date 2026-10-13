@@ -5,7 +5,6 @@
 "Start on phone?" = "폰으로 시작할까요?";
 "Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)." = "폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함).";
 "The first time you turn on a reminder, your phone will ask to allow notifications." = "알림을 처음 켜면 폰이 알림 허용을 물어봐요.";
-"Phone recording comes in a later Android build." = "폰으로 기록하기는 다음 안드로이드 빌드에 들어가요.";
 "or start PFT on your watch" = "또는 워치에서 PFT를 시작하세요";
 "Once saved, the event name, date and division appear on the Race start screen on your watch." = "저장하면 워치의 레이스 시작 화면에 대회명·날짜·Division이 표시돼요.";
 "Your watch alerts you with a vibration during workouts." = "운동 중에 워치가 진동으로 알려줘요.";
@@ -45,5 +44,5 @@
 /* 친구 (빌드 24: 최대 10명) */
 "You can add up to %lld friends." = "최대 %lld명까지 추가할 수 있어요";
 
-/* 기록 상세 (안드로이드: 사진 공유는 다음 단계) */
-"Photo sharing comes in the next Android build." = "사진과 함께 공유는 다음 안드로이드 빌드에 들어가요.";
+/* 폰으로 기록 (아이폰 "iPhone · No HR") */
+"Phone · No HR" = "폰 · 심박 없음";

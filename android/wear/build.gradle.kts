@@ -16,7 +16,17 @@ android {
         versionCode = 102
         versionName = "1.0.0"
     }
+    // 폰과 같은 디버그 서명 키 (폰 ↔ 워치는 서명이 같아야 서로 주고받음)
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("../app/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("debug") }
         release {
             isMinifyEnabled = false
         }

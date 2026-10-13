@@ -17,7 +17,17 @@ android {
         versionCode = 101
         versionName = "1.0.0"
     }
+    // 고정 디버그 서명 키 (GitHub 빌드마다 키가 바뀌면 구글 로그인 등록(SHA-1)이 매번 안 맞음). 디버그용이라 비밀 아님
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("debug") }
         release {
             isMinifyEnabled = false
         }

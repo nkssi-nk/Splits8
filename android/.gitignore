@@ -8,3 +8,5 @@ captures/
 *.jks
 *.keystore
 __pycache__/
+# 고정 디버그 서명 키만 올림 (구글 로그인 SHA-1 · 폰 ↔ 워치 같은 서명). 비밀 키 아님
+!app/debug.keystore

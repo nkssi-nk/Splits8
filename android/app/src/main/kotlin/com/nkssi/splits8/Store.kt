@@ -329,7 +329,13 @@ object Store {
     }
 
     /** 폰으로 기록한 것 (source = "phone") */
-    fun addPhoneRecord(r: Record) = add(r.copy(source = "phone"))
+    /** 폰으로 끝낸 기록 — Health Connect 에도 저장 (워치 기록은 워치 앱 단계에서 같은 방식으로) */
+    fun addPhoneRecord(r: Record) {
+        val x = r.copy(source = "phone")
+        if (records.any { it.id.equals(x.id, ignoreCase = true) }) return
+        add(x)
+        Health.save(x)
+    }
 
     fun add(r: Record) {
         if (records.any { it.id.equals(r.id, ignoreCase = true) }) return

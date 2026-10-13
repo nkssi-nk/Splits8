@@ -39,9 +39,11 @@ class Shots {
     @Before fun setUp() {
         GlowDrift.fixed = true
         Store.useDemo(Settings(hasOnboarded = true), com.nkssi.splits8.shared.Program.presets(), emptyList())
+        Health.api = FakeHealth(perms = emptySet())      // Health Connect 있고 아직 허락 전인 폰
     }
 
     @After fun tearDown() {
+        Health.api = RealHealth
         Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
         Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null; Router.toast = null
         Router.email = ""; Router.code = ""; Router.nickDraft = ""; Router.signupFlow = false; Router.profileEdit = false; Router.userMenu = null
@@ -228,6 +230,7 @@ class Shots {
     @Test fun ob1Ko() { fresh(); shot("50_ob1_ko", "ko", Scr.Ob1) }
     @Test fun ob2() { fresh(); shot("51_ob2", s = Scr.Ob2) }
     @Test fun ob3Ko() { fresh(); shot("52_ob3_ko", "ko", Scr.Ob3) }
+    @Test fun ob3Allowed() { fresh(); Health.api = FakeHealth(); shot("52_ob3_health_allowed", "en", Scr.Ob3) }
     @Test fun authSignup() { fresh(); Router.toAuth(Scr.Account); shot("53_auth", s = Scr.Auth) }
     @Test fun authSigninKo() { fresh(); Router.toAuth(Scr.Splash, "signin"); shot("53_auth_signin_ko", "ko", Scr.Auth) }
     @Test fun code() { fresh(); Router.email = "me@example.com"; Router.code = "123"; shot("54_code", s = Scr.Code) }

@@ -19,7 +19,6 @@
 
 /* 시작 3단계 · 가입 (안드로이드) */
 "Connect your watch" = "워치 연결";
-"Workouts and heart rate are measured on your watch. Allow location for outdoor run pace." = "운동 기록과 심박은 워치에서 측정해요. 야외 러닝 페이스를 위해 위치를 허용해 주세요.";
 "Connects with the watch app" = "워치 앱과 함께 연결돼요";
 "Continue with Google" = "Google로 계속하기";
 "Sign-in comes in a later Android build." = "로그인은 다음 안드로이드 빌드에 들어가요.";
@@ -57,3 +56,10 @@
 "Workout reminders" = "운동 알림";
 "Workout in progress" = "운동 기록 중";
 "Recording on your phone" = "폰으로 기록하고 있어요";
+
+/* Health Connect (6-3) */
+"Health Connect" = "헬스 커넥트";
+"Workouts and heart rate are measured on your watch. Please allow access to Health Connect." = "운동 기록과 심박은 워치에서 측정해요. 헬스 커넥트 접근을 허용해 주세요.";
+"Install Health Connect" = "헬스 커넥트 설치 필요";
+"Not available on this phone" = "이 폰에서는 쓸 수 없어요";
+"Filled in from Health Connect. Change anything that isn't right." = "헬스 커넥트에서 가져왔어요. 다른 부분이 있으면 고쳐 주세요.";

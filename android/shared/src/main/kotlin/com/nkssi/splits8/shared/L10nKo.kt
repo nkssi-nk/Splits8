@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1528).apply {
+        HashMap<String, String>(1536).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -269,6 +269,7 @@ internal object L10nKo {
         m["Fastest km: [y]%@[/y] (%@)."] = "가장 빠른 구간: [y]%1\$@[/y] (%2\$@)."
         m["Fastest: [g]%@[/g] (%@). Slowest: [r]%@[/r] (%@)."] = "가장 빠른 러닝: [g]%1\$@[/g] (%2\$@), 가장 느린 러닝: [r]%3\$@[/r] (%4\$@)."
         m["Filled in from Apple Health. Change anything that isn't right."] = "건강 앱에서 가져왔어요. 다른 부분이 있으면 고쳐 주세요."
+        m["Filled in from Health Connect. Change anything that isn't right."] = "헬스 커넥트에서 가져왔어요. 다른 부분이 있으면 고쳐 주세요."
         m["Find event"] = "대회 찾기"
         m["Finish"] = "완료"
         m["First half"] = "전반부"
@@ -314,14 +315,15 @@ internal object L10nKo {
         m["Have you raced HYROX before?"] = "HYROX 대회에 나가 본 적 있나요?"
         m["Have you raced HYROX? We'll set your division to match."] = "HYROX 대회에 나가 본 적 있나요? 나간 디비전에 맞춰 설정해 드려요."
         m["Haze"] = "헤이즈"
+        m["Health Connect"] = "헬스 커넥트"
         m["Health data"] = "건강 데이터"
         m["Heart rate peaked on [y]%@[/y] (%lld)."] = "심박이 가장 높았던 곳: [y]%1\$@[/y] (%2\$lld)."
         m["Heart rate rose [r]%lld bpm[/r] in the second half while your pace held."] = "페이스는 그대로인데 후반 심박이 [r]%lld[/r] 올랐어요."
         m["Heart rate zone change"] = "심박 존이 바뀔 때"
-        m["Heart rate zones"] = "심박 존"
-        m["Heart rate, workouts, distance"] = "심박, 운동, 거리"
     }
     private fun part2(m: HashMap<String, String>) {
+        m["Heart rate zones"] = "심박 존"
+        m["Heart rate, workouts, distance"] = "심박, 운동, 거리"
         m["Heavy"] = "짙게"
         m["Height and weight"] = "키와 몸무게"
         m["Height · Weight"] = "키 · 몸무게"
@@ -336,6 +338,7 @@ internal object L10nKo {
         m["Indoor (treadmill)"] = "실내 (러닝머신)"
         m["Indoor · 1 km splits"] = "실내 · 1km 스플릿"
         m["Insights"] = "분석"
+        m["Install Health Connect"] = "헬스 커넥트 설치 필요"
         m["Intervals"] = "인터벌"
         m["Intervals · heart rate · calories"] = "인터벌 · 심박 · 칼로리"
         m["It won't be saved here, on iPhone or in Health."] = "워치 · 아이폰 · 건강 앱 어디에도 저장되지 않습니다."
@@ -404,6 +407,7 @@ internal object L10nKo {
         m["No. %lld"] = "%lld번째"
         m["None"] = "없음"
         m["None yet"] = "아직 없어요"
+        m["Not available on this phone"] = "이 폰에서는 쓸 수 없어요"
         m["Not connected"] = "연결 안 됨"
         m["Not now"] = "다음에"
         m["Not on the list? "] = "목록에 없나요? "
@@ -468,12 +472,12 @@ internal object L10nKo {
         m["REMINDER"] = "알림"
         m["REPS"] = "개"
         m["REQUESTS"] = "받은 요청"
+    }
+    private fun part3(m: HashMap<String, String>) {
         m["RUN"] = "러닝"
         m["RUN AVG"] = "평균 러닝"
         m["RUN FATIGUE"] = "러닝 피로도"
         m["RUN PACE"] = "러닝 페이스"
-    }
-    private fun part3(m: HashMap<String, String>) {
         m["Race"] = "레이스"
         m["Race day"] = "대회 날"
         m["Race day · %@"] = "대회 날 · %@"
@@ -620,12 +624,12 @@ internal object L10nKo {
         m["THIS MONTH"] = "이번 달"
         m["THIS WEEK"] = "이번 주"
         m["TIME IN ZONES"] = "존별 시간"
+    }
+    private fun part4(m: HashMap<String, String>) {
         m["TOTAL"] = "합계"
         m["TOTAL "] = "합계 "
         m["TOTAL TIME"] = "총 시간"
         m["TYPE"] = "종류"
-    }
-    private fun part4(m: HashMap<String, String>) {
         m["Tap Allow to pair"] = "허용을 누르면 연결돼요"
         m["Tap runs and stations above\nto add them here in order"] = "위에서 러닝과 스테이션을 누르면\n여기에 순서대로 쌓여요"
         m["Tap to add"] = "탭해서 추가"
@@ -708,7 +712,7 @@ internal object L10nKo {
         m["Workout reminders"] = "운동 알림"
         m["Workouts"] = "운동"
         m["Workouts and heart rate are measured on Apple Watch. Please allow access to Health data."] = "운동 기록과 심박은 Apple Watch에서 측정해요. 건강 데이터 접근을 허용해 주세요."
-        m["Workouts and heart rate are measured on your watch. Allow location for outdoor run pace."] = "운동 기록과 심박은 워치에서 측정해요. 야외 러닝 페이스를 위해 위치를 허용해 주세요."
+        m["Workouts and heart rate are measured on your watch. Please allow access to Health Connect."] = "운동 기록과 심박은 워치에서 측정해요. 헬스 커넥트 접근을 허용해 주세요."
         m["Workouts, time and calories this week."] = "이번 주 운동 횟수 · 시간 · 칼로리."
         m["Worldwide medians (2025/26 season) at this finish time — not an official ranking."] = "같은 완주 시간대 전 세계 기록(2025/26 시즌)의 중간값이에요. 공식 순위는 아니에요."
         m["Yellow"] = "노랑"
@@ -772,12 +776,12 @@ internal object L10nKo {
         m["or"] = "또는"
         m["or start PFT on your Apple Watch"] = "또는 Apple Watch에서 PFT를 시작하세요"
         m["or start PFT on your watch"] = "또는 워치에서 PFT를 시작하세요"
+    }
+    private fun part5(m: HashMap<String, String>) {
         m["per km"] = "km당"
         m["races"] = "레이스"
         m["sims"] = "풀 시뮬"
         m["unit.h"] = "시간"
-    }
-    private fun part5(m: HashMap<String, String>) {
         m["unit.m"] = "분"
         m["unit.s"] = "초"
         m["unit.workouts"] = "회"

@@ -12,6 +12,7 @@ junit = "4.13.2"
 robolectric = "4.17"
 credentials = "1.5.0"
 googleid = "1.1.1"
+healthConnect = "1.1.0"
 roborazzi = "1.76.0"
 
 [libraries]
@@ -30,6 +31,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 androidx-credentials-play = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 junit = { module = "junit:junit", version.ref = "junit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }

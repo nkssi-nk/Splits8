@@ -96,6 +96,7 @@ import com.nkssi.splits8.ui.tap
 import com.nkssi.splits8.ui.yellowFill
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.nkssi.splits8.Health
 import java.time.Year
 
 // 아이폰 OnboardingViews.swift (시작 3단계) · AuthViews.swift (이메일 · 코드 · 닉네임) ·
@@ -228,8 +229,9 @@ fun Onboarding2() {
 }
 
 /**
- * 워치 연결: 안드로이드는 지금 위치 권한만 실제로 물어봄 (야외 러닝 페이스).
- * 갤럭시 워치 · Health Connect 연결은 워치 앱 (7단계) · 건강 앱 (6단계) 에서 붙임 — 그 줄은 그렇다고 알려 줌
+ * 워치 연결: 위치(야외 러닝 페이스) + Health Connect(운동 · 심박 저장, 키 · 몸무게) 를 물어봄.
+ * 갤럭시 워치 연결은 워치 앱 (7단계) 에서 붙임 — 그 줄은 그렇다고 알려 줌.
+ * Health Connect 가 없는 폰(안드로이드 13 이하)은 그 줄을 누르면 Play 스토어로.
  */
 @Composable
 fun Onboarding3() {
@@ -238,19 +240,53 @@ fun Onboarding3() {
     fun locOK() = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     var loc by remember { mutableStateOf(locOK()) }
+    var hcStatus by remember { mutableIntStateOf(Health.status(ctx)) }
+    var health by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { health = Health.connected(ctx) }
+    // 다른 화면(Play 스토어 · Health Connect)에서 돌아오면 다시 확인
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { hcStatus = Health.status(ctx); loc = locOK() }
+        }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+    val scope = rememberCoroutineScope()
+    val askHealth = rememberLauncherForActivityResult(Health.api.contract()) { got ->
+        health = got.containsAll(Health.writePerms)
+        scope.launch { health = health || Health.connected(ctx) }
+        asked = true
+    }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
-        loc = r.values.any { it } || locOK(); asked = true
+        loc = r.values.any { it } || locOK()
+        if (hcStatus == Health.READY && !health) runCatching { askHealth.launch(Health.perms) }.onFailure { asked = true }
+        else asked = true
     }
     fun finish() {
         Store.update { it.copy(hasOnboarded = true) }
         Router.go(Scr.Home)
     }
-    ObFrame(3, "Connect your watch", "Workouts and heart rate are measured on your watch. Allow location for outdoor run pace.",
-        if (asked || loc) "Start training" else "Allow & connect",
-        { if (asked || loc) finish() else ask.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) }) {
+    val done = asked || (loc && (health || hcStatus != Health.READY))
+    ObFrame(3, "Connect your watch", "Workouts and heart rate are measured on your watch. Please allow access to Health Connect.",
+        if (done) "Start training" else "Allow & connect",
+        {
+            when {
+                done -> finish()
+                !loc -> ask.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                else -> runCatching { askHealth.launch(Health.perms) }.onFailure { asked = true }
+            }
+        }) {
         Column(Modifier.fillMaxWidth().card8()) {
             PermRow("i_permWatch", "Watch", "Connects with the watch app", false, false)
-            PermRow("i_permHealth", "Health data", "Connects with the watch app", false, false)
+            val hSub = when {
+                health -> "Allowed · heart rate, workouts"
+                hcStatus == Health.NEEDS_INSTALL -> "Install Health Connect"
+                hcStatus == Health.NONE -> "Not available on this phone"
+                else -> "Heart rate, workouts, distance"
+            }
+            PermRow("i_permHealth", "Health Connect", hSub, health, false,
+                Modifier.testTag("ob.health"), onClick = if (hcStatus == Health.NEEDS_INSTALL) ({ Health.install(ctx) }) else null)
             PermRow("i_permLoc", "Location", if (loc) "Allowed · outdoor runs" else "Outdoor run pace (optional)", loc, true)
         }
         Note8("No account needed. Records are saved only on this device.")
@@ -259,8 +295,8 @@ fun Onboarding3() {
 
 /** 36 사각 아이콘 (허용 전 #2C2C2E / 후 초록 0.15) · 이름 17/500 · 설명 13 · 초록 체크 */
 @Composable
-private fun PermRow(icon: String, name: String, sub: String, on: Boolean, last: Boolean) {
-    Row(Modifier.fillMaxWidth().rowLine(!last).padding(vertical = 16.dp, horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically,
+private fun PermRow(icon: String, name: String, sub: String, on: Boolean, last: Boolean, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    Row(modifier.fillMaxWidth().rowLine(!last).let { if (onClick != null) it.tap { onClick() } else it }.padding(vertical = 16.dp, horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(if (on) C.good.copy(alpha = 0.15f) else C.control), contentAlignment = Alignment.Center) {
             Glyph(icon, 18.dp, if (on) C.good else Color.White)
@@ -538,6 +574,17 @@ fun ProfileSetupView() {
     var year by remember { mutableIntStateOf(s0.birthYear ?: 1990) }
     var height by remember { mutableIntStateOf(s0.heightCm ?: if (s0.sex == "W") 163 else 175) }
     var weight by remember { mutableIntStateOf(kotlin.math.round(s0.weightKg ?: if (s0.sex == "W") 58.0 else 75.0).toInt()) }
+    // Health Connect 키 · 몸무게로 비어 있는 칸만 채움 (고치는 중에는 안 함 — 아이폰 prefill 과 같음)
+    var fromHealth by remember { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) {
+        if (editing || Store.demo || (s0.heightCm != null && s0.weightKg != null)) return@LaunchedEffect
+        val v = Health.body(ctx)
+        var any = false
+        if (s0.heightCm == null) v.heightCm?.takeIf { it in 120..220 }?.let { height = it; any = true }
+        if (s0.weightKg == null) v.weightKg?.toInt()?.takeIf { it in 30..200 }?.let { weight = it; any = true }
+        if (any) fromHealth = true
+    }
 
     BackAction(if (editing) ({ Router.go(Scr.Account) }) else if (step > 1) ({ step -= 1 }) else null)
 
@@ -643,6 +690,7 @@ fun ProfileSetupView() {
                         Wheel8((30..200).toList(), weight, Modifier.padding(top = 6.dp), { "$it kg" }, "profile.weight") { weight = it }
                     }
                 }
+                if (fromHealth) Note8("Filled in from Health Connect. Change anything that isn't right.", Modifier.testTag("profile.fromHealth"))
             }
         }
         Spacer(Modifier.weight(1f))

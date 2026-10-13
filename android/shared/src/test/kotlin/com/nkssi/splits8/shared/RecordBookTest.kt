@@ -159,4 +159,20 @@ class RecordBookTest {
             " on your average run." to null), p)
         assertEquals(listOf("[y]open" to null), Insights.pieces("[y]open"))
     }
+
+    /** 아이폰 고칠점 1: 결승 차이는 "VS GOAL" 칸과 같은 계산 (Roxzone 포함 총 시간 − 목표) */
+    @Test fun raceFinishLineMatchesVsGoal() {
+        // 런 1 은 목표보다 10초 빠름(앞섬) → SkiErg 에서 60초 늦음(뒤짐) → Roxzone 15번을 목표보다 20초씩 빨리 (5분 이득)
+        val runs = listOf(260) + List(7) { 270 }
+        val sts = listOf(300) + List(7) { 240 }
+        val base = sim("2026-09-13T00:00:00Z", runs, sts, rox = 10, mode = Mode.Race)
+        // 목표보다 27초 빨리 끝남 → "결승에서 +…" 줄은 나오면 안 됨 (예전에는 구간 합 +50초로 나왔음)
+        val ahead = base.copy(goal = base.total + 27)
+        assertTrue(Insights.make(ahead, RecordBook(listOf(ahead), Settings())).none { it.id == 5 })
+        // 목표보다 50초 늦게 끝남 → 나오고, 숫자는 총 시간 차이
+        val behind = base.copy(goal = base.total - 50)
+        val line = Insights.make(behind, RecordBook(listOf(behind), Settings())).first { it.id == 5 }
+        assertTrue(line.text.contains("[y]SkiErg[/y]"))
+        assertTrue(line.text.contains("50"))
+    }
 }

@@ -87,6 +87,28 @@ def gen_l10n():
     return len(items)
 
 
+def gen_widget_l10n():
+    """아이폰 위젯 확장의 한국어 (Widgets/ko.lproj) → WidgetKo.kt. 앱 표와 열쇠가 겹쳐도 뜻이 달라서 따로 둠 (BEST = 최고 / 최고 기록)"""
+    w = read_strings(os.path.join(ROOT, "Widgets/ko.lproj/Localizable.strings"))
+    items = sorted(w.items())
+    lines = [
+        "// 자동 생성 — 직접 고치지 말 것. android/tools/gen_from_ios.py",
+        "// 원본: Widgets/ko.lproj/Localizable.strings (아이폰 위젯)",
+        "package com.nkssi.splits8.shared",
+        "",
+        "/** 홈 화면 위젯 한국어 (앱 표보다 먼저 봄) */",
+        "object WidgetKo {",
+        "    private val map: Map<String, String> = hashMapOf(",
+    ]
+    for k, v in items:
+        lines.append("        %s to %s," % (kstr(k), kstr(v)))
+    lines += ["    )", "", "    /** 위젯 글자: 한국어면 위젯 표 → 앱 표 */",
+              "    fun t(key: String): String = if (L10n.isKorean) map[key] ?: L10n.t(key) else L10n.t(key)", "}"]
+    with open(os.path.join(OUT, "WidgetKo.kt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return len(items)
+
+
 ROW = re.compile(r"\(band:\s*(\d+),\s*run:\s*(\d+),\s*st:\s*\[([\d,\s]+)\],\s*rox:\s*(\d+)\)")
 TABLE = re.compile(r"static let (\w+): \[\(band")
 
@@ -177,6 +199,7 @@ if __name__ == "__main__":
     n = gen_l10n()
     b = gen_bench()
     print("L10nKo:", n, "entries")
+    print("WidgetKo:", gen_widget_l10n(), "entries")
     print("Bench rows:", b)
     print("Images:", gen_images())
     sys.exit(0)

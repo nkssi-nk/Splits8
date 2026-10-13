@@ -21,7 +21,23 @@ import java.time.Instant
 import kotlin.math.max
 
 /** 폰으로 기록 시작 요청 (트레이닝이면 프로그램, 끝나거나 취소하면 돌아갈 화면) */
+@kotlinx.serialization.Serializable
 data class PhoneRunRequest(val mode: Mode, val program: Program? = null, val from: Scr = Scr.Home)
+
+/**
+ * 진행 중인 폰 기록을 파일로 (앱이 완전히 꺼져도 다시 열면 이어서). 시간은 시계 기준이라 꺼져 있던 동안도 그대로 흐름
+ */
+@kotlinx.serialization.Serializable
+data class PhoneRunSnapshot(
+    val req: PhoneRunRequest, val savedAt: Long,
+    val mode: Mode, val title: String, val sets: Int, val seq: List<Seg>, val idx: Int, val splits: List<Int>, val running: Boolean,
+    val startMs: Long, val segStart: Long, val pauseAt: Long?, val segPaused: Long,
+    val useGPS: Boolean, val segDist: Double, val segDists: List<Double?>,
+    val division: String, val goalTime: Int, val simWord: String, val hasPFTBest: Boolean,
+    val kind: String?, val runKm: Int, val place: String?, val route: List<RoutePt>,
+    val steps: Double, val rawSteps: Double, val pausedSteps: Double, val pauseStepAt: Double, val segStepStart: Double,
+    val segSteps: List<Double?>,
+)
 
 /**
  * 워치 없이 폰으로 기록 (아이폰 PhoneRunEngine 과 같은 규칙). 큰 Next 버튼으로 구간을 넘김. 심박 없음.
@@ -50,6 +66,11 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     private var last: RoutePt? = null
 
     private var settings = Settings()
+    /** 진행 상태가 바뀔 때 (파일에 저장) */
+    var onChange: (() -> Unit)? = null
+    /** 다시 열었을 때 이어 받은 걸음 (센서는 0 부터 다시 셈) */
+    private var stepCarry = 0.0
+    private var request: PhoneRunRequest? = null
     private var simWord = "VS BEST"
     private var hasPFTBest = false
 
@@ -145,6 +166,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
 
     fun start(req: PhoneRunRequest) {
         if (active) return
+        request = req
         settings = Store.settings
         simWord = simPick().second
         hasPFTBest = Store.book.pftBest != null
@@ -166,6 +188,33 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         segSteps = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
         steps = 0.0; rawSteps = 0.0; pausedSteps = 0.0; pauseStepAt = 0.0; segStepStart = 0.0
         useGPS = if (isRunKind) !(req.program?.indoor ?: true) else req.mode != Mode.Race && settings.runMode == "outdoor"
+        changed()
+    }
+
+    private fun changed() = onChange?.invoke()
+
+    /** 지금 상태 (진행 중일 때만) */
+    fun snapshot(): PhoneRunSnapshot? {
+        val req = request ?: return null
+        if (!active || finished) return null
+        return PhoneRunSnapshot(req, clock(), mode, title, sets, seq, idx, splits, running, startMs, segStart, pauseAt, segPaused,
+            useGPS, segDist, segDists.toList(), settings.division, settings.goalTime, simWord, hasPFTBest, kind, runKm, place, route.toList(),
+            steps, rawSteps, pausedSteps, pauseStepAt, segStepStart, segSteps.toList())
+    }
+
+    /** 파일에서 이어 받기 (앱을 다시 열었을 때) */
+    fun restore(x: PhoneRunSnapshot) {
+        request = x.req
+        settings = Store.settings.copy(division = x.division, goalTime = x.goalTime)
+        mode = x.mode; title = x.title; sets = x.sets; seq = x.seq; idx = x.idx; splits = x.splits; running = x.running
+        startMs = x.startMs; segStart = x.segStart; pauseAt = x.pauseAt; segPaused = x.segPaused
+        useGPS = x.useGPS; segDist = x.segDist; segDists = ArrayList(x.segDists); last = null
+        simWord = x.simWord; hasPFTBest = x.hasPFTBest; kind = x.kind; runKm = x.runKm; place = x.place
+        route = ArrayList(x.route); lastRoute = x.route.lastOrNull()
+        steps = x.steps; rawSteps = x.rawSteps; pausedSteps = x.pausedSteps; pauseStepAt = x.pauseStepAt; segStepStart = x.segStepStart
+        segSteps = ArrayList(x.segSteps); stepCarry = x.rawSteps
+        undoPoint = null; canUndo = false; autoDone = null; autoSplits = 0
+        finished = false; active = true
     }
 
     /** HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임 */
@@ -193,6 +242,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         segStart = now; segPaused = 0
         segDist = 0.0
         segStepStart = steps
+        changed()
         return null
     }
 
@@ -217,6 +267,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         segStepStart = u.segStepStart
         undoPoint = null
         canUndo = false
+        changed()
     }
 
     fun togglePause() {
@@ -232,6 +283,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
             pausedSteps += max(0.0, rawSteps - pauseStepAt)
             steps = max(0.0, rawSteps - pausedSteps)
         }
+        changed()
     }
 
     /** End → Save: 현재 구간까지 기록하고 끝냄 */
@@ -245,6 +297,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     /** End → Discard */
     fun discard() {
         active = false; finished = true
+        changed()
     }
 
     private fun closeSeg(now: Long) {
@@ -257,6 +310,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     private fun finish(complete: Boolean): Record {
         undoPoint = null; canUndo = false
         finished = true
+        changed()
         return makeRecord(complete)
     }
 
@@ -286,8 +340,8 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     /** 운동 시작부터 걸음 수 */
     fun gotSteps(n: Double) {
         if (!active || finished) return
-        rawSteps = n
-        if (running) steps = max(0.0, n - pausedSteps)
+        rawSteps = n + stepCarry
+        if (running) steps = max(0.0, rawSteps - pausedSteps)
     }
 
     /**
@@ -327,5 +381,6 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         segDist = 0.0
         segStepStart = steps
         autoSplits++
+        changed()
     }
 }

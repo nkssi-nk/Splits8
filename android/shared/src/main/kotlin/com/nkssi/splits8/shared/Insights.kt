@@ -187,9 +187,13 @@ object Insights {
                 cum += s.time - s.target
                 if (cum <= 0) wasAhead = true else if (wasAhead && aheadUntil == null && s.kind == SegKind.St) aheadUntil = s.name
             }
-            if (aheadUntil != null && cum >= MIN_DIFF) {
+            // 결승 차이는 기록 화면 위 "VS GOAL" 칸과 같은 계산 (Roxzone 포함 총 시간 − 목표 시간).
+            // 예전에는 Roxzone 을 뺀 구간 합으로 계산해서, 목표보다 빨리 끝났는데도 "결승에서 +2:13" 처럼 반대로 나왔음
+            val goal = r.goal ?: r.vsTarget
+            val finish = goal?.let { r.total - it }
+            if (aheadUntil != null && finish != null && finish >= MIN_DIFF) {
                 o.add(Insight(5, "goal", BIG, Insight.Mark.Time,
-                    t("Ahead of goal until [y]%@[/y], then [r]+%@[/r] by the finish.", aheadUntil, sec(cum))))
+                    t("Ahead of goal until [y]%@[/y], then [r]+%@[/r] by the finish.", aheadUntil, sec(finish))))
             }
         }
         // 6 지난번과

@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Splits8</string>
+    <!-- 위젯 고르는 화면 (아이폰 위젯 이름 · 설명과 같음) -->
+    <string name="widget_dday_name">Next race</string>
+    <string name="widget_dday_desc">Days to your next race.</string>
+    <string name="widget_week_name">This week</string>
+    <string name="widget_week_desc">Workouts, time and calories this week.</string>
 </resources>

@@ -212,7 +212,7 @@ object Router {
     var phoneClock: () -> Long = { System.currentTimeMillis() }
 
     fun startOnPhone(mode: Mode, program: Program?) {
-        phoneEngine = PhoneRunEngine(phoneClock)
+        phoneEngine = PhoneRunEngine(phoneClock).also { watchPhoneRun(it) }
         phoneRun = PhoneRunRequest(mode, program, scr)
         go(Scr.PhoneLive)
     }
@@ -228,6 +228,17 @@ object Router {
 
     fun start() {
         scr = if (Store.settings.hasOnboarded) Scr.Home else Scr.Splash
+        // 폰으로 기록하던 중 앱이 꺼졌으면 그 화면으로 이어서 (3 · 2 · 1 없이)
+        Store.loadPhoneRun()?.let { x ->
+            phoneEngine = PhoneRunEngine(phoneClock).also { it.restore(x); watchPhoneRun(it) }
+            phoneRun = x.req
+            scr = Scr.PhoneLive
+        }
+    }
+
+    /** 진행 상태가 바뀔 때마다 파일에 (끝나면 지움) */
+    fun watchPhoneRun(e: PhoneRunEngine) {
+        e.onChange = { Store.savePhoneRun(e.snapshot()) }
     }
 
     fun go(s: Scr) {

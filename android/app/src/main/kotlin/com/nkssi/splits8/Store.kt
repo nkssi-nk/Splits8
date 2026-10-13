@@ -137,6 +137,8 @@ object Store {
         if (!demo) Cloud.settingsChanged(old, settings)
         // 대회를 바꾸면 대회 알림 (일주일 전 · 전날) 다시
         if (!demo && old.event != settings.event) Reminders.scheduleRace(settings.event)
+        if (!demo && (old.event != settings.event || old.goalTime != settings.goalTime || old.division != settings.division ||
+                old.lang != settings.lang)) widgets()
     }
 
     /** 트레이닝 저장 (같은 id 면 바꿈, 새것은 맨 위 — 아이폰과 같음) */
@@ -303,9 +305,27 @@ object Store {
             val fresh = r.filter { x -> records.none { it.id.equals(x.id, ignoreCase = true) } }
             records = r; rebuild(); save("records.json", ListSerializer(Record.serializer()), records)
             fresh.forEach { Cloud.upload(it) }
+            widgets()
         }
         if (np > 0) { programs = p; save("programs.json", ListSerializer(Program.serializer()), programs) }
         return nr to np
+    }
+
+    // MARK: 진행 중인 폰 기록 (앱이 꺼져도 이어서)
+
+    /** 저장 (null = 지움). 기록이 끝나거나 버리면 지움 */
+    fun savePhoneRun(x: PhoneRunSnapshot?) {
+        if (demo) return
+        val f = dir?.let { File(it, "phone_run.json") } ?: return
+        if (x == null) { f.delete(); return }
+        save("phone_run.json", PhoneRunSnapshot.serializer(), x)
+    }
+
+    /** 이어서 할 기록 (12시간이 넘은 것은 버림) */
+    fun loadPhoneRun(): PhoneRunSnapshot? {
+        val x = load("phone_run.json", PhoneRunSnapshot.serializer()) ?: return null
+        if (now().toEpochMilli() - x.startMs > 12 * 3600_000L) { savePhoneRun(null); return null }
+        return x
     }
 
     /** 폰으로 기록한 것 (source = "phone") */
@@ -317,6 +337,7 @@ object Store {
         rebuild()
         save("records.json", ListSerializer(Record.serializer()), records)
         Cloud.upload(r)
+        widgets()
     }
 
     /** 더블 파트너 닉네임 바꾸기 (null = 빼기). 기기에만 저장 */
@@ -333,7 +354,11 @@ object Store {
         rebuild()
         save("records.json", ListSerializer(Record.serializer()), records)
         Cloud.deleteRecord(r.id)
+        widgets()
     }
+
+    /** 홈 화면 위젯 새로 그리기 */
+    private fun widgets() { if (!demo) Reminders.context?.let { Widgets.refresh(it) } }
 
     private fun rebuild() {
         book = RecordBook(records, settings, friend)

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_dday_name">다음 대회</string>
+    <string name="widget_dday_desc">다음 대회까지 남은 날.</string>
+    <string name="widget_week_name">이번 주</string>
+    <string name="widget_week_desc">이번 주 운동 횟수 · 시간 · 칼로리.</string>
+</resources>

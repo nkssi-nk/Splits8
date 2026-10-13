@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2×2 로 시작, 가로로 늘리면 가로형 (아이폰 Small · Medium). 30분마다 (날이 바뀌면 D-day · 이번 주가 바뀜) -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp" android:minHeight="110dp"
+    android:minResizeWidth="110dp" android:minResizeHeight="110dp"
+    android:targetCellWidth="2" android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_image"
+    android:previewImage="@drawable/widget_week_preview"
+    android:description="@string/widget_week_desc"
+    android:widgetCategory="home_screen" />

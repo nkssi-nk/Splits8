@@ -25,6 +25,18 @@ import kotlinx.coroutines.delay
 import androidx.lifecycle.repeatOnLifecycle
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        openFrom(intent)
+    }
+
+    /** 위젯을 눌러서 열었을 때 (다음 대회 → Race 탭, 이번 주 → 홈). 폰으로 기록 중이면 그 화면 그대로 */
+    private fun openFrom(i: android.content.Intent?) {
+        val to = when (i?.getStringExtra("open")) { "race" -> Scr.Race; "home" -> Scr.Home; else -> return }
+        if (Router.scr == Scr.PhoneLive || !Store.settings.hasOnboarded) return
+        Router.go(to)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -36,6 +48,7 @@ class MainActivity : ComponentActivity() {
         if (Supabase.isConfigured) Accounts.api = SupabaseAccounts
         GoogleSignIn.activity = java.lang.ref.WeakReference(this)
         if (savedInstanceState == null) Router.start()
+        openFrom(intent)
         setContent { App(showLogo = savedInstanceState == null) }
     }
 }

@@ -173,7 +173,12 @@ fun PhoneLiveView() {
     }
     // 0.25초마다 시간 다시 그림
     LaunchedEffect(Unit) {
-        while (true) { now = Router.phoneClock(); delay(250) }
+        var n = 0
+        while (true) {
+            now = Router.phoneClock(); delay(250)
+            // 5초마다 진행 상태 저장 (GPS 거리 · 경로 · 걸음까지 — 앱이 꺼져도 이어서)
+            if (++n % 20 == 0 && eng.active && !eng.finished) Store.savePhoneRun(eng.snapshot())
+        }
     }
     // GPS 러닝이 총거리를 다 뛰어서 저절로 끝남
     LaunchedEffect(eng.autoDone) { eng.autoDone?.let { success(); done(it) } }

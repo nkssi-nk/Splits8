@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1450).apply {
+        HashMap<String, String>(1452).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -732,6 +732,7 @@ internal object L10nKo {
         m["nickname"] = "닉네임"
         m["or"] = "또는"
         m["or start PFT on your Apple Watch"] = "또는 Apple Watch에서 PFT를 시작하세요"
+        m["or start PFT on your watch"] = "또는 워치에서 PFT를 시작하세요"
         m["per km"] = "km당"
         m["races"] = "레이스"
         m["sims"] = "풀 시뮬"

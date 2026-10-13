@@ -73,6 +73,7 @@ import java.time.YearMonth
 fun Overlays() {
     Sheet8(Router.bonus, onClose = { Router.bonus = null }) { req -> BonusSheet(req) }
     Sheet8(Router.planRequest, onClose = { Router.planRequest = null }, large = true) { req -> PlanSheet(req) }
+    Sheet8(Router.testInfo, onClose = { Router.testInfo = null }, large = true) { k -> TestInfoSheet(k) }
     AskHost()
 }
 

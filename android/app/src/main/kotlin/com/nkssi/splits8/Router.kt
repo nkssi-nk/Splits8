@@ -153,6 +153,8 @@ object Router {
     var bonus by mutableStateOf<BonusRequest?>(null)
     var planRequest by mutableStateOf<PlanRequest?>(null)
     var ask by mutableStateOf<Ask?>(null)
+    /** Test 탭 설명 시트: "pft" / "sim" / null */
+    var testInfo by mutableStateOf<String?>(null)
 
     fun openPlan(date: java.time.Instant, mode: Mode = Mode.Training, existing: PlannedWorkout? = null) {
         planRequest = PlanRequest(date, if (mode == Mode.Sim) Mode.Sim else Mode.Training, existing)
@@ -253,6 +255,7 @@ object Router {
         if (ask != null) { ask = null; return true }
         if (bonus != null) { bonus = null; return true }
         if (planRequest != null) { planRequest = null; return true }
+        if (testInfo != null) { testInfo = null; return true }
         backAction?.let { it(); return true }
         barBack?.let { it.second(); return true }
         if (scr.showsTabs && scr != Scr.Home) { go(Scr.Home); return true }

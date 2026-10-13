@@ -6,3 +6,4 @@
 "Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)." = "폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함).";
 "The first time you turn on a reminder, your phone will ask to allow notifications." = "알림을 처음 켜면 폰이 알림 허용을 물어봐요.";
 "Phone recording comes in a later Android build." = "폰으로 기록하기는 다음 안드로이드 빌드에 들어가요.";
+"or start PFT on your watch" = "또는 워치에서 PFT를 시작하세요";

@@ -40,7 +40,8 @@ class Shots {
     }
 
     @After fun tearDown() {
-        Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null
+        Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
+        Router.testTab = "pft"
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -117,6 +118,33 @@ class Shots {
         rule.onRoot().captureRoboImage("$out/15_plan_time.png")
         Router.planRequest = null
     }
+
+    // MARK: Test 탭 (4-3)
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2000dp-xxhdpi")
+    @Test fun pftDemo() { demoTraining(); Router.testTab = "pft"; shot("20_pft", s = Scr.Sim) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2000dp-xxhdpi")
+    @Test fun pftEmptyKo() {
+        Store.useDemo(Settings(hasOnboarded = true), Program.presets(), emptyList())
+        Router.testTab = "pft"; shot("21_pft_empty_ko", "ko", Scr.Sim)
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2800dp-xxhdpi")
+    @Test fun simDemo() { demoTraining(); Router.testTab = "sim"; shot("22_sim", s = Scr.Sim) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2800dp-xxhdpi")
+    @Test fun simDemoKo() { demoTraining("ko"); Router.testTab = "sim"; shot("22_sim_ko", "ko", Scr.Sim) }
+
+    @Test fun simEmpty() {
+        Store.useDemo(Settings(hasOnboarded = true), Program.presets(), emptyList())
+        Router.testTab = "sim"; shot("23_sim_empty", s = Scr.Sim)
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1600dp-xxhdpi")
+    @Test fun pftInfoKo() { demoTraining("ko"); Router.testTab = "pft"; Router.testInfo = "pft"; shot("24_pft_info_ko", "ko", Scr.Sim) }
+
+    @Test fun simInfo() { demoTraining(); Router.testTab = "sim"; Router.testInfo = "sim"; shot("25_sim_info", s = Scr.Sim) }
 
     @Test fun limitAlertKo() {
         demoTraining("ko")

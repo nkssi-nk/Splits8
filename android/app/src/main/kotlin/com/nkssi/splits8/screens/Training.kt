@@ -320,18 +320,22 @@ fun ShareTrainingButton(program: Program) {
 fun StartOnPhoneButton(mode: Mode, program: Program?, before: (() -> Unit)? = null) {
     Row(
         Modifier.height(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f))
-            .press(0.96f, tag = "startOnPhone." + mode.name.lowercase()) {
-                Router.ask = Ask(
-                    "Start on phone?",
-                    "Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs).",
-                    ok = "Start",
-                ) { before?.invoke(); Router.startOnPhone(mode, program) }
-            }.padding(horizontal = 14.dp),
+            .press(0.96f, tag = "startOnPhone." + mode.name.lowercase()) { askStartOnPhone(mode, program, before) }
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Sym(R.drawable.sym_phone, 15.dp)
         T("Start on phone", F.t(14, W600), maxLines = 1)
     }
+}
+
+/** 폰으로 시작 전 확인 창 (폰 기록은 심박 등을 못 씀) */
+fun askStartOnPhone(mode: Mode, program: Program? = null, before: (() -> Unit)? = null) {
+    Router.ask = Ask(
+        "Start on phone?",
+        "Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs).",
+        ok = "Start",
+    ) { before?.invoke(); Router.startOnPhone(mode, program) }
 }
 
 // MARK: - I2 새 트레이닝 / 고치기 (맨 위 고정 Cancel · 제목 · Save)

@@ -39,7 +39,7 @@ fun ScreenFor(s: Scr) {
         Scr.Home -> HomeView()
         Scr.Training -> TrainingView()
         Scr.Builder -> BuilderView()
-        Scr.Sim -> ComingScreen("Test")
+        Scr.Sim -> TestView()
         Scr.Race -> ComingScreen("Race")
         Scr.Settings -> ComingScreen("Settings")
         else -> ComingScreen(s.name)

@@ -13,6 +13,7 @@ import com.nkssi.splits8.shared.Program
 import com.nkssi.splits8.shared.Settings
 import com.nkssi.splits8.ui.GlowDrift
 import com.nkssi.splits8.ui.PhoneRoot
+import com.nkssi.splits8.Demo
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -40,7 +41,8 @@ class Flows {
     }
 
     @After fun tearDown() {
-        Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null
+        Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
+        Router.testTab = "pft"
     }
 
     private fun show(s: Scr) {
@@ -129,6 +131,46 @@ class Flows {
         Router.openPlan(p.date, p.mode, p); rule.waitForIdle()
         tap("plan.delete")
         assertTrue(Store.plans.isEmpty())
+    }
+
+    @Test fun testTabSwitchAndSettings() {
+        val now = java.time.Instant.parse("2026-09-25T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), Demo.records(o), Demo.friends(), me = "demo.me")
+        Router.testTab = "pft"
+        show(Scr.Sim)
+        rule.onNodeWithTag("pft.best").assertExists()
+        tap("test.seg.sim")
+        assertEquals("sim", Router.testTab)
+        rule.onNodeWithTag("predict.card").assertExists()
+        rule.onNodeWithTag("sim.fatigue").assertExists()
+        val before = Store.settings.roxAuto
+        tap("sim.rox")
+        assertEquals(!before, Store.settings.roxAuto)
+        tap("sim.metric.run")                              // 칩 바꾸기 (오류 없이)
+        tap("sim.info")
+        assertEquals("sim", Router.testInfo)
+        assertTrue(Router.back())
+        assertNull(Router.testInfo)
+        tap("sim.division")
+        assertEquals(Scr.SetDiv, Router.scr)
+        assertEquals(Scr.Sim, Router.subFrom)
+    }
+
+    @Test fun pftEmptyStartAsks() {
+        Router.testTab = "pft"
+        show(Scr.Sim)
+        rule.onNodeWithTag("pft.about").assertExists()
+        tap("startOnPhone.pft")
+        assertEquals("Start on phone?", Router.ask?.title)
+    }
+
+    @Test fun pftScalePositions() {
+        assertEquals(0f, com.nkssi.splits8.screens.pftPos(12 * 60), 0.001f)
+        assertEquals(0.44f, com.nkssi.splits8.screens.pftPos(22 * 60), 0.001f)
+        assertEquals(0.70f, com.nkssi.splits8.screens.pftPos(26 * 60), 0.001f)
+        assertEquals(1f, com.nkssi.splits8.screens.pftPos(40 * 60), 0.001f)
     }
 
     @Test fun backClosesSheetFirst() {

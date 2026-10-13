@@ -172,6 +172,7 @@ object Router {
 
     /** 프로필 화면에서 한 항목만 고치기 */
     fun editProfile(step: Int) {
+        signupFlow = false
         profileStep = step; profileEdit = true; profileNext = Scr.Account
         go(Scr.ProfileSetup)
     }
@@ -218,8 +219,45 @@ object Router {
     var authReturn by mutableStateOf(Scr.Training)
     var authMode by mutableStateOf("signup")
     fun toAuth(from: Scr, mode: String = "signup") {
-        authReturn = from; authMode = mode; go(Scr.Auth)
+        authReturn = from; authMode = mode; code = ""; nickDraft = ""; go(Scr.Auth)
     }
+    var email by mutableStateOf("")
+    var code by mutableStateOf("")
+    var nickDraft by mutableStateOf("")
+    /** 새 계정 가입 중 (닉네임 → 가입 프로필 4단계, 위 점 1 / 5) */
+    var signupFlow by mutableStateOf(false)
+
+    /** 로그인 · 가입 직후: 새 계정이면 닉네임 → 가입 프로필, 아니면 (프로필을 안 했으면) 가입 프로필 → 원래 화면 */
+    fun afterSignIn(newAccount: Boolean) {
+        if (newAccount) {
+            signupFlow = true; nickDraft = ""; go(Scr.Nick)
+        } else if (Store.settings.profileDone != true) {
+            startProfile(authReturn)
+        } else {
+            go(authReturn)
+        }
+    }
+
+    /** 닉네임을 저장한 뒤 */
+    fun afterNick() {
+        if (signupFlow && Store.settings.profileDone != true) startProfile(authReturn)
+        else { signupFlow = false; go(if (authReturn == Scr.Nick) Scr.Account else authReturn) }
+    }
+
+    /** 가입 프로필 처음부터 (끝나면 next 로) */
+    fun startProfile(next: Scr) {
+        profileStep = 1; profileEdit = false; profileNext = next
+        go(Scr.ProfileSetup)
+    }
+
+    /** 가입 프로필이 끝났거나 건너뜀 */
+    fun finishProfile() {
+        signupFlow = false
+        go(profileNext)
+    }
+
+    /** 잠깐 떴다 사라지는 안내 (2.5초) */
+    var toast by mutableStateOf<String?>(null)
 
     fun sub(s: Scr, from: Scr) {
         subFrom = from; go(s)

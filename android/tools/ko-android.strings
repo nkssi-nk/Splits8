@@ -17,3 +17,27 @@
 "Your records stay on this phone." = "기록은 이 폰에 그대로 남아요.";
 "Couldn't open the file. If it's in Google Drive, wait for it to download and try again." = "파일을 열지 못했어요. Google Drive에 있는 파일이면 내려받기가 끝난 뒤 다시 해 주세요.";
 "Account deletion comes in a later Android build." = "계정 삭제는 다음 안드로이드 빌드에 들어가요.";
+
+/* 시작 3단계 · 가입 (안드로이드) */
+"Connect your watch" = "워치 연결";
+"Workouts and heart rate are measured on your watch. Allow location for outdoor run pace." = "운동 기록과 심박은 워치에서 측정해요. 야외 러닝 페이스를 위해 위치를 허용해 주세요.";
+"Connects with the watch app" = "워치 앱과 함께 연결돼요";
+"Continue with Google" = "Google로 계속하기";
+"Sign-in comes in a later Android build." = "로그인은 다음 안드로이드 빌드에 들어가요.";
+
+/* 가입 프로필 — 빌드 24 순서 (인계-최신 3.2, 대표님 확정 문구) */
+"Have you raced HYROX before?" = "HYROX 대회에 나가 본 적 있나요?";
+"Yes, I've raced" = "네, 나가 봤어요";
+"Not yet" = "아직이에요";
+"BEST FINISH TIME" = "최고 완주 시간";
+"We use it for your default goal time, split targets and predicted finish." = "목표 시간 기본값 · 구간 목표 · 예상 완주 시간에 바로 써요.";
+"Skip the time" = "시간은 건너뛰기";
+"My division" = "내 디비전";
+"Weights and record comparisons follow this." = "무게와 기록 비교 기준이 여기에 맞춰져요.";
+"New to HYROX? We recommend Doubles (Open). You share the work with a friend, so it's easier." = "처음이라면 더블(Open)을 추천해요. 친구와 나눠서 해서 부담이 적어요.";
+"SINGLE" = "싱글";
+"DOUBLES" = "더블";
+"Recommended" = "추천";
+"Your gender" = "본인 성별";
+"You can change this later in Settings." = "나중에 설정에서 바꿀 수 있어요";
+"No problem! You can fill this in anytime from Settings › Profile." = "괜찮아요! 나중에 설정 › 프로필에서 언제든 입력할 수 있어요 🙂";

@@ -49,6 +49,13 @@ fun ScreenFor(s: Scr) {
         Scr.SetRun -> SetRunView()
         Scr.SetHr -> SetHrView()
         Scr.Account -> AccountView()
+        Scr.Ob1 -> Onboarding1()
+        Scr.Ob2 -> Onboarding2()
+        Scr.Ob3 -> Onboarding3()
+        Scr.Auth -> AuthView()
+        Scr.Code -> CodeView()
+        Scr.Nick -> NickView()
+        Scr.ProfileSetup -> ProfileSetupView()
         else -> ComingScreen(s.name)
     }
 }

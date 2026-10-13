@@ -431,18 +431,18 @@ fun AccountView() {
 
             SectionLabel("ATHLETE")
             Column(Modifier.fillMaxWidth().card8()) {
-                SettingRow("Division", s.div.name, Modifier.testTag("profile.division")) { Router.sub(Scr.SetDiv, Scr.Account) }
+                SettingRow("Division", s.div.name, Modifier.testTag("profile.division")) { Router.editProfile(2) }
                 val hr = (if (s.hrMode == "age") L10n.t("Age %lld", s.age) + " · " else "") + "${s.maxHR} BPM"
                 SettingRow("Age · Max heart rate", hr, Modifier.testTag("profile.hr"), numeric = true, last = true) { Router.sub(Scr.SetHr, Scr.Account) }
             }
 
-            // 성별 · 키/몸무게 · 태어난 해 · 대회 경험 (아이폰 빌드 23). 고치는 화면은 가입 절차 단계에서 붙임
+            // 가입 프로필과 같은 구성 (빌드 24): 대회 경험 · 태어난 해 · 키 · 몸무게. 성별은 디비전에서 정해짐
             SectionLabel("ABOUT YOU")
             Column(Modifier.fillMaxWidth().card8()) {
-                SettingRow("Gender", ProfileText.sex(s.sex).l10n, Modifier.testTag("profile.about.sex")) { Router.editProfile(1) }
-                SettingRow("Height · Weight", ProfileText.body(s.heightCm, s.weightKg).l10n, Modifier.testTag("profile.about.body"), numeric = true) { Router.editProfile(2) }
-                SettingRow("Birth year", s.birthYear?.toString() ?: "Not set".l10n, Modifier.testTag("profile.about.year"), numeric = true) { Router.editProfile(3) }
-                SettingRow("Race experience", ProfileText.race(s.raced, s.raceDivision).l10n, Modifier.testTag("profile.about.race"), last = true) { Router.editProfile(4) }
+                val race = ProfileText.race(s.raced, s.raceDivision).l10n + (s.bestFinish?.let { " · " + com.nkssi.splits8.shared.Fm.t(it) } ?: "")
+                SettingRow("Race experience", race, Modifier.testTag("profile.about.race")) { Router.editProfile(1) }
+                SettingRow("Birth year", s.birthYear?.let { "$it · " + ageGroup(it) } ?: "Not set".l10n, Modifier.testTag("profile.about.year"), numeric = true) { Router.editProfile(3) }
+                SettingRow("Height · Weight", ProfileText.body(s.heightCm, s.weightKg).l10n, Modifier.testTag("profile.about.body"), numeric = true, last = true) { Router.editProfile(4) }
             }
             Note8("Only you can see these. They're used for your division and age-group comparisons.")
 

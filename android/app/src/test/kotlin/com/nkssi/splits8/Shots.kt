@@ -41,7 +41,8 @@ class Shots {
 
     @After fun tearDown() {
         Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
-        Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null
+        Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null; Router.toast = null
+        Router.email = ""; Router.code = ""; Router.nickDraft = ""; Router.signupFlow = false; Router.profileEdit = false
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -213,6 +214,32 @@ class Shots {
     @Test fun setHrKo() { demoTraining("ko"); Router.subFrom = Scr.Account; shot("45_hr_ko", "ko", Scr.SetHr) }
 
     @Test fun setRun() { demoTraining(); shot("46_running", s = Scr.SetRun) }
+
+    // MARK: 시작 · 가입 (4-6)
+
+    private fun fresh() = Store.useDemo(Settings(hasOnboarded = false), Program.presets(), emptyList())
+
+    @Test fun ob1Ko() { fresh(); shot("50_ob1_ko", "ko", Scr.Ob1) }
+    @Test fun ob2() { fresh(); shot("51_ob2", s = Scr.Ob2) }
+    @Test fun ob3Ko() { fresh(); shot("52_ob3_ko", "ko", Scr.Ob3) }
+    @Test fun authSignup() { fresh(); Router.toAuth(Scr.Account); shot("53_auth", s = Scr.Auth) }
+    @Test fun authSigninKo() { fresh(); Router.toAuth(Scr.Splash, "signin"); shot("53_auth_signin_ko", "ko", Scr.Auth) }
+    @Test fun code() { fresh(); Router.email = "me@example.com"; Router.code = "123"; shot("54_code", s = Scr.Code) }
+    @Test fun nickKo() { fresh(); Router.signupFlow = true; Router.nickDraft = "nkssi"; shot("55_nick_ko", "ko", Scr.Nick); Router.signupFlow = false }
+
+    private fun profileStep(name: String, lang: String, step: Int, raced: Boolean?) {
+        fresh(); Store.update { it.copy(raced = raced) }
+        Router.signupFlow = true; Router.startProfile(Scr.Home); Router.profileStep = step
+        shot(name, lang, Scr.ProfileSetup)
+        Router.signupFlow = false
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1000dp-xxhdpi")
+    @Test fun profile1() { profileStep("56_profile1_raced", "en", 1, true) }
+
+    @Test fun profile2Ko() { profileStep("57_profile2_ko", "ko", 2, false) }
+    @Test fun profile3() { profileStep("58_profile3", "en", 3, null) }
+    @Test fun profile4Ko() { profileStep("59_profile4_ko", "ko", 4, null) }
 
     @Test fun limitAlertKo() {
         demoTraining("ko")

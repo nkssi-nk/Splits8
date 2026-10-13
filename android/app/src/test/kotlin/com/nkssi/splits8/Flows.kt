@@ -281,10 +281,14 @@ class Flows {
         show(Scr.Settings)
         tap("settings.profile")
         assertEquals(Scr.Account, Router.scr)
-        tap("profile.division")
-        assertEquals(Scr.SetDiv, Router.scr)
-        tap("div.proW")
+        tap("profile.division")                             // 프로필의 Division = 가입 프로필 "내 디비전" (빌드 24)
+        assertEquals(Scr.ProfileSetup, Router.scr)
+        tap("profile.div.proW"); tap("profile.next")
         assertEquals("proW", Store.settings.division)
+        assertEquals(Scr.Account, Router.scr)
+        Router.sub(Scr.SetDiv, Scr.Account); rule.waitForIdle()   // 레이스 · 풀 시뮬에서 여는 Division 목록
+        tap("div.openW")
+        assertEquals("openW", Store.settings.division)
         assertTrue(Router.back())                           // ‹ Profile
         assertEquals(Scr.Account, Router.scr)
         tap("profile.hr")

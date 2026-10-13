@@ -799,6 +799,8 @@ data class Settings(
     val raced: Boolean? = null,
     val raceDivision: String? = null,
     val profileDone: Boolean? = null,
+    /** 대회 최고 완주 시간(초) — 가입 프로필 ① 에서 (빌드 24). 목표 시간 기본값에 씀 */
+    val bestFinish: Int? = null,
     val divPicked: Boolean? = null,
     /** 더블 구간 나누기 계획 (폰에만). 반반이면 null */
     val doublesPlan: DoublesPlan? = null,

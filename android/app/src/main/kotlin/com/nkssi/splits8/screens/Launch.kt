@@ -40,6 +40,7 @@ import com.nkssi.splits8.ui.YellowButton
 import com.nkssi.splits8.ui.navBottom
 import com.nkssi.splits8.ui.tap
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 
 /** 사진 초점 (CSS background-position center 30%) */
 private val splashFocus = BiasAlignment(0f, -0.4f)
@@ -71,7 +72,7 @@ fun SplashView() {
             YellowButton("Get started", Modifier.padding(top = 10.dp), tag = "splash.start") { Router.go(Scr.Ob1) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 T("Have an account? ", F.t(15, color = Color.White.copy(alpha = 0.7f)))
-                T("Sign in", F.t(15, W600), Modifier.tap { Router.go(Scr.Auth) })
+                T("Sign in", F.t(15, W600), Modifier.tap { Router.toAuth(Scr.Splash, "signin") }.testTag("splash.signin"))
             }
         }
     }

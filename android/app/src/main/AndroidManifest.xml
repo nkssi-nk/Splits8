@@ -9,6 +9,12 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- 폰으로 러닝 기록할 때 걸음 수 (케이던스) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- 운동 예약 · 대회 알림 (폰을 다시 켜면 다시 잡음) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 폰으로 야외 기록하는 동안 화면이 꺼져도 위치를 받음 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
         android:allowBackup="false"
@@ -33,6 +39,14 @@
                 <data android:scheme="splits8" android:host="t" />
             </intent-filter>
         </activity>
+
+        <receiver android:name=".ReminderReceiver" android:exported="false" />
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <service android:name=".RunService" android:exported="false" android:foregroundServiceType="location" />
 
         <!-- 공유 그림을 다른 앱(인스타그램 · 카카오톡 등)에 넘길 때 -->
         <provider

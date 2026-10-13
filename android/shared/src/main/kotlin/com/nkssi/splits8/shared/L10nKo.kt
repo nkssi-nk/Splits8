@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1522).apply {
+        HashMap<String, String>(1528).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -486,6 +486,7 @@ internal object L10nKo {
         m["Recommended"] = "추천"
         m["Reconnecting…"] = "다시 연결 중…"
         m["Recording on iPhone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "아이폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
+        m["Recording on your phone"] = "폰으로 기록하고 있어요"
         m["Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
         m["Records are kept only on this iPhone and are deleted with the app. Save a backup file to Files or iCloud Drive before you delete the app or change phones."] = "기록은 이 아이폰에만 저장돼서, 앱을 지우면 함께 지워져요. 앱을 지우거나 폰을 바꾸기 전에 백업 파일을 ‘파일’ 앱이나 iCloud Drive에 저장해 두세요."
         m["Records are kept only on this phone and are deleted with the app. Save a backup file to your files or Google Drive before you delete the app or change phones."] = "기록은 이 폰에만 저장돼서, 앱을 지우면 함께 지워져요. 앱을 지우거나 폰을 바꾸기 전에 백업 파일을 내 파일이나 Google Drive에 저장해 두세요."
@@ -623,9 +624,9 @@ internal object L10nKo {
         m["TOTAL "] = "합계 "
         m["TOTAL TIME"] = "총 시간"
         m["TYPE"] = "종류"
-        m["Tap Allow to pair"] = "허용을 누르면 연결돼요"
     }
     private fun part4(m: HashMap<String, String>) {
+        m["Tap Allow to pair"] = "허용을 누르면 연결돼요"
         m["Tap runs and stations above\nto add them here in order"] = "위에서 러닝과 스테이션을 누르면\n여기에 순서대로 쌓여요"
         m["Tap to add"] = "탭해서 추가"
         m["Tap to cancel"] = "누르면 취소"
@@ -703,6 +704,8 @@ internal object L10nKo {
         m["Within 26:00"] = "26:00 이내"
         m["Women"] = "여자"
         m["Workout %lld this week."] = "이번 주 %lld번째 운동이에요."
+        m["Workout in progress"] = "운동 기록 중"
+        m["Workout reminders"] = "운동 알림"
         m["Workouts"] = "운동"
         m["Workouts and heart rate are measured on Apple Watch. Please allow access to Health data."] = "운동 기록과 심박은 Apple Watch에서 측정해요. 건강 데이터 접근을 허용해 주세요."
         m["Workouts and heart rate are measured on your watch. Allow location for outdoor run pace."] = "운동 기록과 심박은 워치에서 측정해요. 야외 러닝 페이스를 위해 위치를 허용해 주세요."
@@ -773,11 +776,11 @@ internal object L10nKo {
         m["races"] = "레이스"
         m["sims"] = "풀 시뮬"
         m["unit.h"] = "시간"
+    }
+    private fun part5(m: HashMap<String, String>) {
         m["unit.m"] = "분"
         m["unit.s"] = "초"
         m["unit.workouts"] = "회"
-    }
-    private fun part5(m: HashMap<String, String>) {
         m["vs best"] = "최고 기록 대비"
         m["vs goal"] = "목표 대비"
         m["vs last"] = "지난 기록 대비"

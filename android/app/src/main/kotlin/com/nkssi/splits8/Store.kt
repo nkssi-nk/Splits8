@@ -83,6 +83,7 @@ object Store {
     fun init(context: Context) {
         if (dir != null) return
         dir = context.filesDir
+        Reminders.context = context.applicationContext
         prefs = context.getSharedPreferences("splits8", Context.MODE_PRIVATE)
         settings = load("settings.json", Settings.serializer()) ?: Settings()
         programs = load("programs.json", ListSerializer(Program.serializer())) ?: Program.presets()
@@ -134,6 +135,8 @@ object Store {
         rebuild()
         save("settings.json", Settings.serializer(), settings)
         if (!demo) Cloud.settingsChanged(old, settings)
+        // 대회를 바꾸면 대회 알림 (일주일 전 · 전날) 다시
+        if (!demo && old.event != settings.event) Reminders.scheduleRace(settings.event)
     }
 
     /** 트레이닝 저장 (같은 id 면 바꿈, 새것은 맨 위 — 아이폰과 같음) */
@@ -147,15 +150,17 @@ object Store {
         save("programs.json", ListSerializer(Program.serializer()), programs)
     }
 
-    /** 운동 예약 추가 · 수정 (같은 id 면 바꿈). 알림은 6단계에서 붙임 */
+    /** 운동 예약 추가 · 수정 (같은 id 면 바꿈) + 알림 */
     fun savePlan(p: PlannedWorkout) {
         plans = (if (plans.any { it.id == p.id }) plans.map { if (it.id == p.id) p else it } else plans + p).sortedBy { it.date }
         save("plans.json", ListSerializer(PlannedWorkout.serializer()), plans)
+        if (!demo) Reminders.schedule(p)
     }
 
     fun deletePlan(id: String) {
         plans = plans.filterNot { it.id == id }
         save("plans.json", ListSerializer(PlannedWorkout.serializer()), plans)
+        if (!demo) Reminders.cancel(id)
     }
 
     /** 앞으로 남은 예약 (오늘 이후) */

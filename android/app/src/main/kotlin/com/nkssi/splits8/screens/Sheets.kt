@@ -178,7 +178,9 @@ private fun PlanSheet(req: PlanRequest) {
     val program = Store.programs.firstOrNull { it.id == programId }
 
     fun close() { Router.planRequest = null }
+    val askNotify = com.nkssi.splits8.rememberAskNotifications()
     fun save() {
+        if (reminder != PlanReminder.None) askNotify()
         val title = if (sim) "Full Simulation" else (program?.name ?: "Training")
         val at = LocalDateTime.of(day, time).atZone(Fm.zone).toInstant()
         val p = PlannedWorkout(id = ex?.id ?: newId(), mode = if (sim) Mode.Sim else Mode.Training,

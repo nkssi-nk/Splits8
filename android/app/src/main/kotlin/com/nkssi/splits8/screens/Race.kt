@@ -314,9 +314,11 @@ fun SetEventView() {
     fun set(f: (RaceEvent) -> RaceEvent) { Router.evDraft = f(Router.evDraft ?: Store.settings.event) }
     var pick by remember { mutableStateOf<String?>(null) }
 
+    val askNotify = com.nkssi.splits8.rememberAskNotifications()
     fun save() {
         if (!ev.isSet) return
-        Store.update { it.copy(event = ev) }   // 대회 알림은 6단계 (알림)에서
+        askNotify()                             // 대회 알림 (일주일 전 · 전날)을 처음 쓸 때 허락
+        Store.update { it.copy(event = ev) }
         Router.evDraft = null
         Router.go(Scr.Race)
     }

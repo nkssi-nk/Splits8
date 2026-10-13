@@ -367,7 +367,13 @@ private fun Sensors(eng: PhoneRunEngine, ctx: Context) {
         }
         onDispose { listener?.let { runCatching { lm?.removeUpdates(it) } } }
     }
-    // 걸음 수 (러닝 카드 · 케이던스)
+    // 야외 GPS 기록: 화면을 끄거나 다른 앱으로 가도 위치를 계속 받게 (알림 줄 "운동 기록 중")
+    val gpsOn = eng.active && !eng.finished && eng.useGPS && locOk
+    DisposableEffect(gpsOn) {
+        if (gpsOn) com.nkssi.splits8.RunService.start(ctx, if (eng.mode == Mode.Training) eng.title else eng.mode.title)
+        onDispose { if (gpsOn) com.nkssi.splits8.RunService.stop(ctx) }
+    }
+        // 걸음 수 (러닝 카드 · 케이던스)
     DisposableEffect(eng.active, eng.isRunKind, stepOk) {
         val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         val sensor = sm?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)

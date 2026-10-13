@@ -52,3 +52,8 @@
 "Google sign-in isn't set up yet. Please use email for now." = "구글 로그인은 아직 준비 중이에요. 지금은 이메일로 로그인해 주세요.";
 "Couldn't delete the account" = "계정을 삭제하지 못했어요";
 "Couldn't reach the server. Check your connection." = "서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.";
+
+/* 알림 (6단계) */
+"Workout reminders" = "운동 알림";
+"Workout in progress" = "운동 기록 중";
+"Recording on your phone" = "폰으로 기록하고 있어요";

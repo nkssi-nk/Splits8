@@ -37,7 +37,8 @@ fun ScreenFor(s: Scr) {
     when (s) {
         Scr.Splash -> SplashView()
         Scr.Home -> HomeView()
-        Scr.Training -> ComingScreen("Training")
+        Scr.Training -> TrainingView()
+        Scr.Builder -> BuilderView()
         Scr.Sim -> ComingScreen("Test")
         Scr.Race -> ComingScreen("Race")
         Scr.Settings -> ComingScreen("Settings")

@@ -9,6 +9,11 @@
   - 그림       : Resources/iOS/Assets.xcassets → app/res/drawable-nodpi + IconRes.kt
 
 아이폰 문구나 표가 바뀌면 이 스크립트를 다시 돌리면 됨.
+
+⚠ android 가지 안의 아이폰 폴더는 빌드 21 그대로라 오래됨. 최신 아이폰 가지(예: build23)를
+  따로 꺼낸 폴더에 android/ 를 복사해 넣고 거기서 돌린 뒤, 나온 파일만 가져올 것:
+    git worktree add --detach ../wt origin/build23 && cp -r android ../wt/ && (cd ../wt && python3 android/tools/gen_from_ios.py)
+  안드로이드에만 있는 한국어 문구는 android/tools/ko-android.strings 에 넣음.
 """
 import os
 import re
@@ -55,11 +60,13 @@ def gen_l10n():
     watch = read_strings(os.path.join(ROOT, "Resources/Watch/ko.lproj/Localizable.strings"))
     merged = dict(watch)
     merged.update(ios)  # 같은 열쇠는 아이폰 쪽
+    # 안드로이드에만 있는 문구 ("iPhone" → "폰" 등). 같은 열쇠면 이쪽이 이김
+    merged.update(read_strings(os.path.join(ROOT, "android/tools/ko-android.strings")))
     items = sorted(merged.items())
     chunks = [items[i:i + 150] for i in range(0, len(items), 150)]
     lines = [
         "// 자동 생성 — 직접 고치지 말 것. android/tools/gen_from_ios.py",
-        "// 원본: Resources/iOS/ko.lproj · Resources/Watch/ko.lproj Localizable.strings",
+        "// 원본: Resources/iOS/ko.lproj · Resources/Watch/ko.lproj Localizable.strings + android/tools/ko-android.strings",
         "package com.nkssi.splits8.shared",
         "",
         "internal object L10nKo {",

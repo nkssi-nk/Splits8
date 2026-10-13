@@ -75,12 +75,28 @@ fun HistoryRow(
     title: String, sub: String, time: String, modifier: Modifier = Modifier,
     subColor: Color = C.text2, delta: String? = null, deltaColor: Color = C.good, last: Boolean = false,
     pb: Boolean = false, flag: RecordFlag? = null, grade: PFTGrade? = null, partner: String? = null,
-    onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null, onClick: () -> Unit,
+) {
+    if (onDelete != null) {
+        // 왼쪽으로 밀면 삭제 (아이폰 HistoryRow 의 onDelete)
+        SwipeDelete("Delete this record?", modifier.fillMaxWidth().rowLine(!last), onTap = onClick, onDelete = onDelete) {
+            HistoryRowBody(title, sub, time, Modifier, subColor, delta, deltaColor, pb, flag, grade, partner, null)
+        }
+    } else {
+        HistoryRowBody(title, sub, time, modifier.rowLine(!last), subColor, delta, deltaColor, pb, flag, grade, partner, onClick)
+    }
+}
+
+@Composable
+private fun HistoryRowBody(
+    title: String, sub: String, time: String, modifier: Modifier, subColor: Color, delta: String?, deltaColor: Color,
+    pb: Boolean, flag: RecordFlag?, grade: PFTGrade?, partner: String?, onClick: (() -> Unit)?,
 ) {
     val nick = partner?.trim().orEmpty()
     val subText = if (nick.isEmpty()) sub else sub + " · " + L10n.t("with @%@", nick)
     Row(
-        modifier.fillMaxWidth().rowLine(!last).tap(onClick = onClick).padding(vertical = 14.dp, horizontal = 18.dp),
+        modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.001f))
+            .let { if (onClick != null) it.tap(onClick = onClick) else it }.padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

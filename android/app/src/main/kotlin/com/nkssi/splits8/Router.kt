@@ -4,8 +4,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.nkssi.splits8.shared.GlowTheme
+import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.Mode
+import com.nkssi.splits8.shared.PlannedWorkout
+import com.nkssi.splits8.shared.ProgItem
+import com.nkssi.splits8.shared.Program
 import com.nkssi.splits8.shared.Record
+import com.nkssi.splits8.shared.Station
 import com.nkssi.splits8.ui.Ambient
 import com.nkssi.splits8.ui.GlowDrift
 
@@ -78,6 +83,18 @@ enum class Scr {
     }
 }
 
+/** 운동 예약 시트 요청 (달력 날짜 · 예약 줄에서 엶). mode = Training 또는 Sim */
+data class PlanRequest(val date: java.time.Instant, val mode: Mode, val existing: PlannedWorkout? = null)
+
+/** HIIT · 러닝 설정 시트 (새로 만들기 / 저장된 것 편집). kind = "hiit" / "run" */
+data class BonusRequest(val kind: String, val existing: Program? = null, val key: String = java.util.UUID.randomUUID().toString())
+
+/** 확인 창 (아이폰 .alert). destructive = 빨간 확인 단추 */
+data class Ask(
+    val title: String, val message: String? = null, val ok: String = "OK", val cancel: String? = "Cancel",
+    val destructive: Boolean = false, val onOk: () -> Unit = {},
+)
+
 /** 화면 이동 (아이폰 Router) */
 object Router {
     var scr by mutableStateOf(Scr.Splash)
@@ -91,6 +108,60 @@ object Router {
     var testTab by mutableStateOf("pft")
     /** 지금 화면 안 ‹ 버튼이 등록한 뒤로 동작 (시스템 뒤로 가기에 씀) */
     var backAction: (() -> Unit)? = null
+
+    // MARK: 트레이닝 만들기 (아이폰 BuilderView 의 draft)
+
+    var editId by mutableStateOf<String?>(null)
+    var draftName by mutableStateOf("")
+    var draftSeq by mutableStateOf<List<ProgItem>>(emptyList())
+    var draftSets by mutableStateOf(1)
+
+    /** 새 트레이닝: 기본은 HYROX 한 바퀴 16구간 (Run 1KM + 스테이션 8개 순서대로) */
+    fun newTraining() {
+        editId = null; draftName = ""; draftSets = 1
+        draftSeq = Station.all.flatMap { listOf(ProgItem("run", "1KM"), ProgItem(it.key)) }.take(MAX_SEQ)
+        go(Scr.Builder)
+    }
+
+    fun edit(p: Program) {
+        editId = p.id; draftName = p.name; draftSets = p.sets; draftSeq = p.seq
+        go(Scr.Builder)
+    }
+
+    /** 만들기 화면 Cancel */
+    fun cancelDraft() {
+        editId = null
+        go(Scr.Training)
+    }
+
+    /** 만들기 화면 Save: 바로 저장. 이름이 비면 "Training N" */
+    fun saveDraft() {
+        if (draftSeq.isEmpty()) return
+        val typed = draftName.trim()
+        val name = typed.ifEmpty { L10n.t("Training %lld", Store.programs.size + 1) }
+        val old = Store.programs.firstOrNull { it.id == editId }
+        val p = Program(editId ?: "u${System.currentTimeMillis() / 1000}", name, draftSets, draftSeq, meta = null, quick = old?.quick ?: false)
+        Store.saveProgram(p)
+        editId = null; draftName = ""
+        go(Scr.Training)
+    }
+
+    const val MAX_SEQ = 16
+
+    // MARK: 시트 · 확인 창
+
+    var bonus by mutableStateOf<BonusRequest?>(null)
+    var planRequest by mutableStateOf<PlanRequest?>(null)
+    var ask by mutableStateOf<Ask?>(null)
+
+    fun openPlan(date: java.time.Instant, mode: Mode = Mode.Training, existing: PlannedWorkout? = null) {
+        planRequest = PlanRequest(date, if (mode == Mode.Sim) Mode.Sim else Mode.Training, existing)
+    }
+
+    /** 폰으로 기록 (4-3 단계에서 화면을 붙임. 지금은 안내만) */
+    fun startOnPhone(mode: Mode, program: Program?) {
+        ask = Ask("Start on phone", "Phone recording comes in a later Android build.", cancel = null)
+    }
 
     fun start() {
         scr = if (Store.settings.hasOnboarded) Scr.Home else Scr.Splash
@@ -179,6 +250,9 @@ object Router {
 
     /** 안드로이드 뒤로 가기: 화면 안 ‹ → 고정 바 ‹ → 탭 화면이면 홈 → 홈이면 앱 닫기(false) */
     fun back(): Boolean {
+        if (ask != null) { ask = null; return true }
+        if (bonus != null) { bonus = null; return true }
+        if (planRequest != null) { planRequest = null; return true }
         backAction?.let { it(); return true }
         barBack?.let { it.second(); return true }
         if (scr.showsTabs && scr != Scr.Home) { go(Scr.Home); return true }

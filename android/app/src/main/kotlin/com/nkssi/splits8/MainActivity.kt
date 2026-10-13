@@ -43,7 +43,8 @@ fun App(showLogo: Boolean = true) {
     LaunchedEffect(Unit) {
         if (logo) { delay(1300); logo = false }
     }
-    BackHandler(enabled = Router.scr != Scr.Home && Router.scr != Scr.Splash) { Router.back() }
+    val overlay = Router.ask != null || Router.bonus != null || Router.planRequest != null
+    BackHandler(enabled = overlay || (Router.scr != Scr.Home && Router.scr != Scr.Splash)) { Router.back() }
     Box(Modifier.fillMaxSize()) {
         PhoneRoot { s -> ScreenFor(s) }
         AnimatedVisibility(logo, exit = fadeOut(tween(400))) { LaunchLogo() }

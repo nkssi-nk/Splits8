@@ -277,7 +277,7 @@ private fun DaySection(sel: LocalDate) {
     }
     if (!past) {
         YellowButton("＋ Plan a workout on this day", Modifier.padding(top = 4.dp), height = 44.dp, radius = 22.dp, tag = "cal.planButton") {
-            // 예약 시트는 다음 단계 (PlanSheet)
+            Router.openPlan(sel.atTime(7, 0).atZone(Fm.zone).toInstant(), Mode.Training)
         }
     }
 }
@@ -301,7 +301,8 @@ private fun planSub(p: PlannedWorkout): String {
 
 @Composable
 private fun PlanRow(p: PlannedWorkout, last: Boolean) {
-    Row(Modifier.fillMaxWidth().rowLine(!last).padding(vertical = 14.dp, horizontal = 18.dp),
+    Row(Modifier.fillMaxWidth().rowLine(!last).tap { Router.openPlan(p.date, p.mode, p) }.testTag("cal.plan")
+        .padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(8.dp).border(1.5.dp, hex(p.mode.calendarHex), CircleShape))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

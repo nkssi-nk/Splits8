@@ -1,10 +1,10 @@
 // 자동 생성 — 직접 고치지 말 것. android/tools/gen_from_ios.py
-// 원본: Resources/iOS/ko.lproj · Resources/Watch/ko.lproj Localizable.strings
+// 원본: Resources/iOS/ko.lproj · Resources/Watch/ko.lproj Localizable.strings + android/tools/ko-android.strings
 package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1440).apply {
+        HashMap<String, String>(1450).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -425,6 +425,7 @@ internal object L10nKo {
         m["Partner"] = "파트너"
         m["Pause"] = "일시정지"
         m["Personal best"] = "개인 최고 기록"
+        m["Phone recording comes in a later Android build."] = "폰으로 기록하기는 다음 안드로이드 빌드에 들어가요."
         m["Physical Fitness Test"] = "PFT 체력 테스트"
         m["Physical Fitness Test · six movements back to back, for time."] = "PFT 체력 테스트 · 6가지 종목을 이어서 하고 시간을 잽니다."
         m["Pick a nickname"] = "닉네임 정하기"
@@ -464,15 +465,16 @@ internal object L10nKo {
         m["Real race medians at your goal time."] = "같은 완주 시간대 실제 대회 중간값대로 나눠요."
         m["Reconnecting…"] = "다시 연결 중…"
         m["Recording on iPhone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "아이폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
+        m["Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
         m["Records are kept only on this iPhone and are deleted with the app. Save a backup file to Files or iCloud Drive before you delete the app or change phones."] = "기록은 이 아이폰에만 저장돼서, 앱을 지우면 함께 지워져요. 앱을 지우거나 폰을 바꾸기 전에 백업 파일을 ‘파일’ 앱이나 iCloud Drive에 저장해 두세요."
         m["Records are shared only after you accept."] = "수락해야 서로 기록이 보여요."
         m["Records you've done with it stay in History."] = "이 트레이닝으로 한 기록은 기록 목록에 그대로 남아요."
         m["Red"] = "빨강"
         m["Relay"] = "릴레이"
-        m["Remove"] = "삭제"
-        m["Remove last"] = "마지막 지우기"
     }
     private fun part3(m: HashMap<String, String>) {
+        m["Remove"] = "삭제"
+        m["Remove last"] = "마지막 지우기"
         m["Remove partner"] = "파트너 빼기"
         m["Report"] = "신고"
         m["Report by email"] = "메일로 신고해 주세요"
@@ -571,6 +573,8 @@ internal object L10nKo {
         m["Start a workout on your watch and your records will show up here."] = "워치에서 운동을 시작하면 여기에 기록이 쌓여요."
         m["Start on iPhone"] = "iPhone으로 시작"
         m["Start on iPhone?"] = "iPhone으로 시작할까요?"
+        m["Start on phone"] = "폰으로 시작"
+        m["Start on phone?"] = "폰으로 시작할까요?"
         m["Start time"] = "시작 시간"
         m["Start training"] = "트레이닝 시작"
         m["Start your first one"] = "첫 운동을 시작해 봐요"
@@ -610,6 +614,7 @@ internal object L10nKo {
         m["The clock keeps running between movements. Tap Next (or swipe left on your watch) when you finish each one."] = "종목 사이에도 시간은 계속 갑니다. 한 종목이 끝나면 다음을 누르세요 (워치는 왼쪽으로 밀기)."
         m["The code is valid for 10 minutes"] = "코드는 10분간 유효해요"
         m["The first time you turn on a reminder, your iPhone will ask to allow notifications."] = "알림을 처음 켜면 아이폰이 알림 허용을 물어봐요."
+        m["The first time you turn on a reminder, your phone will ask to allow notifications."] = "알림을 처음 켜면 폰이 알림 허용을 물어봐요."
         m["The full race order for time: a 1 km run before each of the 8 stations."] = "실제 레이스 순서 그대로 시간을 잽니다. 스테이션 8개마다 앞에 1 km 러닝이 있어요."
         m["The link may be cut off. Ask for it again."] = "링크가 중간에 잘렸을 수 있어요. 다시 보내 달라고 해 주세요."
         m["The run after %@"] = "%@ 다음 런"
@@ -618,13 +623,13 @@ internal object L10nKo {
         m["The workout ends on Apple Watch and is saved there."] = "Apple Watch 의 운동이 끝나고 워치에서 저장돼요."
         m["They are removed from your friends and hidden from your search and rankings. You can unblock them here later."] = "친구 목록에서 빠지고, 검색과 순위표에 보이지 않아요. 나중에 이 화면에서 차단을 풀 수 있어요."
         m["They'll see your request in Friends. Records are shared once they accept."] = "상대의 친구 화면에 요청이 보여요. 수락하면 서로 기록이 보여요."
+    }
+    private fun part4(m: HashMap<String, String>) {
         m["This can't be undone."] = "이 기록은 되돌릴 수 없어요."
         m["This file isn't a SPLITS8 backup."] = "SPLITS8 백업 파일이 아니에요."
         m["This looks too fast to be a valid result. A tap may have been missed."] = "너무 빨라서 정상 기록으로 보이지 않아요. 구간 넘기기가 잘못 눌렸을 수 있어요."
         m["This sets your default weights and reps. You can change it anytime in Settings."] = "무게와 횟수의 기본값이 돼요. 설정에서 언제든 바꿀 수 있어요."
         m["This training link can't be read"] = "트레이닝 링크를 읽을 수 없어요"
-    }
-    private fun part4(m: HashMap<String, String>) {
         m["This week"] = "이번 주"
         m["Ticket"] = "티켓"
         m["Time"] = "시간"

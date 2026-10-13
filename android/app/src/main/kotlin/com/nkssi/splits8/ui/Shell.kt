@@ -101,6 +101,8 @@ fun PhoneRoot(screen: @Composable (Scr) -> Unit) {
             TabFade(Modifier.align(Alignment.BottomCenter))
             TabBar8(Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp).padding(bottom = maxOf(26.dp, navBottom() + 10.dp)))
         }
+        // 시트 · 확인 창 (탭 바보다 위)
+        com.nkssi.splits8.screens.Overlays()
     }
 }
 

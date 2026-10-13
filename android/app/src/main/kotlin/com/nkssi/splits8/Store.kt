@@ -84,9 +84,10 @@ object Store {
     fun useDemo(
         s: Settings, p: List<Program>, r: List<Record>, f: List<Friend> = emptyList(),
         lb: List<LBRow> = emptyList(), req: List<FriendReq> = emptyList(), me: String? = null,
+        pl: List<PlannedWorkout> = emptyList(),
     ) {
         demo = true
-        settings = s; programs = p; records = r; friends = f; plans = emptyList()
+        settings = s; programs = p; records = r; friends = f; plans = pl
         leaderboard = lb; requests = req; myId = me; memPrefs.clear()
         applyLang()
         rebuild()
@@ -105,8 +106,9 @@ object Store {
         save("settings.json", Settings.serializer(), settings)
     }
 
+    /** 트레이닝 저장 (같은 id 면 바꿈, 새것은 맨 위 — 아이폰과 같음) */
     fun saveProgram(p: Program) {
-        programs = if (programs.any { it.id == p.id }) programs.map { if (it.id == p.id) p else it } else programs + p
+        programs = if (programs.any { it.id == p.id }) programs.map { if (it.id == p.id) p else it } else listOf(p) + programs
         save("programs.json", ListSerializer(Program.serializer()), programs)
     }
 
@@ -114,6 +116,27 @@ object Store {
         programs = programs.filterNot { it.id == id }
         save("programs.json", ListSerializer(Program.serializer()), programs)
     }
+
+    /** 운동 예약 추가 · 수정 (같은 id 면 바꿈). 알림은 6단계에서 붙임 */
+    fun savePlan(p: PlannedWorkout) {
+        plans = (if (plans.any { it.id == p.id }) plans.map { if (it.id == p.id) p else it } else plans + p).sortedBy { it.date }
+        save("plans.json", ListSerializer(PlannedWorkout.serializer()), plans)
+    }
+
+    fun deletePlan(id: String) {
+        plans = plans.filterNot { it.id == id }
+        save("plans.json", ListSerializer(PlannedWorkout.serializer()), plans)
+    }
+
+    /** 앞으로 남은 예약 (오늘 이후) */
+    val upcomingPlans: List<PlannedWorkout>
+        get() {
+            val start = today().atStartOfDay(com.nkssi.splits8.shared.Fm.zone).toInstant()
+            return plans.filter { !it.date.isBefore(start) }.sortedBy { it.date }
+        }
+
+    /** 친구 목표 (트레이닝 탭 "Mine | 친구") */
+    fun setTgtSrc(v: String) = update { it.copy(tgtSrc = v) }
 
     fun add(r: Record) {
         if (records.any { it.id.equals(r.id, ignoreCase = true) }) return

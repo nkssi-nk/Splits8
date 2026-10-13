@@ -10,6 +10,10 @@ import com.nkssi.splits8.ui.GlowDrift
 import com.nkssi.splits8.ui.PhoneRoot
 import com.nkssi.splits8.screens.LaunchLogo
 import com.nkssi.splits8.screens.ScreenFor
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import com.nkssi.splits8.shared.Program
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -33,6 +37,10 @@ class Shots {
     @Before fun setUp() {
         GlowDrift.fixed = true
         Store.useDemo(Settings(hasOnboarded = true), com.nkssi.splits8.shared.Program.presets(), emptyList())
+    }
+
+    @After fun tearDown() {
+        Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -65,6 +73,59 @@ class Shots {
 
     @Test fun homeDemo() = demoHome("06_home_demo", "en", 3)
     @Test fun trainingKo() = shot("03_training_ko", "ko", Scr.Training)
+
+    // MARK: 트레이닝 탭 (4-2)
+
+    private fun demoTraining(lang: String = "en") {
+        val now = java.time.Instant.parse("2026-09-25T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true)
+        val progs = listOf(Program.run(5, false, "run.demo1"), Program.hiit().copy(id = "hiit.demo1")) + Demo.programs()
+        Store.useDemo(Demo.settings(o, Store.today()), progs, Demo.records(o), Demo.friends(), me = "demo.me")
+        L10n.lang = lang
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1500dp-xxhdpi")
+    @Test fun trainingDemo() { demoTraining(); shot("10_training", s = Scr.Training) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1500dp-xxhdpi")
+    @Test fun trainingDemoKo() { demoTraining("ko"); shot("10_training_ko", "ko", Scr.Training) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2000dp-xxhdpi")
+    @Test fun builderNew() { demoTraining(); Router.newTraining(); shot("11_builder_new", s = Scr.Builder) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2000dp-xxhdpi")
+    @Test fun builderEditKo() {
+        demoTraining("ko"); Router.edit(Store.programs.first { it.id == "p1" }); shot("12_builder_edit_ko", "ko", Scr.Builder)
+    }
+
+    @Test fun bonusRun() {
+        demoTraining(); Router.bonus = BonusRequest("run"); shot("13_bonus_run", s = Scr.Training); Router.bonus = null
+    }
+
+    @Test fun bonusHiitKo() {
+        demoTraining("ko"); Router.bonus = BonusRequest("hiit"); shot("14_bonus_hiit_ko", "ko", Scr.Training); Router.bonus = null
+    }
+
+    @Test fun planSheet() {
+        demoTraining()
+        Router.openPlan(java.time.LocalDate.of(2026, 9, 27).atTime(7, 0).atZone(com.nkssi.splits8.shared.Fm.zone).toInstant())
+        shot("15_plan", s = Scr.Home)
+        rule.onNodeWithTag("plan.date").performClick(); rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/15_plan_date.png")
+        rule.onNodeWithTag("plan.time").performClick(); rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/15_plan_time.png")
+        Router.planRequest = null
+    }
+
+    @Test fun limitAlertKo() {
+        demoTraining("ko")
+        Store.useDemo(Store.settings, Store.programs + Program.presets().map { it.copy(id = it.id + "x") }, Store.records)
+        shot("16_limit_ko", "ko", Scr.Training)
+        rule.onNodeWithTag("training.new").performClick(); rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/16_limit_ko.png")
+        Router.ask = null
+    }
     @Test fun settings() = shot("04_settings", s = Scr.Settings)
 
     @Test fun launch() {

@@ -28,5 +28,16 @@
                 <data android:scheme="splits8" android:host="t" />
             </intent-filter>
         </activity>
+
+        <!-- 공유 그림을 다른 앱(인스타그램 · 카카오톡 등)에 넘길 때 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
     </application>
 </manifest>

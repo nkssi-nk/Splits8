@@ -1,7 +1,6 @@
 package com.nkssi.splits8
 
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -115,10 +114,10 @@ class DetailFlows {
         assertNull(Store.records.first { it.id == r.id }.partner)
     }
 
-    @Test fun shareSaysNextBuild() {
+    @Test fun shareOpensShareScreen() {
         open(race)
         tap("Share with photo")
-        rule.onNodeWithTag("toast").assertIsDisplayed()
+        assertEquals(Scr.Share, Router.scr)
     }
 
     @Test fun styledAndColors() {

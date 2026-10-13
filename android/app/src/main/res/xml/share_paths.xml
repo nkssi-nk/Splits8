@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 공유 그림은 앱 캐시의 share 폴더에만 -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>

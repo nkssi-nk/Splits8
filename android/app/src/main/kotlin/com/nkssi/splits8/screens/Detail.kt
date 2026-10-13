@@ -591,7 +591,7 @@ private fun InsightBadge(m: Insight.Mark) {
 private fun ShareButton() {
     Row(
         Modifier.fillMaxWidth().height(52.dp).yellowFill(RoundedCornerShape(14.dp))
-            .press(0.97f, tag = "Share with photo") { Router.toast = "Photo sharing comes in the next Android build.".l10n },
+            .press(0.97f, tag = "Share with photo") { Router.go(Scr.Share) },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
         Glyph("i_share", 18.dp, Color.Black)

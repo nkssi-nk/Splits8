@@ -193,4 +193,45 @@ object Demo {
         val steps = segs.map { (it.cad ?: 0) * it.time / 60.0 }
         return com.nkssi.splits8.shared.RunMetrics.fill(r, steps, null)
     }
+
+    /**
+     * 공유 화면 확인용 예시 사진 (아이폰 ShareView.demoPhoto · --sharephoto): 밝고 복잡한 체육관 느낌의 그림.
+     * 연기 · 그라데이션 위 글자가 읽히는지 보려고
+     */
+    fun sharePhoto(): android.graphics.Bitmap {
+        val w = 720
+        val h = 1280
+        val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        val p = android.graphics.Paint()
+        p.shader = android.graphics.LinearGradient(0f, 0f, 0f, h.toFloat(),
+            intArrayOf(android.graphics.Color.rgb(219, 219, 219), android.graphics.Color.rgb(140, 153, 168), android.graphics.Color.rgb(77, 77, 77)),
+            floatArrayOf(0f, 0.5f, 1f), android.graphics.Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
+        p.shader = null
+        val rng = com.nkssi.splits8.screens.SeededRandom(99)
+        // 천장 조명 줄 · 기둥 · 바닥 선 · 사람 그림자 같은 덩어리
+        p.color = android.graphics.Color.argb(217, 255, 255, 255)
+        for (i in 0 until 9) {
+            val y = (60 + rng.unit() * 30).toFloat()
+            c.drawRect(40f + i * 78, y, 84f + i * 78, y + 10, p)
+        }
+        repeat(26) {
+            val bw = (30 + rng.unit() * 150).toFloat()
+            val bh = (60 + rng.unit() * 360).toFloat()
+            val hue = ((0.05 + rng.unit() * 0.6) * 360).toFloat()
+            val sat = (0.25 + rng.unit() * 0.4).toFloat()
+            val bri = (0.25 + rng.unit() * 0.7).toFloat()
+            p.color = android.graphics.Color.HSVToColor(191, floatArrayOf(hue, sat, bri))
+            val x = (rng.unit() * w - 40).toFloat()
+            val y = (160 + rng.unit() * 980).toFloat()
+            c.drawRect(x, y, x + bw, y + bh, p)
+        }
+        p.color = android.graphics.Color.argb(230, 20, 20, 20)
+        c.drawOval(250f, 330f, 380f, 460f, p)                       // 머리
+        c.drawRect(215f, 450f, 415f, 870f, p)                       // 몸
+        p.color = android.graphics.Color.argb(128, 255, 255, 255)
+        for (i in 0 until 14) c.drawRect(0f, 900f + i * 28, w.toFloat(), 903f + i * 28, p)
+        return bmp
+    }
 }

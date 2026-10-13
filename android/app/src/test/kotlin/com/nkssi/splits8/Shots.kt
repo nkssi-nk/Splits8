@@ -3,6 +3,8 @@ package com.nkssi.splits8
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.test.onNodeWithText
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.Settings
@@ -44,6 +46,8 @@ class Shots {
         Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null; Router.toast = null
         Router.email = ""; Router.code = ""; Router.nickDraft = ""; Router.signupFlow = false; Router.profileEdit = false; Router.userMenu = null
         Router.partnerFor = null; Router.detail = null
+        com.nkssi.splits8.screens.ShareDemo.photo = null; com.nkssi.splits8.screens.ShareDemo.colorDemo = false
+        com.nkssi.splits8.screens.ShareDebug.dryRun = false
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -295,6 +299,49 @@ class Shots {
     @Test fun detailRun() = demoDetail("65_detail_run", "en", { r -> r.first { it.isRunKind } }, from = Scr.Training)
     @Config(sdk = [35], qualifiers = "w412dp-h2400dp-xxhdpi")
     @Test fun detailPftKo() = demoDetail("66_detail_pft_ko", "ko", { r -> r.filter { it.mode == com.nkssi.splits8.shared.Mode.Pft }.maxBy { it.date } }, from = Scr.Sim)
+    // 공유 화면 (아이폰 --sharephoto 예시 사진). 저장 그림(1080 너비)도 같이 남김
+    private fun demoShare(name: String, lang: String, run: Boolean = false, photo: Boolean = true, setup: () -> Unit = {}) {
+        val now = java.time.Instant.parse("2026-10-05T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), Demo.records(o) + Demo.runRecord(), Demo.friends(),
+            Demo.leaderboard(), Demo.requests(), "demo.me")
+        val rec = Store.records.first { if (run) it.isRunKind else it.title == "Incheon" }
+        Store.updatePartner(rec.id, if (run) null else "jiho")
+        Router.detail = Store.records.first { it.id == rec.id }
+        if (photo) { com.nkssi.splits8.screens.ShareDemo.photo = Demo.sharePhoto().asImageBitmap(); com.nkssi.splits8.screens.ShareDemo.colorDemo = true }
+        com.nkssi.splits8.screens.ShareDebug.dryRun = true
+        shot(name, lang, Scr.Share)
+        setup()
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/$name.png")
+        rule.onNodeWithTag("share.save").performClick()
+        rule.waitForIdle()
+        com.nkssi.splits8.screens.ShareDebug.last?.let { b ->
+            java.io.File(out).mkdirs()
+            java.io.FileOutputStream("$out/${name}_image.png").use { b.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+    }
+
+    private fun tapTag(t: String) { rule.onNodeWithTag(t).performClick(); rule.waitForIdle() }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun sharePoster() = demoShare("68_share_poster", "en")
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun sharePosterHazeKo() = demoShare("69_share_haze_ko", "ko") { tapTag("share.smoke.strong") }
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun sharePosterBlack() = demoShare("70_share_black", "en") { tapTag("share.text.black"); tapTag("share.gradient") }
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun shareTicket() = demoShare("71_share_ticket", "en") { tapTag("Ticket") }
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun shareBlockPostKo() = demoShare("72_share_block_post_ko", "ko", photo = false) {
+        tapTag("Block"); rule.onNodeWithText(L10n.t("Post 4:5")).performClick()
+    }
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun shareRunMap() = demoShare("73_share_run_map", "en", run = true, photo = false) { tapTag("share.map") }
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun shareEmpty() = demoShare("74_share_empty", "en", photo = false)
+
     @Test fun partnerSheet() {
         demoDetail("67_detail_partner", "en", { r -> r.first { it.title == "Incheon" } }, friend = true)
         val id = Router.detail!!.id

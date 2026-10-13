@@ -164,6 +164,23 @@ object Router {
         planRequest = PlanRequest(date, if (mode == Mode.Sim) Mode.Sim else Mode.Training, existing)
     }
 
+    // MARK: 가입 프로필 (성별 · 키/몸무게 · 태어난 해 · 대회 경험) — 화면은 가입 절차 단계에서
+
+    var profileStep by mutableStateOf(1)
+    var profileEdit by mutableStateOf(false)
+    var profileNext by mutableStateOf(Scr.Home)
+
+    /** 프로필 화면에서 한 항목만 고치기 */
+    fun editProfile(step: Int) {
+        profileStep = step; profileEdit = true; profileNext = Scr.Account
+        go(Scr.ProfileSetup)
+    }
+
+    /** 계정 삭제 (서버에서 지움 — 5단계 서버 연결 때 붙임. 지금은 안내만) */
+    fun deleteAccount() {
+        ask = Ask("Delete account", "Account deletion comes in a later Android build.", cancel = null)
+    }
+
     /** 폰으로 기록 (4-3 단계에서 화면을 붙임. 지금은 안내만) */
     fun startOnPhone(mode: Mode, program: Program?) {
         ask = Ask("Start on phone", "Phone recording comes in a later Android build.", cancel = null)

@@ -8,3 +8,12 @@
 "Phone recording comes in a later Android build." = "폰으로 기록하기는 다음 안드로이드 빌드에 들어가요.";
 "or start PFT on your watch" = "또는 워치에서 PFT를 시작하세요";
 "Once saved, the event name, date and division appear on the Race start screen on your watch." = "저장하면 워치의 레이스 시작 화면에 대회명·날짜·Division이 표시돼요.";
+"Your watch alerts you with a vibration during workouts." = "운동 중에 워치가 진동으로 알려줘요.";
+"Follows your phone language unless you pick one here." = "여기서 고르지 않으면 폰 언어를 따라요.";
+"Watch" = "워치";
+"Show on phone" = "폰에 같이 보기";
+"Shows your watch workout on this phone and on the lock screen while you train. You can control it from either device." = "워치로 운동하는 동안 이 폰 화면과 잠금 화면에 같이 보여 줘요. 어느 쪽에서든 넘기고 멈출 수 있어요.";
+"Records are kept only on this phone and are deleted with the app. Save a backup file to your files or Google Drive before you delete the app or change phones." = "기록은 이 폰에만 저장돼서, 앱을 지우면 함께 지워져요. 앱을 지우거나 폰을 바꾸기 전에 백업 파일을 내 파일이나 Google Drive에 저장해 두세요.";
+"Your records stay on this phone." = "기록은 이 폰에 그대로 남아요.";
+"Couldn't open the file. If it's in Google Drive, wait for it to download and try again." = "파일을 열지 못했어요. Google Drive에 있는 파일이면 내려받기가 끝난 뒤 다시 해 주세요.";
+"Account deletion comes in a later Android build." = "계정 삭제는 다음 안드로이드 빌드에 들어가요.";

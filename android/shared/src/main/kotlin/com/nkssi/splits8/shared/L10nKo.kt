@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1454).apply {
+        HashMap<String, String>(1472).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -81,6 +81,7 @@ internal object L10nKo {
         m["AVG HR"] = "평균 심박"
         m["About %lld seconds faster on each movement gets you there."] = "종목마다 약 %lld초씩만 줄이면 돼요."
         m["Accept"] = "수락"
+        m["Account deletion comes in a later Android build."] = "계정 삭제는 다음 안드로이드 빌드에 들어가요."
         m["Add"] = "추가"
         m["Add Roxzone"] = "Roxzone 추가"
         m["Add a race"] = "대회 추가"
@@ -166,9 +167,9 @@ internal object L10nKo {
         m["Choose"] = "선택"
         m["City or venue"] = "도시 또는 장소"
         m["Clear"] = "지우기"
-        m["Clear all"] = "모두 지우기"
     }
     private fun part1(m: HashMap<String, String>) {
+        m["Clear all"] = "모두 지우기"
         m["Close"] = "닫기"
         m["Code sent again"] = "코드를 다시 보냈어요"
         m["Compare rankings with friends"] = "친구와 순위를 비교해 보세요"
@@ -182,6 +183,7 @@ internal object L10nKo {
         m["Couldn't check this nickname. Check your connection and type it again."] = "닉네임을 확인하지 못했어요. 인터넷 연결을 확인하고 다시 입력해 주세요."
         m["Couldn't create the image. Please try again."] = "이미지를 만들지 못했어요. 다시 시도해 주세요."
         m["Couldn't make the backup file. Please try again."] = "백업 파일을 만들지 못했어요. 다시 해 주세요."
+        m["Couldn't open the file. If it's in Google Drive, wait for it to download and try again."] = "파일을 열지 못했어요. Google Drive에 있는 파일이면 내려받기가 끝난 뒤 다시 해 주세요."
         m["Couldn't open the file. If it's in iCloud, wait for it to download and try again."] = "파일을 열지 못했어요. iCloud에 있는 파일이면 내려받기가 끝난 뒤 다시 해 주세요."
         m["Couldn't read the server response"] = "응답을 읽을 수 없어요"
         m["Couldn't save"] = "저장하지 못했어요"
@@ -265,6 +267,7 @@ internal object L10nKo {
         m["First record"] = "첫 기록"
         m["Follows the ratio of your best Full Simulation."] = "내 최고 풀 시뮬레이션의 비율을 따라가요."
         m["Follows your iPhone language unless you pick one here."] = "여기서 고르지 않으면 iPhone 언어를 따라요."
+        m["Follows your phone language unless you pick one here."] = "여기서 고르지 않으면 폰 언어를 따라요."
         m["Free"] = "자유"
         m["Free run"] = "자유 러닝"
         m["Friends"] = "친구"
@@ -316,11 +319,11 @@ internal object L10nKo {
         m["How much slower the 1 km after each station is, against your average run of %@ /km"] = "내 평균 러닝 %@ /km 기준, 스테이션 다음 1km가 얼마나 느려지는지"
         m["In Doubles, you run all 8 runs together. Only stations are split."] = "더블에서 러닝 8개는 둘이 같이 뛰어요. 스테이션만 나눠요."
         m["Incomplete"] = "미완료"
+    }
+    private fun part2(m: HashMap<String, String>) {
         m["Individual"] = "개인"
         m["Indoor"] = "실내"
         m["Indoor (treadmill)"] = "실내 (러닝머신)"
-    }
-    private fun part2(m: HashMap<String, String>) {
         m["Indoor · 1 km splits"] = "실내 · 1km 스플릿"
         m["Insights"] = "분석"
         m["Intervals"] = "인터벌"
@@ -468,11 +471,12 @@ internal object L10nKo {
         m["Recording on iPhone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "아이폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
         m["Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
         m["Records are kept only on this iPhone and are deleted with the app. Save a backup file to Files or iCloud Drive before you delete the app or change phones."] = "기록은 이 아이폰에만 저장돼서, 앱을 지우면 함께 지워져요. 앱을 지우거나 폰을 바꾸기 전에 백업 파일을 ‘파일’ 앱이나 iCloud Drive에 저장해 두세요."
+    }
+    private fun part3(m: HashMap<String, String>) {
+        m["Records are kept only on this phone and are deleted with the app. Save a backup file to your files or Google Drive before you delete the app or change phones."] = "기록은 이 폰에만 저장돼서, 앱을 지우면 함께 지워져요. 앱을 지우거나 폰을 바꾸기 전에 백업 파일을 내 파일이나 Google Drive에 저장해 두세요."
         m["Records are shared only after you accept."] = "수락해야 서로 기록이 보여요."
         m["Records you've done with it stay in History."] = "이 트레이닝으로 한 기록은 기록 목록에 그대로 남아요."
         m["Red"] = "빨강"
-    }
-    private fun part3(m: HashMap<String, String>) {
         m["Relay"] = "릴레이"
         m["Remove"] = "삭제"
         m["Remove last"] = "마지막 지우기"
@@ -544,7 +548,9 @@ internal object L10nKo {
         m["Shared training"] = "받은 트레이닝"
         m["Short, but it counts."] = "짧아도 기록은 남아요."
         m["Show on iPhone"] = "iPhone에 같이 보기"
+        m["Show on phone"] = "폰에 같이 보기"
         m["Shows your watch workout on this iPhone and on the Lock Screen while you train. You can control it from either device."] = "워치로 운동하는 동안 이 iPhone 화면과 잠금 화면에 같이 보여 줘요. 어느 쪽에서든 넘기고 멈출 수 있어요."
+        m["Shows your watch workout on this phone and on the lock screen while you train. You can control it from either device."] = "워치로 운동하는 동안 이 폰 화면과 잠금 화면에 같이 보여 줘요. 어느 쪽에서든 넘기고 멈출 수 있어요."
         m["Sign in"] = "로그인"
         m["Sign in with Apple"] = "Apple로 로그인"
         m["Sign out"] = "로그아웃"
@@ -617,14 +623,14 @@ internal object L10nKo {
         m["The first time you turn on a reminder, your iPhone will ask to allow notifications."] = "알림을 처음 켜면 아이폰이 알림 허용을 물어봐요."
         m["The first time you turn on a reminder, your phone will ask to allow notifications."] = "알림을 처음 켜면 폰이 알림 허용을 물어봐요."
         m["The full race order for time: a 1 km run before each of the 8 stations."] = "실제 레이스 순서 그대로 시간을 잽니다. 스테이션 8개마다 앞에 1 km 러닝이 있어요."
+    }
+    private fun part4(m: HashMap<String, String>) {
         m["The link may be cut off. Ask for it again."] = "링크가 중간에 잘렸을 수 있어요. 다시 보내 달라고 해 주세요."
         m["The run after %@"] = "%@ 다음 런"
         m["The selected friend's records are used as the Full Simulation comparison and as Training split targets."] = "선택한 친구의 기록이 풀 시뮬레이션 비교 대상과 트레이닝 구간 목표로 쓰여요."
         m["The server isn't set up yet (Config.swift)"] = "서버 설정이 아직 없어요 (Config.swift)"
         m["The workout ends on Apple Watch and is saved there."] = "Apple Watch 의 운동이 끝나고 워치에서 저장돼요."
         m["They are removed from your friends and hidden from your search and rankings. You can unblock them here later."] = "친구 목록에서 빠지고, 검색과 순위표에 보이지 않아요. 나중에 이 화면에서 차단을 풀 수 있어요."
-    }
-    private fun part4(m: HashMap<String, String>) {
         m["They'll see your request in Friends. Records are shared once they accept."] = "상대의 친구 화면에 요청이 보여요. 수락하면 서로 기록이 보여요."
         m["This can't be undone."] = "이 기록은 되돌릴 수 없어요."
         m["This file isn't a SPLITS8 backup."] = "SPLITS8 백업 파일이 아니에요."
@@ -663,6 +669,7 @@ internal object L10nKo {
         m["W%lld"] = "%lld주"
         m["WEIGHT"] = "몸무게"
         m["WHO CAN SEE MY RECORDS"] = "내 기록 공개 범위"
+        m["Watch"] = "워치"
         m["Watch workouts, live"] = "워치 운동을 실시간으로"
         m["We'll send a code to the email you signed up with."] = "가입한 이메일로 코드를 보내드려요."
         m["Website"] = "홈페이지"
@@ -707,8 +714,10 @@ internal object L10nKo {
         m["Your record will appear here in a moment."] = "잠시 뒤 여기에 기록이 나와요."
         m["Your records stay on this iPhone."] = "기록은 이 아이폰에 그대로 남아요."
         m["Your records stay on this iPhone. Sign in again to use friends and leaderboards here."] = "기록은 이 iPhone에 그대로 있어요. 여기서 친구 · 순위표를 쓰려면 다시 로그인하세요."
+        m["Your records stay on this phone."] = "기록은 이 폰에 그대로 남아요."
         m["Your runs slowed most after [y]%@[/y] — [r]+%llds[/r] on your average run."] = "[y]%1\$@[/y] 다음 러닝이 가장 느려졌어요. 평균보다 [r]+%2\$lld초[/r]."
         m["Your second half was [r]%llds/km slower[/r] than the first."] = "후반이 전반보다 [r]1km 에 %lld초 느렸어요[/r]."
+        m["Your watch alerts you with a vibration during workouts."] = "운동 중에 워치가 진동으로 알려줘요."
         m["Z1–Z5 are calculated from your max heart rate. Heart rate colors on your watch follow these ranges."] = "최대 심박을 기준으로 Z1–Z5를 계산해요. 워치의 심박 색이 이 범위를 따라요."
         m["ZONES"] = "존"
         m["[g]%@ faster[/g] than last time on this training."] = "이 트레이닝 지난번보다 [g]%@ 빨라요[/g]."

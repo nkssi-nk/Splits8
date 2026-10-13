@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asImageBitmap
 import com.nkssi.splits8.shared.EventItem
 import com.nkssi.splits8.shared.Friend
 import com.nkssi.splits8.shared.L10n
@@ -48,6 +49,10 @@ object Store {
     /** 내 계정 id (순위표에서 "나" 줄 찾기). 화면 확인용 예시에서는 "demo.me" */
     var myId by mutableStateOf<String?>(null)
 
+    /** 내 프로필 사진 (앱 폴더 avatar.jpg, 720×720 정사각). 서버 올리기는 5단계 */
+    var photo by mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+        private set
+
     /** 지금 시각 (화면 사진에서는 고정해서 늘 같은 화면이 나오게) */
     var now: () -> java.time.Instant = { java.time.Instant.now() }
     fun today(): java.time.LocalDate = now().atZone(com.nkssi.splits8.shared.Fm.zone).toLocalDate()
@@ -76,6 +81,7 @@ object Store {
         records = load("records.json", ListSerializer(Record.serializer())) ?: emptyList()
         friends = load("friends.json", ListSerializer(Friend.serializer())) ?: emptyList()
         plans = load("plans.json", ListSerializer(PlannedWorkout.serializer())) ?: emptyList()
+        photo = runCatching { android.graphics.BitmapFactory.decodeFile(File(dir, "avatar.jpg").path)?.asImageBitmap() }.getOrNull()
         applyLang()
         rebuild()
     }
@@ -137,6 +143,41 @@ object Store {
 
     /** 친구 목표 (트레이닝 탭 "Mine | 친구") */
     fun setTgtSrc(v: String) = update { it.copy(tgtSrc = v) }
+
+    /** 사진 바꾸기 (null = 지우기). 가운데를 정사각으로 잘라 720×720 JPEG 로 저장 */
+    fun setPhoto(src: android.graphics.Bitmap?) {
+        val f = dir?.let { File(it, "avatar.jpg") }
+        if (src == null) {
+            photo = null
+            if (!demo) f?.delete()
+            return
+        }
+        val side = minOf(src.width, src.height)
+        val sq = android.graphics.Bitmap.createBitmap(src, (src.width - side) / 2, (src.height - side) / 2, side, side)
+        val out = android.graphics.Bitmap.createScaledBitmap(sq, 720, 720, true)
+        photo = out.asImageBitmap()
+        if (!demo && f != null) runCatching { f.outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) } }
+    }
+
+    /** 로그아웃: 이 기기에서 계정 정보만 지움. 기록 · 트레이닝 · 설정(프로필 포함)은 그대로 (서버 로그아웃은 5단계) */
+    fun signOut() {
+        update { it.copy(nickname = null, email = null, signMethod = null) }
+        friends = emptyList(); leaderboard = emptyList(); requests = emptyList(); myId = null
+        save("friends.json", ListSerializer(Friend.serializer()), friends)
+    }
+
+    /** 백업 파일 글자 (아이폰과 같은 모양) */
+    fun backupJson(): String = com.nkssi.splits8.shared.BackupFile(exportedAt = now(), records = records, programs = programs).json()
+
+    /** 백업 가져오기: 없는 기록 · 트레이닝만 더함. 파일이 SPLITS8 백업이 아니면 null, 아니면 (기록 수, 트레이닝 수) */
+    fun importBackup(text: String): Pair<Int, Int>? {
+        val b = com.nkssi.splits8.shared.BackupFile.read(text) ?: return null
+        val (r, nr) = com.nkssi.splits8.shared.BackupFile.mergeRecords(b.records, records)
+        val (p, np) = com.nkssi.splits8.shared.BackupFile.mergePrograms(b.programs, programs, Program.freeLimit)
+        if (nr > 0) { records = r; rebuild(); save("records.json", ListSerializer(Record.serializer()), records) }
+        if (np > 0) { programs = p; save("programs.json", ListSerializer(Program.serializer()), programs) }
+        return nr to np
+    }
 
     fun add(r: Record) {
         if (records.any { it.id.equals(r.id, ignoreCase = true) }) return

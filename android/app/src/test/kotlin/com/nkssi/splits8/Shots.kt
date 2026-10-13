@@ -186,6 +186,34 @@ class Shots {
     @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
     @Test fun setGoals() { demoRace(); shot("36_goals", s = Scr.SetGoals) }
 
+    // MARK: 설정 탭 (4-5)
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2300dp-xxhdpi")
+    @Test fun settingsDemo() { demoTraining(); shot("40_settings", s = Scr.Settings) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h2300dp-xxhdpi")
+    @Test fun settingsKoGuest() {
+        Store.useDemo(Settings(hasOnboarded = true), Program.presets(), emptyList())
+        Store.update { it.withGlow(com.nkssi.splits8.shared.GlowTheme.Blue) }
+        shot("41_settings_ko_guest", "ko", Scr.Settings)
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1900dp-xxhdpi")
+    @Test fun accountSigned() { demoTraining(); shot("42_account", s = Scr.Account) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1300dp-xxhdpi")
+    @Test fun accountGuestKo() {
+        Store.useDemo(Settings(hasOnboarded = true), Program.presets(), emptyList())
+        shot("43_account_guest_ko", "ko", Scr.Account)
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1500dp-xxhdpi")
+    @Test fun setDiv() { demoTraining(); Router.subFrom = Scr.Account; shot("44_division", s = Scr.SetDiv) }
+
+    @Test fun setHrKo() { demoTraining("ko"); Router.subFrom = Scr.Account; shot("45_hr_ko", "ko", Scr.SetHr) }
+
+    @Test fun setRun() { demoTraining(); shot("46_running", s = Scr.SetRun) }
+
     @Test fun limitAlertKo() {
         demoTraining("ko")
         Store.useDemo(Store.settings, Store.programs + Program.presets().map { it.copy(id = it.id + "x") }, Store.records)

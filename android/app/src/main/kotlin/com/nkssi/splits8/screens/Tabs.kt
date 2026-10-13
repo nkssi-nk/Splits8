@@ -44,7 +44,11 @@ fun ScreenFor(s: Scr) {
         Scr.SetEvent -> SetEventView()
         Scr.FindEvent -> FindEventView()
         Scr.SetGoals -> SetGoalsView()
-        Scr.Settings -> ComingScreen("Settings")
+        Scr.Settings -> SettingsView()
+        Scr.SetDiv -> SetDivView()
+        Scr.SetRun -> SetRunView()
+        Scr.SetHr -> SetHrView()
+        Scr.Account -> AccountView()
         else -> ComingScreen(s.name)
     }
 }

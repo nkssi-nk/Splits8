@@ -125,7 +125,7 @@ private fun ProfileCard() {
         Modifier.fillMaxWidth().card8().gradeBorder(grade).padding(vertical = 14.dp, horizontal = 16.dp).testTag("home.profile"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Avatar8(52.dp, if (signed) nick.take(1).uppercase() else "?", bg = if (signed) C.accent else C.control,
+        Avatar8(52.dp, if (signed) nick.take(1).uppercase() else "?", photo = Store.photo, bg = if (signed) C.accent else C.control,
             fg = if (signed) Color.Black else C.text2)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

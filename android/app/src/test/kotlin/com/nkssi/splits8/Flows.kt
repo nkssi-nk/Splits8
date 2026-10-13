@@ -255,6 +255,80 @@ class Flows {
         assertNull(Store.settings.doublesPlan)
     }
 
+    @Test fun settingsToggles() {
+        show(Scr.Settings)
+        tap("settings.hapticZone")
+        assertEquals(false, Store.settings.hapticZone)
+        tap("settings.mirror")
+        assertEquals(false, Store.settings.mirror)
+        tap("settings.theme.blue")
+        assertEquals(com.nkssi.splits8.shared.GlowTheme.Blue, Store.settings.glow)
+        tap("settings.theme.yellow")
+        assertNull(Store.settings.themeOpt)                // 노랑이면 비워 둠 (아이폰 파일과 같게)
+    }
+
+    @Test fun languageAppliesRightAway() {
+        show(Scr.Settings)
+        Store.update { it.copy(lang = "ko") }
+        rule.waitForIdle()
+        assertTrue(L10n.isKorean)
+        Store.update { it.copy(lang = "en") }
+        rule.waitForIdle()
+        assertTrue(!L10n.isKorean)
+    }
+
+    @Test fun divisionHrRunScreens() {
+        show(Scr.Settings)
+        tap("settings.profile")
+        assertEquals(Scr.Account, Router.scr)
+        tap("profile.division")
+        assertEquals(Scr.SetDiv, Router.scr)
+        tap("div.proW")
+        assertEquals("proW", Store.settings.division)
+        assertTrue(Router.back())                           // ‹ Profile
+        assertEquals(Scr.Account, Router.scr)
+        tap("profile.hr")
+        assertEquals(Scr.SetHr, Router.scr)
+        val age = Store.settings.age
+        rule.onNodeWithTag("hr.stepper").assertExists()
+        Store.update { it.copy(hrMode = "manual", manualHr = 190) }; rule.waitForIdle()
+        assertEquals(190, Store.settings.maxHR)
+        Store.update { it.copy(hrMode = "age", age = age) }
+        Router.go(Scr.SetRun); rule.waitForIdle()
+        tap("run.outdoor")
+        assertEquals("outdoor", Store.settings.runMode)
+    }
+
+    @Test fun backupRoundTrip() {
+        val now = java.time.Instant.parse("2026-09-25T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true)
+        val recs = Demo.records(o)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), recs, Demo.friends(), me = "demo.me")
+        val json = Store.backupJson()
+        assertTrue(json.contains("\"app\":\"SPLITS8\""))
+        // 기록이 없는 폰에 가져오기 → 전부 들어옴, 다시 가져오면 0
+        Store.useDemo(Settings(hasOnboarded = true), Program.presets(), emptyList())
+        assertEquals(L10n.t("Restored %lld records and %lld trainings.", recs.size, 1), com.nkssi.splits8.screens.restoreMessage(json))
+        assertEquals(recs.size, Store.records.size)
+        assertEquals("Nothing new to restore. Everything in this file is already here.", com.nkssi.splits8.screens.restoreMessage(json))
+        assertEquals("This file isn't a SPLITS8 backup.", com.nkssi.splits8.screens.restoreMessage("{\"app\":\"OTHER\"}"))
+    }
+
+    @Test fun signOutKeepsRecords() {
+        val now = java.time.Instant.parse("2026-09-25T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), Demo.records(o), Demo.friends(), me = "demo.me")
+        val n = Store.records.size
+        show(Scr.Settings)
+        tap("settings.signout")
+        tap("ask.ok")
+        assertTrue(!Store.signedIn)
+        assertEquals(n, Store.records.size)
+        assertTrue(Store.friends.isEmpty())
+    }
+
     @Test fun backClosesSheetFirst() {
         Router.bonus = BonusRequest("hiit")
         show(Scr.Training)

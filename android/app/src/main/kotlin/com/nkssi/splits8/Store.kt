@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asImageBitmap
+import com.nkssi.splits8.shared.BlockedUser
+import kotlinx.coroutines.launch
 import com.nkssi.splits8.shared.EventItem
 import com.nkssi.splits8.shared.Friend
 import com.nkssi.splits8.shared.L10n
@@ -164,6 +166,78 @@ object Store {
         update { it.copy(nickname = null, email = null, signMethod = null) }
         friends = emptyList(); leaderboard = emptyList(); requests = emptyList(); myId = null
         save("friends.json", ListSerializer(Friend.serializer()), friends)
+    }
+
+    // MARK: 친구 (아이폰 Store 와 같은 규칙)
+
+    /** 친구 최대 인원 (빌드 24 — 트레이닝 5개처럼. 이미 넘은 사람은 지우지 않고 추가만 막음) */
+    const val FRIEND_LIMIT = 10
+
+    /** 이번에 요청을 보낸 사람 (서버 목록이 다시 오기 전까지 "Requested" 로 보이게) */
+    var requested by mutableStateOf<Set<String>>(emptySet())
+
+    val friendsFull: Boolean get() = friends.size >= FRIEND_LIMIT
+
+    /** 친구를 고르면 Full Sim 비교 · 트레이닝 목표에 씀. 다시 누르면 풂 */
+    fun toggleFriend(f: Friend) {
+        val on = settings.friendId == f.id
+        update {
+            var n = it.copy(friendId = if (on) null else f.id)
+            if (on && n.simCmp == "friend") n = n.copy(simCmp = "goal")
+            if (on) n = n.copy(tgtSrc = "mine")
+            n
+        }
+    }
+
+    fun isBlocked(id: String): Boolean = settings.blocked.any { it.id == id }
+
+    /** 차단: 이 폰의 차단 목록에 넣고, 친구 목록 · 순위표 · 요청에서 바로 빼고, 서버의 친구 관계도 끊음 */
+    fun block(id: String, name: String) {
+        update {
+            var n = if (it.blocked.any { b -> b.id == id }) it else it.withBlocked(it.blocked + BlockedUser(id, name))
+            if (n.friendId == id) n = n.copy(friendId = null, simCmp = if (n.simCmp == "friend") "goal" else n.simCmp, tgtSrc = "mine")
+            n
+        }
+        friends = friends.filterNot { it.id == id }
+        leaderboard = leaderboard.filterNot { it.user_id == id }
+        requested = requested - id
+        requests = requests.filterNot { it.id == id }
+        save("friends.json", ListSerializer(Friend.serializer()), friends)
+        if (signedIn && !demo) socialCall { Accounts.api.removeFriend(id) }
+    }
+
+    fun unblock(id: String) = update { it.withBlocked(it.blocked.filterNot { b -> b.id == id }) }
+
+    /** 받은 요청 수락 / 거절. 수락은 친구 10명 한도 안에서만 (넘으면 false) */
+    fun respond(q: FriendReq, accept: Boolean): Boolean {
+        if (accept && friendsFull && friends.none { it.id == q.id }) return false
+        requests = requests.filterNot { it.id == q.id }
+        if (accept && friends.none { it.id == q.id }) {
+            friends = friends + Friend(q.id, q.name, q.div, "", emptyList(), q.avatarUrl)
+            save("friends.json", ListSerializer(Friend.serializer()), friends)
+        }
+        if (!demo) socialCall { Accounts.api.respondFriend(q.id, accept) }
+        return true
+    }
+
+    /** 보낸 요청 취소 */
+    fun cancelRequest(q: FriendReq) {
+        requests = requests.filterNot { it.id == q.id }
+        requested = requested - q.id
+        if (!demo) socialCall { Accounts.api.removeFriend(q.id) }
+    }
+
+    /** 친구 요청 보내기. 10명이면 false */
+    fun addFriend(id: String): Boolean {
+        if (friendsFull) return false
+        requested = requested + id
+        if (!demo) socialCall { Accounts.api.addFriend(id) }
+        return true
+    }
+
+    /** 서버 일은 화면을 막지 않고 뒤에서 (실패해도 앱은 그대로 — 다음 새로고침 때 맞춰짐) */
+    private fun socialCall(f: suspend () -> Unit) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main.immediate).launch { runCatching { f() } }
     }
 
     /** 백업 파일 글자 (아이폰과 같은 모양) */

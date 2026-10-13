@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1512).apply {
+        HashMap<String, String>(1514).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -711,6 +711,7 @@ internal object L10nKo {
         m["You %lld m · Partner %lld m"] = "나 %1\$lld m · 파트너 %2\$lld m"
         m["You %lld · Partner %lld reps"] = "나 %1\$lld개 · 파트너 %2\$lld개"
         m["You beat @%@ on [g]%lld of 8[/g] stations."] = "@%1\$@ 보다 스테이션 8개 중 [g]%2\$lld개[/g]가 빨라요."
+        m["You can add up to %lld friends."] = "최대 %lld명까지 추가할 수 있어요"
         m["You can change this later in Settings."] = "나중에 설정에서 바꿀 수 있어요"
         m["You can record everything on your own without an account.\nYou only need one to add friends and compare rankings."] = "가입하지 않아도 혼자 기록하는 기능은 모두 쓸 수 있어요.\n친구 추가와 순위 비교에만 계정이 필요해요."
         m["You can save up to %lld trainings"] = "트레이닝은 %lld개까지 만들 수 있어요"
@@ -775,9 +776,9 @@ internal object L10nKo {
         m["vs goal"] = "목표 대비"
         m["vs last"] = "지난 기록 대비"
         m["vs your best"] = "내 최고 대비"
-        m["with @%@"] = "@%@ 함께"
     }
     private fun part5(m: HashMap<String, String>) {
+        m["with @%@"] = "@%@ 함께"
         m["~%lld reps"] = "약 %lld회"
         m["~%lld strokes"] = "약 %lld회"
         m["‹ Swipe left to go back"] = "‹ 왼쪽으로 밀어 돌아가기"

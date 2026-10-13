@@ -42,7 +42,7 @@ class Shots {
     @After fun tearDown() {
         Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
         Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null; Router.toast = null
-        Router.email = ""; Router.code = ""; Router.nickDraft = ""; Router.signupFlow = false; Router.profileEdit = false
+        Router.email = ""; Router.code = ""; Router.nickDraft = ""; Router.signupFlow = false; Router.profileEdit = false; Router.userMenu = null
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -240,6 +240,27 @@ class Shots {
     @Test fun profile2Ko() { profileStep("57_profile2_ko", "ko", 2, false) }
     @Test fun profile3() { profileStep("58_profile3", "en", 3, null) }
     @Test fun profile4Ko() { profileStep("59_profile4_ko", "ko", 4, null) }
+
+    // MARK: 친구 (4-7)
+
+    private fun demoFriends(lang: String) {
+        demoTraining(lang)
+        Store.useDemo(Store.settings, Store.programs, Store.records, Demo.friends(), req = Demo.requests(), me = "demo.me")
+        Store.update { it.copy(friendId = Demo.friends().first { f -> f.hasSplits }.id) }
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun friends() { demoFriends("en"); shot("60_friends", s = Scr.Friends) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun friendsKo() { demoFriends("ko"); Router.friendsFrom = Scr.Home; shot("60_friends_ko", "ko", Scr.Friends) }
+
+    @Test fun friendsGuest() { Store.useDemo(Settings(hasOnboarded = true), Program.presets(), emptyList()); shot("61_friends_guest", s = Scr.Friends) }
+
+    @Test fun userMenuKo() {
+        demoFriends("ko"); Router.userMenu = com.nkssi.splits8.shared.BlockedUser("x", "jiho")
+        shot("62_user_menu_ko", "ko", Scr.Friends); Router.userMenu = null
+    }
 
     @Test fun limitAlertKo() {
         demoTraining("ko")

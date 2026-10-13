@@ -41,3 +41,6 @@
 "Your gender" = "본인 성별";
 "You can change this later in Settings." = "나중에 설정에서 바꿀 수 있어요";
 "No problem! You can fill this in anytime from Settings › Profile." = "괜찮아요! 나중에 설정 › 프로필에서 언제든 입력할 수 있어요 🙂";
+
+/* 친구 (빌드 24: 최대 10명) */
+"You can add up to %lld friends." = "최대 %lld명까지 추가할 수 있어요";

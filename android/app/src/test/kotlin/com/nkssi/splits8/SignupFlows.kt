@@ -37,6 +37,17 @@ class FakeApi(private val existing: Boolean = false) : AccountApi {
     override suspend fun nicknameAvailable(nick: String) = nick != "taken"
     override suspend fun saveNickname(nick: String) { if (nick == "taken") throw NicknameTaken() }
     override suspend fun loadProfile() = if (existing) ProfileLoad.Found else ProfileLoad.None
+    val calls = mutableListOf<String>()
+    override suspend fun findUser(q: String): RemoteProfile? = when (q) {
+        "minji", "minji@example.com" -> RemoteProfile("u.minji", "minji", "Open Women")
+        "me_myself" -> RemoteProfile("me", "me_myself", "Open Men")
+        "offline" -> throw Exception("network")
+        else -> null
+    }
+    override suspend fun addFriend(id: String) { calls += "add:$id" }
+    override suspend fun respondFriend(id: String, accept: Boolean) { calls += "respond:$id:$accept" }
+    override suspend fun removeFriend(id: String) { calls += "remove:$id" }
+    override val userId: String = "me"
 }
 
 /** 시작 · 가입 흐름 (가짜 서버로) */

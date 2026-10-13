@@ -25,7 +25,27 @@ interface AccountApi {
 
     /** 로그인한 계정의 프로필 읽기 */
     suspend fun loadProfile(): ProfileLoad
+
+    // 친구 (같은 서버 함수 — 아이폰 ↔ 안드로이드 서로 친구)
+
+    /** 이메일 전체 또는 닉네임 전체로 한 사람 찾기 (없으면 null). 물어보지 못하면 예외 */
+    suspend fun findUser(q: String): RemoteProfile?
+
+    /** 친구 요청 보내기 */
+    suspend fun addFriend(id: String)
+
+    /** 받은 요청 수락 / 거절 (respond_friend) */
+    suspend fun respondFriend(id: String, accept: Boolean)
+
+    /** 친구 끊기 · 보낸 요청 취소 */
+    suspend fun removeFriend(id: String)
+
+    /** 내 서버 user id (검색에서 나를 빼려고) */
+    val userId: String?
 }
+
+/** 서버의 공개 프로필 한 줄 (profiles 표) */
+data class RemoteProfile(val id: String, val nickname: String?, val division: String?, val avatarUrl: String? = null)
 
 enum class ProfileLoad { Found, None, Failed }
 
@@ -41,6 +61,11 @@ object NotConnected : AccountApi {
     override suspend fun nicknameAvailable(nick: String): Boolean = throw NotReady()
     override suspend fun saveNickname(nick: String) = throw NotReady()
     override suspend fun loadProfile(): ProfileLoad = ProfileLoad.Failed
+    override suspend fun findUser(q: String): RemoteProfile? = throw NotReady()
+    override suspend fun addFriend(id: String) = throw NotReady()
+    override suspend fun respondFriend(id: String, accept: Boolean) = throw NotReady()
+    override suspend fun removeFriend(id: String) = throw NotReady()
+    override val userId: String? = null
 }
 
 object Accounts {

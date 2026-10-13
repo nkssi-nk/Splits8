@@ -79,6 +79,7 @@ fun Overlays() {
         bg = androidx.compose.ui.graphics.Color(0xFF141414)) { k ->
         if (k == "doubles") DoublesPlanSheet() else GoalTimeSheet()
     }
+    Sheet8(Router.userMenu, onClose = { Router.userMenu = null }) { u -> UserMenuSheet(u) }
     ToastHost()
     AskHost()
 }

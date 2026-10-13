@@ -132,7 +132,7 @@ fun AskHost() {
  * 바깥을 누르거나 손잡이를 아래로 끌면 닫힘. large = 화면 위쪽 거의 끝까지
  */
 @Composable
-fun <T : Any> Sheet8(item: T?, onClose: () -> Unit, large: Boolean = false, content: @Composable ColumnScope.(T) -> Unit) {
+fun <T : Any> Sheet8(item: T?, onClose: () -> Unit, large: Boolean = false, bg: Color = C.sheet, content: @Composable ColumnScope.(T) -> Unit) {
     var last by remember { mutableStateOf<T?>(null) }
     if (item != null) last = item
     val density = LocalDensity.current
@@ -152,7 +152,7 @@ fun <T : Any> Sheet8(item: T?, onClose: () -> Unit, large: Boolean = false, cont
                     .then(if (large) Modifier.fillMaxHeight(0.94f) else Modifier.heightIn(max = 760.dp))
                     .offset { IntOffset(0, drag.value.roundToInt()) }
                     .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .background(C.sheet)
+                    .background(bg)
                     .pointerInput(Unit) { detectTapGestures { } }   // 판 안을 눌러도 닫히지 않게
                     .padding(bottom = navBottom()),
             ) {

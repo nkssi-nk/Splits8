@@ -41,7 +41,7 @@ class Shots {
 
     @After fun tearDown() {
         Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
-        Router.testTab = "pft"
+        Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -145,6 +145,46 @@ class Shots {
     @Test fun pftInfoKo() { demoTraining("ko"); Router.testTab = "pft"; Router.testInfo = "pft"; shot("24_pft_info_ko", "ko", Scr.Sim) }
 
     @Test fun simInfo() { demoTraining(); Router.testTab = "sim"; Router.testInfo = "sim"; shot("25_sim_info", s = Scr.Sim) }
+
+    // MARK: 레이스 탭 (4-4)
+
+    private fun demoRace(lang: String = "en", dbl: Boolean = false) {
+        demoTraining(lang)
+        Store.update { it.copy(event = com.nkssi.splits8.shared.RaceEvent("Seoul", "KINTEX, Goyang",
+            java.time.LocalDate.of(2026, 11, 13).atStartOfDay(com.nkssi.splits8.shared.Fm.zone).toInstant(), "09:30"),
+            division = if (dbl) "dblM" else it.division) }
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1900dp-xxhdpi")
+    @Test fun raceDemo() { demoRace(); shot("30_race", s = Scr.Race) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1900dp-xxhdpi")
+    @Test fun raceDemoKoDbl() { demoRace("ko", dbl = true); shot("30_race_ko_dbl", "ko", Scr.Race) }
+
+    @Test fun raceEmpty() {
+        Store.useDemo(Settings(hasOnboarded = true), Program.presets(), emptyList())
+        shot("31_race_empty", s = Scr.Race)
+    }
+
+    @Test fun goalSheet() { demoRace(); Router.raceSheet = "goal"; shot("32_goal_sheet", s = Scr.Race) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1100dp-xxhdpi")
+    @Test fun doublesSheetKo() { demoRace("ko", dbl = true); Router.raceSheet = "doubles"; shot("33_doubles_ko", "ko", Scr.Race) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1400dp-xxhdpi")
+    @Test fun setEvent() {
+        demoRace(); Router.evDraft = null; shot("34_event", s = Scr.SetEvent)
+        rule.onNodeWithTag("ev.Date").performClick(); rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/34_event_date.png")
+        rule.onNodeWithTag("ev.Date").performClick(); rule.onNodeWithTag("ev.Start time").performClick(); rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/34_event_time.png")
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1500dp-xxhdpi")
+    @Test fun findEventKo() { demoRace("ko"); shot("35_find_ko", "ko", Scr.FindEvent) }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")
+    @Test fun setGoals() { demoRace(); shot("36_goals", s = Scr.SetGoals) }
 
     @Test fun limitAlertKo() {
         demoTraining("ko")

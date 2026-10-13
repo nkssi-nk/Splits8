@@ -153,6 +153,10 @@ object Router {
     var bonus by mutableStateOf<BonusRequest?>(null)
     var planRequest by mutableStateOf<PlanRequest?>(null)
     var ask by mutableStateOf<Ask?>(null)
+    /** 레이스 탭 시트: "goal" (목표 시간) / "doubles" (더블 구간 나누기) / null */
+    var raceSheet by mutableStateOf<String?>(null)
+    /** 대회 화면에서 고치는 중인 대회 (Save 전) */
+    var evDraft by mutableStateOf<com.nkssi.splits8.shared.RaceEvent?>(null)
     /** Test 탭 설명 시트: "pft" / "sim" / null */
     var testInfo by mutableStateOf<String?>(null)
 
@@ -256,6 +260,7 @@ object Router {
         if (bonus != null) { bonus = null; return true }
         if (planRequest != null) { planRequest = null; return true }
         if (testInfo != null) { testInfo = null; return true }
+        if (raceSheet != null) { raceSheet = null; return true }
         backAction?.let { it(); return true }
         barBack?.let { it.second(); return true }
         if (scr.showsTabs && scr != Scr.Home) { go(Scr.Home); return true }

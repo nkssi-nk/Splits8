@@ -42,7 +42,7 @@ class Flows {
 
     @After fun tearDown() {
         Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
-        Router.testTab = "pft"
+        Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null
     }
 
     private fun show(s: Scr) {
@@ -171,6 +171,88 @@ class Flows {
         assertEquals(0.44f, com.nkssi.splits8.screens.pftPos(22 * 60), 0.001f)
         assertEquals(0.70f, com.nkssi.splits8.screens.pftPos(26 * 60), 0.001f)
         assertEquals(1f, com.nkssi.splits8.screens.pftPos(40 * 60), 0.001f)
+    }
+
+    private fun useRaceDemo() {
+        val now = java.time.Instant.parse("2026-09-25T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), Demo.records(o), Demo.friends(), me = "demo.me")
+    }
+
+    @Test fun findEventFillsDraftAndSaves() {
+        useRaceDemo()
+        show(Scr.Race)
+        tap("race.Event")
+        assertEquals(Scr.SetEvent, Router.scr)
+        tap("ev.find")
+        assertEquals(Scr.FindEvent, Router.scr)
+        tap("ev.region.korea")
+        tap("ev.item.Seoul")
+        assertEquals(Scr.SetEvent, Router.scr)
+        assertEquals("Seoul", Router.evDraft?.name)
+        tap("ev.Start time"); tap("ev.h.9"); tap("ev.m.30")
+        assertEquals("09:30", Router.evDraft?.time)
+        tap("nav.right")
+        assertEquals(Scr.Race, Router.scr)
+        assertEquals("Seoul", Store.settings.event.name)
+        assertEquals("09:30", Store.settings.event.time)
+        assertEquals(java.time.LocalDate.of(2026, 11, 13), Store.settings.event.date.atZone(com.nkssi.splits8.shared.Fm.zone).toLocalDate())
+        assertNull(Router.evDraft)
+    }
+
+    @Test fun cancelEventKeepsOld() {
+        useRaceDemo()
+        val old = Store.settings.event
+        Router.evDraft = null
+        show(Scr.SetEvent)
+        tap("ev.find"); tap("ev.item.Shanghai")
+        tap("nav.left")
+        assertEquals(Scr.Race, Router.scr)
+        assertEquals(old, Store.settings.event)
+    }
+
+    @Test fun goalTimeSplitsGoals() {
+        useRaceDemo()
+        show(Scr.Race)
+        tap("race.Goal time")
+        assertEquals("goal", Router.raceSheet)
+        tap("nav.right")                                    // 같은 시간 · "Current" 방식으로 저장
+        assertNull(Router.raceSheet)
+        val s = Store.settings
+        assertEquals(4320, s.goalTime)
+        assertEquals(16, s.goals.size)
+        assertTrue(kotlin.math.abs(s.goals.sum() - (s.goalTime - 8 * s.roxTarget)) <= 5)   // 5초 단위로 반올림
+        assertTrue(s.goals.all { it % 5 == 0 && it >= 30 })
+    }
+
+    @Test fun splitGoalsStep() {
+        useRaceDemo()
+        show(Scr.Race)
+        tap("race.splitTargets")
+        assertEquals(Scr.SetGoals, Router.scr)
+        val before = Store.settings.goals[0]
+        changeGoalViaUi()
+        assertEquals(before + 5, Store.settings.goals[0])
+        assertEquals(Store.settings.goals.sum() + 8 * Store.settings.roxTarget, Store.settings.goalTime)
+        assertTrue(Router.back())                           // ‹ Race
+        assertEquals(Scr.Race, Router.scr)
+    }
+
+    private fun changeGoalViaUi() {
+        com.nkssi.splits8.screens.changeGoal(0, 5); rule.waitForIdle()
+    }
+
+    @Test fun doublesPlanOnlyForDoubles() {
+        useRaceDemo()
+        show(Scr.Race)
+        rule.onAllNodesWithTag("race.Doubles plan").fetchSemanticsNodes().let { assertTrue(it.isEmpty()) }
+        Store.update { it.copy(division = "dblM") }
+        rule.waitForIdle()
+        tap("race.Doubles plan")
+        assertEquals("doubles", Router.raceSheet)
+        tap("nav.right")                                    // 반반 그대로 저장 → 비워 둠
+        assertNull(Store.settings.doublesPlan)
     }
 
     @Test fun backClosesSheetFirst() {

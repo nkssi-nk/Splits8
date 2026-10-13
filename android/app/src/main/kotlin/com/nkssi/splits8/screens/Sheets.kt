@@ -74,6 +74,11 @@ fun Overlays() {
     Sheet8(Router.bonus, onClose = { Router.bonus = null }) { req -> BonusSheet(req) }
     Sheet8(Router.planRequest, onClose = { Router.planRequest = null }, large = true) { req -> PlanSheet(req) }
     Sheet8(Router.testInfo, onClose = { Router.testInfo = null }, large = true) { k -> TestInfoSheet(k) }
+    // 목표 시간 · 더블 시트는 아이폰처럼 더 어두운 #141414 (회색 러닝 막대가 보이게)
+    Sheet8(Router.raceSheet, onClose = { Router.raceSheet = null }, large = Router.raceSheet == "doubles",
+        bg = androidx.compose.ui.graphics.Color(0xFF141414)) { k ->
+        if (k == "doubles") DoublesPlanSheet() else GoalTimeSheet()
+    }
     AskHost()
 }
 

@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1452).apply {
+        HashMap<String, String>(1454).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -400,6 +400,7 @@ internal object L10nKo {
         m["Off"] = "끔"
         m["On"] = "켬"
         m["Once saved, the event name, date and division appear on the Race start screen on Apple Watch."] = "저장하면 Apple Watch의 레이스 시작 화면에 대회명·날짜·Division이 표시돼요."
+        m["Once saved, the event name, date and division appear on the Race start screen on your watch."] = "저장하면 워치의 레이스 시작 화면에 대회명·날짜·Division이 표시돼요."
         m["Once you have a race record, we'll compare it with your best"] = "대회 기록이 생기면 최고 기록과 비교해 드려요"
         m["Only me"] = "나만 보기"
         m["Only people you've added as friends can see your records and rankings."] = "친구로 추가된 사람만 내 기록과 순위를 볼 수 있어요."
@@ -470,9 +471,9 @@ internal object L10nKo {
         m["Records are shared only after you accept."] = "수락해야 서로 기록이 보여요."
         m["Records you've done with it stay in History."] = "이 트레이닝으로 한 기록은 기록 목록에 그대로 남아요."
         m["Red"] = "빨강"
-        m["Relay"] = "릴레이"
     }
     private fun part3(m: HashMap<String, String>) {
+        m["Relay"] = "릴레이"
         m["Remove"] = "삭제"
         m["Remove last"] = "마지막 지우기"
         m["Remove partner"] = "파트너 빼기"
@@ -622,9 +623,9 @@ internal object L10nKo {
         m["The server isn't set up yet (Config.swift)"] = "서버 설정이 아직 없어요 (Config.swift)"
         m["The workout ends on Apple Watch and is saved there."] = "Apple Watch 의 운동이 끝나고 워치에서 저장돼요."
         m["They are removed from your friends and hidden from your search and rankings. You can unblock them here later."] = "친구 목록에서 빠지고, 검색과 순위표에 보이지 않아요. 나중에 이 화면에서 차단을 풀 수 있어요."
-        m["They'll see your request in Friends. Records are shared once they accept."] = "상대의 친구 화면에 요청이 보여요. 수락하면 서로 기록이 보여요."
     }
     private fun part4(m: HashMap<String, String>) {
+        m["They'll see your request in Friends. Records are shared once they accept."] = "상대의 친구 화면에 요청이 보여요. 수락하면 서로 기록이 보여요."
         m["This can't be undone."] = "이 기록은 되돌릴 수 없어요."
         m["This file isn't a SPLITS8 backup."] = "SPLITS8 백업 파일이 아니에요."
         m["This looks too fast to be a valid result. A tap may have been missed."] = "너무 빨라서 정상 기록으로 보이지 않아요. 구간 넘기기가 잘못 눌렸을 수 있어요."

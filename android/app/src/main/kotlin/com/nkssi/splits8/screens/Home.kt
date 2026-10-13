@@ -183,7 +183,7 @@ private fun NextRace() {
         Row(Modifier.fillMaxWidth().card8().padding(vertical = 16.dp, horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             T("No race added yet. Add one to start it right away from Race on your watch.", F.t(13, color = C.text2), Modifier.weight(1f))
-            YellowPill("Add event") { Router.go(Scr.FindEvent) }
+            YellowPill("Add event") { Router.evDraft = Store.settings.event; Router.go(Scr.FindEvent) }
         }
         return
     }

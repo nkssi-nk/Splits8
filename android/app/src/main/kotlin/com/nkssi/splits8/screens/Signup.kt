@@ -146,7 +146,7 @@ private fun StepDots(step: Int, total: Int) {
 
 /** ‹ 뒤로 (노랑, 44 높이) */
 @Composable
-private fun BackLink(label: String, onClick: () -> Unit) {
+fun BackLink(label: String, onClick: () -> Unit) {
     Row(Modifier.height(44.dp).tap(onClick = onClick).testTag("back"), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Glyph("i_chevL", 22.dp, C.accent)
@@ -156,7 +156,7 @@ private fun BackLink(label: String, onClick: () -> Unit) {
 
 /** 시스템 뒤로 가기가 누를 동작 */
 @Composable
-private fun BackAction(f: (() -> Unit)?) {
+fun BackAction(f: (() -> Unit)?) {
     DisposableEffect(f) {
         Router.backAction = f
         onDispose { if (Router.backAction === f) Router.backAction = null }

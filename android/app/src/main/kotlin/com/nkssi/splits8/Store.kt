@@ -260,6 +260,15 @@ object Store {
         save("records.json", ListSerializer(Record.serializer()), records)
     }
 
+    /** 더블 파트너 닉네임 바꾸기 (null = 빼기). 기기에만 저장 */
+    fun updatePartner(id: String, nick: String?) {
+        val i = records.indexOfFirst { it.id == id }
+        if (i < 0) return
+        records = records.toMutableList().also { it[i] = it[i].copy(partner = nick) }
+        rebuild()
+        save("records.json", ListSerializer(Record.serializer()), records)
+    }
+
     fun delete(r: Record) {
         records = records.filterNot { it.id == r.id }
         rebuild()

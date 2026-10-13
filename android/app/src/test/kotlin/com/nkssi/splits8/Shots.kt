@@ -43,6 +43,7 @@ class Shots {
         Router.ask = null; Router.bonus = null; Router.planRequest = null; Router.editId = null; Router.testInfo = null
         Router.testTab = "pft"; Router.raceSheet = null; Router.evDraft = null; Router.toast = null
         Router.email = ""; Router.code = ""; Router.nickDraft = ""; Router.signupFlow = false; Router.profileEdit = false; Router.userMenu = null
+        Router.partnerFor = null; Router.detail = null
     }
 
     private fun shot(name: String, lang: String = "en", s: Scr) {
@@ -271,6 +272,40 @@ class Shots {
         Router.ask = null
     }
     @Test fun settings() = shot("04_settings", s = Scr.Settings)
+
+    // 기록 상세 (아이폰 --demo · --demorun 과 같은 기록). 화면 전체를 보려고 아주 긴 화면으로
+    private fun demoDetail(name: String, lang: String, pick: (List<com.nkssi.splits8.shared.Record>) -> com.nkssi.splits8.shared.Record,
+                           friend: Boolean = false, from: Scr = Scr.Race) {
+        val now = java.time.Instant.parse("2026-10-05T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = friend)
+        val recs = Demo.records(o) + Demo.runRecord()
+        var st = Demo.settings(o, Store.today())
+        if (friend) st = st.copy(friendId = Demo.friends().first { it.hasSplits }.id)
+        Store.useDemo(st, Demo.programs(), recs, Demo.friends(), Demo.leaderboard(), Demo.requests(), "demo.me")
+        Router.detail = pick(Store.records); Router.detailFrom = from
+        shot(name, lang, Scr.Detail)
+    }
+
+    @Config(sdk = [35], qualifiers = "w412dp-h4200dp-xxhdpi")
+    @Test fun detailRace() = demoDetail("63_detail_race", "en", { r -> r.first { it.title == "Incheon" } }, friend = true)
+    @Config(sdk = [35], qualifiers = "w412dp-h4200dp-xxhdpi")
+    @Test fun detailSimKo() = demoDetail("64_detail_sim_ko", "ko", { r -> r.filter { it.mode == com.nkssi.splits8.shared.Mode.Sim }.maxBy { it.date } }, from = Scr.Sim)
+    @Config(sdk = [35], qualifiers = "w412dp-h3000dp-xxhdpi")
+    @Test fun detailRun() = demoDetail("65_detail_run", "en", { r -> r.first { it.isRunKind } }, from = Scr.Training)
+    @Config(sdk = [35], qualifiers = "w412dp-h2400dp-xxhdpi")
+    @Test fun detailPftKo() = demoDetail("66_detail_pft_ko", "ko", { r -> r.filter { it.mode == com.nkssi.splits8.shared.Mode.Pft }.maxBy { it.date } }, from = Scr.Sim)
+    @Test fun partnerSheet() {
+        demoDetail("67_detail_partner", "en", { r -> r.first { it.title == "Incheon" } }, friend = true)
+        val id = Router.detail!!.id
+        Store.updatePartner(id, "jiho")
+        Router.detail = Store.records.first { it.id == id }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/67_detail_partner.png")
+        Router.partnerFor = id
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/67_partner_sheet.png")
+    }
 
     @Test fun launch() {
         rule.setContent { LaunchLogo() }

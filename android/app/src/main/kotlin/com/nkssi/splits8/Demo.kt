@@ -152,4 +152,45 @@ object Demo {
         }
         return out
     }
+
+    /**
+     * 러닝 기록 화면 확인용 (아이폰 runRecord): 공원 1 km 한 바퀴 코스를 6바퀴 (서울숲 근처).
+     * 한쪽에 작은 언덕(4번째 km 는 조금 더 높게) · km 마다 페이스와 케이던스가 조금씩 다름
+     */
+    fun runRecord(): Record {
+        val lat0 = 37.5444
+        val lon0 = 127.0374
+        val radius = 1000 / (2 * Math.PI)
+        val kx = 111_320 * kotlin.math.cos(lat0 * Math.PI / 180)
+        val paces = listOf(298, 292, 295, 309, 290, 284)
+        val cads = listOf(174, 175, 173, 168, 166, 165)
+        val hills = listOf(8.0, 8.0, 8.0, 15.0, 8.0, 8.0)
+        val route = ArrayList<com.nkssi.splits8.shared.RoutePt>()
+        val segs = ArrayList<SegResult>()
+        var t = 0.0
+        for (k in 0 until 6) {
+            val n = 100
+            for (j in 0 until n) {
+                val ang = j.toDouble() / n * 2 * Math.PI
+                val x = radius * sin(ang)
+                val y = radius - radius * kotlin.math.cos(ang)
+                val hill = if (ang < Math.PI) hills[k] * sin(ang) else 0.0
+                val h = 24 + hill + sin(j * 1.7) * 0.6
+                val slope = if (ang < Math.PI) kotlin.math.cos(ang) else 0.0
+                val dt = paces[k].toDouble() / n * (1 + 0.18 * slope)
+                route.add(com.nkssi.splits8.shared.RoutePt(lat0 + y / 111_320, lon0 + x / kx, h, Math.round(t).toInt()))
+                t += dt
+            }
+            segs.add(SegResult("run", "KM ${k + 1}", "1KM", SegKind.Run, paces[k], 0, hr = 152 + k * 3, dist = 1000.0, cad = cads[k]))
+        }
+        route.first().let { route.add(it.copy(t = Math.round(t).toInt())) }
+        val total = paces.sum()
+        val start = day("2026-09-27").plusSeconds(7 * 3600 + 300)
+        val r = Record(newId(), Mode.Training, "Easy 6K", 1, start, total, segs,
+            (0..30).map { HRPoint(it * total / 30, 138 + min(22, it * 2) + (it % 4) * 2) }, 402, 156, 171, "openM", null,
+            "VS BEST", null, complete = true, kind = "run", place = "Seongsu-dong, Seoul", route = route)
+        // 오르막 · 구간 오르막 · 보폭은 실제 기록과 같은 계산으로 (걸음 = 케이던스 × 시간)
+        val steps = segs.map { (it.cad ?: 0) * it.time / 60.0 }
+        return com.nkssi.splits8.shared.RunMetrics.fill(r, steps, null)
+    }
 }

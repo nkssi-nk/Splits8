@@ -50,6 +50,7 @@ fun ScreenFor(s: Scr) {
         Scr.SetHr -> SetHrView()
         Scr.Account -> AccountView()
         Scr.Friends -> FriendsView()
+        Scr.Detail -> DetailView()
         Scr.Ob1 -> Onboarding1()
         Scr.Ob2 -> Onboarding2()
         Scr.Ob3 -> Onboarding3()

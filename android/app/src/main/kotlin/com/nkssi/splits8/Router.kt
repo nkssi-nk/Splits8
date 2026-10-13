@@ -159,6 +159,8 @@ object Router {
     var evDraft by mutableStateOf<com.nkssi.splits8.shared.RaceEvent?>(null)
     /** ··· 메뉴 (신고 · 차단)를 띄울 사람 */
     var userMenu by mutableStateOf<com.nkssi.splits8.shared.BlockedUser?>(null)
+    /** 기록 상세의 파트너 고르기 시트 (기록 id) */
+    var partnerFor by mutableStateOf<String?>(null)
     /** Test 탭 설명 시트: "pft" / "sim" / null */
     var testInfo by mutableStateOf<String?>(null)
 
@@ -319,6 +321,7 @@ object Router {
         if (testInfo != null) { testInfo = null; return true }
         if (raceSheet != null) { raceSheet = null; return true }
         if (userMenu != null) { userMenu = null; return true }
+        if (partnerFor != null) { partnerFor = null; return true }
         backAction?.let { it(); return true }
         barBack?.let { it.second(); return true }
         if (scr.showsTabs && scr != Scr.Home) { go(Scr.Home); return true }

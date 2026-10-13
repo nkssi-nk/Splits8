@@ -44,3 +44,6 @@
 
 /* 친구 (빌드 24: 최대 10명) */
 "You can add up to %lld friends." = "최대 %lld명까지 추가할 수 있어요";
+
+/* 기록 상세 (안드로이드: 사진 공유는 다음 단계) */
+"Photo sharing comes in the next Android build." = "사진과 함께 공유는 다음 안드로이드 빌드에 들어가요.";

@@ -835,3 +835,9 @@
 "500 km run" = "러닝 500 km";
 "Run 100 km in total across your workouts." = "운동하면서 달린 거리가 모두 100 km 가 돼요.";
 "Run 500 km in total across your workouts." = "운동하면서 달린 거리가 모두 500 km 가 돼요.";
+
+/* 빌드 25 (66번) */
+"Already on your watch list" = "이미 워치 목록에 있어요";
+"Save changes" = "변경 내용 저장";
+"Save to My Trainings" = "내 트레이닝으로 저장";
+"Saved to My Trainings" = "내 트레이닝에 저장했어요";

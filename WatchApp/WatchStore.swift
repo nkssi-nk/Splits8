@@ -26,9 +26,9 @@ final class WatchStore: NSObject, WCSessionDelegate {
         // 저장된 언어로 번역을 바로 맞춤 (앱을 다시 켜지 않아도 되게)
         L10n.set(ctx.settings.lang)
         pending = JSONStore.load([Record].self, pendingFile) ?? []
-        // 63번: 워치에는 마지막 Quick 하나만 남김 (예전 빌드에서 쌓인 Quick 들 정리)
-        quickSaved = Array((JSONStore.load([Program].self, quickFile) ?? []).prefix(1))
-        JSONStore.save(quickSaved, quickFile)
+        // 66번(빌드 25): Quick 은 한 번 쓰는 운동 → 워치 목록에 남기지 않음 (예전 빌드에서 남은 것도 지움)
+        quickSaved = []
+        try? FileManager.default.removeItem(at: JSONStore.url(quickFile))
     }
 
     var settings: Settings { ctx.settings }
@@ -51,13 +51,11 @@ final class WatchStore: NSObject, WCSessionDelegate {
 
     /// Quick training: 이번 운동에 쓰는 것. 63번 — 아이폰 트레이닝 목록에는 더 이상 자동으로 안 쌓음
     /// (예전: 시작할 때마다 Quick 1, 2, 3… 이 아이폰 · 워치 양쪽에 쌓이고 워치 쪽은 지워지지도 않았음)
-    /// 워치에는 마지막 Quick 하나만 남겨 다시 할 수 있게 함. 기록은 평소처럼 아이폰으로 감
+    /// 66번(빌드 25): 워치 목록에도 남기지 않음 — 아이폰 목록과 늘 같게. 기록은 평소처럼 아이폰으로 감.
+    /// 같은 구성을 다시 하려면 아이폰 기록 화면의 "내 트레이닝으로 저장"으로 정식 트레이닝을 만듦
     func saveQuick(_ seq: [ProgItem]) -> Program {
-        let p = Program(id: "q" + UUID().uuidString.prefix(8), name: "Quick · \(Fm.dm.string(from: Date()))",
-                        sets: 1, seq: seq, quick: true)
-        quickSaved = [p]
-        JSONStore.save(quickSaved, quickFile)
-        return p
+        Program(id: "q" + UUID().uuidString.prefix(8), name: "Quick · \(Fm.dm.string(from: Date()))",
+                sets: 1, seq: seq, quick: true)
     }
 
     /// 기록을 아이폰으로. 전달이 확인될 때까지 보류 목록에도 남겨 둠 (아이폰이 꺼져 있거나 멀어도 안 잃어버리게)

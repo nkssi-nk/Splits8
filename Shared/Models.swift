@@ -493,6 +493,9 @@ struct RaceEvent: Codable, Hashable {
 // MARK: - 친구 (계정 · Supabase)
 
 struct Friend: Codable, Hashable, Identifiable {
+    /// 빌드 24: 친구 최대 10명 (수락된 친구 + 보낸 요청). 이미 넘은 사람은 지우지 않고 추가만 막음
+    static let freeLimit: Int = 10
+
     var id: String             // 상대 user id
     var name: String           // 닉네임
     var div: String            // Open Men
@@ -768,6 +771,8 @@ struct Settings: Codable, Hashable {
     var raceDivision: String? = nil
     /// 프로필 단계를 한 번 끝냈는지 (업데이트 뒤 한 번만 묻기 위해)
     var profileDone: Bool? = nil
+    /// 빌드 24: 가입 때 적은 하이록스 최고 완주 시간(초). 목표 시간 기본값 · 구간 나누기에 씀
+    var bestFinish: Int? = nil
     /// 사용자가 디비전 목록에서 직접 고른 적 있는지 (없으면 프로필의 대회 디비전으로 채워도 됨)
     var divPicked: Bool? = nil
     /// 빌드 23: 더블 구간 나누기 계획 (폰에만 저장) — 예전 저장 파일과 호환되도록 옵셔널, 반반이면 nil
@@ -840,17 +845,17 @@ enum SeqBuilder {
         var o: [Seg] = []
         for i in 0..<8 {
             o.append(Seg(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, target: targets16[i * 2]))
-            if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: roxTarget)) }
+            if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
             let s = Station.all[i]
             o.append(Seg(icon: s.key, name: s.name, detail: s.detail(div), kind: .st, target: targets16[i * 2 + 1]))
-            if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: roxTarget)) }
+            if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
         }
         return o
     }
 
     /// HIIT 라운드 (끝 없이 늘어남, 목표 없음)
     static func hiitRound(_ n: Int) -> Seg {
-        Seg(icon: "hiit", name: "Round \(n)", detail: "INTERVAL", kind: .st, target: 0)
+        Seg(icon: "hiit", name: "Round \(n)", detail: "Interval", kind: .st, target: 0)
     }
     /// 러닝 1km 구간
     static func runKm(_ n: Int, target: Int = 0) -> Seg {

@@ -20,6 +20,13 @@ struct WidgetPreviewView: View {
             }
             label("D-day · medium")
             medium(stage: 2) { DdayMediumView(snap: .demo(days: 10, now: now), now: now) }
+            // 빌드 24: 위젯 바탕 고르기 (흰색 · 테마 색)
+            label("Background · white / theme color")
+            HStack(spacing: 12) {
+                small(stage: 2, pal: .light) { DdaySmallView(snap: .demo(days: 10, now: now), now: now) }
+                small(stage: 2, pal: .theme(GlowTheme.current.hex)) { DdaySmallView(snap: .demo(days: 10, now: now), now: now) }
+            }
+            medium(stage: 0, pal: .light) { WeekMediumView(snap: .demo(now: now)) }
             label("This week")
             HStack(spacing: 12) {
                 small(stage: 0) { WeekSmallView(snap: .demo(now: now)) }
@@ -67,23 +74,19 @@ struct WidgetPreviewView: View {
         Text(t).font(F.t(13, .semibold)).foregroundStyle(C.text2).padding(.top, 6)
     }
 
-    private func small<V: View>(stage: Int, @ViewBuilder _ v: () -> V) -> some View {
-        box(v(), w: 165, stage: stage)
+    private func small<V: View>(stage: Int, pal: WPal = .dark, @ViewBuilder _ v: () -> V) -> some View {
+        box(v(), w: 165, stage: stage, pal: pal)
     }
-    private func medium<V: View>(stage: Int, @ViewBuilder _ v: () -> V) -> some View {
-        box(v(), w: 345, stage: stage)
+    private func medium<V: View>(stage: Int, pal: WPal = .dark, @ViewBuilder _ v: () -> V) -> some View {
+        box(v(), w: 345, stage: stage, pal: pal)
     }
-    private func box<V: View>(_ v: V, w: CGFloat, stage: Int) -> some View {
+    private func box<V: View>(_ v: V, w: CGFloat, stage: Int, pal: WPal) -> some View {
         v.padding(16)
             .frame(width: w, height: 165)
-            .background {
-                ZStack {
-                    Color(hex: 0x0C0C0C)
-                    DdayGlow(stage: stage)
-                }
-            }
+            .background { WidgetBackdrop(stage: stage) }
+            .environment(\.wpal, pal)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(C.accent.opacity([0.0, 0.25, 0.4, 0.8][stage]), lineWidth: 1.5))
+                .strokeBorder(C.accent.opacity(pal.light ? 0 : [0.0, 0.25, 0.4, 0.8][stage]), lineWidth: 1.5))
     }
 }

@@ -49,6 +49,46 @@ struct FriendRow: Codable {
     var direction: String? = nil
 }
 
+/// 받은 응원 한 줄 (빌드 24)
+struct CheerRow: Codable, Hashable, Identifiable {
+    var id: Int
+    var sender: String
+    var nickname: String
+    var avatar_url: String?
+    var kind: String
+    var created_at: Date
+    var seen: Bool
+}
+
+/// 응원 종류 (정해진 것만 — 자유 글 없음). 서버 check 목록과 같아야 함
+enum CheerKind: String, CaseIterable, Identifiable {
+    case fire, clap, muscle, pb, race, together, go
+    var id: String { rawValue }
+    var emoji: String {
+        switch self {
+        case .fire: return "🔥"
+        case .clap: return "👏"
+        case .muscle: return "💪"
+        case .pb: return "🏆"
+        case .race: return "🏁"
+        case .together: return "🤝"
+        case .go: return "⚡️"
+        }
+    }
+    /// 이모지만 보내는 것 (나머지는 문구)
+    var isEmoji: Bool { [.fire, .clap, .muscle].contains(self) }
+    /// 문구 (번역 키)
+    var line: String {
+        switch self {
+        case .fire, .clap, .muscle: return emoji
+        case .pb: return "Nice PB!"
+        case .race: return "Good luck at the race!"
+        case .together: return "Let's train together"
+        case .go: return "You've got this"
+        }
+    }
+}
+
 /// friendships 표 한 줄 (본인과 관련된 줄만 읽힘)
 struct FriendLink: Codable {
     var requester: String
@@ -288,6 +328,31 @@ final class Supabase {
                               headers: ["Prefer": "return=minimal"])
         _ = try await request("/rest/v1/friendships?requester=eq.\(otherId)&addressee=eq.\(me)", method: "DELETE",
                               headers: ["Prefer": "return=minimal"])
+    }
+
+    // MARK: 빌드 24 · 응원 (supabase/build24_cheers.sql)
+
+    func sendCheer(to otherId: String, kind: String) async throws {
+        _ = try await request("/rest/v1/rpc/send_cheer", method: "POST", body: ["other": otherId, "kind": kind])
+    }
+
+    /// 받은 응원 최근 50개
+    func cheers() async throws -> [CheerRow] {
+        let d = try await request("/rest/v1/rpc/my_cheers", method: "POST", body: [:])
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .custom { c in
+            // Postgres 는 "2026-10-14T06:30:12.123456+00:00" 처럼 소수점 6자리 → 소수점 부분을 떼고 읽음
+            let raw = try c.singleValueContainer().decode(String.self)
+            let s: String = raw.replacingOccurrences(of: "\\.[0-9]+", with: "", options: .regularExpression)
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime]
+            return f.date(from: s) ?? Date()
+        }
+        do { return try dec.decode([CheerRow].self, from: d) } catch { throw SBError.bad }
+    }
+
+    func markCheersSeen() async throws {
+        _ = try await request("/rest/v1/rpc/mark_cheers_seen", method: "POST", body: [:])
     }
 
     /// 친구 + 각자의 최고 Full Simulation (SQL 함수 friends_with_best)

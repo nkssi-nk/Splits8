@@ -64,6 +64,10 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored private var pauseStepAt: Double = 0
     @ObservationIgnored private var segStepStart: Double = 0
     @ObservationIgnored private var segSteps: [Double?] = []
+    /// 빌드 24: 앱이 꺼졌다 이어 받을 때, 그 전까지 센 걸음 (걸음 센서는 다시 켜면 0부터 셈)
+    @ObservationIgnored private var stepBase: Double = 0
+    /// 빌드 24: 끝나면 / 취소하면 돌아갈 화면 (이어 받기용으로 저장)
+    @ObservationIgnored var from: Scr = .home
 
     // 잘못 넘김 되돌리기 (방금 넘긴 것 한 번만) — 워치와 같음
     private struct UndoPoint {
@@ -162,7 +166,8 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         runKm = req.program?.runKm ?? 0
         autoDone = nil; place = nil; routePts = []; lastRouteLoc = nil
         segSteps = Array(repeating: nil, count: seq.count)
-        steps = 0; rawSteps = 0; pausedSteps = 0; pauseStepAt = 0; segStepStart = 0
+        steps = 0; rawSteps = 0; pausedSteps = 0; pauseStepAt = 0; segStepStart = 0; stepBase = 0
+        from = req.from
         if isRunKind { startSteps(now) }
 
         if isRunKind {
@@ -177,6 +182,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             placeLookup = p
             p.fetch { [weak self] name in self?.place = name; self?.placeLookup = nil }
         }
+        persist()
     }
 
     /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
@@ -216,6 +222,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         segStart = now; segPaused = 0
         segDist = 0
         segStepStart = steps
+        persist()
         return nil
     }
 
@@ -239,6 +246,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         segStepStart = u.segStepStart
         undoPoint = nil
         canUndo = false
+        persist()
     }
 
     func togglePause() {
@@ -252,8 +260,9 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             lastLoc = nil
             // 62번: 일시정지 동안 걸은 걸음은 케이던스에서 뺌
             pausedSteps += max(0, rawSteps - pauseStepAt)
-            steps = max(0, rawSteps - pausedSteps)
+            steps = stepBase + max(0, rawSteps - pausedSteps)
         }
+        persist()
     }
 
     /// End → Save: 현재 구간까지 기록하고 끝냄
@@ -269,6 +278,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         stopGPS()
         stopSteps()
         active = false; finished = true
+        PhoneRunEngine.clearSnapshot()
     }
 
     private func closeSeg(_ now: Date) {
@@ -287,6 +297,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         stopSteps()
         undoPoint = nil; canUndo = false
         finished = true
+        PhoneRunEngine.clearSnapshot()
         return makeRecord(complete: complete)
     }
 
@@ -335,7 +346,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     private func gotSteps(_ n: Double) {
         guard active, !finished else { return }
         rawSteps = n
-        if running { steps = max(0, n - pausedSteps) }
+        if running { steps = stepBase + max(0, n - pausedSteps) }
     }
 
     /// VS GOAL / VS LAST / VS JIHO / VS BEST (워치와 같음)
@@ -424,6 +435,87 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         segDist = 0
         segStepStart = steps
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        persist()
+    }
+
+    // MARK: 빌드 24 · 앱이 꺼져도 이어서 (phone_run.json)
+    // 시작 · 넘기기 · 되돌리기 · 일시정지 · 1 km 자동 넘김 때마다 + 운동 중 5초마다 저장.
+    // 끝내거나 버리면 지움. 앱을 켤 때 파일이 있고 시작한 지 12시간 안이면 3 · 2 · 1 없이 바로 이어서.
+    // 시간은 시계 기준이라 꺼져 있던 동안도 운동 시간에 들어감 (일시정지 중이었으면 그대로 일시정지).
+
+    static let snapFile = "phone_run.json"
+
+    struct Snapshot: Codable {
+        var mode: Mode
+        var title: String
+        var sets: Int
+        var seq: [Seg]
+        var idx: Int
+        var splits: [Int]
+        var running: Bool
+        var startDate: Date
+        var segStart: Date
+        var pauseAt: Date?
+        var segPaused: Double
+        var useGPS: Bool
+        var segDist: Double
+        var segDists: [Double?]
+        var settings: Settings
+        var simWord: String
+        var hasPFTBest: Bool
+        var kind: String?
+        var runKm: Int
+        var place: String?
+        var routePts: [RoutePt]
+        var steps: Double
+        var segStepStart: Double
+        var segSteps: [Double?]
+        var from: String
+    }
+
+    func persist() {
+        guard active, !finished, !Demo.enabled else { return }
+        let snap = Snapshot(mode: mode, title: title, sets: sets, seq: seq, idx: idx, splits: splits, running: running,
+                            startDate: startDate, segStart: segStart, pauseAt: pauseAt, segPaused: segPaused,
+                            useGPS: useGPS, segDist: segDist, segDists: segDists, settings: settings, simWord: simWord,
+                            hasPFTBest: hasPFTBest, kind: kind, runKm: runKm, place: place, routePts: routePts,
+                            steps: steps, segStepStart: segStepStart, segSteps: segSteps, from: from.rawValue)
+        JSONStore.save(snap, PhoneRunEngine.snapFile)
+    }
+
+    static func clearSnapshot() {
+        try? FileManager.default.removeItem(at: JSONStore.url(snapFile))
+    }
+
+    /// 이어 받을 기록 (없거나 12시간 넘었으면 nil, 넘은 것은 지움)
+    static func pendingSnapshot(now: Date = Date()) -> Snapshot? {
+        guard let s = JSONStore.load(Snapshot.self, snapFile) else { return nil }
+        if now.timeIntervalSince(s.startDate) > 12 * 3600 || s.seq.isEmpty { clearSnapshot(); return nil }
+        return s
+    }
+
+    /// 저장해 둔 상태로 바로 이어서 (3 · 2 · 1 없음)
+    func resume(_ s: Snapshot) {
+        guard !active else { return }
+        mode = s.mode; title = s.title; sets = s.sets; seq = s.seq
+        idx = min(s.idx, max(0, s.seq.count - 1)); splits = s.splits; running = s.running
+        startDate = s.startDate; segStart = s.segStart; pauseAt = s.pauseAt; segPaused = s.segPaused
+        useGPS = s.useGPS; segDist = s.segDist; segDists = s.segDists
+        if segDists.count < seq.count { segDists += Array(repeating: nil, count: seq.count - segDists.count) }
+        settings = s.settings; simWord = s.simWord; hasPFTBest = s.hasPFTBest
+        kind = s.kind; runKm = s.runKm; place = s.place; routePts = s.routePts
+        segSteps = s.segSteps
+        if segSteps.count < seq.count { segSteps += Array(repeating: nil, count: seq.count - segSteps.count) }
+        segStepStart = s.segStepStart
+        from = Scr(rawValue: s.from) ?? .home
+        // 걸음: 센서는 0부터 다시 셈 → 저장한 걸음에 이어서 더함
+        steps = s.steps; stepBase = s.steps; rawSteps = 0; pausedSteps = 0; pauseStepAt = 0
+        undoPoint = nil; canUndo = false
+        finished = false; autoDone = nil; lastLoc = nil; lastRouteLoc = nil
+        active = true
+        if isRunKind { startSteps(Date()) }
+        if useGPS { startGPS() }
+        persist()
     }
 }
 
@@ -469,6 +561,7 @@ struct PhoneLiveView: View {
     /// 시작 전 3 · 2 · 1 (nil = 세는 중 아님)
     @State private var count: Int? = nil
     @State private var countTimer: Timer? = nil
+    @State private var saveTimer: Timer? = nil
 
     private var req: PhoneRunRequest { r.phoneRun ?? PhoneRunRequest(mode: .sim) }
 
@@ -503,12 +596,13 @@ struct PhoneLiveView: View {
 
     private func content(_ m: PhoneLiveMetrics) -> some View {
         VStack(spacing: 0) {
-            header
+            // 빌드 24: 제목 / ● iPhone · No HR / n / 16 / 막대 (워치 같이 보기 화면과 같은 머리)
+            LiveHeader(f: frame(Date()), status: "iPhone · No HR", live: false, idPrefix: "phone")
             TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-                live(m, now: ctx.date)
+                LiveBody(f: frame(ctx.date), m: m, idPrefix: "phone")
             }
-            .padding(.top, m.top)
-            nextRow(m)
+            .padding(.top, m.top * 0.6)
+            LiveNextRow(next: eng.nextSeg, m: m)
             Spacer(minLength: 16)
             nextButton(m)
             HStack(spacing: 10) {
@@ -524,95 +618,12 @@ struct PhoneLiveView: View {
 
     // MARK: 위
 
-    /// Full Simulation (15/600 노랑) · iPhone · No HR (13 회색)
-    private var header: some View {
-        HStack {
-            Text((eng.mode == .training ? eng.title : eng.mode.name).l10n)
-                .font(F.t(15, .semibold)).foregroundStyle(C.accent).lineLimit(1)
-            Spacer(minLength: 12)
-            Text("iPhone · No HR").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
-        }
-        .frame(height: 44)
-    }
-
-    /// TOTAL · 큰 전체 시간 · [아이콘 구간 시간] · 이름 · 설명
-    /// 64번: 맨 위 총 시간, 그 아래 '지금 구간 시간 | 지금 페이스(러닝) 또는 목표 대비(스테이션)'를 같은 크기로 가로에
-    private func live(_ m: PhoneLiveMetrics, now: Date) -> some View {
-        let cur: Seg = eng.cur
-        let el: Int = eng.segEl(now)
-        let tint: IconTint = cur.kind == .rox ? .mute : .yellow
-        let timeColor: Color = eng.running ? .white : C.text2
-        // 지금 하는 구간의 시간은 노랑 (전체 시간은 흰색) — 운동 중에 두 숫자가 헷갈리지 않게
-        let segColor: Color = eng.running ? C.accent : C.text2
-        let isRun: Bool = cur.kind == .run
-        return VStack(spacing: 0) {
-            Text("TOTAL").font(F.t(12, .semibold)).tracking(0.12 * 12).foregroundStyle(C.text2)
-            Text(Fm.t(eng.total(now)))
-                .font(F.num(m.totalFont)).tracking(-0.02 * m.totalFont)
-                .foregroundStyle(timeColor)
-                .lineLimit(1).minimumScaleFactor(0.6)
-                .accessibilityIdentifier("phone.total")
-            HStack(spacing: 10) {
-                Icon8(cur.icon, m.icon * 0.7, tint: tint)
-                Text(cur.name)
-                    .font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-            }
-            .padding(.top, m.segTop * 0.6)
-            HStack(alignment: .top, spacing: 0) {
-                LiveCol(label: "SPLIT", value: Fm.t(el), color: segColor, size: m.segFont * 0.8)
-                    .accessibilityIdentifier("phone.seg")
-                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.segFont).padding(.top, 20)
-                if isRun {
-                    LiveCol(label: "PACE /KM", value: LivePace.text(el: el, dist: eng.useGPS ? eng.segDist : nil),
-                            color: timeColor, size: m.segFont * 0.8)
-                } else if cur.target > 0 && cur.kind != .rox {
-                    let d: Int = el - cur.target
-                    LiveCol(label: eng.mode == .training ? "VS BEST" : "VS GOAL", value: Fm.d(d), color: d <= 0 ? C.good : C.bad, size: m.segFont * 0.8)
-                } else {
-                    LiveCol(label: "", value: cur.detail, color: C.text2, size: m.nameFont)
-                }
-            }
-            .padding(.top, m.nameTop)
-            Text(detailLine)
-                .font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb)
-                .lineLimit(1).minimumScaleFactor(0.7)
-                .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// 50M · 152KG · 4 / 16  /  러닝: 1KM (GPS면 0.38 KM / 1KM) · 3 / 16  /  Roxzone: TRANSITION
-    private var detailLine: String {
-        let cur: Seg = eng.cur
-        if cur.kind == .rox { return cur.detail }
-        var head: String = cur.detail
-        if cur.kind == .run && eng.useGPS {
-            let km: Double = eng.segDist / 1000
-            head = String(format: "%.2f KM / ", km) + cur.detail
-        }
-        if cur.kind == .run && eng.useGPS && eng.isRunKind && eng.totalDist >= 10 {
-            return head + " · " + String(localized: "Total \(String(format: "%.2f", eng.totalDist / 1000)) km")
-        }
-        return head + " · \(eng.countNow) / \(eng.countTotal)"
-    }
-
-    /// 선 · NEXT [아이콘] 이름
-    private func nextRow(_ m: PhoneLiveMetrics) -> some View {
-        VStack(spacing: 0) {
-            Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-                .padding(.horizontal, 20)
-                .padding(.top, m.dividerTop)
-                .padding(.bottom, 14 * m.k)
-            HStack(spacing: 12) {
-                Text("NEXT").font(F.t(m.nextLabel)).tracking(0.1 * m.nextLabel).foregroundStyle(C.text2)
-                if let nx = eng.nextSeg {
-                    Icon8(nx.icon, m.nextIcon, tint: nx.kind == .rox ? .mute : .yellow)
-                    Text(nx.name).font(F.t(m.nextFont, .semibold)).lineLimit(1)
-                } else {
-                    Text("Finish").font(F.t(m.nextFont, .semibold)).foregroundStyle(C.accent).lineLimit(1)
-                }
-            }
-        }
+    /// 엔진 → 화면 한 장면
+    private func frame(_ now: Date) -> LiveFrame {
+        LiveFrame(mode: eng.mode, title: eng.title, seq: eng.seq, idx: eng.idx, segEl: eng.segEl(now), total: eng.total(now),
+                  running: eng.running, open: eng.growsOpen,
+                  segDist: eng.useGPS ? eng.segDist : nil, totalDist: eng.useGPS ? eng.totalDist : nil,
+                  runKind: eng.isRunKind)
     }
 
     // MARK: 아래 버튼
@@ -741,13 +752,20 @@ struct PhoneLiveView: View {
         UIApplication.shared.isIdleTimerDisabled = true
         // 3 · 2 · 1 을 센 뒤 시작 (화면 확인용 --nocount 는 바로 시작)
         if !eng.active && count == nil {
-            if CommandLine.arguments.contains("--nocount") { eng.start(req) } else { startCount() }
+            // 빌드 24: 앱이 꺼졌다 켜졌으면 3 · 2 · 1 없이 그대로 이어서
+            if req.resume, let snap = PhoneRunEngine.pendingSnapshot() {
+                eng.resume(snap)
+            } else if CommandLine.arguments.contains("--nocount") { eng.start(req) } else { startCount() }
         }
+        // 운동 중 5초마다 저장 (앱이 갑자기 꺼져도 이어 받게)
+        saveTimer?.invalidate()
+        saveTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in eng.persist() }
         // 왼쪽 끝에서 밀기 = End 확인 (실수로 나가지 않게). 세는 중이면 취소
         r.backAction = { if count != nil { cancelCount() } else { askEnd = true } }
     }
 
     private func leave() {
+        saveTimer?.invalidate(); saveTimer = nil
         stopCountTimer()
         UIApplication.shared.isIdleTimerDisabled = false
     }
@@ -778,7 +796,7 @@ struct PhoneLiveView: View {
     }
 
     private func done(_ rec: Record) {
-        let from: Scr = req.from
+        let from: Scr = eng.from
         UIApplication.shared.isIdleTimerDisabled = false
         Store.shared.addPhoneRecord(rec)
         // addPhoneRecord 가 source = "phone" 을 붙여 저장 → 저장된 것으로 상세 열기
@@ -789,7 +807,7 @@ struct PhoneLiveView: View {
     }
 
     private func discard() {
-        let from: Scr = req.from
+        let from: Scr = eng.from
         eng.discard()
         UIApplication.shared.isIdleTimerDisabled = false
         r.go(from)

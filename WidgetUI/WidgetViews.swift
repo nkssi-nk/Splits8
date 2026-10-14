@@ -1,7 +1,75 @@
 import SwiftUI
+import WidgetKit        // 빌드 24: .widgetAccentable() (앱 · 위젯 확장 둘 다 이 파일을 씀)
 
 // MARK: - 위젯 · 잠금 화면 실시간 표시의 모양 (53번 · 52번)
 // 아이폰 위젯 확장과 앱(화면 확인용 미리보기)이 같이 씀. 위젯 바탕(containerBackground)은 위젯 쪽에서 붙임.
+
+// MARK: - 빌드 24 · 위젯 바탕 고르기 (자동 / 검정 / 흰색 / 테마 색)
+// 흰 바탕에서는 노란 글자가 안 보이므로 D-day 숫자 · GOAL 막대는 진한 황토(#8A7400), 글자는 검정, 빛은 연한 노랑.
+
+struct WPal {
+    var fg: Color
+    var sub: Color
+    var dim: Color
+    var accent: Color
+    var glow: Color
+    var track: Color
+    var bg: Color
+    var light: Bool
+
+    static let dark = WPal(fg: .white, sub: C.text2, dim: C.text3, accent: C.accent, glow: C.accent,
+                           track: Color.white.opacity(0.12), bg: Color(hex: 0x0C0C0C), light: false)
+    static let light = WPal(fg: .black, sub: Color(hex: 0x6E6E73), dim: Color(hex: 0xAEAEB2), accent: Color(hex: 0x8A7400),
+                            glow: Color(hex: 0xFFE600), track: Color.black.opacity(0.10), bg: .white, light: true)
+    /// 테마 색 바탕: 그 색을 진하게 깐 어두운 바탕 (글자는 흰색, 강조는 테마 색 밝게)
+    static func theme(_ hex: UInt32) -> WPal {
+        var p = WPal.dark
+        p.bg = Color(hex: blendHex(hex, 0x000000, 0.72))
+        p.accent = hex == 0xFFE600 ? C.accent : Color(hex: blendHex(hex, 0xFFFFFF, 0.25))
+        p.glow = Color(hex: hex)
+        p.track = Color.white.opacity(0.16)
+        p.sub = Color.white.opacity(0.68)
+        p.dim = Color.white.opacity(0.42)
+        return p
+    }
+
+    /// look: auto / black / white / theme
+    static func of(_ look: String, scheme: ColorScheme, themeHex: UInt32?) -> WPal {
+        switch look {
+        case "black": return .dark
+        case "white": return .light
+        case "theme": return .theme(themeHex ?? 0xFFE600)
+        default: return scheme == .light ? .light : .dark
+        }
+    }
+}
+
+/// 두 색 섞기 (iOS 17 에는 Color.mix 가 없음). t = b 쪽 비율
+func blendHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
+    func ch(_ v: UInt32, _ sh: UInt32) -> Double { Double((v >> sh) & 0xFF) }
+    func mixc(_ sh: UInt32) -> UInt32 { UInt32((ch(a, sh) * (1 - t) + ch(b, sh) * t).rounded()) << sh }
+    return mixc(16) | mixc(8) | mixc(0)
+}
+
+private struct WPalKey: EnvironmentKey { static let defaultValue: WPal = .dark }
+extension EnvironmentValues {
+    var wpal: WPal {
+        get { self[WPalKey.self] }
+        set { self[WPalKey.self] = newValue }
+    }
+}
+
+/// 위젯 바탕 (고른 색 + 대회가 가까울수록 빛)
+struct WidgetBackdrop: View {
+    let stage: Int
+    @Environment(\.wpal) private var pal
+    var body: some View {
+        ZStack {
+            pal.bg
+            DdayGlow(stage: stage)
+        }
+    }
+}
 
 /// D-day 단계: 30일 넘게 0 · 30일 안 1 · 10일 안 2 · 대회 날 3 (앱 홈의 대회 카드와 같은 단계)
 func ddayStage(_ d: Int?) -> Int {
@@ -11,22 +79,24 @@ func ddayStage(_ d: Int?) -> Int {
 
 /// 대회가 가까울수록 진해지는 노란 기운 (오른쪽 아래) + 테두리
 struct DdayGlow: View {
+    @Environment(\.wpal) private var pal
     let stage: Int
     var body: some View {
         let a: Double = [0.0, 0.14, 0.26, 0.48][min(3, max(0, stage))]
         GeometryReader { g in
-            RadialGradient(colors: [C.accent.opacity(a), C.accent.opacity(0)], center: .bottomTrailing,
+            RadialGradient(colors: [pal.glow.opacity(pal.light ? a * 0.9 : a), pal.glow.opacity(0)], center: .bottomTrailing,
                            startRadius: 0, endRadius: max(g.size.width, g.size.height) * 0.9)
         }
     }
 }
 
 struct WidgetFlagLabel: View {
+    @Environment(\.wpal) private var pal
     let text: String
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "flag.checkered").font(.system(size: 10, weight: .bold)).foregroundStyle(C.accent)
-            Text(text.l10n).font(F.t(11, .semibold)).tracking(0.08 * 11).foregroundStyle(C.text2).lineLimit(1)
+            Image(systemName: "flag.checkered").font(.system(size: 10, weight: .bold)).foregroundStyle(pal.accent)
+            Text(text.l10n).font(F.t(11, .semibold)).tracking(0.08 * 11).foregroundStyle(pal.sub).lineLimit(1)
         }
     }
 }
@@ -41,17 +111,19 @@ private func raceDay(_ s: WidgetSnap, _ d: Int) -> String {
 // MARK: D-day 작게
 
 struct DdaySmallView: View {
+    @Environment(\.wpal) private var pal
     let snap: WidgetSnap
     let now: Date
     var body: some View {
         if let d = snap.daysLeft(now), let name = snap.raceName {
             VStack(alignment: .leading, spacing: 0) {
                 WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "NEXT RACE")
-                Text(name).font(F.t(19, .semibold)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
+                Text(name).font(F.t(19, .semibold)).foregroundStyle(pal.fg).lineLimit(1).minimumScaleFactor(0.7)
                     .padding(.top, 6)
-                Text(raceDay(snap, d)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                Text(raceDay(snap, d)).font(F.t(13)).foregroundStyle(pal.sub).lineLimit(1)
                 Spacer(minLength: 0)
-                Text(ddayText(d)).font(F.num(d == 0 ? 34 : 44, .bold)).tracking(-0.03 * 44).foregroundStyle(C.accent)
+                Text(ddayText(d)).font(F.num(d == 0 ? 34 : 44, .bold)).tracking(-0.03 * 44).foregroundStyle(pal.accent)
+                    .widgetAccentable()
                     .lineLimit(1).minimumScaleFactor(0.6)
                     .padding(.bottom, 9)           // 가안 고친 것: 9pt 올림
             }
@@ -64,12 +136,13 @@ struct DdaySmallView: View {
 
 /// 대회가 없을 때: "Add a race"
 struct NoRaceView: View {
+    @Environment(\.wpal) private var pal
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             WidgetFlagLabel(text: "NEXT RACE")
             Spacer(minLength: 0)
-            Text("Add a race").font(F.t(17, .semibold)).foregroundStyle(.white)
-            Text("Count down to race day.").font(F.t(12)).foregroundStyle(C.text2).lineLimit(2)
+            Text("Add a race").font(F.t(17, .semibold)).foregroundStyle(pal.fg)
+            Text("Count down to race day.").font(F.t(12)).foregroundStyle(pal.sub).lineLimit(2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -78,19 +151,20 @@ struct NoRaceView: View {
 // MARK: D-day 가로형 (목표 · 최고 기록 막대)
 
 struct DdayMediumView: View {
+    @Environment(\.wpal) private var pal
     let snap: WidgetSnap
     let now: Date
     var body: some View {
         if let d = snap.daysLeft(now), let name = snap.raceName {
             VStack(alignment: .leading, spacing: 0) {
                 WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "NEXT RACE")
-                Text(name).font(F.t(19, .semibold)).foregroundStyle(.white).lineLimit(1).padding(.top, 6)
+                Text(name).font(F.t(19, .semibold)).foregroundStyle(pal.fg).lineLimit(1).padding(.top, 6)
                 Text(raceDay(snap, d) + (snap.division.isEmpty ? "" : " · " + snap.division))
-                    .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                    .font(F.t(13)).foregroundStyle(pal.sub).lineLimit(1)
                 Spacer(minLength: 0)
                 // D-day 와 GOAL · BEST 막대 묶음을 한 줄에, 세로 가운데 맞춤 (D-day 가운데 = GOAL 과 BEST 사이)
                 HStack(alignment: .center, spacing: 16) {
-                    Text(ddayText(d)).font(F.num(d == 0 ? 34 : 42, .bold)).tracking(-0.03 * 42).foregroundStyle(C.accent)
+                    Text(ddayText(d)).font(F.num(d == 0 ? 34 : 42, .bold)).tracking(-0.03 * 42).foregroundStyle(pal.accent)
                         .lineLimit(1).minimumScaleFactor(0.6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     bars.frame(width: 140)
@@ -107,21 +181,21 @@ struct DdayMediumView: View {
         let g: Int = snap.goal ?? 0, b: Int = snap.best ?? 0
         let mx: Double = Double(max(g, b, 1)) * 1.04
         return VStack(spacing: 9) {
-            bar("GOAL", g, mx, C.accent)
-            bar("BEST", b, mx, Color(hex: 0x8E8E93))
+            bar("GOAL", g, mx, pal.accent)
+            bar("BEST", b, mx, pal.light ? Color(hex: 0xAEAEB2) : Color(hex: 0x8E8E93))
         }
     }
 
     private func bar(_ label: String, _ v: Int, _ mx: Double, _ c: Color) -> some View {
         VStack(spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(C.text2)
+                Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(pal.sub)
                 Spacer(minLength: 4)
-                Text(v > 0 ? Fm.t(v) : "--:--").font(F.num(13)).foregroundStyle(.white).lineLimit(1)
+                Text(v > 0 ? Fm.t(v) : "--:--").font(F.num(13)).foregroundStyle(pal.fg).lineLimit(1)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.12))
+                    Capsule().fill(pal.track)
                     Capsule().fill(c).frame(width: geo.size.width * CGFloat(Double(v) / mx))
                 }
             }
@@ -134,6 +208,7 @@ struct DdayMediumView: View {
 
 /// 요일 막대 (막대 색 = 그날 한 운동 종류)
 struct WeekBars: View {
+    @Environment(\.wpal) private var pal
     let snap: WidgetSnap
     var height: CGFloat = 46
     var labels = true
@@ -145,11 +220,11 @@ struct WeekBars: View {
             ForEach(0..<7, id: \.self) { i in
                 VStack(spacing: 3) {
                     let m: Int = snap.dayMin[i]
-                    let c: Color = Mode(rawValue: snap.dayMode[i]).map { Color(hex: $0.calendarHex) } ?? Color.white.opacity(0.14)
+                    let c: Color = Mode(rawValue: snap.dayMode[i]).map { Color(hex: $0.calendarHex) } ?? pal.track
                     RoundedRectangle(cornerRadius: 2, style: .continuous).fill(c)
                         .frame(height: m > 0 ? max(8, height * CGFloat(m) / CGFloat(mx)) : 3)
                     if labels {
-                        Text(days[i]).font(F.t(8, .semibold)).foregroundStyle(i == today ? .white : C.text3)
+                        Text(days[i]).font(F.t(8, .semibold)).foregroundStyle(i == today ? pal.fg : pal.dim)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .bottom)
@@ -162,17 +237,18 @@ struct WeekBars: View {
 private func hours(_ s: Int) -> String { String(format: "%d:%02d", s / 3600, (s % 3600) / 60) }
 
 struct WeekSmallView: View {
+    @Environment(\.wpal) private var pal
     let snap: WidgetSnap
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("THIS WEEK".l10n).font(F.t(11, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+            Text("THIS WEEK".l10n).font(F.t(11, .semibold)).tracking(0.9).foregroundStyle(pal.sub)
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text("\(snap.weekCount)").font(F.num(40, .bold)).foregroundStyle(snap.weekCount > 0 ? .white : C.text2)
-                Text("workouts".l10n).font(F.t(14)).foregroundStyle(C.text2)
+                Text("\(snap.weekCount)").font(F.num(40, .bold)).foregroundStyle(snap.weekCount > 0 ? pal.fg : pal.sub)
+                Text("workouts".l10n).font(F.t(14)).foregroundStyle(pal.sub)
             }
             .padding(.top, 4)
             Text(snap.weekCount > 0 ? "\(hours(snap.weekSec)) h · \(grouped0(snap.weekKcal)) kcal" : "Start your first one".l10n)
-                .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+                .font(F.t(13)).foregroundStyle(pal.sub).lineLimit(1).minimumScaleFactor(0.8)
             Spacer(minLength: 0)
             WeekBars(snap: snap, height: 26, labels: false)
         }
@@ -181,14 +257,15 @@ struct WeekSmallView: View {
 }
 
 struct WeekMediumView: View {
+    @Environment(\.wpal) private var pal
     let snap: WidgetSnap
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
-                    Text("THIS WEEK".l10n).font(F.t(11, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+                    Text("THIS WEEK".l10n).font(F.t(11, .semibold)).tracking(0.9).foregroundStyle(pal.sub)
                         .lineLimit(1).fixedSize()
-                    Text(range).font(F.t(11)).foregroundStyle(C.text3).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(range).font(F.t(11)).foregroundStyle(pal.dim).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 6)
                 HStack(alignment: .top, spacing: 18) {
@@ -215,10 +292,10 @@ struct WeekMediumView: View {
 
     private func stat(_ l: String, _ v: String, _ u: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(l.l10n).font(F.t(9, .semibold)).tracking(0.7).foregroundStyle(C.text2).lineLimit(1)
+            Text(l.l10n).font(F.t(9, .semibold)).tracking(0.7).foregroundStyle(pal.sub).lineLimit(1)
             HStack(alignment: .firstTextBaseline, spacing: 1) {
-                Text(v).font(F.num(19)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
-                if !u.isEmpty { Text(u.l10n).font(F.t(9, .semibold)).foregroundStyle(C.text2) }
+                Text(v).font(F.num(19)).foregroundStyle(pal.fg).lineLimit(1).minimumScaleFactor(0.7)
+                if !u.isEmpty { Text(u.l10n).font(F.t(9, .semibold)).foregroundStyle(pal.sub) }
             }
         }
     }
@@ -292,6 +369,8 @@ struct LiveCardState: Codable, Hashable {
     var nextIcon: String?
     var idx: Int
     var count: Int
+    /// 빌드 24: 막대 자리 (Roxzone 동안 반 칸). nil 이면 idx 로
+    var progress: Double? = nil
     /// 시계가 흐르는 기준: 지금 구간 · 전체가 시작된 시각 (일시정지 시간은 빼서 당겨 둠)
     var segStart: Date
     var totalStart: Date
@@ -310,9 +389,11 @@ struct LiveProgress: View {
     let idx: Int
     let count: Int
     var height: CGFloat = 3
+    /// 빌드 24: 자리를 직접 줌 (0~1, Roxzone 동안 반 칸 등). nil 이면 idx / (count − 1)
+    var fraction: Double? = nil
     var body: some View {
         GeometryReader { g in
-            let f: CGFloat = count > 1 ? CGFloat(idx) / CGFloat(count - 1) : (count == 1 ? 0 : 0.5)
+            let f: CGFloat = fraction.map { CGFloat($0) } ?? (count > 1 ? CGFloat(idx) / CGFloat(count - 1) : (count == 1 ? 0 : 0.5))
             let x: CGFloat = g.size.width * min(1, max(0, f))
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.white.opacity(0.16)).frame(height: height)
@@ -364,7 +445,7 @@ struct LiveLockView: View {
                     .font(F.num(32)).foregroundStyle(s.paused ? C.text2 : C.accent)
                     .multilineTextAlignment(.trailing).frame(maxWidth: 120, alignment: .trailing)
             }
-            if s.count > 0 { LiveProgress(idx: s.idx, count: s.count) }
+            if s.count > 0 { LiveProgress(idx: s.idx, count: s.count, fraction: s.progress) }
             HStack(spacing: 6) {
                 Text("TOTAL".l10n).font(F.t(10, .semibold)).foregroundStyle(C.text2)
                 LiveClock(start: s.totalStart, paused: s.paused, fixed: s.totalSec)

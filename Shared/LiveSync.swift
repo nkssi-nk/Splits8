@@ -71,3 +71,25 @@ enum LivePace {
         return "\(p / 60):" + String(format: "%02d", p % 60)
     }
 }
+
+// MARK: - 빌드 24: 운동 중 "n / 16" 세는 법 하나로 (워치 · 아이폰 직접 기록 · 같이 보기 · 잠금 화면)
+// Roxzone 은 세지 않음. Roxzone 동안은 앞 구간 번호 그대로, 막대만 반 칸 더 참.
+
+extension Array where Element == Seg {
+    /// Roxzone 을 뺀 전체 구간 수
+    var liveCountTotal: Int { filter { $0.kind != .rox }.count }
+
+    /// idx 번째 구간이 Roxzone 을 뺀 몇 번째인지 (Roxzone 이면 바로 앞 구간 번호)
+    func liveCountNow(_ idx: Int) -> Int {
+        Swift.max(1, prefix(idx + 1).filter { $0.kind != .rox }.count)
+    }
+
+    /// 막대 자리 0~1
+    func liveProgress(_ idx: Int) -> Double {
+        let n: Int = liveCountTotal
+        guard n > 1 else { return 0 }
+        let isRox: Bool = indices.contains(idx) && self[idx].kind == .rox
+        let pos: Double = Double(liveCountNow(idx) - 1) + (isRox ? 0.5 : 0)
+        return Swift.min(1, Swift.max(0, pos / Double(n - 1)))
+    }
+}

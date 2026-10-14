@@ -162,9 +162,10 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
         let seg: Int = st.segEl(now, received: received)
         let tot: Int = st.total(now, received: received)
         let nx: Seg? = st.nextSeg
-        return LiveCardState(segName: cur.name, segIcon: cur.icon, segDetail: cur.detail,
+        return LiveCardState(segName: cur.name, segIcon: cur.icon, segDetail: cur.kind == .rox ? "Transition".l10n : cur.detail,
                              nextName: nx?.name ?? (st.open ? nil : "Finish".l10n), nextIcon: nx?.icon,
-                             idx: st.idx, count: st.open ? 0 : st.seq.count,
+                             idx: st.seq.liveCountNow(st.idx) - 1, count: st.open ? 0 : st.seq.liveCountTotal,
+                             progress: st.open ? nil : st.seq.liveProgress(st.idx),
                              segStart: now.addingTimeInterval(-Double(seg)), totalStart: now.addingTimeInterval(-Double(tot)),
                              paused: !st.running, segSec: seg, totalSec: tot, hr: st.hr, zone: st.zone, kcal: st.kcal,
                              reconnecting: reconnecting, finished: st.finished)

@@ -23,7 +23,7 @@ struct SettingsView: View {
 
             SectionLabel(text: "FRIENDS", top: 14)
             VStack(spacing: 0) {
-                SettingRow(title: "Friends", value: friendsValue, last: true, badge: store.incoming.count) { r.friendsFrom = .settings; r.go(.friends) }
+                SettingRow(title: "Friends", value: friendsValue, last: true, badge: store.incoming.count + store.unseenCheers) { r.friendsFrom = .settings; r.go(.friends) }
                     .accessibilityIdentifier("settings.friends")
             }
             .card8()
@@ -390,11 +390,26 @@ struct SetHrView: View {
                     .multilineTextAlignment(.trailing)
             }
             Seg8(items: [("age", "By age"), ("manual", "Manual")], selected: s.hrMode) { store.settings.hrMode = $0 }
-            HStack {
-                Text(age ? "Age" : "Max heart rate").font(F.t(15))
-                Spacer()
-                Stepper8(value: "\(age ? s.age : s.manualHr)", minWidth: 40, fontSize: 20,
-                         down: { bump(-1) }, up: { bump(1) })
+            if age, let y = s.birthYear {
+                // 빌드 24: 나이는 태어난 해에서 자동 (두 군데서 따로 받지 않음) → 누르면 태어난 해 고치기
+                Button { Router.shared.editProfile(step: 3) } label: {
+                    HStack {
+                        Text("Age").font(F.t(15))
+                        Spacer()
+                        Text(String(localized: "\(s.age) · born \(String(y))")).font(F.num(17)).foregroundStyle(C.text2)
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(C.text3)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("hr.ageFromYear")
+            } else {
+                HStack {
+                    Text(age ? "Age" : "Max heart rate").font(F.t(15))
+                    Spacer()
+                    Stepper8(value: "\(age ? s.age : s.manualHr)", minWidth: 40, fontSize: 20,
+                             down: { bump(-1) }, up: { bump(1) })
+                }
             }
         }
         .padding(18)

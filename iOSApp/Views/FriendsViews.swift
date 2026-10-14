@@ -13,6 +13,10 @@ struct FriendsView: View {
     @State private var blockAsk: BlockedUser?
     /// 메일 앱을 열 수 없을 때 주소 안내
     @State private var mailFail = false
+    /// 빌드 24: 친구 10명이 다 참
+    @State private var limitAlert = false
+    /// 빌드 24: 응원 보낼 친구 (시트)
+    @State private var cheerTo: Friend?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -36,7 +40,18 @@ struct FriendsView: View {
             }
 
             requestsSection
+            cheersSection
 
+            if store.signedIn {
+                HStack(alignment: .firstTextBaseline) {
+                    SectionText("MY FRIENDS")
+                    Spacer(minLength: 0)
+                    Text(verbatim: "\(store.friendCount) / \(Friend.freeLimit)")
+                        .font(F.num(13)).foregroundStyle(store.friendsFull ? C.accent : C.text2)
+                        .accessibilityIdentifier("friends.count")
+                }
+                .padding(.top, 14).padding(.horizontal, 4)
+            }
             Note8(text: "The selected friend's records are used as the Full Simulation comparison and as Training split targets.", color: C.text2)
                 .padding(.bottom, 4)
             if !store.friends.isEmpty {
@@ -53,6 +68,20 @@ struct FriendsView: View {
         }
         .padding(.horizontal, 16)
         .task { await store.refreshSocial() }
+        .onAppear {
+            // 받은 응원은 화면을 열고 잠깐 뒤 읽음으로 (빨간 점이 바로 사라지지 않게)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { store.markCheersSeen() }
+        }
+        .sheet(item: $cheerTo) { f in
+            CheerSheet(friend: f)
+                .presentationDetents([.height(430)])
+                .presentationBackground(Color(hex: 0x1C1C1E))
+        }
+        .alert(String(localized: "You can add up to \(Friend.freeLimit) friends"), isPresented: $limitAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Remove a friend or cancel a request to add someone new.")
+        }
         .alert("Block this user?", isPresented: Binding(get: { blockAsk != nil }, set: { if !$0 { blockAsk = nil } })) {
             Button("Block user", role: .destructive) {
                 if let b = blockAsk {
@@ -125,7 +154,10 @@ struct FriendsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         pill("Decline", yellow: false) { withAnimation(.easeOut(duration: 0.2)) { store.respond(q, accept: false) } }
                             .accessibilityIdentifier("friends.decline")
-                        pill("Accept", yellow: true) { withAnimation(.easeOut(duration: 0.2)) { store.respond(q, accept: true) } }
+                        pill("Accept", yellow: true) {
+                            if store.friendsFull { limitAlert = true; return }
+                            withAnimation(.easeOut(duration: 0.2)) { store.respond(q, accept: true) }
+                        }
                             .accessibilityIdentifier("friends.accept")
                     }
                     .padding(.vertical, 12).padding(.horizontal, 18)
@@ -135,6 +167,49 @@ struct FriendsView: View {
             .card8()
             Note8(text: "Records are shared only after you accept.")
         }
+    }
+
+    /// 빌드 24: 받은 응원 (최근 8개) — 누가 · 뭘 · 언제
+    @ViewBuilder private var cheersSection: some View {
+        let list: [CheerRow] = Array(store.cheers.prefix(8))
+        if store.signedIn && !list.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                SectionText("CHEERS")
+                if store.unseenCheers > 0 {
+                    Circle().fill(C.bad).frame(width: 8, height: 8).accessibilityIdentifier("friends.cheerDot")
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 14).padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, c in
+                    let k: CheerKind = CheerKind(rawValue: c.kind) ?? .clap
+                    HStack(spacing: 12) {
+                        FriendAvatar(url: c.avatar_url, ini: String(c.nickname.prefix(1)).uppercased(), size: 34)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("@" + c.nickname).font(F.t(15, .semibold)).lineLimit(1)
+                            Text(k.isEmoji ? String(localized: "Sent you \(k.emoji)") : k.emoji + " " + k.line.l10n)
+                                .font(F.t(13)).foregroundStyle(c.seen ? C.text2 : .white).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(Self.ago(c.created_at)).font(F.t(12)).foregroundStyle(C.text3).lineLimit(1)
+                        if !c.seen { Circle().fill(C.bad).frame(width: 6, height: 6) }
+                    }
+                    .padding(.vertical, 11).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+        }
+    }
+
+    /// 방금 · 5분 · 3시간 · 2일
+    static func ago(_ d: Date) -> String {
+        let s: Int = max(0, Int(Date().timeIntervalSince(d)))
+        if s < 60 { return String(localized: "now") }
+        if s < 3600 { return String(localized: "\(s / 60)m") }
+        if s < 86400 { return String(localized: "\(s / 3600)h") }
+        return String(localized: "\(s / 86400)d")
     }
 
     /// 보낸 요청: 상대가 수락할 때까지 기다림 · Cancel 로 취소
@@ -232,7 +307,10 @@ struct FriendsView: View {
                 Text(h.division ?? "").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button { if let got { store.respond(got, accept: true) } else { add(h) } } label: {
+            Button {
+                if store.friendsFull { limitAlert = true; return }
+                if let got { store.respond(got, accept: true) } else { add(h) }
+            } label: {
                 Text(title.l10n).font(F.t(13, .semibold))
                     .foregroundStyle(yellow ? Color.black : C.text2)
                     .padding(.horizontal, 14).frame(height: 32)
@@ -277,6 +355,15 @@ struct FriendsView: View {
           }
           .buttonStyle(.plain)
           .accessibilityIdentifier("friend." + f.name)
+          // 빌드 24: 응원 보내기 (정해진 이모지 · 문구만)
+          Button { cheerTo = f } label: {
+              Image(systemName: "hands.clap.fill").font(.system(size: 15, weight: .semibold))
+                  .foregroundStyle(C.accent)
+                  .frame(width: 36, height: 44)
+                  .contentShape(Rectangle())
+          }
+          .buttonStyle(Press(scale: 0.9))
+          .accessibilityIdentifier("friends.cheer")
           moreMenu(id: f.id, name: f.name)
               .padding(.trailing, 6)
         }
@@ -342,6 +429,77 @@ struct CountBadge: View {
                 .background(C.accent, in: Capsule())
                 .fixedSize()
                 .accessibilityIdentifier("friends.badge")
+        }
+    }
+}
+
+/// 빌드 24: 응원 고르기 (이모지 3개 + 문구 4개). 누르면 바로 보냄
+struct CheerSheet: View {
+    let friend: Friend
+    let store = Store.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var sending = false
+    @State private var sent = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Capsule().fill(Color.white.opacity(0.25)).frame(width: 36, height: 5).padding(.top, 8)
+            Text(String(localized: "Cheer @\(friend.name)")).font(F.t(20, .semibold)).lineLimit(1)
+            if sent {
+                Spacer()
+                Check8(color: C.good, size: 44)
+                Text("Sent!").font(F.t(17, .semibold))
+                Spacer()
+            } else {
+                HStack(spacing: 12) {
+                    ForEach(CheerKind.allCases.filter(\.isEmoji)) { k in
+                        Button { send(k) } label: {
+                            Text(k.emoji).font(.system(size: 34))
+                                .frame(maxWidth: .infinity).frame(height: 72)
+                                .background(C.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(Press(scale: 0.94))
+                        .accessibilityIdentifier("cheer.\(k.rawValue)")
+                    }
+                }
+                VStack(spacing: 0) {
+                    let lines = CheerKind.allCases.filter { !$0.isEmoji }
+                    ForEach(Array(lines.enumerated()), id: \.element) { i, k in
+                        Button { send(k) } label: {
+                            HStack(spacing: 10) {
+                                Text(k.emoji).font(.system(size: 18))
+                                Text(k.line.l10n).font(F.t(16)).foregroundStyle(.white)
+                                Spacer()
+                            }
+                            .padding(.vertical, 12).padding(.horizontal, 16)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .rowLine(i < lines.count - 1)
+                        .accessibilityIdentifier("cheer.\(k.rawValue)")
+                    }
+                }
+                .card8()
+                if let error { Text(error).font(F.t(13)).foregroundStyle(C.bad).multilineTextAlignment(.center) }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 20)
+        .disabled(sending)
+    }
+
+    private func send(_ k: CheerKind) {
+        sending = true; error = nil
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Task {
+            let e: String? = await store.sendCheer(k, to: friend)
+            sending = false
+            if let e { error = e; return }
+            withAnimation(.spring(duration: 0.3)) { sent = true }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            dismiss()
         }
     }
 }

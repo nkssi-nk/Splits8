@@ -629,4 +629,78 @@ final class ScreenshotTests: XCTestCase {
         app.swipeUp(); app.swipeUp()
         shot("B53_widgets_3")
     }
+
+    // MARK: 빌드 24 — 가입 흐름 · GOAL/Roxzone 실시간 · 응원 · 배지 · 위젯 바탕
+
+    func test10_build24() {
+        // 가입 흐름: 닉네임(1 / 5) → 대회 경험 → 내 디비전 → 태어난 해 → 키·몸무게
+        launch(onboarded: true, extra: ["--nickflow"])
+        shot("N1_nickname_1of5")
+        app.terminate()
+        launch(onboarded: true, extra: ["--profile"])
+        shot("N2_race_experience")
+        id("profile.raced.yes")
+        id("profile.best.toggle")
+        shot("N2_race_experience_best_time")
+        id("profile.raced.no")
+        id("profile.next")
+        shot("N3_division_recommend")
+        id("profile.div.dblX")
+        app.swipeUp()
+        shot("N3_division_mixed_gender")
+        id("profile.skip")
+        shotNow("N3_skip_toast")
+        sleep(2)
+        shot("N4_birth_year")
+        id("profile.next")
+        shot("N5_height_weight")
+        app.terminate()
+        // 아이폰 직접 기록: 머리(n / 16 · 막대) · GOAL · Roxzone
+        launch(onboarded: true, extra: ["--nocount"])
+        tab("Test")
+        let simBtn = element("startOnPhone.sim")
+        if simBtn.waitForExistence(timeout: 3) {
+            if !simBtn.isHittable { app.swipeUp() }
+            id("startOnPhone.sim")
+            tap("Start")
+            sleep(2)
+            shot("G1_phone_live_run")
+            id("phone.next")
+            shot("G2_phone_live_roxzone")
+            id("phone.next")
+            shot("G3_phone_live_station_goal")
+        }
+        app.terminate()
+        // 워치 같이 보기: Roxzone · 막대
+        launch(onboarded: true, extra: ["--mirror"])
+        id("watchLive.next")
+        shot("G4_watch_live_roxzone")
+        app.terminate()
+        // 친구: 10명 표시 · 받은 응원 · 응원 보내기
+        launch(onboarded: true, extra: ["--friends"])
+        tab("Settings")
+        shot("C1_settings_badge_cheers")
+        id("settings.friends")
+        shot("C2_friends_cheers")
+        app.swipeUp()
+        shot("C3_friends_list_limit")
+        if element("friends.cheer").waitForExistence(timeout: 3) {
+            id("friends.cheer")
+            shot("C4_cheer_sheet")
+        }
+        app.terminate()
+        // 배지 · 프로필 (대회 경험 · Division · 태어난 해 · 키몸무게)
+        launch(onboarded: true)
+        tab("Settings")
+        id("settings.profile")
+        app.swipeUp()
+        shot("B1_profile_about")
+        app.swipeUp(); app.swipeUp()
+        shot("B2_badges")
+        app.terminate()
+        // 위젯 바탕 (흰색 · 테마)
+        launch(onboarded: true, extra: ["--widgets"])
+        app.swipeUp()
+        shot("W1_widget_backgrounds")
+    }
 }

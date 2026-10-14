@@ -224,14 +224,15 @@ struct WLive: View {
             }
             .frame(height: 24)
             HStack(alignment: .top, spacing: 0) {
-                col("SPLIT", Fm.t(el), aod ? C.text3 : C.accent)
+                // 빌드 24: 목표를 넘기면 SPLIT 빨강 (진동은 그대로)
+                col("SPLIT", Fm.t(el), aod ? C.text3 : (cur.target > 0 && el > cur.target ? C.bad : C.accent))
                 Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.seg * 1.1)
                     .padding(.top, 16)
                 if isRun {
                     col(curvedRun ? "PACE ≈" : "PACE", pace(el: el, dist: engine.segDist), fg)
-                } else if cur.target > 0 && cur.kind != .rox {
-                    let d: Int = el - cur.target
-                    col(engine.deltaWord, Fm.d(d), aod ? C.text3 : (d <= 0 ? C.good : C.bad))
+                } else if cur.target > 0 {
+                    // 빌드 24: 차이(±) 대신 목표 시간 그대로 (Roxzone 도). 트레이닝은 최고 기록 = BEST
+                    col(engine.mode == .training ? "BEST" : "GOAL", Fm.t(cur.target), fg)
                 } else {
                     col("", cur.detail, C.text2, small: true)
                 }
@@ -556,7 +557,8 @@ struct WEndSheet: View {
             Text("End workout?").font(F.t(16, .semibold))
             Text(engine.growsOpen ? "Everything so far will be saved.".l10n
                                   : String(format: "%lld/%lld segments done. The rest won't be recorded.".l10n,
-                                           engine.idx, engine.seq.count))
+                                           engine.seq.prefix(engine.idx).filter { $0.kind != .rox }.count,
+                                           engine.seq.filter { $0.kind != .rox }.count))
                 .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)

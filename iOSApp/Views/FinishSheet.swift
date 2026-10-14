@@ -150,6 +150,9 @@ struct FinishSheet: View {
                 ForEach(tiles, id: \.0) { t in tile(t.0, t.1, t.2) }
             }
             .padding(.top, 14)
+            // 빌드 24: 이 기록으로 새로 받은 배지
+            let nb: [Badge] = Badges.new(with: rec, in: store.records)
+            if !nb.isEmpty { NewBadgesRow(badges: nb).padding(.top, 12) }
             Spacer(minLength: 16)
             HStack(spacing: 10) {
                 Button {

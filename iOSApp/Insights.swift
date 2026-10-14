@@ -163,9 +163,12 @@ enum Insights {
                 cum += s.time - s.target
                 if cum <= 0 { wasAhead = true } else if wasAhead && aheadUntil == nil && s.kind == .st { aheadUntil = s.name }
             }
-            if let a = aheadUntil, cum >= minDiff {
+            // 빌드 24: 결승 차이는 기록 화면 위 VS GOAL 타일과 같은 계산 (전체 시간 − 목표 시간, Roxzone 포함).
+            // 예전엔 Roxzone 을 뺀 구간 목표만 더해서, 타일은 −0:27 인데 여기선 "+2:13" 처럼 반대로 나왔음.
+            let goal: Int? = r.goal ?? r.vsTarget
+            if let a = aheadUntil, let g = goal, r.total - g >= minDiff {
                 o.append(Insight(id: 5, group: "goal", score: big, mark: .time,
-                                 text: String(localized: "Ahead of goal until [y]\(a)[/y], then [r]+\(sec(cum))[/r] by the finish.")))
+                                 text: String(localized: "Ahead of goal until [y]\(a)[/y], then [r]+\(sec(r.total - g))[/r] by the finish.")))
             }
         }
         // 6 지난번과 (풀 시뮬 · 레이스)

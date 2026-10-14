@@ -12,6 +12,14 @@ struct Splits8App: App {
             Router.shared.scr = .watchLive
         }
         if Demo.enabled && CommandLine.arguments.contains("--widgets") { Router.shared.scr = .widgets }
+        // 빌드 24 화면 확인: 새 가입 흐름 (닉네임 1 / 5 → 프로필 2~5 / 5)
+        if Demo.enabled && CommandLine.arguments.contains("--nickflow") {
+            Router.shared.profileDotOffset = 1
+            Router.shared.scr = .nick
+        }
+        if Demo.enabled && CommandLine.arguments.contains("--profile") {
+            Router.shared.startProfile(next: .home, offset: 1)
+        }
         if Demo.enabled, let a = CommandLine.arguments.first(where: { $0.hasPrefix("--finish=") }) {
             let kind = String(a.dropFirst("--finish=".count))
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { Demo.showFinish(kind) }
@@ -83,13 +91,15 @@ struct PhoneRunRequest: Equatable {
     var mode: Mode
     var program: Program? = nil        // 트레이닝이면 프로그램
     var from: Scr = .home              // 끝나면 / 취소하면 돌아갈 화면
+    /// 빌드 24: 앱이 꺼졌다 켜졌을 때 저장해 둔 기록 이어 받기 (phone_run.json)
+    var resume: Bool = false
 }
 
 /// 화면 이동 (시안의 screen 상태와 같은 구조)
 @Observable
 final class Router {
     static let shared = Router()
-    var scr: Scr = Store.shared.settings.hasOnboarded ? .home : .splash
+    var scr: Scr = Router.launchResume != nil ? .phoneLive : (Store.shared.settings.hasOnboarded ? .home : .splash)
     var detail: Record?
     var detailFrom: Scr = .race
     /// Division · 심박 화면을 어디서 열었는지 (돌아갈 곳)
@@ -137,6 +147,8 @@ final class Router {
     var profileStep = 1
     var profileNext: Scr = .home
     var profileEdit = false
+    /// 빌드 24: 가입 단계 점 앞에 닉네임 단계가 있으면 1 (1 / 5 … 5 / 5)
+    var profileDotOffset = 0
 
     // 대회 편집
     var evDraft: RaceEvent? = nil
@@ -183,7 +195,14 @@ final class Router {
     var bonus: BonusRequest? = nil
 
     // 아이폰으로 기록
-    var phoneRun: PhoneRunRequest? = nil
+    var phoneRun: PhoneRunRequest? = Router.launchResume
+
+    /// 빌드 24: 아이폰으로 기록하던 중 앱이 꺼졌으면, 켤 때 그 기록 화면으로 바로
+    static let launchResume: PhoneRunRequest? = {
+        guard !Demo.enabled, Store.shared.settings.hasOnboarded, let s = PhoneRunEngine.pendingSnapshot() else { return nil }
+        return PhoneRunRequest(mode: s.mode, program: nil, from: Scr(rawValue: s.from) ?? .home, resume: true)
+    }()
+
     func startOnPhone(_ mode: Mode, program: Program? = nil) {
         phoneRun = PhoneRunRequest(mode: mode, program: program, from: scr)
         go(.phoneLive)

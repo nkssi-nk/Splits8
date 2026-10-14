@@ -35,6 +35,12 @@ final class Store: NSObject, WCSessionDelegate {
     /// 친구 요청 (빌드 22): 받은 요청은 수락해야 친구가 되고, 그 뒤에만 서로 기록이 보임
     var requests: [FriendReq] = []
     var incoming: [FriendReq] { requests.filter(\.incoming) }
+    /// 빌드 24: 받은 응원 (서버에 표가 아직 없으면 빈 목록)
+    var cheers: [CheerRow] = []
+    var unseenCheers: Int { cheers.filter { !$0.seen }.count }
+    /// 친구 수 (수락된 친구 + 보낸 요청) — 10명 제한에 씀
+    var friendCount: Int { friends.count + outgoing.count }
+    var friendsFull: Bool { friendCount >= Friend.freeLimit }
     var outgoing: [FriendReq] { requests.filter { !$0.incoming } }
     var lastError: String?
     /// 빌드 23: 같은 계정이 다른 기기에서 로그인해서 이 기기가 로그아웃됨 → 안내창
@@ -58,6 +64,15 @@ final class Store: NSObject, WCSessionDelegate {
         let picked: String? = UserDefaults.standard.string(forKey: "appLanguage")
         let lang: String? = (picked == "ko" || picked == "en") ? picked : nil
         if settings.lang != lang { settings.lang = lang }
+        // 빌드 24: 태어난 해가 있으면 나이는 늘 그 해로 계산 (프로필의 Age 와 태어난 해가 따로 놀지 않게)
+        if let y = settings.birthYear {
+            let a: Int = Calendar.current.component(.year, from: Date()) - y
+            if (10...100).contains(a), settings.age != a { settings.age = a }
+        }
+        // 빌드 24: 예전 '대회 경험 디비전'(raceDivision)은 Division 하나로 합침
+        if settings.divPicked != true, let k = settings.raceDivision, Division.all.contains(where: { $0.key == k }) {
+            settings.division = k; settings.divPicked = true
+        }
         programs = JSONStore.load([Program].self, "programs.json") ?? Program.presets()
         records = JSONStore.load([Record].self, "records.json") ?? []
         friends = JSONStore.load([Friend].self, "friends.json") ?? []
@@ -81,6 +96,7 @@ final class Store: NSObject, WCSessionDelegate {
                 leaderboard = Demo.leaderboard()
                 friends = Demo.friends()
                 requests = Demo.requests()
+                cheers = Demo.cheers()
             }
         }
         if sb.session == nil && settings.nickname != nil && !Demo.friendsOn { settings.nickname = nil }   // 세션이 없으면 로그아웃 상태
@@ -551,7 +567,30 @@ final class Store: NSObject, WCSessionDelegate {
             requested = requested.filter { r in !fs.contains { $0.id == r } }
             if let sel, !friends.contains(where: { $0.id == sel }) { settings.friendId = nil }
         }
+        if let cs = try? await sb.cheers() { cheers = cs.filter { !isBlocked($0.sender) } }
         await refreshLeaderboard()
+    }
+
+    /// 받은 응원을 읽음으로 (친구 화면을 열면)
+    func markCheersSeen() {
+        guard cheers.contains(where: { !$0.seen }) else { return }
+        cheers = cheers.map { var c = $0; c.seen = true; return c }
+        guard !Demo.enabled else { return }
+        Task { try? await sb.markCheersSeen() }
+    }
+
+    /// 응원 보내기. 실패하면 이유 (nil = 보냄)
+    func sendCheer(_ k: CheerKind, to f: Friend) async -> String? {
+        if Demo.enabled { return nil }
+        do { try await sb.sendCheer(to: f.id, kind: k.rawValue); return nil }
+        catch SBError.http(_, let msg) {
+            if msg.contains("daily limit") { return String(localized: "You've sent a lot of cheers today. Try again tomorrow.") }
+            if msg.contains("too fast") { return String(localized: "Give it a minute before cheering the same friend again.") }
+            if msg.contains("send_cheer") || msg.contains("function") { return String(localized: "Cheers aren't available yet.") }
+            return String(localized: "Couldn't send. Check your connection and try again.")
+        } catch {
+            return String(localized: "Couldn't send. Check your connection and try again.")
+        }
     }
 
     @MainActor

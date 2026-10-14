@@ -55,7 +55,9 @@ struct WatchLiveView: View {
 
     private func content(_ st: LiveState, _ m: PhoneLiveMetrics) -> some View {
         VStack(spacing: 0) {
-            header(st)
+            // 빌드 24: 머리는 아이폰 직접 기록 화면과 같은 부품 (n / 16 은 Roxzone 뺌)
+            LiveHeader(f: frame(st, now: Date()), status: mirror.reconnecting ? "Apple Watch · Reconnecting…" : "Apple Watch · Live",
+                       live: !mirror.reconnecting, idPrefix: "watchLive")
             if mirror.discarded {
                 // 워치에서 버림: 기록이 안 오니 '저장 중…'을 보여 주지 않고 잠시 뒤 홈으로 감
                 Spacer()
@@ -63,11 +65,11 @@ struct WatchLiveView: View {
                 saving
             } else {
                 TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-                    live(st, m, now: ctx.date)
+                    LiveBody(f: frame(st, now: ctx.date), m: m, idPrefix: "watchLive")
                 }
                 .padding(.top, m.top * 0.6)
                 chips(st).padding(.top, 14 * m.k)
-                nextRow(st, m)
+                LiveNextRow(next: nextSeg(st), m: m, dividerTop: m.dividerTop * 0.7)
                 Spacer(minLength: 16)
                 buttons(st, m)
             }
@@ -75,80 +77,20 @@ struct WatchLiveView: View {
         .padding(.horizontal, 20)
     }
 
-    // MARK: 위
-
-    private func header(_ st: LiveState) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text((st.mode == .training ? st.title : st.mode.name).l10n)
-                        .font(F.t(17, .semibold)).foregroundStyle(.white).lineLimit(1)
-                    HStack(spacing: 6) {
-                        Circle().fill(mirror.reconnecting ? C.text3 : C.good).frame(width: 6, height: 6)
-                        Text(mirror.reconnecting ? "Apple Watch · Reconnecting…" : "Apple Watch · Live")
-                            .font(F.t(12)).foregroundStyle(C.text2).lineLimit(1)
-                            .accessibilityIdentifier("watchLive.status")
-                    }
-                }
-                Spacer(minLength: 12)
-                if !st.open {
-                    Text("\(min(st.idx + 1, st.seq.count)) / \(st.seq.count)")
-                        .font(F.num(12)).foregroundStyle(C.accent)
-                        .padding(.horizontal, 8).frame(height: 22)
-                        .overlay(Capsule().strokeBorder(C.accent.opacity(0.5), lineWidth: 1))
-                }
-            }
-            if !st.open { LiveProgress(idx: st.idx, count: st.seq.count) }
-        }
-        .padding(.top, 8)
+    /// 워치에서 받은 상태 → 화면 한 장면
+    private func frame(_ st: LiveState, now: Date) -> LiveFrame {
+        LiveFrame(mode: st.mode, title: st.title, seq: st.seq, idx: st.idx,
+                  segEl: st.segEl(now, received: mirror.received), total: st.total(now, received: mirror.received),
+                  running: st.running, open: st.open, segDist: st.segDist, totalDist: st.dist,
+                  runKind: st.mode == .training && st.cur?.icon == "run")
     }
 
-    /// 64번: 맨 위 총 시간, 그 아래 '지금 구간 시간 | 지금 페이스(러닝) 또는 목표 대비(스테이션)'를 같은 크기로 가로에
-    private func live(_ st: LiveState, _ m: PhoneLiveMetrics, now: Date) -> some View {
-        let cur: Seg = st.cur ?? Seg(icon: "run", name: "Run", detail: "1KM", kind: .run, target: 0)
-        let el: Int = st.segEl(now, received: mirror.received)
-        let timeColor: Color = st.running ? .white : C.text2
-        let isRun: Bool = cur.icon == "run"
-        return VStack(spacing: 0) {
-            Text("TOTAL").font(F.t(12, .semibold)).tracking(0.12 * 12).foregroundStyle(C.text2)
-            Text(Fm.t(st.total(now, received: mirror.received)))
-                .font(F.num(m.totalFont)).tracking(-0.02 * m.totalFont)
-                .foregroundStyle(timeColor).lineLimit(1).minimumScaleFactor(0.6)
-                .accessibilityIdentifier("watchLive.total")
-            HStack(spacing: 10) {
-                Icon8(cur.icon, m.icon * 0.7, tint: cur.kind == .rox ? .mute : .yellow)
-                Text(cur.name).font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-            }
-            .padding(.top, m.segTop * 0.6)
-            HStack(alignment: .top, spacing: 0) {
-                LiveCol(label: "SPLIT", value: Fm.t(el), color: st.running ? C.accent : C.text2, size: m.segFont * 0.8)
-                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.segFont).padding(.top, 20)
-                if isRun {
-                    LiveCol(label: "PACE /KM", value: LivePace.text(el: el, dist: st.segDist), color: timeColor, size: m.segFont * 0.8)
-                } else if cur.target > 0 && cur.kind != .rox {
-                    let d: Int = el - cur.target
-                    LiveCol(label: st.vsWord, value: Fm.d(d), color: d <= 0 ? C.good : C.bad, size: m.segFont * 0.8)
-                } else {
-                    LiveCol(label: "", value: cur.detail, color: C.text2, size: m.nameFont)
-                }
-            }
-            .padding(.top, m.nameTop)
-            Text(isRun ? runLine(st, cur) : cur.detail).font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb).lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// "0.62 / 1.00 KM · 총 7.62 KM"
-    private func runLine(_ st: LiveState, _ cur: Seg) -> String {
-        let km: Double = runMeters(cur.detail) / 1000
-        guard let sd = st.segDist else { return cur.detail }
-        var s: String = String(format: "%.2f / %.2f KM", min(km, sd / 1000), km)
-        if st.open || st.mode == .training, let d = st.dist, d >= 10 {
-            s += " · " + String(localized: "Total \(String(format: "%.2f", d / 1000)) km")
-        }
-        return s
+    /// 다음 구간 (HIIT · 자유 러닝은 아직 순서에 없는 다음 라운드/km)
+    private func nextSeg(_ st: LiveState) -> Seg? {
+        if let nx = st.nextSeg { return nx }
+        guard st.open else { return nil }
+        let n: Int = st.seq.count + 1
+        return st.cur?.icon == "hiit" ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n)
     }
 
     /// ♥ 165 BPM [Z4] · 286 KCAL
@@ -173,19 +115,6 @@ struct WatchLiveView: View {
             .padding(.horizontal, 12).frame(height: 32)
             .background(Color.white.opacity(0.08), in: Capsule())
         }
-    }
-
-    private func nextRow(_ st: LiveState, _ m: PhoneLiveMetrics) -> some View {
-        HStack(spacing: 12) {
-            Text("NEXT").font(F.t(m.nextLabel)).tracking(0.1 * m.nextLabel).foregroundStyle(C.text2)
-            if let nx = st.nextSeg {
-                Icon8(nx.icon, m.nextIcon, tint: nx.kind == .rox ? .mute : .yellow)
-                Text(nx.name).font(F.t(m.nextFont, .semibold)).lineLimit(1)
-            } else {
-                Text("Finish").font(F.t(m.nextFont, .semibold)).foregroundStyle(C.accent).lineLimit(1)
-            }
-        }
-        .padding(.top, 22 * m.k)
     }
 
     // MARK: 아래 버튼 (누르면 워치로 보냄)

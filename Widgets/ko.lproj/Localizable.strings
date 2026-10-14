@@ -25,3 +25,11 @@
 "Full Simulation" = "풀 시뮬레이션";
 "Race" = "레이스";
 "Training" = "트레이닝";
+
+/* 빌드 24 · 위젯 바탕 */
+"Background" = "바탕";
+"Automatic" = "자동";
+"Black" = "검정";
+"White" = "흰색";
+"Theme color" = "테마 색";
+"Choose the widget background." = "위젯 바탕색을 골라요.";

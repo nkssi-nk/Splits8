@@ -140,7 +140,7 @@ struct DetailView: View {
                     SectionText("SPLITS")
                     Spacer(minLength: 8)
                     if rec.mode == .training {
-                        Text("vs your best").font(F.t(11, .medium)).foregroundStyle(C.text3).lineLimit(1)
+                        Text("VS YOUR BEST").font(F.t(11, .semibold)).tracking(0.6).foregroundStyle(C.text3).lineLimit(1)
                     }
                 }
                 .padding(.top, 20).padding(.horizontal, 4)

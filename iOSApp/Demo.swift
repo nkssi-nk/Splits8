@@ -50,6 +50,14 @@ enum Demo {
          Friend(id: "demo.2", name: "minseo", div: "Open Women", date: "", splits: [])]
     }
 
+    /// 받은 응원 예시 (--friends)
+    static func cheers() -> [CheerRow] {
+        let now = Date()
+        return [CheerRow(id: 3, sender: "demo.1", nickname: "jiho", avatar_url: nil, kind: "pb", created_at: now.addingTimeInterval(-600), seen: false),
+                CheerRow(id: 2, sender: "demo.2", nickname: "minseo", avatar_url: nil, kind: "fire", created_at: now.addingTimeInterval(-7200), seen: false),
+                CheerRow(id: 1, sender: "demo.1", nickname: "jiho", avatar_url: nil, kind: "race", created_at: now.addingTimeInterval(-90000), seen: true)]
+    }
+
     /// 친구 요청 예시 (--friends): 받은 요청 1 · 보낸 요청 1
     static func requests() -> [FriendReq] {
         [FriendReq(id: "demo.4", name: "hana", div: "Open Women", avatarUrl: nil, incoming: true),
@@ -98,12 +106,12 @@ enum Demo {
             for i in 0..<8 {
                 let r = Int(Double(runs[i]) * scale), s = Int(Double(stT[i]) * scale)
                 segs.append(SegResult(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, time: r, target: 270, hr: 158 + (i % 3) * 3, dist: 1000))
-                segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, time: 18, target: 30, hr: 150, dist: nil))
+                segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, time: 18, target: 30, hr: 150, dist: nil))
                 let st = Station.all[i]
                 // 스키 · 로잉 · 월볼은 워치가 센 횟수(참고용)를 예시로 넣음
                 let reps: Int? = ["skiErg": 118, "row": 104, "wallBalls": 97][st.key]
                 segs.append(SegResult(icon: st.key, name: st.name, detail: st.detail(div), kind: .st, time: s, target: Defaults.stationGoals[i], hr: 165 + (i % 4) * 4, dist: nil, reps: reps))
-                if i < 7 { segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, time: 18, target: 30, hr: 150, dist: nil)) }
+                if i < 7 { segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, time: 18, target: 30, hr: 150, dist: nil)) }
             }
             let fix = want - segs.map(\.time).reduce(0, +)
             if let li = segs.lastIndex(where: { $0.kind == .st }) { segs[li].time += fix }

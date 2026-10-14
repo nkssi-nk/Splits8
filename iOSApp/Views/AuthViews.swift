@@ -345,7 +345,12 @@ struct NickView: View {
 
     var body: some View {
         Page8(spacing: 12) {
-            Color.clear.frame(height: 44)
+            // 빌드 24: 새 계정 가입 흐름이면 닉네임이 1단계 (1 / 5)
+            if !editing && r.profileDotOffset == 1 {
+                ProfileDots(now: 1, total: 5)
+            } else {
+                Color.clear.frame(height: 44)
+            }
             AuthHead(title: "Pick a nickname", sub: "Friends find you by this name, and it appears on leaderboards.")
             field
             Text(msg).font(F.t(13, .medium)).foregroundStyle(msgColor).padding(.horizontal, 4)
@@ -424,10 +429,12 @@ struct NickView: View {
 
     private func save() {
         busy = true; error = nil
+        // 저장하면 닉네임이 생겨 editing 이 true 로 바뀌므로 미리 기억
+        let wasEditing: Bool = editing
         Task {
             do {
                 try await store.saveNickname(nd)
-                r.go(editing ? .account : r.authReturn)
+                if wasEditing { r.go(.account) } else { r.afterNick() }
             } catch {
                 if case SBError.http(409, _) = error { taken = true } else { self.error = error.localizedDescription }
             }
@@ -449,7 +456,8 @@ struct AccountView: View {
             photoBlock
             SectionLabel(text: "ATHLETE", top: 14)
             athleteCard
-            ProfileAboutCard()          // 빌드 23: 성별 · 키/몸무게 · 태어난 해 · 대회 경험
+            ProfileAboutCard()          // 빌드 24: 대회 경험 · Division · 태어난 해 · 키/몸무게 (가입 순서와 같게)
+            BadgesCard()                // 빌드 24: 배지 모음
             if store.signedIn { accountBlock } else { signUpCard }
         }
         .padding(.horizontal, 16)
@@ -518,11 +526,10 @@ struct AccountView: View {
 
     private var athleteCard: some View {
         let s = store.settings
-        let hr: String = (s.hrMode == "age" ? String(localized: "Age \(s.age)") + " · " : "") + "\(s.maxHR) BPM"
+        // 빌드 24: Division 은 아래 ABOUT YOU 로 옮김(가입 순서와 같게). 나이는 태어난 해에서 자동 → 여기엔 최대 심박만
+        let hr: String = (s.hrMode == "age" && s.birthYear == nil ? String(localized: "Age \(s.age)") + " · " : "") + "\(s.maxHR) BPM"
         return VStack(spacing: 0) {
-            SettingRow(title: "Division", value: store.div.name) { r.sub(.setDiv, from: .account) }
-                .accessibilityIdentifier("profile.division")
-            SettingRow(title: "Age · Max heart rate", value: hr, numeric: true, last: true) { r.sub(.setHr, from: .account) }
+            SettingRow(title: s.birthYear == nil ? "Age · Max heart rate" : "Max heart rate", value: hr, numeric: true, last: true) { r.sub(.setHr, from: .account) }
                 .accessibilityIdentifier("profile.hr")
         }
         .card8()

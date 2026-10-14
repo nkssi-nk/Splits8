@@ -22,6 +22,8 @@ struct WidgetSnap: Codable, Equatable {
     var dayMode: [String] = Array(repeating: "", count: 7)
     /// 요일 7칸: 운동한 분
     var dayMin: [Int] = Array(repeating: 0, count: 7)
+    /// 빌드 24: 앱 테마 색 (위젯 바탕 '테마 색' 고를 때). 예전 파일엔 없음 → 노랑
+    var themeHex: UInt32? = nil
 
     static let group = "group.com.nkssi.splits8"
     static let file = "widget.json"
@@ -65,6 +67,7 @@ struct WidgetSnap: Codable, Equatable {
             s.raceDate = ev.date
         }
         s.division = settings.div.name
+        s.themeHex = settings.glow.hex
         s.goal = settings.goalTime > 0 ? settings.goalTime : nil
         s.best = best
         let mon = monday

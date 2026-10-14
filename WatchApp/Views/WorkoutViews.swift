@@ -23,7 +23,9 @@ struct WWorkoutPager: View {
             .tabViewStyle(.verticalPage)
 
             if endSheet {
-                WEndSheet(onEnd: { endSheet = false; engine.endNow() }, onResume: { endSheet = false })
+                WEndSheet(onEnd: { endSheet = false; engine.endNow() },
+                          onDiscard: { endSheet = false; engine.discardNow(); WNav.shared.screen = .home },
+                          onResume: { endSheet = false })
                     .transition(.opacity)
             }
 
@@ -206,42 +208,70 @@ struct WLive: View {
         return engine.cur.kind == .rox ? .mute : .yellow
     }
 
+    /// 64번: 구간 이름 줄 아래에 '지금 구간 시간 | 지금 페이스'를 같은 크기로 가로에 (세로로 쌓으면 NEXT 가 밀림)
+    /// 러닝 = 페이스(/km), 스테이션 = 목표 대비 ±(목표가 없으면 세부 내용)
     private func current(now: Date) -> some View {
         let cur: Seg = engine.cur
         let el: Int = engine.segEl(now)
+        let isRun: Bool = cur.icon == "run"
         return VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Icon8(cur.icon, m.icon, tint: curTint)
-                // 지금 하는 구간의 시간은 노랑 (전체 시간은 흰색) — 아이폰 기록 화면과 같게. 손목을 내렸을 때는 회색
-                Text(Fm.t(el))
-                    .font(F.num(m.seg)).tracking(-0.01 * m.seg)
-                    .foregroundStyle(aod ? C.text3 : C.accent)
-                    .lineLimit(1).minimumScaleFactor(0.7)
+            HStack(spacing: 6) {
+                Icon8(cur.icon, max(18, m.icon * 0.6), tint: curTint)
+                Text(cur.name)
+                    .font(F.t(16, .semibold))
+                    .foregroundStyle(fg)
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }
-            .frame(height: m.icon)
-            Text(cur.name)
-                .font(F.t(16, .semibold))
-                .foregroundStyle(fg)
-                .lineLimit(1).minimumScaleFactor(0.85)
-                .padding(.top, m.nameTop)
-            Text(detailLine(cur: cur, el: el))
-                .font(cur.icon == "run" ? F.num(13, .medium) : F.t(13, .medium))
+            .frame(height: 24)
+            HStack(alignment: .top, spacing: 0) {
+                // 빌드 24: 목표를 넘기면 SPLIT 빨강 (진동은 그대로)
+                col("SPLIT", Fm.t(el), aod ? C.text3 : (cur.target > 0 && el > cur.target ? C.bad : C.accent))
+                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.seg * 1.1)
+                    .padding(.top, 16)
+                if isRun {
+                    col(curvedRun ? "PACE ≈" : "PACE", pace(el: el, dist: engine.segDist), fg)
+                } else if cur.target > 0 {
+                    // 빌드 24: 차이(±) 대신 목표 시간 그대로 (Roxzone 도). 트레이닝은 최고 기록 = BEST
+                    col(engine.mode == .training ? "BEST" : "GOAL", Fm.t(cur.target), fg)
+                } else {
+                    col("", cur.detail, C.text2, small: true)
+                }
+            }
+            .padding(.top, m.nameTop)
+            Text(isRun ? runLine(cur: cur) : (cur.target > 0 && cur.kind != .rox ? cur.detail : ""))
+                .font(isRun ? F.num(13, .medium) : F.t(13, .medium))
                 .foregroundStyle(C.text2)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .frame(height: 18)
-                .padding(.top, 3)
+                .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
     }
 
-    /// 러닝: "4:42 /KM · 0.62 km" (곡면 트레드밀은 "/KM ≈"), 그 외: 세부 (50M · 152KG)
-    private func detailLine(cur: Seg, el: Int) -> String {
-        guard cur.icon == "run" else { return cur.detail }
-        let curved: Bool = engine.settings.runMode == "curved" && engine.mode != .race
+    /// 작은 이름표 + 큰 숫자 (두 칸이 같은 크기)
+    private func col(_ label: String, _ value: String, _ color: Color, small: Bool = false) -> some View {
+        VStack(spacing: 1) {
+            Text(label.l10n).font(F.t(11, .semibold)).tracking(0.8).foregroundStyle(C.text3)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .frame(height: 15)
+            Text(value)
+                .font(small ? F.t(14, .semibold) : F.num(m.seg)).tracking(small ? 0 : -0.01 * m.seg)
+                .foregroundStyle(color)
+                .lineLimit(1).minimumScaleFactor(0.55)
+                .frame(height: m.seg * 1.15)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var curvedRun: Bool { engine.settings.runMode == "curved" && engine.mode != .race }
+
+    /// 러닝 아래 줄: "0.62 / 1.00 km · 총 7.62 km" (러닝 모드에서 몇 km 뛰었는지가 바로 보이게)
+    private func runLine(cur: Seg) -> String {
         let km: Double = runMeters(cur.detail) / 1000
-        let d: Double = engine.segDist
-        let dist: String = String(format: "%.2f", min(km, d / 1000))
-        return pace(el: el, dist: d) + " " + (curved ? "/KM ≈" : "/KM") + " · " + dist + " km"
+        let d: Double = min(km, engine.segDist / 1000)
+        let seg: String = String(format: "%.2f / %.2f km", d, km)
+        guard engine.isRunKind, engine.distance >= 10 else { return seg }
+        return seg + " · " + String(format: "Total %@ km".l10n, String(format: "%.2f", engine.distance / 1000))
     }
 
     private func pace(el: Int, dist: Double) -> String {
@@ -506,30 +536,66 @@ struct WSegmentList: View {
 struct WEndSheet: View {
     let engine = WorkoutEngine.shared
     let onEnd: () -> Void
+    let onDiscard: () -> Void
     let onResume: () -> Void
+    /// 버리기를 한 번 눌렀음 → 한 번 더 묻는 화면
+    @State private var askDiscard = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("End workout?").font(F.t(16, .semibold))
-            Text(engine.growsOpen ? String(localized: "Everything so far will be saved.")
-                                  : String(localized: "\(engine.idx)/\(engine.seq.count) segments done. The rest won't be recorded."))
-                .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            sheetButton("End", fg: .black, bg: C.bad, action: onEnd)
-                .accessibilityIdentifier("w.endConfirm")
-            sheetButton("Resume", fg: .white, bg: Color(hex: 0x1F1F1F), action: onResume)
-                .accessibilityIdentifier("w.resume")
+        Group {
+            if askDiscard { discardAsk } else { main }
         }
-        .padding(.top, 30).padding(.horizontal, 18).padding(.bottom, 16)
+        .padding(.top, 30).padding(.horizontal, 18).padding(.bottom, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black)
         .ignoresSafeArea()
     }
 
+    /// 저장하고 끝내기 · 버리기 · 계속 (아이폰과 같은 이름)
+    private var main: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("End workout?").font(F.t(16, .semibold))
+            Text(engine.growsOpen ? "Everything so far will be saved.".l10n
+                                  : String(format: "%lld/%lld segments done. The rest won't be recorded.".l10n,
+                                           engine.seq.prefix(engine.idx).filter { $0.kind != .rox }.count,
+                                           engine.seq.filter { $0.kind != .rox }.count))
+                .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            sheetButton("Save & end", fg: .black, bg: C.accent, action: onEnd)
+                .accessibilityIdentifier("w.endConfirm")
+            HStack(spacing: 6) {
+                sheetButton("Discard", fg: C.bad, bg: Color(hex: 0x2A1412)) {
+                    WKInterfaceDevice.current().play(.click)
+                    withAnimation(.easeOut(duration: 0.15)) { askDiscard = true }
+                }
+                .accessibilityIdentifier("w.discard")
+                sheetButton("Resume", fg: .white, bg: Color(hex: 0x1F1F1F), action: onResume)
+                    .accessibilityIdentifier("w.resume")
+            }
+        }
+    }
+
+    /// 실수 방지: 한 번 더 묻기
+    private var discardAsk: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Discard this workout?").font(F.t(16, .semibold))
+            Text("It won't be saved here, on iPhone or in Health.")
+                .font(F.t(13)).foregroundStyle(C.text2).lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            sheetButton("Discard", fg: .white, bg: C.bad, action: onDiscard)
+                .accessibilityIdentifier("w.discardConfirm")
+            sheetButton("Cancel", fg: .white, bg: Color(hex: 0x1F1F1F)) {
+                withAnimation(.easeOut(duration: 0.15)) { askDiscard = false }
+            }
+        }
+    }
+
     private func sheetButton(_ t: String, fg: Color, bg: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(t.l10n).font(F.t(14, .semibold)).foregroundStyle(fg)
+                .lineLimit(1).minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
@@ -547,7 +613,12 @@ struct WSummary: View {
             AmbientLayer(a: Ambient(hex: 0x30D158, alpha: 0.18, rx: 1.2, ry: 0.6, cx: 0.5, cy: -0.1))
             // 위 34 는 시계 줄: 내용은 그 아래에서만 움직임 (위로 밀어도 시계와 겹치지 않게)
             VStack(spacing: 0) {
-                Color.clear.frame(height: 34)
+                // 시계 줄 왼쪽에 모드 이름 (51번: 멘트는 그 아래 노랑)
+                Text(engine.lastRecord.map { $0.mode == .training ? $0.title : $0.mode.name.l10n } ?? "")
+                    .font(F.t(13, .semibold)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16).padding(.trailing, WClock.reserve)
+                    .frame(height: 34, alignment: .bottom)
                 ScrollView {
                     if let r = engine.lastRecord {
                         VStack(spacing: 10) {
@@ -569,7 +640,11 @@ struct WSummary: View {
         let tg: Int = r.vsTarget ?? r.total
         let showVs: Bool = r.vsTarget != nil
         return VStack(spacing: 0) {
-            Text(String(localized: "\(r.mode.name.l10n) complete")).font(F.t(13, .semibold)).foregroundStyle(C.accent).lineLimit(1).minimumScaleFactor(0.85)
+            // 51번: "수고했어요" 류 한 줄 (워치가 아는 것만으로 고름)
+            Text(cheer(r).line).font(F.t(14, .semibold)).foregroundStyle(C.accent)
+                .multilineTextAlignment(.center).lineLimit(3).minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("w.cheer")
             Text(Fm.t(r.total)).font(F.num(32)).tracking(-0.96)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .padding(.top, 4)
@@ -588,6 +663,32 @@ struct WSummary: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)
+    }
+
+    /// 워치가 아는 것: 내 최고 Full Sim · 최고 PFT · 레이스 목표 · 대회 날짜 · 심박
+    private func cheer(_ r: Record) -> Cheer {
+        let ctx = WatchStore.shared.ctx
+        var x = CheerInput(mode: r.mode, title: r.title, total: r.total, complete: r.isComplete,
+                           check: r.flag == .check, start: r.date, end: r.end, seed: CheerPicker.seed(r.id))
+        x.isHIIT = r.isHIIT
+        x.isRun = r.isRunKind
+        x.hiitRounds = r.isHIIT ? r.segs.count : 0
+        x.runKm = r.runs.map { $0.dist ?? runMeters($0.detail) }.reduce(0, +) / 1000
+        x.hiShare = CheerPicker.hiShare(r.hr, settings: ctx.settings)
+        if r.mode == .race, let g = r.goal ?? r.vsTarget { x.goalDelta = r.total - g }
+        if r.mode == .sim, let b = ctx.simBestTotal, r.total < b, r.counts { x.pbDelta = r.total - b }
+        if r.mode == .sim && ctx.simBestTotal == nil && r.splits16 != nil { x.firstFullSim = true }
+        if r.mode == .pft {
+            x.pftPrevBest = ctx.pftBestTotal ?? ctx.pftBest.map { $0.reduce(0, +) }
+            x.pftEverGold = (x.pftPrevBest ?? .max) < PFT.goldLimit
+        }
+        let ev = ctx.settings.event
+        if ev.isSet {
+            let cal = Calendar.current
+            let d = cal.dateComponents([.day], from: cal.startOfDay(for: r.date), to: cal.startOfDay(for: ev.date)).day ?? -1
+            if d >= 0 { x.daysToRace = d }
+        }
+        return CheerPicker.pick(x)
     }
 
     private func stats(_ r: Record) -> some View {

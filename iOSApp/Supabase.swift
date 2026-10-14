@@ -18,6 +18,16 @@ struct RemoteProfile: Codable {
     var visibility: String?
 }
 
+/// 빌드 23: 본인만 읽고 쓰는 프로필 (profile_private 표 · 친구에게도 안 보임)
+struct PrivateProfile: Codable {
+    var sex: String? = nil
+    var height_cm: Int? = nil
+    var weight_kg: Double? = nil
+    var birth_year: Int? = nil
+    var raced: Bool? = nil
+    var race_division: String? = nil
+}
+
 struct LBRow: Codable, Identifiable {
     var user_id: String
     var nickname: String
@@ -35,6 +45,64 @@ struct FriendRow: Codable {
     var best_date: String?
     var splits: [Int]?
     var status: String
+    /// 빌드 22 서버: incoming(받은 요청) / outgoing(보낸 요청) / mutual. 예전 서버엔 없음
+    var direction: String? = nil
+}
+
+/// 받은 응원 한 줄 (빌드 24)
+struct CheerRow: Codable, Hashable, Identifiable {
+    var id: Int
+    var sender: String
+    var nickname: String
+    var avatar_url: String?
+    var kind: String
+    var created_at: Date
+    var seen: Bool
+}
+
+/// 응원 종류 (정해진 것만 — 자유 글 없음). 서버 check 목록과 같아야 함
+enum CheerKind: String, CaseIterable, Identifiable {
+    case fire, clap, muscle, pb, race, together, go
+    var id: String { rawValue }
+    var emoji: String {
+        switch self {
+        case .fire: return "🔥"
+        case .clap: return "👏"
+        case .muscle: return "💪"
+        case .pb: return "🏆"
+        case .race: return "🏁"
+        case .together: return "🤝"
+        case .go: return "⚡️"
+        }
+    }
+    /// 이모지만 보내는 것 (나머지는 문구)
+    var isEmoji: Bool { [.fire, .clap, .muscle].contains(self) }
+    /// 문구 (번역 키)
+    var line: String {
+        switch self {
+        case .fire, .clap, .muscle: return emoji
+        case .pb: return "Nice PB!"
+        case .race: return "Good luck at the race!"
+        case .together: return "Let's train together"
+        case .go: return "You've got this"
+        }
+    }
+}
+
+/// friendships 표 한 줄 (본인과 관련된 줄만 읽힘)
+struct FriendLink: Codable {
+    var requester: String
+    var addressee: String
+    var status: String
+}
+
+/// 친구 요청 (받은 것 · 보낸 것)
+struct FriendReq: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var div: String
+    var avatarUrl: String?
+    var incoming: Bool
 }
 
 enum SBError: LocalizedError {
@@ -128,6 +196,12 @@ final class Supabase {
         session = nil
     }
 
+    /// 빌드 23: 다른 기기에서 로그인해서 이 기기만 로그아웃할 때.
+    /// 서버에 logout 을 보내지 않음 (보통 logout 은 모든 기기의 로그인을 끊어서, 새로 로그인한 기기까지 끊길 수 있음)
+    func dropSession() {
+        session = nil
+    }
+
     /// 계정 삭제 (SQL 함수 delete_account) — 서버의 프로필·친구·기록이 지워짐
     func deleteAccount() async throws {
         _ = try await request("/rest/v1/rpc/delete_account", method: "POST", body: [:])
@@ -157,6 +231,48 @@ final class Supabase {
         if let avatarUrl { b["avatar_url"] = avatarUrl } else if clearAvatar { b["avatar_url"] = NSNull() }
         _ = try await request("/rest/v1/profiles", method: "POST", body: b,
                               headers: ["Prefer": "resolution=merge-duplicates,return=minimal"])
+    }
+
+    // MARK: 본인만 보는 프로필 (빌드 23 · supabase/build23_profile.sql)
+
+    /// 서버에 아직 표가 없으면(404) nil
+    func myPrivate() async throws -> PrivateProfile? {
+        guard let id = userId else { throw SBError.noSession }
+        do {
+            let d = try await request("/rest/v1/profile_private?id=eq.\(id)&select=sex,height_cm,weight_kg,birth_year,raced,race_division")
+            return try decode([PrivateProfile].self, d).first
+        } catch SBError.http(404, _) {
+            return nil
+        }
+    }
+
+    /// 값이 nil 이면 서버에서도 비움 (사용자가 지운 값이 남지 않게)
+    func upsertPrivate(_ p: PrivateProfile) async throws {
+        guard let id = userId else { throw SBError.noSession }
+        func v(_ x: Any?) -> Any { x ?? NSNull() }
+        let b: [String: Any] = ["id": id,
+                                "sex": v(p.sex),
+                                "height_cm": v(p.height_cm),
+                                "weight_kg": v(p.weight_kg),
+                                "birth_year": v(p.birth_year),
+                                "raced": v(p.raced),
+                                "race_division": v(p.race_division)]
+        _ = try await request("/rest/v1/profile_private", method: "POST", body: b,
+                              headers: ["Prefer": "resolution=merge-duplicates,return=minimal"])
+    }
+
+    // MARK: 한 기기만 로그인 (빌드 23)
+
+    /// 이 기기를 "지금 로그인한 기기"로 서버에 적음 (SQL 함수 claim_device)
+    func claimDevice(_ dev: String) async throws {
+        _ = try await request("/rest/v1/rpc/claim_device", method: "POST", body: ["dev": dev])
+    }
+
+    /// 서버에 적힌 "지금 로그인한 기기" (없으면 nil)
+    func activeDevice() async throws -> String? {
+        let d = try await request("/rest/v1/rpc/active_device", method: "POST", body: [:])
+        let v = try? JSONSerialization.jsonObject(with: d, options: [.fragmentsAllowed])
+        return v as? String
     }
 
     /// 아바타 올리기 → 공개 URL
@@ -189,6 +305,22 @@ final class Supabase {
         _ = try await request("/rest/v1/rpc/add_friend", method: "POST", body: ["other": otherId])
     }
 
+    /// 받은 요청에 답하기. 빌드 22 서버 함수 respond_friend 가 아직 없으면(404)
+    /// 수락 = add_friend(서로 추가하면 바로 친구), 거절 = 줄 지우기
+    func respondFriend(_ otherId: String, accept: Bool) async throws {
+        do {
+            _ = try await request("/rest/v1/rpc/respond_friend", method: "POST", body: ["other": otherId, "accept": accept])
+        } catch SBError.http(404, _) {
+            if accept { try await addFriend(otherId) } else { try await removeFriend(otherId) }
+        }
+    }
+
+    /// 나와 관련된 친구 줄 (누가 누구에게 요청했는지 알기 위해)
+    func friendLinks() async throws -> [FriendLink] {
+        let d = try await request("/rest/v1/friendships?select=requester,addressee,status")
+        return try decode([FriendLink].self, d)
+    }
+
     /// 친구 끊기 (차단할 때): 두 사람 사이의 친구·요청 줄을 양쪽 방향 모두 지움 (서버 삭제 규칙: 당사자만)
     func removeFriend(_ otherId: String) async throws {
         guard let me = userId else { throw SBError.noSession }
@@ -196,6 +328,31 @@ final class Supabase {
                               headers: ["Prefer": "return=minimal"])
         _ = try await request("/rest/v1/friendships?requester=eq.\(otherId)&addressee=eq.\(me)", method: "DELETE",
                               headers: ["Prefer": "return=minimal"])
+    }
+
+    // MARK: 빌드 24 · 응원 (supabase/build24_cheers.sql)
+
+    func sendCheer(to otherId: String, kind: String) async throws {
+        _ = try await request("/rest/v1/rpc/send_cheer", method: "POST", body: ["other": otherId, "kind": kind])
+    }
+
+    /// 받은 응원 최근 50개
+    func cheers() async throws -> [CheerRow] {
+        let d = try await request("/rest/v1/rpc/my_cheers", method: "POST", body: [:])
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .custom { c in
+            // Postgres 는 "2026-10-14T06:30:12.123456+00:00" 처럼 소수점 6자리 → 소수점 부분을 떼고 읽음
+            let raw = try c.singleValueContainer().decode(String.self)
+            let s: String = raw.replacingOccurrences(of: "\\.[0-9]+", with: "", options: .regularExpression)
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime]
+            return f.date(from: s) ?? Date()
+        }
+        do { return try dec.decode([CheerRow].self, from: d) } catch { throw SBError.bad }
+    }
+
+    func markCheersSeen() async throws {
+        _ = try await request("/rest/v1/rpc/mark_cheers_seen", method: "POST", body: [:])
     }
 
     /// 친구 + 각자의 최고 Full Simulation (SQL 함수 friends_with_best)

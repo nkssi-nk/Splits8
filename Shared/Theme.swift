@@ -260,10 +260,23 @@ struct PFTBadge: View {
 
 // MARK: - 번역
 
+/// 번역을 읽을 묶음. 워치는 설정 › Language 를 바꾸면 set 을 불러서 앱을 다시 켜지 않아도 바뀜.
+/// 아이폰에서는 아무도 set 을 부르지 않아 .main 그대로 (예전과 같음)
+enum L10n {
+    static var bundle: Bundle = .main
+    static func set(_ lang: String?) {
+        if let l = lang, let p = Bundle.main.path(forResource: l, ofType: "lproj"), let b = Bundle(path: p) {
+            bundle = b
+        } else {
+            bundle = .main
+        }
+    }
+}
+
 extension String {
     /// Localizable.strings 에서 번역을 찾음 (키 = 영어 원문). 없으면 그대로.
     /// 변수로 들어오는 화면 문자열(부품의 title/label 등)에 씀. 사용자 입력·숫자는 키가 없어 그대로 나옴.
-    var l10n: String { Bundle.main.localizedString(forKey: self, value: self, table: nil) }
+    var l10n: String { L10n.bundle.localizedString(forKey: self, value: self, table: nil) }
 }
 
 // MARK: - 시간 형식

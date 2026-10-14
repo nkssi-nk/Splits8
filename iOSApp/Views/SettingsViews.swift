@@ -23,7 +23,7 @@ struct SettingsView: View {
 
             SectionLabel(text: "FRIENDS", top: 14)
             VStack(spacing: 0) {
-                SettingRow(title: "Friends", value: friendsValue, last: true) { r.friendsFrom = .settings; r.go(.friends) }
+                SettingRow(title: "Friends", value: friendsValue, last: true, badge: store.incoming.count + store.unseenCheers) { r.friendsFrom = .settings; r.go(.friends) }
                     .accessibilityIdentifier("settings.friends")
             }
             .card8()
@@ -44,7 +44,13 @@ struct SettingsView: View {
                 themeSection
 
                 SectionLabel(text: "DEVICE", top: 14)
-                deviceCard
+                VStack(spacing: 0) {
+                    deviceCard
+                    hapticRow("Show on iPhone", sub: "Watch workouts, live", on: mirrorBinding, last: true)
+                        .accessibilityIdentifier("settings.mirror")
+                }
+                .card8()
+                Note8(text: "Shows your watch workout on this iPhone and on the Lock Screen while you train. You can control it from either device.")
 
                 SectionLabel(text: "ABOUT", top: 14)
                 VStack(spacing: 0) {
@@ -201,6 +207,7 @@ struct SettingsView: View {
         } else {
             UserDefaults.standard.set([k], forKey: "AppleLanguages")
         }
+        store.settings.lang = k == "system" ? nil : k   // 63번: 워치도 같은 언어로 (워치 앱을 다시 열면 적용)
         askRestart = true
     }
 
@@ -285,8 +292,13 @@ struct SettingsView: View {
             .fixedSize()
         }
         .padding(.vertical, 14).padding(.horizontal, 18)
-        .card8()
+        .rowLine(true)
         .accessibilityIdentifier("settings.device")
+    }
+
+    /// 52번: 워치 운동을 아이폰 화면 · 잠금 화면에 같이 보여 주기 (기본 켬)
+    private var mirrorBinding: Binding<Bool> {
+        Binding(get: { store.settings.mirror }, set: { store.settings.mirror = $0 })
     }
 }
 
@@ -378,11 +390,26 @@ struct SetHrView: View {
                     .multilineTextAlignment(.trailing)
             }
             Seg8(items: [("age", "By age"), ("manual", "Manual")], selected: s.hrMode) { store.settings.hrMode = $0 }
-            HStack {
-                Text(age ? "Age" : "Max heart rate").font(F.t(15))
-                Spacer()
-                Stepper8(value: "\(age ? s.age : s.manualHr)", minWidth: 40, fontSize: 20,
-                         down: { bump(-1) }, up: { bump(1) })
+            if age, let y = s.birthYear {
+                // 빌드 24: 나이는 태어난 해에서 자동 (두 군데서 따로 받지 않음) → 누르면 태어난 해 고치기
+                Button { Router.shared.editProfile(step: 3) } label: {
+                    HStack {
+                        Text("Age").font(F.t(15))
+                        Spacer()
+                        Text(String(localized: "\(s.age) · born \(String(y))")).font(F.num(17)).foregroundStyle(C.text2)
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(C.text3)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("hr.ageFromYear")
+            } else {
+                HStack {
+                    Text(age ? "Age" : "Max heart rate").font(F.t(15))
+                    Spacer()
+                    Stepper8(value: "\(age ? s.age : s.manualHr)", minWidth: 40, fontSize: 20,
+                             down: { bump(-1) }, up: { bump(1) })
+                }
             }
         }
         .padding(18)
@@ -474,7 +501,7 @@ struct SetGoalsView: View {
         var s = store.settings
         guard s.goals.indices.contains(i) else { return }
         s.goals[i] = max(30, s.goals[i] + v)
-        s.goalTime = s.goals.reduce(0, +) + 8 * Defaults.roxTarget
+        s.goalTime = s.goals.reduce(0, +) + 8 * s.roxTarget
         store.settings = s
     }
 }

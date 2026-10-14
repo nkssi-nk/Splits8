@@ -57,6 +57,11 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var segHR: [[Double]] = []
     @ObservationIgnored private var segDistStart: Double = 0
     @ObservationIgnored private var segDists: [Double?] = []
+    // 62번 · 러닝 카드: 걸음 수(케이던스) · 보폭 (건강 앱 운동 기록에서 받음)
+    @ObservationIgnored private var steps: Double = 0             // 누적 걸음
+    @ObservationIgnored private var segStepStart: Double = 0
+    @ObservationIgnored private var segSteps: [Double?] = []
+    @ObservationIgnored private var strideAvg: Double? = nil      // 평균 보폭(m), 워치가 재 줄 때만
 
     // 시간 (일시정지 제외)
     private(set) var startDate = Date()
@@ -77,6 +82,7 @@ final class WorkoutEngine: NSObject {
         let segDistStart: Double
         let grew: Bool
         let reps: Int?
+        var segStepStart: Double = 0
     }
     @ObservationIgnored private var undoPoint: UndoPoint?
     /// 조작 화면의 Undo 를 누를 수 있는지
@@ -92,12 +98,20 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var paceBuzzed: Set<Int> = []     // 목표 초과 진동을 이미 울린 구간
     @ObservationIgnored private var tickTimer: Timer?
 
+    // 아이폰에 같이 보여 주기 (52번 · HealthKit 운동 미러링)
+    @ObservationIgnored private var mirroring = false
+    @ObservationIgnored private var liveTicks = 0
+    /// 운동 중에 아이폰과 끊김 → 30초마다 다시 이어 봄
+    @ObservationIgnored private var mirrorLost = false
+
     // MARK: 권한
 
     func requestAuthorization() {
         let share: Set<HKSampleType> = [HKObjectType.workoutType(), HKSeriesType.workoutRoute()]
+        // 62번: 걸음 수 · 보폭 (러닝 카드 케이던스)
         let read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned),
-                                       HKQuantityType(.distanceWalkingRunning), HKObjectType.workoutType()]
+                                       HKQuantityType(.distanceWalkingRunning), HKObjectType.workoutType(),
+                                       HKQuantityType(.stepCount), HKQuantityType(.runningStrideLength)]
         health.requestAuthorization(toShare: share, read: read) { _, _ in }
         location.requestWhenInUseAuthorization()
     }
@@ -191,11 +205,14 @@ final class WorkoutEngine: NSObject {
         segHR = Array(repeating: [], count: seq.count)
         segDists = Array(repeating: nil, count: seq.count)
         segReps = Array(repeating: nil, count: seq.count)
+        segSteps = Array(repeating: nil, count: seq.count)
+        steps = 0; segStepStart = 0; strideAvg = nil
         segDistStart = 0; segPaused = 0; pauseAt = nil
         undoPoint = nil; canUndo = false
         let now = Date()
         startDate = now; segStart = now
         lastZone = 0; lastZoneBuzz = .distantPast; paceBuzzed = []
+        mirroring = false; mirrorLost = false; liveTicks = 0
         active = true
         startTick()
         repCounter.start(icon: cur.icon)
@@ -214,12 +231,32 @@ final class WorkoutEngine: NSObject {
         }
         if let s = try? HKWorkoutSession(healthStore: health, configuration: cfg) {
             let b = s.associatedWorkoutBuilder()
-            b.dataSource = HKLiveWorkoutDataSource(healthStore: health, workoutConfiguration: cfg)
+            let src = HKLiveWorkoutDataSource(healthStore: health, workoutConfiguration: cfg)
+            // 62번: 러닝 카드는 걸음 수 · 보폭도 모음 (케이던스 계산용)
+            if isRunKind {
+                src.enableCollection(for: HKQuantityType(.stepCount), predicate: nil)
+                src.enableCollection(for: HKQuantityType(.runningStrideLength), predicate: nil)
+            }
+            b.dataSource = src
             s.delegate = self
             b.delegate = self
             session = s; builder = b
             s.startActivity(with: now)
             b.beginCollection(withStart: now) { _, _ in }
+            // 설정 › Device › Show on iPhone 이 켜져 있으면 아이폰에 같이 보여 줌 (아이폰 앱이 뒤에서 켜짐)
+            if settings.mirror {
+                Task { @MainActor in
+                    do {
+                        try await s.startMirroringToCompanionDevice()
+                        self.mirroring = true
+                        self.pushLive()
+                    } catch {
+                        // 시작할 때 아이폰이 잠겨 있으면 실패함 → 30초마다 다시 시도
+                        self.mirroring = false
+                        self.mirrorLost = true
+                    }
+                }
+            }
         }
         if buzz { WKInterfaceDevice.current().play(.start) }
         startPlaceAndRoute()
@@ -268,7 +305,9 @@ final class WorkoutEngine: NSObject {
         for l in good {
             if let prev = lastRouteLoc, l.distance(from: prev) < 8 { continue }
             lastRouteLoc = l
-            routePts.append(RoutePt(a: l.coordinate.latitude, o: l.coordinate.longitude))
+            // 62번: 높이(못 쟀으면 nil) · 시작부터 초(일시정지 뺀 시간) — 오르막 · 속도 색 지도용
+            let h: Double? = l.verticalAccuracy > 0 ? l.altitude : nil
+            routePts.append(RoutePt(a: l.coordinate.latitude, o: l.coordinate.longitude, h: h, t: total(l.timestamp)))
         }
     }
 
@@ -287,6 +326,7 @@ final class WorkoutEngine: NSObject {
         let prevStart: Date = segStart
         let prevPaused: Double = segPaused
         let prevDistStart: Double = segDistStart
+        let prevStepStart: Double = segStepStart
         closeSeg(now)
         var grew = false
         if splits.count >= seq.count && (isHIIT || (isRunKind && runKm == 0)) {
@@ -298,15 +338,18 @@ final class WorkoutEngine: NSObject {
         } else {
             // 되돌리기용으로 방금 구간의 상태를 기억 (한 번만 되돌릴 수 있음)
             undoPoint = UndoPoint(idx: prevIdx, segStart: prevStart, segPaused: prevPaused, segDistStart: prevDistStart,
-                                  grew: grew, reps: segReps.indices.contains(prevIdx) ? segReps[prevIdx] : nil)
+                                  grew: grew, reps: segReps.indices.contains(prevIdx) ? segReps[prevIdx] : nil,
+                                  segStepStart: prevStepStart)
             canUndo = !isRunKind
             idx = splits.count
             segStart = now; segPaused = 0
             segDistStart = distance
+            segStepStart = steps
             advanceCount += 1
             repCounter.start(icon: cur.icon)
             // 다음 구간 알림: .click 은 너무 약해서 운동 중에는 느껴지지 않음
             WKInterfaceDevice.current().play(.notification)
+            pushLive()
         }
     }
 
@@ -323,22 +366,26 @@ final class WorkoutEngine: NSObject {
         }
         if segDists.indices.contains(u.idx) { segDists[u.idx] = nil }
         if segReps.indices.contains(u.idx) { segReps[u.idx] = nil }
+        if segSteps.indices.contains(u.idx) { segSteps[u.idx] = nil }
         if u.grew, seq.count == newIdx + 1 {          // HIIT·자유 러닝에서 붙였던 다음 라운드를 뗌
             seq.removeLast()
             if segHR.count > seq.count { segHR.removeLast() }
             if segDists.count > seq.count { segDists.removeLast() }
             if segReps.count > seq.count { segReps.removeLast() }
+            if segSteps.count > seq.count { segSteps.removeLast() }
         }
         idx = u.idx
         segStart = u.segStart
         segPaused = u.segPaused + segPaused       // 넘긴 뒤에 일시정지한 시간도 빼 줌
         segDistStart = u.segDistStart
+        segStepStart = u.segStepStart
         paceBuzzed.remove(newIdx)
         undoPoint = nil
         canUndo = false
         repCounter.start(icon: cur.icon, base: u.reps ?? 0)
         if !running { repCounter.setPaused(true) }
         WKInterfaceDevice.current().play(.directionDown)
+        pushLive()
     }
 
     /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
@@ -348,6 +395,7 @@ final class WorkoutEngine: NSObject {
         segHR.append([])
         segDists.append(nil)
         segReps.append(nil)
+        segSteps.append(nil)
     }
 
     /// 러닝: 1km 넘으면 자동으로 다음 km (총거리 다 뛰면 끝)
@@ -363,8 +411,10 @@ final class WorkoutEngine: NSObject {
             idx = splits.count
             segStart = now; segPaused = 0
             segDistStart = distance
+            segStepStart = steps
             advanceCount += 1
             WKInterfaceDevice.current().play(.notification)
+            pushLive()
         }
     }
 
@@ -380,17 +430,35 @@ final class WorkoutEngine: NSObject {
             session?.resume()
             repCounter.setPaused(false)
         }
+        pushLive()
     }
 
     /// End: 현재 구간까지 기록하고 끝냄
     func endNow() {
-        guard active else { return }
+        guard active, !finished else { return }
         if !running { togglePause() }
         let now = Date()
         closeSeg(now)
         // HIIT·자유 러닝은 끝이 없으니 End 가 정상 종료. 그 외는 마지막 구간에서 End 눌러도 다 한 것
         let open: Bool = isHIIT || (isRunKind && runKm == 0)
         finish(now, complete: open || splits.count >= seq.count)
+    }
+
+    /// 61번 · 버리기: 기록 안 만듦 · 아이폰으로 안 보냄 · 건강 앱 운동도 저장 안 함 → 첫 화면
+    func discardNow() {
+        guard active, !finished else { return }
+        stopTick()
+        repCounter.stop()
+        undoPoint = nil; canUndo = false
+        mirroring = false
+        mirrorLost = false
+        session?.end()
+        builder?.discardWorkout()
+        builder = nil
+        routeBuilder?.discard()
+        stopRoute(workout: nil)
+        WKInterfaceDevice.current().play(.click)
+        active = false; finished = false; lastRecord = nil
     }
 
     func reset() {
@@ -416,6 +484,18 @@ final class WorkoutEngine: NSObject {
 
     /// 1초마다: Race · Full Sim 에서 현재 구간이 목표 시간을 넘으면 그 구간에서 한 번만 .retry
     private func tick() {
+        // 아이폰에 5초마다 심박 · 칼로리 · 시간 맞추기
+        liveTicks += 1
+        if mirroring && liveTicks % 5 == 0 { pushLive() }
+        if mirrorLost && active && !finished && liveTicks % 30 == 0, let s = session {
+            Task { @MainActor in
+                if (try? await s.startMirroringToCompanionDevice()) != nil {
+                    self.mirrorLost = false
+                    self.mirroring = true
+                    self.pushLive()
+                }
+            }
+        }
         guard active, !finished, running else { return }
         guard settings.hapticPace, mode == .race || mode == .sim else { return }
         let c: Seg = cur
@@ -442,6 +522,10 @@ final class WorkoutEngine: NSObject {
         let t = segEl(now)
         splits.append(t)
         if cur.kind == .run, segDists.indices.contains(idx) { segDists[idx] = segDist }
+        // 62번: 이 구간 걸음 수 (러닝 카드에서 걸음을 받았을 때만)
+        if isRunKind, cur.kind == .run, steps > segStepStart, segSteps.indices.contains(idx) {
+            segSteps[idx] = steps - segStepStart
+        }
         let reps: Int? = repCounter.stop()
         if segReps.indices.contains(idx) { segReps[idx] = reps }
     }
@@ -468,6 +552,8 @@ final class WorkoutEngine: NSObject {
         r.place = place
         r.kind = kind
         if outdoorRun && routePts.count >= 2 { r.route = routePts }
+        // 62번: 러닝 카드 — 케이던스 · 보폭 · 오르막 (경로 높이로)
+        if isRunKind { RunMetrics.fill(&r, segSteps: segSteps, strideHK: strideAvg) }
         return r
     }
 
@@ -478,6 +564,9 @@ final class WorkoutEngine: NSObject {
         let r = makeRecord(complete: complete)
         lastRecord = r
         finished = true
+        pushLive()                      // 아이폰: "Apple Watch 에 저장 중…" → 기록이 도착하면 카드
+        mirroring = false
+        mirrorLost = false
         WatchStore.shared.send(r)
         WKInterfaceDevice.current().play(.success)
 
@@ -500,6 +589,8 @@ final class WorkoutEngine: NSObject {
         segHR = Array(repeating: [], count: seq.count)
         segDists = Array(repeating: nil, count: seq.count)
         segReps = Array(repeating: nil, count: seq.count)
+        segSteps = Array(repeating: nil, count: seq.count)
+        steps = 0; segStepStart = 0; strideAvg = nil
         segDistStart = 0; segPaused = 0; pauseAt = nil
         undoPoint = nil; canUndo = !done && idx > 0      // 화면 캡처에서 Undo 가 켜진 모습
         let now = Date()
@@ -545,6 +636,35 @@ final class WorkoutEngine: NSObject {
         active = true
     }
 
+    // MARK: 아이폰에 같이 보여 주기 (52번)
+
+    /// 지금 상태를 아이폰으로 (미러링 중일 때만)
+    func pushLive() {
+        guard mirroring, let s = session else { return }
+        let now = Date()
+        let hasTarget: Bool = kind == nil && seq.contains { $0.target > 0 }
+        let st = LiveState(mode: mode, title: title, seq: seq, idx: idx, splits: splits, segElapsed: segEl(now),
+                           running: running, hr: Int(hr.rounded()), kcal: Int(kcal.rounded()), zone: hr > 0 ? zone : 0,
+                           canUndo: canUndo, finished: finished, vsWord: deltaWord,
+                           delta: hasTarget ? delta(now) : nil, open: growsOpen, autoSplit: isRunKind && !(distance <= 0 && !outdoorRun),
+                           segDist: segDist, dist: distance)
+        guard let d = LivePacket(state: st).data() else { return }
+        s.sendToRemoteWorkoutSession(data: d) { _, _ in }
+    }
+
+    /// 아이폰에서 누른 버튼
+    fileprivate func gotCommand(_ c: LiveCommand) {
+        guard active, !finished else { return }
+        switch c {
+        case .next: advance()
+        case .undo: undo()
+        case .pause: if running { togglePause() }
+        case .resume: if !running { togglePause() }
+        case .end: endNow()
+        }
+        pushLive()
+    }
+
     /// VS GOAL / VS LAST / VS JIHO / VS BEST
     var deltaWord: String {
         if mode == .race { return "VS GOAL" }
@@ -566,6 +686,16 @@ final class WorkoutEngine: NSObject {
         distance = v
         autoSplitIfNeeded()
     }
+    /// 62번: 누적 걸음 수 (러닝 카드 케이던스)
+    fileprivate func gotSteps(_ v: Double) {
+        guard active, !finished else { return }
+        steps = v
+    }
+    /// 62번: 평균 보폭(m)
+    fileprivate func gotStride(_ v: Double) {
+        guard active, !finished, v > 0 else { return }
+        strideAvg = v
+    }
 }
 
 extension WorkoutEngine: CLLocationManagerDelegate {
@@ -579,6 +709,22 @@ extension WorkoutEngine: HKWorkoutSessionDelegate {
     func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState,
                         from fromState: HKWorkoutSessionState, date: Date) {}
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {}
+
+    /// 아이폰에서 보낸 버튼 (Next · Undo · Pause · Resume · End)
+    func workoutSession(_ workoutSession: HKWorkoutSession, didReceiveDataFromRemoteWorkoutSession data: [Data]) {
+        for d in data {
+            guard let c = LivePacket.read(d)?.command else { continue }
+            DispatchQueue.main.async { self.gotCommand(c) }
+        }
+    }
+
+    /// 아이폰과 연결이 끊김: 워치 혼자 계속 (다시 이어지지 않으면 끝까지 워치 기록만)
+    func workoutSession(_ workoutSession: HKWorkoutSession, didDisconnectFromRemoteDeviceWithError error: Error?) {
+        DispatchQueue.main.async {
+            if self.mirroring && self.active && !self.finished { self.mirrorLost = true }
+            self.mirroring = false
+        }
+    }
 }
 
 extension WorkoutEngine: HKLiveWorkoutBuilderDelegate {
@@ -599,6 +745,16 @@ extension WorkoutEngine: HKLiveWorkoutBuilderDelegate {
             } else if qt == HKQuantityType(.distanceWalkingRunning) {
                 if let v = st.sumQuantity()?.doubleValue(for: .meter()) {
                     DispatchQueue.main.async { self.gotDistance(v) }
+                }
+            } else if qt == HKQuantityType(.stepCount) {
+                // 62번: 걸음 수는 누적(합계)
+                if let v = st.sumQuantity()?.doubleValue(for: .count()) {
+                    DispatchQueue.main.async { self.gotSteps(v) }
+                }
+            } else if qt == HKQuantityType(.runningStrideLength) {
+                // 62번: 보폭은 그때그때 재는 값 → 지금까지 평균
+                if let v = st.averageQuantity()?.doubleValue(for: .meter()) {
+                    DispatchQueue.main.async { self.gotStride(v) }
                 }
             }
         }

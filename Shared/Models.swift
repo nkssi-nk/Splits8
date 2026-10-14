@@ -19,7 +19,10 @@ struct Division: Codable, Hashable {
         Division(key: "dblWP", name: "Doubles Women Pro", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: " · shared"),
         Division(key: "dblX", name: "Doubles Mixed", push: 152, pull: 103, fc: 24, sb: 20, wb: 6, wbReps: 100, wbNote: " · shared"),
     ]
-    static func of(_ key: String) -> Division { all.first { $0.key == key } ?? all[0] }
+    /// 키("openM") 또는 이름("Open Men") 둘 다 받음 — 기록에는 이름이 저장돼 있음
+    static func of(_ key: String) -> Division {
+        all.first { $0.key == key } ?? all.first { $0.name.caseInsensitiveCompare(key) == .orderedSame } ?? all[0]
+    }
 
     /// Push 152 · Pull 103 · FC 2×24 · SB 20 · WB 6KG
     var spec: String { "Push \(push) · Pull \(pull) · FC 2×\(fc) · SB \(sb) · WB \(wb)KG" }
@@ -69,7 +72,7 @@ enum Defaults {
 // MARK: - 목표 시간 → 구간별 목표 나누기
 
 /// 총 목표 시간을 러닝 8개 · 종목 8개(16칸)로 나눔. Roxzone(8 × 30초)은 빼고 나눔.
-/// 비율은 공식 수치가 아니라 앱이 정한 값: 균형형 = 기본 목표 비율, 러너형 = 러닝을 더 빠르게, 근력형 = 종목을 더 빠르게
+/// 균형형 = 같은 완주 시간대 실제 대회 중간값(HyroxBench) 비율, 러너형 = 거기서 러닝을 더 빠르게, 근력형 = 종목을 더 빠르게
 enum GoalSplit {
     /// keep = 지금 내 구간 비율 그대로 / balanced / runner / strong / best = 내 최고 풀 시뮬레이션 비율
     static let styles: [String] = ["keep", "balanced", "runner", "strong", "best"]
@@ -79,21 +82,24 @@ enum GoalSplit {
     }
     static func note(_ k: String) -> String {
         ["keep": "Keeps the ratio of your current split goals.",
-         "balanced": "An even mix of running and stations.",
+         "balanced": "Real race medians at your goal time.",
          "runner": "Faster runs, a little more time on stations.",
          "strong": "Faster stations, a little more time on runs.",
          "best": "Follows the ratio of your best Full Simulation."][k] ?? ""
     }
 
-    /// 16칸 비율 (합은 아무 값이나 됨 — 나눌 때 맞춤)
-    static func weights(_ style: String, current: [Int], best: [Int]?) -> [Double] {
-        let base: [Double] = Defaults.goals.map(Double.init)
+    /// 16칸 비율 (합은 아무 값이나 됨 — 나눌 때 맞춤).
+    /// balanced · runner · strong 은 같은 완주 시간대 실제 중간값(HyroxBench)에서 출발
+    static func weights(_ style: String, current: [Int], best: [Int]?,
+                        total: Int = Defaults.goalTime, division: String = "openM", rox: Int = Defaults.roxTarget) -> [Double] {
+        let base: [Double] = HyroxBench.splits16(goal: total, division: division, rox: rox).map(Double.init)
+        // 러닝 칸만 4% 빠르게 (합을 다시 맞추면 스테이션이 그만큼 비례로 느긋해짐) — 근력형은 반대
         func tilt(run: Double, st: Double) -> [Double] {
             base.enumerated().map { $0.offset % 2 == 0 ? $0.element * run : $0.element * st }
         }
         switch style {
-        case "runner": return tilt(run: 0.94, st: 1.07)
-        case "strong": return tilt(run: 1.06, st: 0.93)
+        case "runner": return tilt(run: 0.96, st: 1)
+        case "strong": return tilt(run: 1, st: 0.96)
         case "best":
             if let b = best, b.count == 16, b.reduce(0, +) > 0 { return b.map(Double.init) }
             return base
@@ -105,10 +111,10 @@ enum GoalSplit {
     }
 
     /// 16칸 목표(초). 5초 단위, 칸마다 최소 30초, 합계 = (총 목표 − Roxzone) 을 5초 단위로 맞춘 값
-    static func split(total: Int, style: String, current: [Int], best: [Int]?) -> [Int] {
-        let w: [Double] = weights(style, current: current, best: best)
+    static func split(total: Int, style: String, current: [Int], best: [Int]?, division: String = "openM", rox: Int = Defaults.roxTarget) -> [Int] {
+        let w: [Double] = weights(style, current: current, best: best, total: total, division: division, rox: rox)
         let sumW: Double = max(1, w.reduce(0, +))
-        let raw: Int = max(16 * 30, total - 8 * Defaults.roxTarget)
+        let raw: Int = max(16 * 30, total - 8 * rox)
         let target: Int = Int((Double(raw) / 5).rounded()) * 5
         let exact: [Double] = w.map { $0 / sumW * Double(target) }
         var out: [Int] = exact.map { max(30, Int(($0 / 5).rounded()) * 5) }
@@ -487,6 +493,9 @@ struct RaceEvent: Codable, Hashable {
 // MARK: - 친구 (계정 · Supabase)
 
 struct Friend: Codable, Hashable, Identifiable {
+    /// 빌드 24: 친구 최대 10명 (수락된 친구 + 보낸 요청). 이미 넘은 사람은 지우지 않고 추가만 막음
+    static let freeLimit: Int = 10
+
     var id: String             // 상대 user id
     var name: String           // 닉네임
     var div: String            // Open Men
@@ -553,6 +562,10 @@ struct SegResult: Codable, Hashable {
     var dist: Double?          // 러닝 거리(m)
     /// 워치가 팔 움직임으로 센 횟수 (스키 당긴 횟수 · 로잉 저은 횟수 · 월볼 던진 횟수). 참고용 짐작값 — 시간·순위·등급에는 쓰지 않음. 예전 기록엔 없음
     var reps: Int? = nil
+    /// 62번 · 러닝 구간 평균 케이던스 (분당 걸음). 예전 기록 · 걸음을 못 잰 기록엔 없음
+    var cad: Int? = nil
+    /// 62번 · 러닝 구간에서 오른 높이(m, 3 m 미만 흔들림은 뺌). 높이 있는 실외 경로가 있을 때만
+    var up: Double? = nil
 }
 
 /// 스키 · 로잉 · 월볼 횟수 요약 (기록 화면 카드용). 워치가 팔 움직임으로 센 값이라 참고용
@@ -567,10 +580,14 @@ struct RepSummary: Equatable {
     }
 }
 
-/// 경로 한 점 (위도·경도)
+/// 경로 한 점 (위도·경도 · 높이 · 시간)
 struct RoutePt: Codable, Hashable {
     var a: Double   // latitude
     var o: Double   // longitude
+    /// 62번 · 높이(m, 해발). 예전 기록 · 높이를 못 잰 점엔 없음
+    var h: Double? = nil
+    /// 62번 · 운동 시작부터 초 (일시정지 뺀 시간 = 구간 시간과 같은 시계). 예전 기록엔 없음
+    var t: Int? = nil
 }
 
 struct HRPoint: Codable, Hashable {
@@ -601,6 +618,11 @@ struct Record: Codable, Hashable, Identifiable {
     var place: String? = nil   // 동네 이름 "성수동, 서울" (폰에만 저장, 서버로 안 보냄)
     var route: [RoutePt]? = nil // 실외 러닝 경로 (폰에만)
     var kind: String? = nil    // "hiit" / "run" (트레이닝 중 HIIT·러닝 카드로 한 것)
+    // 62번 · 러닝 카드 기록 분석 (예전 기록 · 못 잰 기록엔 없음)
+    var cadence: Int? = nil    // 평균 케이던스 (분당 걸음)
+    /// 평균 보폭(m). 주의: Record 안에서 전역 stride(from:to:by:) 를 부르면 이 이름에 가려지니 Swift.stride 로 부를 것
+    var stride: Double? = nil
+    var ascent: Double? = nil  // 오른 높이 합계(m)
 
     /// 시작–끝
     var end: Date { endDate ?? date.addingTimeInterval(Double(total)) }
@@ -729,10 +751,39 @@ struct Settings: Codable, Hashable {
 
     // 배경 빛 색 (설정 > Theme). 노랑이 기본 — 예전 저장 파일과 호환되도록 옵셔널, 노랑이면 비워 둠
     var themeOpt: String? = nil
+    /// 워치 운동을 아이폰에 같이 보여 주기 (빌드 22). nil = 켬 — Settings.mirror (LiveSync.swift)
+    var mirrorOpt: Bool? = nil
+    /// 63번: 아이폰 앱 안에서 고른 언어(ko / en). nil = 기기 언어를 따름 → 워치도 같은 언어로
+    var lang: String? = nil
+    /// 이동(Roxzone) 1번 목표(초). nil = 예전 값 30초. 목표 시간으로 나눌 때 그 시간대 실제 중간값으로 채워짐
+    var roxGoal: Int? = nil
+
+    // 빌드 23: 가입 프로필 (모두 선택 · 예전 저장 파일과 호환되도록 옵셔널, 비어 있으면 nil)
+    /// 성별 "M" / "W"
+    var sex: String? = nil
+    var heightCm: Int? = nil
+    var weightKg: Double? = nil
+    /// 태어난 해 (나이대 비교에 씀)
+    var birthYear: Int? = nil
+    /// 대회에 나가 본 적 있는지 (nil = 아직 답 안 함)
+    var raced: Bool? = nil
+    /// 대회에서 뛰는 디비전: Division 키(openM · proW · dblX …) 또는 "relay"
+    var raceDivision: String? = nil
+    /// 프로필 단계를 한 번 끝냈는지 (업데이트 뒤 한 번만 묻기 위해)
+    var profileDone: Bool? = nil
+    /// 빌드 24: 가입 때 적은 하이록스 최고 완주 시간(초). 목표 시간 기본값 · 구간 나누기에 씀
+    var bestFinish: Int? = nil
+    /// 사용자가 디비전 목록에서 직접 고른 적 있는지 (없으면 프로필의 대회 디비전으로 채워도 됨)
+    var divPicked: Bool? = nil
+    /// 빌드 23: 더블 구간 나누기 계획 (폰에만 저장) — 예전 저장 파일과 호환되도록 옵셔널, 반반이면 nil
+    var doublesPlan: DoublesPlan? = nil
+
     var glow: GlowTheme {
         get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }
         set { themeOpt = newValue == .yellow ? nil : newValue.rawValue }
     }
+    /// 이동 목표 (없으면 30초)
+    var roxTarget: Int { roxGoal ?? Defaults.roxTarget }
 
     var signedIn: Bool { nickname != nil }
 
@@ -790,21 +841,21 @@ enum RunModes {
 
 enum SeqBuilder {
     /// Full Simulation / Race: Run i, Roxzone, Station, Roxzone … (마지막 스테이션 뒤 Roxzone 없음)
-    static func full(div: Division, rox: Bool, targets16: [Int]) -> [Seg] {
+    static func full(div: Division, rox: Bool, targets16: [Int], roxTarget: Int = Defaults.roxTarget) -> [Seg] {
         var o: [Seg] = []
         for i in 0..<8 {
             o.append(Seg(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, target: targets16[i * 2]))
-            if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: Defaults.roxTarget)) }
+            if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
             let s = Station.all[i]
             o.append(Seg(icon: s.key, name: s.name, detail: s.detail(div), kind: .st, target: targets16[i * 2 + 1]))
-            if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, target: Defaults.roxTarget)) }
+            if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
         }
         return o
     }
 
     /// HIIT 라운드 (끝 없이 늘어남, 목표 없음)
     static func hiitRound(_ n: Int) -> Seg {
-        Seg(icon: "hiit", name: "Round \(n)", detail: "INTERVAL", kind: .st, target: 0)
+        Seg(icon: "hiit", name: "Round \(n)", detail: "Interval", kind: .st, target: 0)
     }
     /// 러닝 1km 구간
     static func runKm(_ n: Int, target: Int = 0) -> Seg {
@@ -826,8 +877,9 @@ enum SeqBuilder {
             for it in p.seq {
                 let d = it.detail(div)
                 let key = SegKey.of(icon: it.icon, detail: d)
+                // 최고 기록이 아직 없으면 0 (= 비교 안 함). 예전에는 기본 목표와 비교해서 헷갈렸음
                 o.append(Seg(icon: it.icon, name: it.name(), detail: d, kind: it.icon == "run" ? .run : .st,
-                             target: bests[key] ?? defaultTarget(icon: it.icon, detail: d)))
+                             target: bests[key] ?? 0))
             }
         }
         return o
@@ -835,7 +887,19 @@ enum SeqBuilder {
 }
 
 enum SegKey {
-    static func of(icon: String, detail: String) -> String { icon == "run" ? "run|\(detail)" : icon }
+    /// 러닝은 거리, 스테이션은 무게·거리까지 넣어 구분 (예: "sledPush|50M · 152KG")
+    static func of(icon: String, detail: String) -> String { "\(icon)|\(detail)" }
+
+    /// 최고 기록으로 써도 되는 시간인지 (너무 빠른 시험용 탭은 빼기)
+    /// 러닝: 1KM 2:30 기준으로 거리 비례 · 스테이션: 30초 · 인터벌: 제외
+    static func plausible(icon: String, detail: String, time: Int) -> Bool {
+        if icon == "hiit" { return false }
+        if icon == "run" {
+            let m = runMeters(detail)
+            return Double(time) >= Double(Record.minRun) * m / 1000
+        }
+        return time >= Record.minStation
+    }
 }
 
 // MARK: - 아이폰 → 워치

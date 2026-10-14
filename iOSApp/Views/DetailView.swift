@@ -100,9 +100,21 @@ struct DetailView: View {
                 RouteMap(route: route)
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                // 62번: 러닝 카드 — 높이 그래프 (높이를 잰 경로만) · 같은 코스 바퀴 (3바퀴 이상)
+                if rec.mode == .training && rec.isRunKind {
+                    if route.filter({ $0.h != nil }).count >= 2 {
+                        ElevationCard(route: route, ascent: rec.ascent)
+                    }
+                    if let laps = RunLaps.laps(route) {
+                        LapsCard(laps: laps)
+                    }
+                }
             }
             if rec.mode == .pft { pftCard(rec) }
             tilesGrid(rec)
+            // 55번: 이 기록의 숫자로 고른 분석 2~4줄
+            let ins: [Insight] = Insights.make(rec, store: store)
+            if !ins.isEmpty { InsightsCard(items: ins) }
             if showsPartner(rec) {
                 SectionLabel(text: "PARTNER", top: 20)
                 partnerRow(rec)
@@ -124,8 +136,16 @@ struct DetailView: View {
             }
             Group {
                 // SPLITS 라벨: margin 20px 4px 0
-                SectionLabel(text: "SPLITS", top: 20)
+                HStack(alignment: .firstTextBaseline) {
+                    SectionText("SPLITS")
+                    Spacer(minLength: 8)
+                    if rec.mode == .training {
+                        Text("VS YOUR BEST").font(F.t(11, .semibold)).tracking(0.6).foregroundStyle(C.text3).lineLimit(1)
+                    }
+                }
+                .padding(.top, 20).padding(.horizontal, 4)
                 splits(rec)
+                BenchSection(rec: rec)
             }
 
             deleteCard(rec).padding(.top, 10)
@@ -271,16 +291,54 @@ struct DetailView: View {
         let vs = store.vs(rec)
         let pace: String = rec.runPace.map { Fm.t($0) } ?? "--:--"
         // PFT 는 총 시간·최고 기록 대비를 위의 큰 카드(pftCard)가 보여 줌
-        let head: [DetailTile] = rec.mode == .pft ? [] : [
-            DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear),
-            DetailTile(label: vs.word, value: vs.value.map(Fm.d) ?? "--:--", unit: "", color: deltaColor(vs.value), unitColor: .clear),
-        ]
+        let head: [DetailTile]
+        if rec.mode == .pft {
+            head = []
+        } else if rec.mode == .training {
+            // 64번: VS BEST 는 풀 시뮬 · 레이스에서만. 러닝은 거리, 그 외 트레이닝은 구간 수
+            let second: DetailTile = rec.isRunKind
+                ? DetailTile(label: "DISTANCE", value: String(format: "%.2f", rec.runDistance / 1000), unit: "KM", color: .white, unitColor: C.text2)
+                : DetailTile(label: "SEGMENTS", value: "\(rec.mainSegs.count)", unit: "", color: .white, unitColor: .clear)
+            head = [DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear), second]
+        } else {
+            head = [
+                DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear),
+                DetailTile(label: vs.word, value: vs.value.map(Fm.d) ?? "--:--", unit: "", color: deltaColor(vs.value), unitColor: .clear),
+            ]
+        }
         return head + [
             DetailTile(label: "AVG HR", value: rec.avgHR > 0 ? "\(rec.avgHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "MAX HR", value: rec.maxHR > 0 ? "\(rec.maxHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "CALORIES", value: grouped(rec.kcal), unit: "KCAL", color: .white, unitColor: C.text2),
             DetailTile(label: "RUN PACE", value: pace, unit: "/KM", color: .white, unitColor: C.text2),
-        ] + repTiles(rec)
+        ] + runTiles(rec) + repTiles(rec) + bestTiles(rec)
+    }
+
+    /// 62번: 러닝 기록 — 평균 케이던스 · 보폭 · 오른 높이 (잰 값이 있을 때만)
+    private func runTiles(_ rec: Record) -> [DetailTile] {
+        guard rec.mode == .training, rec.isRunKind else { return [] }
+        var out: [DetailTile] = []
+        if let c = rec.cadence {
+            out.append(DetailTile(label: "AVG CADENCE", value: "\(c)", unit: "SPM", color: .white, unitColor: C.text2))
+        }
+        if let s = rec.stride {
+            out.append(DetailTile(label: "STRIDE", value: String(format: "%.2f", s), unit: "M", color: .white, unitColor: C.text2))
+        }
+        if let a = rec.ascent {
+            out.append(DetailTile(label: "ASCENT", value: "\(Int(a.rounded()))", unit: "M", color: .white, unitColor: C.text2))
+        }
+        return out
+    }
+
+    /// 64번: 러닝 기록 — 이번에 뛴 정해진 거리(1 km · 5 km · 10 km · 하프 · 풀)의 가장 빠른 시간. 최고 기록이면 ★ PB
+    private func bestTiles(_ rec: Record) -> [DetailTile] {
+        guard rec.mode == .training, rec.isRunKind else { return [] }
+        let pbs: Set<Double> = Set(store.runPBs(rec))
+        return RunPB.distances.compactMap { d in
+            guard let t = rec.bestEffort(d.m) else { return nil }
+            let pb: Bool = pbs.contains(d.m)
+            return DetailTile(label: d.label, value: Fm.t(t), unit: pb ? "★ PB" : "", color: .white, unitColor: pb ? C.accent : .clear)
+        }
     }
 
     /// 스키 · 로잉 · 월볼 횟수 카드 (워치로 기록해 횟수가 있을 때만).
@@ -435,7 +493,7 @@ struct DetailView: View {
             ("Total", rec.total, f.total),
             ("Runs", rec.runTotal, frRuns),
             ("Stations", rec.stationTotal, frSt),
-            ("Roxzone", rec.roxTotal, 8 * Defaults.roxTarget),
+            ("Roxzone", rec.roxTotal, 8 * store.settings.roxTarget),
         ]
     }
 
@@ -655,14 +713,25 @@ struct DetailView: View {
     }
 
     private func splitRow(_ rec: Record, _ s: SegResult, last: Bool) -> some View {
-        let d = s.time - s.target
+        // 트레이닝: 그 구간 내 최고 기록과 비교. 최고 기록이 없었거나(0) 예전 잘못된 값이면 비교 안 함
+        // 64번: 러닝 기록은 목표가 없어서 '시간 − 0'(+5:48 등)이 나왔음 → 내 평균 페이스 대비 (빠르면 초록, 느리면 빨강)
+        let runAvg: Int? = (rec.mode == .training && rec.isRunKind && s.kind == .run) ? rec.avgKmPace : nil
+        let showDelta: Bool = runAvg != nil || rec.mode != .training
+            || (s.target > 0 && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.target))
+        let d: Int = runAvg.map { rec.pace(s) - $0 } ?? (s.time - s.target)
         let first: String = s.kind == .run ? "\(Fm.t(rec.pace(s))) /KM" : s.detail
         let bpm: String = s.hr.map { String($0) } ?? "--"
         // 스키 · 로잉 · 월볼: 워치가 팔 움직임으로 센 횟수를 참고용으로 덧붙임 ("~" = 짐작값, 한국어 "약")
         let reps: String = s.reps.map { n in
             " · " + (s.icon == "wallBalls" ? String(localized: "~\(n) reps") : String(localized: "~\(n) strokes"))
         } ?? ""
-        let sub = "\(first) · \(bpm) BPM" + reps
+        // 62번: 러닝 기록 — 그 km 의 케이던스 · 오른 높이 ("+18 m", 1 m 이상일 때만)
+        var runExtra: String = ""
+        if rec.mode == .training && rec.isRunKind && s.kind == .run {
+            if let c = s.cad { runExtra += " · \(c) SPM" }
+            if let u = s.up, u >= 1 { runExtra += " · +\(Int(u.rounded())) m" }
+        }
+        let sub = "\(first) · \(bpm) BPM" + reps + runExtra
         return HStack(spacing: 12) {
             Icon8(s.icon, 24, tint: s.kind == .run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 1) {
@@ -673,7 +742,8 @@ struct DetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
                 Text(Fm.t(s.time)).font(F.num(17)).tracking(-0.01 * 17).lineLimit(1)
-                Text(Fm.d(d)).font(F.num(11)).foregroundStyle(deltaColor(d)).lineLimit(1)
+                Text(showDelta ? Fm.d(d) : "–").font(F.num(11))
+                    .foregroundStyle(showDelta ? deltaColor(d) : C.text3).lineLimit(1)
             }
             .fixedSize()
         }
@@ -864,12 +934,28 @@ struct PartnerSheet: View {
 
 struct RouteMap: View {
     let route: [RoutePt]
-    private var coords: [CLLocationCoordinate2D] { route.map { CLLocationCoordinate2D(latitude: $0.a, longitude: $0.o) } }
+    private let coords: [CLLocationCoordinate2D]
+    /// 62번: 속도별 색 토막 (경로 점에 시간이 있을 때만, 없으면 nil → 노란 한 줄)
+    private let chunks: [RouteChunk]?
+
+    init(route: [RoutePt]) {
+        self.route = route
+        coords = route.map { CLLocationCoordinate2D(latitude: $0.a, longitude: $0.o) }
+        chunks = RouteSpeed.chunks(route)
+    }
 
     var body: some View {
         Map(initialPosition: .rect(RouteMap.rect(coords)), interactionModes: [.zoom, .pan]) {
-            MapPolyline(coordinates: coords)
-                .stroke(C.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+            if let ch = chunks {
+                // 느린 곳은 어두운 노랑, 빠른 곳은 밝은 노랑
+                ForEach(ch) { c in
+                    MapPolyline(coordinates: c.cs)
+                        .stroke(c.color, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                }
+            } else {
+                MapPolyline(coordinates: coords)
+                    .stroke(C.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+            }
             if let a = coords.first {
                 Annotation("", coordinate: a) { Circle().fill(Color.white).frame(width: 10, height: 10) }
             }
@@ -879,6 +965,7 @@ struct RouteMap: View {
         }
         .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
         .environment(\.colorScheme, .dark)
+        .overlay(alignment: .bottomLeading) { if chunks != nil { RouteSpeedLegend() } }
         .accessibilityIdentifier("detail.route")
     }
 

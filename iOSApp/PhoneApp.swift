@@ -4,7 +4,27 @@ import Observation
 
 @main
 struct Splits8App: App {
-    init() { Store.shared.activate() }
+    init() {
+        Store.shared.activate()
+        WatchMirror.shared.setUp()          // 52번: 워치가 운동을 아이폰에 같이 보여 줄 때
+        if Demo.enabled && CommandLine.arguments.contains("--mirror") {
+            WatchMirror.shared.demoStart()
+            Router.shared.scr = .watchLive
+        }
+        if Demo.enabled && CommandLine.arguments.contains("--widgets") { Router.shared.scr = .widgets }
+        // 빌드 24 화면 확인: 새 가입 흐름 (닉네임 1 / 5 → 프로필 2~5 / 5)
+        if Demo.enabled && CommandLine.arguments.contains("--nickflow") {
+            Router.shared.profileDotOffset = 1
+            Router.shared.scr = .nick
+        }
+        if Demo.enabled && CommandLine.arguments.contains("--profile") {
+            Router.shared.startProfile(next: .home, offset: 1)
+        }
+        if Demo.enabled, let a = CommandLine.arguments.first(where: { $0.hasPrefix("--finish=") }) {
+            let kind = String(a.dropFirst("--finish=".count))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { Demo.showFinish(kind) }
+        }
+    }
     var body: some Scene {
         WindowGroup {
             LaunchGate {
@@ -45,8 +65,11 @@ enum Scr: String {
     case home, training, builder, sim, race, settings
     case setHr, setDiv, setRun, setGoals, setEvent, friends
     case auth, code, nick, findEvent, account
+    case profileSetup       // 빌드 23: 가입 프로필 (성별 · 키/몸무게 · 태어난 해 · 대회 경험) — ProfileViews.swift
     case detail, share
     case phoneLive          // 워치 없이 아이폰으로 기록 (PhoneLiveView)
+    case watchLive          // 워치 운동을 아이폰에서 같이 보기 (52번 · WatchLiveView)
+    case widgets            // 화면 확인용: 위젯 · 잠금 화면 미리보기 (--demo 에서만)
 }
 
 /// 운동 예약 시트 요청 (달력 날짜 / 홈 UPCOMING 에서 엶)
@@ -68,13 +91,15 @@ struct PhoneRunRequest: Equatable {
     var mode: Mode
     var program: Program? = nil        // 트레이닝이면 프로그램
     var from: Scr = .home              // 끝나면 / 취소하면 돌아갈 화면
+    /// 빌드 24: 앱이 꺼졌다 켜졌을 때 저장해 둔 기록 이어 받기 (phone_run.json)
+    var resume: Bool = false
 }
 
 /// 화면 이동 (시안의 screen 상태와 같은 구조)
 @Observable
 final class Router {
     static let shared = Router()
-    var scr: Scr = Store.shared.settings.hasOnboarded ? .home : .splash
+    var scr: Scr = Router.launchResume != nil ? .phoneLive : (Store.shared.settings.hasOnboarded ? .home : .splash)
     var detail: Record?
     var detailFrom: Scr = .race
     /// Division · 심박 화면을 어디서 열었는지 (돌아갈 곳)
@@ -118,6 +143,12 @@ final class Router {
     var email = ""
     var code = ""
     var nickDraft = ""
+    /// 빌드 23 가입 프로필: 시작 단계(1~4) · 끝나면 갈 화면 · 프로필 화면에서 한 항목만 고치는 중인지
+    var profileStep = 1
+    var profileNext: Scr = .home
+    var profileEdit = false
+    /// 빌드 24: 가입 단계 점 앞에 닉네임 단계가 있으면 1 (1 / 5 … 5 / 5)
+    var profileDotOffset = 0
 
     // 대회 편집
     var evDraft: RaceEvent? = nil
@@ -151,6 +182,12 @@ final class Router {
         planRequest = PlanRequest(date: date, mode: mode, existing: existing)
     }
 
+    // 운동 끝 카드 (51번): 지금 띄운 기록 · 앱이 뒤에 있을 때 도착해 기다리는 워치 기록
+    var finish: Record? = nil
+    var pendingFinish: Record? = nil
+    /// 워치 운동을 아이폰에 같이 보여 주는 중 (52번)
+    var liveMirror = false
+
     // 사진 크게 보기 (nil 이면 닫힘)
     var photoView: PhotoItem? = nil
 
@@ -158,7 +195,14 @@ final class Router {
     var bonus: BonusRequest? = nil
 
     // 아이폰으로 기록
-    var phoneRun: PhoneRunRequest? = nil
+    var phoneRun: PhoneRunRequest? = Router.launchResume
+
+    /// 빌드 24: 아이폰으로 기록하던 중 앱이 꺼졌으면, 켤 때 그 기록 화면으로 바로
+    static let launchResume: PhoneRunRequest? = {
+        guard !Demo.enabled, Store.shared.settings.hasOnboarded, let s = PhoneRunEngine.pendingSnapshot() else { return nil }
+        return PhoneRunRequest(mode: s.mode, program: nil, from: Scr(rawValue: s.from) ?? .home, resume: true)
+    }()
+
     func startOnPhone(_ mode: Mode, program: Program? = nil) {
         phoneRun = PhoneRunRequest(mode: mode, program: program, from: scr)
         go(.phoneLive)
@@ -348,10 +392,12 @@ extension Scr {
         case .auth: return .y(0.22, 1.2, 0.55, 0.5, 0)
         case .code: return .y(0.18, 1.2, 0.55, 0.5, 0.2)
         case .nick: return Ambient(hex: 0x30D158, alpha: 0.14, rx: 1.2, ry: 0.55, cx: 0.5, cy: 0.2)
+        case .profileSetup: return .y(0.20, 1.2, 0.55, 0.5, 0.2)
         case .findEvent: return .y(0.22, 1.3, 0.5, 0.5, 0)
         case .account: return .y(0.18, 1.2, 0.5, 0.5, 0)
         case .splash: return .none
         case .phoneLive: return .y(0.18, 1.3, 0.5, 0.5, 0)
+        case .watchLive, .widgets: return .none
         }
     }
 
@@ -382,6 +428,7 @@ extension Scr {
 
 struct PhoneRoot: View {
     let r = Router.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var edgeDrag: CGFloat = 0
 
     /// 왼쪽 끝에서 밀어 뒤로: 화면 안 ‹/Cancel 이 등록한 동작, 없으면 고정 바의 뒤로
@@ -481,7 +528,37 @@ struct PhoneRoot: View {
                     .preferredColorScheme(.dark)
             }
         }
+        .sheet(item: Binding(get: { r.finish }, set: { r.finish = $0 })) { rec in
+            FinishSheet(rec: rec)
+                .presentationDetents([.height(440), .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(hex: 0x1C1C1E))
+                .preferredColorScheme(.dark)
+        }
+        .onChange(of: scenePhase) { _, p in
+            if p == .active {
+                WatchMirror.shared.appBecameActive()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { r.flushFinish() }
+            }
+        }
         .modifier(IncomingTrainingAlerts())
+        // 빌드 23: 앱이 앞에 있는 동안 — 다른 기기 로그인 확인(3분마다) · 업데이트 뒤 프로필 한 번 묻기
+        .task(id: scenePhase == .active) {
+            guard scenePhase == .active, !Demo.enabled else { return }
+            await Store.shared.checkDevice()
+            await r.askProfileIfNeeded()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 180_000_000_000)
+                if Task.isCancelled { break }
+                await Store.shared.checkDevice()
+            }
+        }
+        .alert("Signed out because this account signed in on another device.",
+               isPresented: Binding(get: { Store.shared.signedOutElsewhere }, set: { Store.shared.signedOutElsewhere = $0 })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your records stay on this iPhone. Sign in again to use friends and leaderboards here.")
+        }
     }
 
     @ViewBuilder private var screen: some View {
@@ -505,11 +582,14 @@ struct PhoneRoot: View {
         case .auth: AuthView()
         case .code: CodeView()
         case .nick: NickView()
+        case .profileSetup: ProfileSetupView()
         case .findEvent: Scroll8 { FindEventView() }
         case .account: Scroll8 { AccountView() }
         case .detail: Scroll8 { DetailView() }
         case .share: Scroll8(bottom: 40) { ShareView() }
         case .phoneLive: PhoneLiveView()
+        case .watchLive: WatchLiveView()
+        case .widgets: Scroll8(bottom: 40) { WidgetPreviewView() }
         }
     }
 }

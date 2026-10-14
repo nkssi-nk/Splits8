@@ -65,7 +65,7 @@ struct ShareData {
 
     /// 스테이션 이름 옆에 붙는 사양: "50M · 152KG" · "1K" · "100 REPS · 6KG". 사양이 아닌 말(INTERVAL 등)은 뺌
     static func spec(_ detail: String) -> String {
-        let skip: Set<String> = ["INTERVAL", "TRANSITION", ""]
+        let skip: Set<String> = ["INTERVAL", "TRANSITION", "Transition", "Interval", ""]
         let parts: [String] = detail.components(separatedBy: " · ")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !skip.contains($0.uppercased()) && $0.lowercased() != "shared" }
@@ -102,7 +102,7 @@ struct ShareCard: View {
     /// Text color: Black (Poster 전체 · Ticket 사진 위 워드마크·닉네임). Block 은 무시
     var textBlack = false
     /// Black & white photo
-    var mono = true
+    var mono = false
     /// Dark gradient (끄면 Poster 사진이 화면 전체 + 스플릿 표 뒤에 흐린 유리판)
     var gradient = true
     /// "" 이면 닉네임 숨김 (@ 없이 넘김)
@@ -1003,7 +1003,7 @@ struct ShareView: View {
     @State private var variant = "poster"
     @State private var splits = true
     @State private var textColor = "white"     // white / black
-    @State private var mono = true             // Black & white photo
+    @State private var mono = false            // Black & white photo
     @State private var gradient = true         // Dark gradient
     @State private var nickOn = true           // Nickname
     @State private var pick: PhotosPickerItem?

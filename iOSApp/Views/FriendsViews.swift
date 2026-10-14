@@ -13,6 +13,10 @@ struct FriendsView: View {
     @State private var blockAsk: BlockedUser?
     /// 메일 앱을 열 수 없을 때 주소 안내
     @State private var mailFail = false
+    /// 빌드 24: 친구 10명이 다 참
+    @State private var limitAlert = false
+    /// 빌드 24: 응원 보낼 친구 (시트)
+    @State private var cheerTo: Friend?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -35,6 +39,19 @@ struct FriendsView: View {
                 signUpCard
             }
 
+            requestsSection
+            cheersSection
+
+            if store.signedIn {
+                HStack(alignment: .firstTextBaseline) {
+                    SectionText("MY FRIENDS")
+                    Spacer(minLength: 0)
+                    Text(verbatim: "\(store.friendCount) / \(Friend.freeLimit)")
+                        .font(F.num(13)).foregroundStyle(store.friendsFull ? C.accent : C.text2)
+                        .accessibilityIdentifier("friends.count")
+                }
+                .padding(.top, 14).padding(.horizontal, 4)
+            }
             Note8(text: "The selected friend's records are used as the Full Simulation comparison and as Training split targets.", color: C.text2)
                 .padding(.bottom, 4)
             if !store.friends.isEmpty {
@@ -46,10 +63,25 @@ struct FriendsView: View {
                 .card8()
             }
             Note8(text: "Tap to compare · Tap again to clear · VS is against your best")
+            sentSection
             blockedSection
         }
         .padding(.horizontal, 16)
         .task { await store.refreshSocial() }
+        .onAppear {
+            // 받은 응원은 화면을 열고 잠깐 뒤 읽음으로 (빨간 점이 바로 사라지지 않게)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { store.markCheersSeen() }
+        }
+        .sheet(item: $cheerTo) { f in
+            CheerSheet(friend: f)
+                .presentationDetents([.height(430)])
+                .presentationBackground(Color(hex: 0x1C1C1E))
+        }
+        .alert(String(localized: "You can add up to \(Friend.freeLimit) friends"), isPresented: $limitAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Remove a friend or cancel a request to add someone new.")
+        }
         .alert("Block this user?", isPresented: Binding(get: { blockAsk != nil }, set: { if !$0 { blockAsk = nil } })) {
             Button("Block user", role: .destructive) {
                 if let b = blockAsk {
@@ -99,6 +131,125 @@ struct FriendsView: View {
         UIApplication.shared.open(u) { ok in if !ok { mailFail = true } }
     }
 
+    // MARK: 친구 요청 (빌드 22) — 수락해야 친구가 되고, 그 뒤에만 서로 기록이 보임
+
+    /// 받은 요청: Accept (노랑) · Decline (흰 0.12)
+    @ViewBuilder private var requestsSection: some View {
+        let list: [FriendReq] = store.incoming
+        if store.signedIn && !list.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                SectionText("REQUESTS")
+                CountBadge(n: list.count)
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 14).padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, q in
+                    HStack(spacing: 12) {
+                        FriendAvatar(url: q.avatarUrl, ini: String(q.name.prefix(1)).uppercased(), size: 34)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("@" + q.name).font(F.t(15, .semibold)).lineLimit(1)
+                            Text(q.div).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        pill("Decline", yellow: false) { withAnimation(.easeOut(duration: 0.2)) { store.respond(q, accept: false) } }
+                            .accessibilityIdentifier("friends.decline")
+                        pill("Accept", yellow: true) {
+                            if store.friendsFull { limitAlert = true; return }
+                            withAnimation(.easeOut(duration: 0.2)) { store.respond(q, accept: true) }
+                        }
+                            .accessibilityIdentifier("friends.accept")
+                    }
+                    .padding(.vertical, 12).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+            Note8(text: "Records are shared only after you accept.")
+        }
+    }
+
+    /// 빌드 24: 받은 응원 (최근 8개) — 누가 · 뭘 · 언제
+    @ViewBuilder private var cheersSection: some View {
+        let list: [CheerRow] = Array(store.cheers.prefix(8))
+        if store.signedIn && !list.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                SectionText("CHEERS")
+                if store.unseenCheers > 0 {
+                    Circle().fill(C.bad).frame(width: 8, height: 8).accessibilityIdentifier("friends.cheerDot")
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 14).padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, c in
+                    let k: CheerKind = CheerKind(rawValue: c.kind) ?? .clap
+                    HStack(spacing: 12) {
+                        FriendAvatar(url: c.avatar_url, ini: String(c.nickname.prefix(1)).uppercased(), size: 34)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("@" + c.nickname).font(F.t(15, .semibold)).lineLimit(1)
+                            Text(k.isEmoji ? String(localized: "Sent you \(k.emoji)") : k.emoji + " " + k.line.l10n)
+                                .font(F.t(13)).foregroundStyle(c.seen ? C.text2 : .white).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(Self.ago(c.created_at)).font(F.t(12)).foregroundStyle(C.text3).lineLimit(1)
+                        if !c.seen { Circle().fill(C.bad).frame(width: 6, height: 6) }
+                    }
+                    .padding(.vertical, 11).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+        }
+    }
+
+    /// 방금 · 5분 · 3시간 · 2일
+    static func ago(_ d: Date) -> String {
+        let s: Int = max(0, Int(Date().timeIntervalSince(d)))
+        if s < 60 { return String(localized: "now") }
+        if s < 3600 { return String(localized: "\(s / 60)m") }
+        if s < 86400 { return String(localized: "\(s / 3600)h") }
+        return String(localized: "\(s / 86400)d")
+    }
+
+    /// 보낸 요청: 상대가 수락할 때까지 기다림 · Cancel 로 취소
+    @ViewBuilder private var sentSection: some View {
+        let list: [FriendReq] = store.outgoing
+        if store.signedIn && !list.isEmpty {
+            SectionLabel(text: "SENT", top: 14)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, q in
+                    HStack(spacing: 12) {
+                        FriendAvatar(url: q.avatarUrl, ini: String(q.name.prefix(1)).uppercased(), size: 34)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("@" + q.name).font(F.t(15, .semibold)).lineLimit(1)
+                            Text(q.div + " · " + "Requested".l10n).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        pill("Cancel", yellow: false) { withAnimation(.easeOut(duration: 0.2)) { store.cancelRequest(q) } }
+                            .accessibilityIdentifier("friends.cancelRequest")
+                    }
+                    .padding(.vertical, 12).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+            Note8(text: "They'll see your request in Friends. Records are shared once they accept.")
+        }
+    }
+
+    /// 32 높이 알약 버튼
+    private func pill(_ title: String, yellow: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title.l10n).font(F.t(13, .semibold))
+                .foregroundStyle(yellow ? Color.black : .white)
+                .padding(.horizontal, 14).frame(height: 32)
+                .background(yellow ? C.accent : Color.white.opacity(0.12), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(Press(scale: 0.96))
+    }
+
     /// 차단한 사람 목록 (Unblock 으로 풂)
     @ViewBuilder private var blockedSection: some View {
         let list: [BlockedUser] = store.settings.blocked
@@ -143,7 +294,11 @@ struct FriendsView: View {
 
     /// 검색 결과: 34 원 · @닉네임 15/600 · 체급 13 · Add (32 높이 노랑) / Requested (흰 0.12, 회색)
     private func hitCard(_ h: RemoteProfile, _ n: String) -> some View {
-        let req = store.requested.contains(h.id) || store.friends.contains { $0.id == h.id }
+        let isFriend: Bool = store.friends.contains { $0.id == h.id }
+        let got: FriendReq? = store.incoming.first { $0.id == h.id }
+        let req = store.requested.contains(h.id) || isFriend || store.outgoing.contains { $0.id == h.id }
+        let title: String = got != nil ? "Accept" : isFriend ? "Friends" : req ? "Requested" : "Add"
+        let yellow: Bool = got != nil || !req
         return HStack(spacing: 12) {
             FriendAvatar(url: h.avatar_url, ini: String(n.prefix(1)).uppercased(), size: 34)
                 .photoTap(h.avatar_url.map { PhotoItem(url: $0, title: "@" + n, sub: h.division ?? "") })
@@ -152,15 +307,18 @@ struct FriendsView: View {
                 Text(h.division ?? "").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button { add(h) } label: {
-                Text(req ? "Requested" : "Add").font(F.t(13, .semibold))
-                    .foregroundStyle(req ? C.text2 : Color.black)
+            Button {
+                if store.friendsFull { limitAlert = true; return }
+                if let got { store.respond(got, accept: true) } else { add(h) }
+            } label: {
+                Text(title.l10n).font(F.t(13, .semibold))
+                    .foregroundStyle(yellow ? Color.black : C.text2)
                     .padding(.horizontal, 14).frame(height: 32)
-                    .background(req ? Color.white.opacity(0.12) : C.accent, in: Capsule())
+                    .background(yellow ? C.accent : Color.white.opacity(0.12), in: Capsule())
                     .contentShape(Capsule())
             }
             .buttonStyle(Press(scale: 0.96))
-            .disabled(req)
+            .disabled(got == nil && req)
             .accessibilityIdentifier("friends.add")
             moreMenu(id: h.id, name: n)
         }
@@ -197,6 +355,15 @@ struct FriendsView: View {
           }
           .buttonStyle(.plain)
           .accessibilityIdentifier("friend." + f.name)
+          // 빌드 24: 응원 보내기 (정해진 이모지 · 문구만)
+          Button { cheerTo = f } label: {
+              Image(systemName: "hands.clap.fill").font(.system(size: 15, weight: .semibold))
+                  .foregroundStyle(C.accent)
+                  .frame(width: 36, height: 44)
+                  .contentShape(Rectangle())
+          }
+          .buttonStyle(Press(scale: 0.9))
+          .accessibilityIdentifier("friends.cheer")
           moreMenu(id: f.id, name: f.name)
               .padding(.trailing, 6)
         }
@@ -248,6 +415,91 @@ struct FriendsView: View {
         Task {
             try? await store.sb.addFriend(p.id)
             await store.refreshSocial()
+        }
+    }
+}
+
+/// 받은 친구 요청 개수 (노란 동그라미, 검은 숫자)
+struct CountBadge: View {
+    let n: Int
+    var body: some View {
+        if n > 0 {
+            Text("\(n)").font(F.num(12, .semibold)).foregroundStyle(.black)
+                .padding(.horizontal, 6).frame(minWidth: 20, minHeight: 20)
+                .background(C.accent, in: Capsule())
+                .fixedSize()
+                .accessibilityIdentifier("friends.badge")
+        }
+    }
+}
+
+/// 빌드 24: 응원 고르기 (이모지 3개 + 문구 4개). 누르면 바로 보냄
+struct CheerSheet: View {
+    let friend: Friend
+    let store = Store.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var sending = false
+    @State private var sent = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Capsule().fill(Color.white.opacity(0.25)).frame(width: 36, height: 5).padding(.top, 8)
+            Text(String(localized: "Cheer @\(friend.name)")).font(F.t(20, .semibold)).lineLimit(1)
+            if sent {
+                Spacer()
+                Check8(color: C.good, size: 44)
+                Text("Sent!").font(F.t(17, .semibold))
+                Spacer()
+            } else {
+                HStack(spacing: 12) {
+                    ForEach(CheerKind.allCases.filter(\.isEmoji)) { k in
+                        Button { send(k) } label: {
+                            Text(k.emoji).font(.system(size: 34))
+                                .frame(maxWidth: .infinity).frame(height: 72)
+                                .background(C.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(Press(scale: 0.94))
+                        .accessibilityIdentifier("cheer.\(k.rawValue)")
+                    }
+                }
+                VStack(spacing: 0) {
+                    let lines = CheerKind.allCases.filter { !$0.isEmoji }
+                    ForEach(Array(lines.enumerated()), id: \.element) { i, k in
+                        Button { send(k) } label: {
+                            HStack(spacing: 10) {
+                                Text(k.emoji).font(.system(size: 18))
+                                Text(k.line.l10n).font(F.t(16)).foregroundStyle(.white)
+                                Spacer()
+                            }
+                            .padding(.vertical, 12).padding(.horizontal, 16)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .rowLine(i < lines.count - 1)
+                        .accessibilityIdentifier("cheer.\(k.rawValue)")
+                    }
+                }
+                .card8()
+                if let error { Text(error).font(F.t(13)).foregroundStyle(C.bad).multilineTextAlignment(.center) }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 20)
+        .disabled(sending)
+    }
+
+    private func send(_ k: CheerKind) {
+        sending = true; error = nil
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Task {
+            let e: String? = await store.sendCheer(k, to: friend)
+            sending = false
+            if let e { error = e; return }
+            withAnimation(.spring(duration: 0.3)) { sent = true }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            dismiss()
         }
     }
 }

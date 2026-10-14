@@ -43,6 +43,49 @@ enum Demo {
          LBRow(user_id: "demo.3", nickname: "taeyang", division: "Pro Men", avatar_url: nil, t: 4930)]
     }
 
+    /// 친구 예시 (--friends): 수락된 친구 2명
+    static func friends() -> [Friend] {
+        [Friend(id: "demo.1", name: "jiho", div: "Open Men", date: "20 Sep 2026",
+                splits: Defaults.goals.map { max(30, $0 - 8) }),
+         Friend(id: "demo.2", name: "minseo", div: "Open Women", date: "", splits: [])]
+    }
+
+    /// 받은 응원 예시 (--friends)
+    static func cheers() -> [CheerRow] {
+        let now = Date()
+        return [CheerRow(id: 3, sender: "demo.1", nickname: "jiho", avatar_url: nil, kind: "pb", created_at: now.addingTimeInterval(-600), seen: false),
+                CheerRow(id: 2, sender: "demo.2", nickname: "minseo", avatar_url: nil, kind: "fire", created_at: now.addingTimeInterval(-7200), seen: false),
+                CheerRow(id: 1, sender: "demo.1", nickname: "jiho", avatar_url: nil, kind: "race", created_at: now.addingTimeInterval(-90000), seen: true)]
+    }
+
+    /// 친구 요청 예시 (--friends): 받은 요청 1 · 보낸 요청 1
+    static func requests() -> [FriendReq] {
+        [FriendReq(id: "demo.4", name: "hana", div: "Open Women", avatarUrl: nil, incoming: true),
+         FriendReq(id: "demo.5", name: "woojin", div: "Pro Men", avatarUrl: nil, incoming: false)]
+    }
+
+    /// 화면 확인용: 운동 끝 카드 (--finish=sim / pft / training / check)
+    static func showFinish(_ kind: String) {
+        let store = Store.shared
+        let r = Router.shared
+        var rec: Record?
+        switch kind {
+        case "pft": rec = store.records(.pft).first
+        case "training": rec = store.records(.training).first
+        case "run": rec = store.records(.training).first { $0.isRunKind }      // --demorun 과 같이
+        case "check":
+            if var x = store.records(.sim).first {
+                x.id = UUID()
+                x.date = Date()
+                if let i = x.segs.firstIndex(where: { $0.kind == .st }) { x.segs[i].time = 9 }
+                rec = x
+            }
+        default: rec = store.records(.sim).first
+        }
+        guard let rec else { return }
+        r.showFinish(rec, from: rec.mode == .training ? .training : rec.mode == .race ? .race : .sim)
+    }
+
     /// 기본 카드 2장 + 16구간짜리 한 장 (아이콘 한 줄 + "+13" 모양 확인용)
     static func programs() -> [Program] {
         let full: [ProgItem] = Station.all.flatMap { [ProgItem(icon: "run", run: "1KM"), ProgItem(icon: $0.key)] }
@@ -63,12 +106,12 @@ enum Demo {
             for i in 0..<8 {
                 let r = Int(Double(runs[i]) * scale), s = Int(Double(stT[i]) * scale)
                 segs.append(SegResult(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, time: r, target: 270, hr: 158 + (i % 3) * 3, dist: 1000))
-                segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, time: 18, target: 30, hr: 150, dist: nil))
+                segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, time: 18, target: 30, hr: 150, dist: nil))
                 let st = Station.all[i]
                 // 스키 · 로잉 · 월볼은 워치가 센 횟수(참고용)를 예시로 넣음
                 let reps: Int? = ["skiErg": 118, "row": 104, "wallBalls": 97][st.key]
                 segs.append(SegResult(icon: st.key, name: st.name, detail: st.detail(div), kind: .st, time: s, target: Defaults.stationGoals[i], hr: 165 + (i % 4) * 4, dist: nil, reps: reps))
-                if i < 7 { segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "TRANSITION", kind: .rox, time: 18, target: 30, hr: 150, dist: nil)) }
+                if i < 7 { segs.append(SegResult(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, time: 18, target: 30, hr: 150, dist: nil)) }
             }
             let fix = want - segs.map(\.time).reduce(0, +)
             if let li = segs.lastIndex(where: { $0.kind == .st }) { segs[li].time += fix }
@@ -107,6 +150,8 @@ enum Demo {
         out.append(training("Sled Intervals", "2026-09-24", 1822))
         out.append(training("Wall Ball Run", "2026-09-21", 2410))
         out.append(training("Sled Intervals", "2026-09-17", 1875))
+        // 62번: 러닝 카드 기록 (경로 높이 · 시간 · 케이던스). 다른 화면 숫자가 바뀌지 않게 `--demorun` 일 때만
+        if CommandLine.arguments.contains("--demorun") { out.append(runRecord()) }
         // PFT (Gold · Silver · Bronze 하나씩). `--nopft` 로 켜면 뺌 (처음 화면 확인용)
         if !CommandLine.arguments.contains("--nopft") {
             let base6: [Int] = [262, 236, 188, 245, 82, 295]       // 21:48
@@ -133,5 +178,50 @@ enum Demo {
             out.append(pft("2026-08-16", 1655))
         }
         return out
+    }
+
+    /// 62번 화면 확인용 러닝 기록: 공원 1 km 한 바퀴 코스를 6바퀴 (서울숲 근처).
+    /// 한쪽에 작은 언덕(4번째 km 는 조금 더 높게) · km 마다 페이스와 케이던스가 조금씩 다름 · 후반 케이던스가 떨어짐
+    static func runRecord() -> Record {
+        let lat0: Double = 37.5444, lon0: Double = 127.0374
+        let radius: Double = 1000 / (2 * .pi)                     // 한 바퀴 1 km
+        let kx: Double = 111_320 * cos(lat0 * .pi / 180)
+        let paces: [Int] = [298, 292, 295, 309, 290, 284]        // km 별 초 (4번째 km 가 언덕)
+        let cads: [Int] = [174, 175, 173, 168, 166, 165]
+        let hills: [Double] = [8, 8, 8, 15, 8, 8]
+        var route: [RoutePt] = []
+        var segs: [SegResult] = []
+        var t: Double = 0
+        for k in 0..<6 {
+            let n: Int = 100                                   // 10 m 마다 한 점
+            for j in 0..<n {
+                let ang: Double = Double(j) / Double(n) * 2 * .pi
+                let x: Double = radius * sin(ang), y: Double = radius - radius * cos(ang)
+                // 언덕: 바퀴 앞쪽 절반에서 올랐다가 내려옴 + 작은 흔들림
+                let hill: Double = ang < .pi ? hills[k] * sin(ang) : 0
+                let h: Double = 24 + hill + sin(Double(j) * 1.7) * 0.6
+                // 오르막에서는 느리게, 내리막에서는 빠르게 (같은 km 평균 페이스는 유지)
+                let slope: Double = ang < .pi ? cos(ang) : 0
+                let dt: Double = Double(paces[k]) / Double(n) * (1 + 0.18 * slope)
+                route.append(RoutePt(a: lat0 + y / 111_320, o: lon0 + x / kx, h: h, t: Int(t.rounded())))
+                t += dt
+            }
+            segs.append(SegResult(icon: "run", name: "KM \(k + 1)", detail: "1KM", kind: .run, time: paces[k], target: 0,
+                                  hr: 152 + k * 3, dist: 1000, cad: cads[k]))
+        }
+        if let first = route.first { route.append(RoutePt(a: first.a, o: first.o, h: first.h, t: Int(t.rounded()))) }
+        let total: Int = paces.reduce(0, +)
+        let start: Date = (Fm.ymd.date(from: "2026-09-27") ?? Date()).addingTimeInterval(7 * 3600 + 300)
+        var r = Record(mode: .training, title: "Easy 6K", sets: 1, date: start, total: total, segs: segs,
+                       hr: (0...30).map { HRPoint(t: $0 * total / 30, b: 138 + min(22, $0 * 2) + ($0 % 4) * 2) },
+                       kcal: 402, avgHR: 156, maxHR: 171, division: "openM", goal: nil, vsWord: "VS BEST", vsTarget: nil,
+                       complete: true)
+        r.kind = "run"
+        r.place = "Seongsu-dong, Seoul"
+        r.route = route
+        // 오르막 · 구간 오르막 · 보폭은 실제 기록과 같은 계산으로 (걸음 = 케이던스 × 시간)
+        let steps: [Double?] = segs.map { Double($0.cad ?? 0) * Double($0.time) / 60 }
+        RunMetrics.fill(&r, segSteps: steps, strideHK: nil)
+        return r
     }
 }

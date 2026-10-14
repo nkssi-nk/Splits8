@@ -68,7 +68,6 @@ targets:
         NSMotionUsageDescription: Splits8 uses motion data to count your steps and show your running cadence.
         # 빌드 22: 워치 운동을 잠금 화면 · 다이내믹 아일랜드에 (Live Activity) + 워치 운동 미러링을 뒤에서 받기
         NSSupportsLiveActivities: true
-        UIBackgroundModes: [workout-processing]
     entitlements:
       path: Resources/iOS/Splits8.entitlements
       properties:

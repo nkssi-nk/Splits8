@@ -117,7 +117,7 @@ struct DdaySmallView: View {
     var body: some View {
         if let d = snap.daysLeft(now), let name = snap.raceName {
             VStack(alignment: .leading, spacing: 0) {
-                WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "NEXT RACE")
+                WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "HYROX RACE")
                 Text(name).font(F.t(19, .semibold)).foregroundStyle(pal.fg).lineLimit(1).minimumScaleFactor(0.7)
                     .padding(.top, 6)
                 Text(raceDay(snap, d)).font(F.t(13)).foregroundStyle(pal.sub).lineLimit(1)
@@ -139,7 +139,7 @@ struct NoRaceView: View {
     @Environment(\.wpal) private var pal
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            WidgetFlagLabel(text: "NEXT RACE")
+            WidgetFlagLabel(text: "HYROX RACE")
             Spacer(minLength: 0)
             Text("Add a race").font(F.t(17, .semibold)).foregroundStyle(pal.fg)
             Text("Count down to race day.").font(F.t(12)).foregroundStyle(pal.sub).lineLimit(2)
@@ -157,7 +157,7 @@ struct DdayMediumView: View {
     var body: some View {
         if let d = snap.daysLeft(now), let name = snap.raceName {
             VStack(alignment: .leading, spacing: 0) {
-                WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "NEXT RACE")
+                WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "HYROX RACE")
                 Text(name).font(F.t(19, .semibold)).foregroundStyle(pal.fg).lineLimit(1).padding(.top, 6)
                 Text(raceDay(snap, d) + (snap.division.isEmpty ? "" : " · " + snap.division))
                     .font(F.t(13)).foregroundStyle(pal.sub).lineLimit(1)
@@ -329,7 +329,7 @@ struct DdayRectView: View {
         if let d = snap.daysLeft(now), let n = snap.raceName {
             HStack(alignment: .center, spacing: 6) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("NEXT RACE".l10n).font(.system(size: 10, weight: .semibold)).opacity(0.7)
+                    Text("HYROX RACE".l10n).font(.system(size: 10, weight: .semibold)).opacity(0.7)
                     Text(n).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                     Text(raceDay(snap, d)).font(.system(size: 12)).opacity(0.7).lineLimit(1)
                 }
@@ -338,7 +338,7 @@ struct DdayRectView: View {
             }
         } else {
             VStack(alignment: .leading) {
-                Text("NEXT RACE".l10n).font(.system(size: 10, weight: .semibold)).opacity(0.7)
+                Text("HYROX RACE".l10n).font(.system(size: 10, weight: .semibold)).opacity(0.7)
                 Text("Add a race".l10n).font(.system(size: 15, weight: .semibold))
             }
         }

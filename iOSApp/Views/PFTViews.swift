@@ -95,6 +95,10 @@ enum PFTText {
             return String(localized: "\(Fm.t(total - PFT.goldLimit + 1)) to Gold")
         case .bronze:
             return String(localized: "\(Fm.t(total - PFT.silverLimit)) to Silver")
+        case .iron:
+            return String(localized: "\(Fm.t(total - PFT.bronzeLimit)) to Bronze")
+        case .unranked:
+            return String(localized: "\(Fm.t(total - PFT.ironLimit)) to Iron")
         }
     }
 
@@ -103,7 +107,9 @@ enum PFTText {
         switch g {
         case .gold: return String(localized: "Gold is under 22:00")
         case .silver: return String(localized: "Silver is within 26:00")
-        case .bronze: return String(localized: "Bronze is over 26:00")
+        case .bronze: return String(localized: "Bronze is within 30:00")
+        case .iron: return String(localized: "Iron is within 35:00")
+        case .unranked: return String(localized: "Finish within 35:00 for Iron")
         }
     }
 
@@ -112,7 +118,9 @@ enum PFTText {
         switch g {
         case .gold: return String(localized: "Under 22:00")
         case .silver: return String(localized: "Within 26:00")
-        case .bronze: return String(localized: "Over 26:00")
+        case .bronze: return String(localized: "Within 30:00")
+        case .iron: return String(localized: "Within 35:00")
+        case .unranked: return String(localized: "Over 35:00")
         }
     }
 }
@@ -287,17 +295,25 @@ struct PFTMovesCard: View {
 struct PFTScale: View {
     let total: Int?
 
-    private static let goldEnd: CGFloat = 0.44
-    private static let silverEnd: CGFloat = 0.70
+    /// 칸 끝 위치 (Gold | Silver | Bronze | Iron | Unranked)
+    private static let ends: [CGFloat] = [0.30, 0.50, 0.68, 0.86, 1.0]
+    /// 칸 경계 시간(초): 12:00 · 22:00 · 26:00 · 30:00 · 35:00 · 40:00
+    private static let marks: [CGFloat] = [12 * 60, CGFloat(PFT.goldLimit), CGFloat(PFT.silverLimit),
+                                           CGFloat(PFT.bronzeLimit), CGFloat(PFT.ironLimit), 40 * 60]
 
-    /// 기록 위치 0…1 (Gold 12:00–22:00 · Silver 22:00–26:00 · Bronze 26:00–36:00)
+    /// 기록 위치 0…1
     static func pos(_ t: Int) -> CGFloat {
         let x: CGFloat = CGFloat(t)
-        let g: CGFloat = CGFloat(PFT.goldLimit), s: CGFloat = CGFloat(PFT.silverLimit)
-        let lo: CGFloat = 12 * 60, hi: CGFloat = 36 * 60
-        if x < g { return goldEnd * max(0, (x - lo) / (g - lo)) }
-        if x <= s { return goldEnd + (silverEnd - goldEnd) * (x - g) / (s - g) }
-        return silverEnd + (1 - silverEnd) * min(1, (x - s) / (hi - s))
+        var start: CGFloat = 0
+        for i in 0..<ends.count {
+            let a: CGFloat = marks[i], b: CGFloat = marks[i + 1]
+            if x <= b || i == ends.count - 1 {
+                let f: CGFloat = min(1, max(0, (x - a) / (b - a)))
+                return start + (ends[i] - start) * f
+            }
+            start = ends[i]
+        }
+        return 1
     }
 
     var body: some View {
@@ -320,16 +336,14 @@ struct PFTScale: View {
     }
 
     private func content(width w: CGFloat) -> some View {
-        let gw: CGFloat = w * Self.goldEnd
-        let sw: CGFloat = w * (Self.silverEnd - Self.goldEnd)
-        let bw: CGFloat = w - gw - sw
+        let widths: [CGFloat] = Self.ends.indices.map { w * (Self.ends[$0] - ($0 == 0 ? 0 : Self.ends[$0 - 1])) }
         let markerX: CGFloat = total.map { min(w - 4, max(0, w * Self.pos($0) - 2)) } ?? 0
         return VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .leading) {
                 HStack(spacing: 2) {
-                    bar(.gold, width: gw - 1)
-                    bar(.silver, width: sw - 2)
-                    bar(.bronze, width: bw - 1)
+                    ForEach(PFTGrade.allCases.indices, id: \.self) { i in
+                        bar(PFTGrade.allCases[i], width: widths[i] - 2)
+                    }
                 }
                 .clipShape(Capsule())
                 if total != nil {
@@ -341,9 +355,11 @@ struct PFTScale: View {
             }
             .frame(width: w, height: 18, alignment: .leading)
             HStack(spacing: 0) {
-                tick("Gold", width: gw)
-                tick("22:00 · Silver", width: sw)
-                tick("26:00 · Bronze", width: bw)
+                tick("Gold", width: widths[0])
+                tick("22:00", width: widths[1])
+                tick("26:00", width: widths[2])
+                tick("30:00", width: widths[3])
+                tick("35:00", width: widths[4])
             }
         }
     }

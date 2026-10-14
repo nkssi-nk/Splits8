@@ -21,11 +21,12 @@ enum Badges {
         Badge(id: "firstRace", group: "first", title: "Race day", sub: "Record your first HYROX race.", icon: "medal"),
         Badge(id: "firstPFT", group: "first", title: "First PFT", sub: "Finish your first PFT.", icon: "stopwatch"),
         Badge(id: "allStations", group: "first", title: "All 8 stations", sub: "Do every HYROX station at least once.", icon: "square.grid.3x3.fill"),
-        // ② 기록 넘기기
+        // ② 기록
         Badge(id: "sub130", group: "record", title: "Sub 1:30", sub: "Full Simulation or race under 1:30:00.", icon: "timer"),
         Badge(id: "sub120", group: "record", title: "Sub 1:20", sub: "Full Simulation or race under 1:20:00.", icon: "timer"),
         Badge(id: "sub110", group: "record", title: "Sub 1:10", sub: "Full Simulation or race under 1:10:00.", icon: "bolt.fill"),
         Badge(id: "sub100", group: "record", title: "Sub 1:00", sub: "Full Simulation or race under 1:00:00.", icon: "crown.fill"),
+        Badge(id: "pb1", group: "record", title: "First PB", sub: "Beat your best Full Simulation for the first time.", icon: "star.fill"),
         Badge(id: "pb5", group: "record", title: "5 PBs", sub: "Beat your best Full Simulation 5 times.", icon: "arrow.up.right"),
         Badge(id: "pb10", group: "record", title: "10 PBs", sub: "Beat your best Full Simulation 10 times.", icon: "chart.line.uptrend.xyaxis"),
         // ③ 꾸준함
@@ -60,7 +61,7 @@ enum Badges {
             if r.mode == .pft && r.isComplete { give("firstPFT", r.date) }
             for s in r.segs where s.kind == .st && s.time > 0 && Station.of(s.icon) != nil { stations.insert(s.icon) }
             if stations.count >= Station.all.count { give("allStations", r.date) }
-            // ② 기록 넘기기 (끝까지 한 풀 시뮬 · 레이스)
+            // ② 기록 (끝까지 한 풀 시뮬 · 레이스)
             if full && r.isComplete && r.splits16 != nil {
                 if r.total < 5400 { give("sub130", r.date) }
                 if r.total < 4800 { give("sub120", r.date) }
@@ -70,6 +71,7 @@ enum Badges {
             if r.mode == .sim && r.isComplete && r.splits16 != nil {
                 if let b = best, r.total < b { pbs += 1 }
                 best = min(best ?? Int.max, r.total)
+                if pbs >= 1 { give("pb1", r.date) }
                 if pbs >= 5 { give("pb5", r.date) }
                 if pbs >= 10 { give("pb10", r.date) }
             }

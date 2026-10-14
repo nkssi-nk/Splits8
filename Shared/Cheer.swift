@@ -134,22 +134,29 @@ enum CheerPicker {
             case .gold: return Cheer(line: String(localized: "Gold on your first try. Impressive."), tone: .celebrate, tag: tag)
             case .silver: return Cheer(line: String(localized: "Silver on your first try. Strong start."), tone: .celebrate, tag: tag)
             case .bronze: return Cheer(line: String(localized: "Bronze on your first try. Not bad at all."), tone: .celebrate, tag: tag)
+            case .iron: return Cheer(line: String(localized: "Iron on your first try. Bronze is next."), tone: .celebrate, tag: tag)
+            case .unranked: return Cheer(line: String(localized: "First PFT done. Iron is within 35:00."), tone: .normal, tag: tag)
             }
         }
         let pg: PFTGrade = PFT.grade(prev)
-        func rank(_ v: PFTGrade) -> Int { v == .gold ? 2 : v == .silver ? 1 : 0 }
+        func rank(_ v: PFTGrade) -> Int { v.rank }
         if g == .gold && !x.pftEverGold { return Cheer(line: String(localized: "Gold. Well earned."), tone: .celebrate, tag: tag) }
         if rank(g) > rank(pg) {
+            if let nx = g.next, nx != .gold {
+                return Cheer(line: String(localized: "Up to \(g.word.l10n). Next: \(nx.word.l10n)."), tone: .celebrate, tag: tag)
+            }
             return Cheer(line: String(localized: "Up to \(g.word.l10n). Gold is next."), tone: .celebrate, tag: tag)
         }
         // 다음 등급까지 30초 안
-        if g != .gold {
-            let limit: Int = g == .silver ? PFT.goldLimit - 1 : PFT.silverLimit
+        if let next = g.next {
+            let limit: Int = PFT.limit(next)
             let gap: Int = x.total - limit
             if gap > 0 && gap <= 30 {
-                let next: PFTGrade = g == .silver ? .gold : .silver
                 return Cheer(line: String(localized: "\(g.word.l10n) — just \(gap)s from \(next.word.l10n)."), tone: .normal, tag: tag)
             }
+        }
+        if g == .unranked {
+            return Cheer(line: String(localized: "PFT done. Iron is within 35:00."), tone: .normal, tag: tag)
         }
         if rank(g) == rank(pg) && x.total < prev && g != .gold {
             return Cheer(line: String(localized: "Still \(g.word.l10n), but \(Fm.t(prev - x.total)) faster."), tone: .normal, tag: tag)

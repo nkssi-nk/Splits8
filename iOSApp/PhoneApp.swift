@@ -713,7 +713,14 @@ struct TopBar8: View {
                     .padding(.leading, -6)
                     .accessibilityIdentifier("back")
                 } else {
-                    Wordmark(size: 17, tracking: -0.03)
+                    // 빌드 26: 로고를 누르면 홈으로
+                    Button { if r.scr != .home { r.go(.home) } } label: {
+                        Wordmark(size: 17, tracking: -0.03)
+                            .frame(height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("bar.logo")
                 }
                 Spacer(minLength: 12)
                 Text(r.barTitle.l10n).font(F.t(17, .semibold)).tracking(-0.17).lineLimit(1)

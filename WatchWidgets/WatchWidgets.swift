@@ -76,7 +76,7 @@ struct WatchDdayView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "flag.checkered").foregroundStyle(Color(hex: 0xFFE600))
                         VStack(alignment: .leading, spacing: 0) {
-                            Text("NEXT RACE".l10n).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                            Text("HYROX RACE".l10n).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                             Text(n).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                             Text(e.snap.raceDate.map { Fm.wdm.string(from: $0) } ?? "").font(.system(size: 12))
                                 .foregroundStyle(.secondary).lineLimit(1)
@@ -87,7 +87,7 @@ struct WatchDdayView: View {
                     }
                 } else {
                     VStack(alignment: .leading) {
-                        Text("NEXT RACE".l10n).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                        Text("HYROX RACE".l10n).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                         Text("Add a race".l10n).font(.system(size: 15, weight: .semibold))
                     }
                 }

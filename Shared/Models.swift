@@ -165,10 +165,10 @@ enum Mode: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - PFT (Physical Fitness Test)
 
-/// 등급: Gold 22:00 미만 · Silver 22:00–26:00 · Bronze 26:00 초과 (남녀 같음).
-/// HYROX 공식 등급이 아니라 SPLITS8 자체 기준.
+/// 등급: Gold 22:00 미만 · Silver 22:00–26:00 · Bronze 26:00 초과–30:00 · Iron 30:00 초과–35:00 · Unranked 35:00 초과 (남녀 같음).
+/// Gold · Silver · Bronze 는 공식 기준 그대로, Iron · Unranked 는 SPLITS8 이 덧붙인 단계 (빌드 26).
 enum PFTGrade: String, Codable, CaseIterable {
-    case gold, silver, bronze
+    case gold, silver, bronze, iron, unranked
 
     var label: String { rawValue.uppercased() }
     /// Gold / Silver / Bronze (문장 안에서)
@@ -176,14 +176,25 @@ enum PFTGrade: String, Codable, CaseIterable {
 
     /// 뱃지 바탕 그라데이션 (왼쪽 위 → 오른쪽 아래)
     var hex1: UInt32 {
-        switch self { case .gold: return 0xFFE08A; case .silver: return 0xEEF1F4; case .bronze: return 0xE8A66E }
+        switch self { case .gold: return 0xFFE08A; case .silver: return 0xEEF1F4; case .bronze: return 0xE8A66E
+        case .iron: return 0xA9B6C6; case .unranked: return 0x6E6E6A }
     }
     var hex2: UInt32 {
-        switch self { case .gold: return 0xC9981E; case .silver: return 0x9098A1; case .bronze: return 0x9A5A28 }
+        switch self { case .gold: return 0xC9981E; case .silver: return 0x9098A1; case .bronze: return 0x9A5A28
+        case .iron: return 0x4A5868; case .unranked: return 0x3A3A37 }
     }
     /// 뱃지 글자색
     var inkHex: UInt32 {
-        switch self { case .gold: return 0x201600; case .silver: return 0x15181C; case .bronze: return 0x1D0F04 }
+        switch self { case .gold: return 0x201600; case .silver: return 0x15181C; case .bronze: return 0x1D0F04
+        case .iron: return 0x0E1318; case .unranked: return 0xB8B8B2 }
+    }
+    /// 높을수록 좋은 등급 (Gold 4 … Unranked 0)
+    var rank: Int {
+        switch self { case .gold: return 4; case .silver: return 3; case .bronze: return 2; case .iron: return 1; case .unranked: return 0 }
+    }
+    /// 한 단계 위 등급 (Gold 는 nil)
+    var next: PFTGrade? {
+        switch self { case .gold: return nil; case .silver: return .gold; case .bronze: return .silver; case .iron: return .bronze; case .unranked: return .iron }
     }
 }
 
@@ -193,11 +204,28 @@ enum PFT {
     static let goldLimit: Int = 22 * 60
     /// 이 시간 이하이면 Silver, 넘으면 Bronze
     static let silverLimit: Int = 26 * 60
+    /// 이 시간 이하이면 Bronze, 넘으면 Iron
+    static let bronzeLimit: Int = 30 * 60
+    /// 이 시간 이하이면 Iron, 넘으면 Unranked
+    static let ironLimit: Int = 35 * 60
 
     static func grade(_ total: Int) -> PFTGrade {
         if total < goldLimit { return .gold }
         if total <= silverLimit { return .silver }
-        return .bronze
+        if total <= bronzeLimit { return .bronze }
+        if total <= ironLimit { return .iron }
+        return .unranked
+    }
+
+    /// 그 등급 안에 들려면 이 시간 이하여야 함 (Gold 는 goldLimit - 1)
+    static func limit(_ g: PFTGrade) -> Int {
+        switch g {
+        case .gold: return goldLimit - 1
+        case .silver: return silverLimit
+        case .bronze: return bronzeLimit
+        case .iron: return ironLimit
+        case .unranked: return .max
+        }
     }
 
     /// 여자 체급은 월볼 4 kg, 그 외 6 kg

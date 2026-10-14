@@ -576,12 +576,12 @@
 "Silver on your first try. Strong start." = "첫 도전에 실버! 출발이 좋아요.";
 "Bronze on your first try. Not bad at all." = "브론즈 달성했어요. 첫 도전치고 나쁘지 않아요.";
 "Gold. Well earned." = "드디어 골드! 축하해요.";
-"Up to %@. Gold is next." = "%@로 올라갔어요. 다음은 골드!";
-"%@ — just %llds from %@." = "%1$@예요. %3$@까지 %2$lld초!";
-"Still %@, but %@ faster." = "아직 %1$@지만 %2$@ 빨라졌어요.";
+"Up to %@. Gold is next." = "%@ 등급으로 올라갔어요. 다음은 골드!";
+"%@ — just %llds from %@." = "%1$@ 등급이에요. %3$@까지 %2$lld초!";
+"Still %@, but %@ faster." = "아직 %1$@ 등급이지만 %2$@ 빨라졌어요.";
 "Gold again. Consistent." = "또 골드! 꾸준해요.";
-"%@ this time. Every test counts." = "이번엔 %@예요. 다음엔 다시 올라가요.";
-"%@. Nice work." = "%@예요. 수고했어요!";
+"%@ this time. Every test counts." = "이번엔 %@ 등급이에요. 다음엔 다시 올라가요.";
+"%@. Nice work." = "%@ 등급이에요. 수고했어요!";
 "Gold" = "골드";
 "Silver" = "실버";
 "Bronze" = "브론즈";
@@ -803,7 +803,7 @@
 "Couldn't send. Check your connection and try again." = "보내지 못했어요. 연결을 확인하고 다시 시도해 주세요.";
 "BADGES" = "배지";
 "FIRST STEPS" = "처음 해 보기";
-"RECORDS" = "기록 넘기";
+"RECORDS" = "기록";
 "CONSISTENCY" = "꾸준함";
 "Earned %@" = "%@ 받음";
 "New badge" = "새 배지";
@@ -815,14 +815,14 @@
 "Finish your first PFT." = "PFT 를 처음 끝까지 해요.";
 "All 8 stations" = "스테이션 8개";
 "Do every HYROX station at least once." = "8개 스테이션을 한 번씩 모두 해요.";
-"Sub 1:30" = "1:30 안";
-"Sub 1:20" = "1:20 안";
-"Sub 1:10" = "1:10 안";
-"Sub 1:00" = "1:00 안";
-"Full Simulation or race under 1:30:00." = "풀 시뮬이나 대회를 1:30:00 안에 끝내요.";
-"Full Simulation or race under 1:20:00." = "풀 시뮬이나 대회를 1:20:00 안에 끝내요.";
-"Full Simulation or race under 1:10:00." = "풀 시뮬이나 대회를 1:10:00 안에 끝내요.";
-"Full Simulation or race under 1:00:00." = "풀 시뮬이나 대회를 1:00:00 안에 끝내요.";
+"Sub 1:30" = "1:30 이내";
+"Sub 1:20" = "1:20 이내";
+"Sub 1:10" = "1:10 이내";
+"Sub 1:00" = "1:00 이내";
+"Full Simulation or race under 1:30:00." = "풀 시뮬이나 대회를 1:30:00 이내에 끝내요.";
+"Full Simulation or race under 1:20:00." = "풀 시뮬이나 대회를 1:20:00 이내에 끝내요.";
+"Full Simulation or race under 1:10:00." = "풀 시뮬이나 대회를 1:10:00 이내에 끝내요.";
+"Full Simulation or race under 1:00:00." = "풀 시뮬이나 대회를 1:00:00 이내에 끝내요.";
 "5 PBs" = "PB 5번";
 "10 PBs" = "PB 10번";
 "Beat your best Full Simulation 5 times." = "풀 시뮬 최고 기록을 5번 깨요.";
@@ -841,3 +841,23 @@
 "Save changes" = "변경 내용 저장";
 "Save to My Trainings" = "내 트레이닝으로 저장";
 "Saved to My Trainings" = "내 트레이닝에 저장했어요";
+
+/* build26 · PFT Iron · Unranked */
+"Iron" = "아이언";
+"Unranked" = "언랭";
+"Iron on your first try. Bronze is next." = "첫 도전에 아이언! 다음은 브론즈예요.";
+"First PFT done. Iron is within 35:00." = "첫 PFT 완주! 35:00 이내면 아이언이에요.";
+"PFT done. Iron is within 35:00." = "PFT 완주! 35:00 이내면 아이언이에요.";
+"Up to %@. Next: %@." = "%1$@ 등급으로 올라갔어요. 다음은 %2$@!";
+"%@ to Bronze" = "브론즈까지 %@";
+"%@ to Iron" = "아이언까지 %@";
+"Bronze is within 30:00" = "브론즈: 30:00 이내";
+"Iron is within 35:00" = "아이언: 35:00 이내";
+"Finish within 35:00 for Iron" = "35:00 이내면 아이언";
+"Within 30:00" = "30:00 이내";
+"Within 35:00" = "35:00 이내";
+"Over 35:00" = "35:00 초과";
+"First PB" = "첫 PB";
+"Beat your best Full Simulation for the first time." = "풀 시뮬 최고 기록을 처음으로 깨요.";
+
+"HYROX RACE" = "HYROX 대회";

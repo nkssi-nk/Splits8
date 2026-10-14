@@ -72,6 +72,9 @@ struct DetailView: View {
     let store = Store.shared
     let r = Router.shared
     @State private var askDelete = false
+    /// 66번: Quick 을 트레이닝으로 저장함 / 5개가 꽉 참
+    @State private var quickSaved = false
+    @State private var quickFull = false
     @State private var partnerSheet = false
 
     var body: some View {
@@ -148,7 +151,14 @@ struct DetailView: View {
                 BenchSection(rec: rec)
             }
 
+            // 66번(빌드 25): 워치 Quick 은 한 번 쓰는 운동 → 마음에 들면 여기서 정식 트레이닝으로
+            if rec.mode == .training && rec.kind == nil && rec.title.hasPrefix("Quick") && !rec.segs.isEmpty {
+                saveQuickCard(rec).padding(.top, 10)
+            }
             deleteCard(rec).padding(.top, 10)
+        }
+        .alert(String(localized: "You can save up to \(Program.freeLimit) trainings"), isPresented: $quickFull) {
+            Button("OK", role: .cancel) {}
         }
         .padding(.horizontal, 16)
         .alert("Delete this record?", isPresented: $askDelete) {
@@ -749,6 +759,45 @@ struct DetailView: View {
         }
         .padding(.vertical, 11).padding(.horizontal, 18)
         .rowLine(!last)
+    }
+
+    // MARK: 66번 · Quick → 내 트레이닝으로 저장
+
+    /// 이 기록의 구간 순서로 만든 트레이닝 (Roxzone 은 뺌)
+    private func quickProgram(_ rec: Record) -> Program {
+        let items: [ProgItem] = rec.segs.filter { $0.kind != .rox }.map { s in
+            s.icon == "run" ? ProgItem(icon: "run", run: s.detail) : ProgItem(icon: s.icon)
+        }
+        return Program(id: "t" + UUID().uuidString.prefix(8), name: rec.title, sets: 1, seq: items)
+    }
+
+    /// 같은 구간 순서의 트레이닝이 이미 목록에 있는지
+    private func alreadySaved(_ rec: Record) -> Bool {
+        let seq: [ProgItem] = quickProgram(rec).seq
+        return store.programs.contains { $0.kind == nil && $0.sets == 1 && $0.seq == seq }
+    }
+
+    private func saveQuickCard(_ rec: Record) -> some View {
+        let done: Bool = quickSaved || alreadySaved(rec)
+        return Button {
+            guard !done else { return }
+            if store.programs.count >= Program.freeLimit { quickFull = true; return }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            store.save(quickProgram(rec))
+            withAnimation(.easeOut(duration: 0.2)) { quickSaved = true }
+        } label: {
+            HStack(spacing: 8) {
+                if done { Check8(color: C.good, size: 18) }
+                Text((done ? "Saved to My Trainings" : "Save to My Trainings").l10n)
+                    .font(F.t(17, .semibold)).foregroundStyle(done ? C.good : C.accent)
+            }
+            .frame(maxWidth: .infinity).frame(height: 50)
+            .card8(14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(Press())
+        .disabled(done)
+        .accessibilityIdentifier("detail.saveQuick")
     }
 
     // MARK: 기록 지우기 (Delete training 과 같은 모양: 50 높이, radius 14 카드, 빨강 17/600)

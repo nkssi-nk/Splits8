@@ -214,20 +214,12 @@ struct WHome: View {
     let nav = WNav.shared
 
     var body: some View {
-        // 57번: 카드 4개를 화면 세로 가운데에 둠. 화면에 다 들어가도 끌면 따라오고 놓으면 제자리(스프링)
-        GeometryReader { g in
-            ScrollView {
-                VStack(spacing: 6) {
-                    ForEach(Mode.allCases) { m in
-                        Button { open(m) } label: { card(m) }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("w.mode." + m.rawValue)
-                    }
-                }
-                .padding(.horizontal, 12).padding(.vertical, 4)
-                .frame(maxWidth: .infinity, minHeight: g.size.height, alignment: .center)
-            }
-            .scrollBounceBehavior(.always)
+        // 57번 → 66번(빌드 25): 카드 4개를 화면 세로 가운데에 고정.
+        // 예전엔 ScrollView 라 실제 워치에서 위 로고 줄 때문에 내용이 살짝 커져 스크롤되고 놓은 자리에 멈췄음.
+        // 이제 화면에 다 들어가면 스크롤 없이 가운데 + 끌면 따라오고 놓으면 제자리(스프링). 안 들어가는 작은 워치만 스크롤.
+        ViewThatFits(in: .vertical) {
+            WHomeFixed(cards: cards)
+            ScrollView { cards.padding(.vertical, 4) }
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -235,6 +227,17 @@ struct WHome: View {
             }
         }
         .wNavBG(Ambient.y(0.22, 0.9, 0.4, 0.5, -0.06))
+    }
+
+    private var cards: some View {
+        VStack(spacing: 6) {
+            ForEach(Mode.allCases) { m in
+                Button { open(m) } label: { card(m) }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("w.mode." + m.rawValue)
+            }
+        }
+        .padding(.horizontal, 12)
     }
 
     @ViewBuilder
@@ -690,5 +693,26 @@ struct WConfirm: View {
         // 3 · 2 · 1 을 센 뒤 시작
         engine.startAfterCountdown(mode: mode, title: title, sets: mode == .training ? program.sets : 1, seq: seq,
                                    program: mode == .training ? program : nil)
+    }
+}
+
+/// 66번: 화면 가운데 고정 + 위아래로 끌면 살짝 따라오고(저항) 놓으면 스프링으로 제자리
+private struct WHomeFixed<C: View>: View {
+    let cards: C
+    @GestureState private var drag: CGFloat = 0
+
+    var body: some View {
+        cards
+            .offset(y: drag)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 6)
+                    .updating($drag) { v, st, _ in
+                        let t: CGFloat = v.translation.height
+                        st = t / (1 + abs(t) / 60) * 0.6      // 멀리 끌수록 덜 따라옴
+                    }
+            )
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: drag)
     }
 }

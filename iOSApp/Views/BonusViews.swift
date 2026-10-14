@@ -31,6 +31,17 @@ struct BonusSheet: View {
         return Program.run(km: km, indoor: indoor, id: req.existing?.id ?? ("run." + fresh))
     }
 
+    /// 지금 고른 설정과 같은 것이 이미 목록(= 워치 목록)에 있는지
+    private var onWatch: Bool {
+        if let e = req.existing {
+            // 저장된 카드를 연 경우: 값을 바꾸지 않았으면 이미 있음
+            return isHIIT || (e.runKm == km && (e.indoor ?? false) == indoor)
+        }
+        return store.programs.contains { p in
+            isHIIT ? p.isHIIT : (p.isRun && p.runKm == km && (p.indoor ?? false) == indoor)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -50,10 +61,21 @@ struct BonusSheet: View {
 
                 if isHIIT { hiitBody } else { runBody }
 
-                YellowButton(action: save) {
-                    Text("Save (add to watch list)")
+                // 66번(빌드 25): 이미 워치 목록에 있는 것(같은 설정)이면 저장 버튼 대신 "워치 목록에 있음"
+                if onWatch {
+                    HStack(spacing: 8) {
+                        Check8(color: C.good, size: 18)
+                        Text("Already on your watch list").font(F.t(17, .semibold)).foregroundStyle(C.good)
+                    }
+                    .frame(maxWidth: .infinity).frame(height: 54)
+                    .card8(16)
+                    .accessibilityIdentifier("bonus.onWatch")
+                } else {
+                    YellowButton(action: save) {
+                        Text((req.existing != nil ? "Save changes" : "Save (add to watch list)").l10n)
+                    }
+                    .accessibilityIdentifier("bonus.save")
                 }
-                .accessibilityIdentifier("bonus.save")
 
                 HStack {
                     if req.existing != nil {

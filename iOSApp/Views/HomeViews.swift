@@ -44,7 +44,7 @@ struct HomeView: View {
         .padding(.horizontal, 16)
     }
 
-    // 프로필: 52 원, @nick 17/600, 체급 13 회색 · 오른쪽에 내 최고 기록 (편집은 설정 → 프로필에서만)
+    // 프로필: 52 원, @nick 17/600, 체급 13 회색 · 오른쪽에 내 최고 기록 (누르면 설정 → 프로필)
     private var profileCard: some View {
         let signed = store.signedIn, nick = store.settings.nickname ?? ""
         return HStack(spacing: 14) {
@@ -69,6 +69,10 @@ struct HomeView: View {
         .card8()
         // PFT 등급 색 테두리 (골드는 홈에 들어올 때마다 빛이 한 바퀴)
         .modifier(GradeBorder(grade: store.pftGrade))
+        // 빌드 26: 카드를 누르면 설정 › 프로필 (사진은 크게 보기 그대로)
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onTapGesture { r.go(.account) }
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("home.profile")
     }
 

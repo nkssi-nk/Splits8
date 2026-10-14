@@ -9,6 +9,8 @@ struct SimView: View {
     @State private var info = false
     /// 그래프 칩: 접으면 한 줄, 겹꺾쇠를 누르면 전부
     @State private var chipsOpen = false
+    /// 빌드 26: 큰 시간을 누르면 목표 시간 시트
+    @State private var goalSheet = false
     fileprivate struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
     private static let stationMetrics: [(String, String, String)] = [
         ("skiErg", "SKIERG", "SkiErg"), ("sledPush", "SLED PUSH", "Sled Push"), ("sledPull", "SLED PULL", "Sled Pull"),
@@ -110,6 +112,7 @@ struct SimView: View {
             history
         }
         .padding(.horizontal, 16)
+        .sheet(isPresented: $goalSheet) { GoalTimeSheet().presentationDetents([.height(GoalTimeSheet.height)]) }
         .sheet(isPresented: $info) {
             SimInfoSheet()
                 .presentationDetents([.large])
@@ -163,6 +166,10 @@ struct SimView: View {
                 Text(current.caption.l10n).font(F.t(13)).foregroundStyle(C.text2)
                 Text(last.map { Fm.t($0) } ?? "--:--").font(F.num(44)).tracking(-1.76).lineLimit(1)
             }
+            .contentShape(Rectangle())
+            .onTapGesture { goalSheet = true }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("sim.bigTime")
             Spacer(minLength: 8)
             if let last, let rf {
                 VStack(alignment: .trailing, spacing: 2) {
@@ -369,6 +376,10 @@ struct RaceView: View {
                     Label8("GOAL")
                     Text(Fm.t(goal)).font(F.num(52)).tracking(-2.34).lineLimit(1).minimumScaleFactor(0.8)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { goalSheet = true }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("race.goalTime")
                 Spacer(minLength: 0)
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(best.map { Fm.d(goal - $0) } ?? "--:--")

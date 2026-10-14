@@ -447,6 +447,10 @@ struct DetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(hex: 0x121210), in: shape)
         .overlay(shape.strokeBorder(pftBorder(g), lineWidth: 1))
+        // 빌드 26: 등급 색으로 은은하게 빛남 (Unranked 는 없음)
+        .shadow(color: g.map { $0 == .unranked ? Color.clear : Color(hex: $0.hex1, alpha: 0.28) } ?? .clear, radius: 18)
+        .modifier(BorderLight(light: Color(hex: (g ?? .unranked).hex1), radius: 20,
+                              mode: g == nil || g == .unranked ? BorderLight.Mode.off : BorderLight.Mode.once))
         .accessibilityIdentifier("detail.pft")
     }
 

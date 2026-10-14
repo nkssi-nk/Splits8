@@ -251,8 +251,15 @@ struct PFTBadge: View {
                 .padding(.leading, 2).padding(.trailing, lead * 0.7)
         }
         .frame(width: width, height: height)
-        .background(LinearGradient(colors: [Color(hex: grade.hex1), Color(hex: grade.hex2)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing), in: shape)
+        .background {
+            // Unranked = 회색 테두리만 (바탕 없음)
+            if grade == .unranked {
+                shape.strokeBorder(Color(hex: grade.hex1), lineWidth: 1.2)
+            } else {
+                shape.fill(LinearGradient(colors: [Color(hex: grade.hex1), Color(hex: grade.hex2)],
+                                          startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: grade.label))
     }

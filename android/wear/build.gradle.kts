@@ -31,9 +31,9 @@ android {
     if (upload != null) {
         signingConfigs.create("release") {
             storeFile = upload
-            storePassword = System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")
-            keyAlias = System.getenv("SPLITS8_UPLOAD_KEY_ALIAS") ?: "upload"
-            keyPassword = System.getenv("SPLITS8_UPLOAD_KEY_PASSWORD") ?: System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")
+            storePassword = System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")?.trim()
+            keyAlias = System.getenv("SPLITS8_UPLOAD_KEY_ALIAS")?.trim()?.ifEmpty { null } ?: "upload"
+            keyPassword = System.getenv("SPLITS8_UPLOAD_KEY_PASSWORD")?.trim()?.ifEmpty { null } ?: System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")?.trim()
         }
     }
     buildTypes {

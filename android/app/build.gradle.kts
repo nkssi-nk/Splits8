@@ -14,7 +14,8 @@ android {
         minSdk = 29          // Android 10
         targetSdk = 36
         // 워치와 겹치지 않게: 폰은 끝자리 1, 워치는 끝자리 2
-        versionCode = 101
+        // 구글 플레이는 올릴 때마다 번호가 커져야 함 → GitHub 빌드 번호 × 10 + 1 (폰 끝자리 1, 워치 끝자리 2). 컴퓨터 빌드는 101
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { it * 10 + 1 } ?: 101
         versionName = "1.0.0"
         // 구글 지도 키: gradle.properties 의 splits8.mapsKey (또는 환경 변수 MAPS_API_KEY)
         val mapsKey = (providers.gradleProperty("splits8.mapsKey").orNull ?: "").ifBlank { System.getenv("MAPS_API_KEY") ?: "" }
@@ -30,10 +31,21 @@ android {
             keyPassword = "android"
         }
     }
+    // 출시용 서명 (구글 플레이 업로드 키). GitHub 비밀값에서 받아 쓰고, 없으면 출시용 빌드는 서명 없이 만들어짐
+    val upload = System.getenv("SPLITS8_UPLOAD_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    if (upload != null) {
+        signingConfigs.create("release") {
+            storeFile = upload
+            storePassword = System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")
+            keyAlias = System.getenv("SPLITS8_UPLOAD_KEY_ALIAS") ?: "upload"
+            keyPassword = System.getenv("SPLITS8_UPLOAD_KEY_PASSWORD") ?: System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")
+        }
+    }
     buildTypes {
         debug { signingConfig = signingConfigs.getByName("debug") }
         release {
             isMinifyEnabled = false
+            if (upload != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

@@ -47,3 +47,27 @@ jobs:
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/wear/build/outputs/apk/debug/*.apk
+
+      # 구글 플레이용 (비밀값 3개가 있을 때만)
+      - name: 플레이용 서명 키 꺼내기
+        env:
+          KEY_B64: ${{ secrets.SPLITS8_UPLOAD_KEYSTORE_BASE64 }}
+        if: env.KEY_B64 != ''
+        run: echo "$KEY_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: 플레이용 폰 · 워치 앱 (AAB)
+        env:
+          KEY_B64: ${{ secrets.SPLITS8_UPLOAD_KEYSTORE_BASE64 }}
+          SPLITS8_UPLOAD_KEYSTORE: ${{ runner.temp }}/upload.jks
+          SPLITS8_UPLOAD_STORE_PASSWORD: ${{ secrets.SPLITS8_UPLOAD_STORE_PASSWORD }}
+          SPLITS8_UPLOAD_KEY_ALIAS: ${{ secrets.SPLITS8_UPLOAD_KEY_ALIAS }}
+        if: env.KEY_B64 != ''
+        run: ./gradlew :app:bundleRelease :wear:bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('android/app/build/outputs/bundle/release/*.aab') != ''
+        with:
+          name: splits8-play
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/wear/build/outputs/bundle/release/*.aab

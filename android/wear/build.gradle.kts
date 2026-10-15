@@ -13,7 +13,8 @@ android {
         applicationId = "com.nkssi.splits8"
         minSdk = 33          // Wear OS 4 (갤럭시 워치 4 이후)
         targetSdk = 36
-        versionCode = 102
+        // 구글 플레이는 올릴 때마다 번호가 커져야 함 → GitHub 빌드 번호 × 10 + 2 (폰 끝자리 1, 워치 끝자리 2). 컴퓨터 빌드는 102
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { it * 10 + 2 } ?: 102
         versionName = "1.0.0"
     }
     // 폰과 같은 디버그 서명 키 (폰 ↔ 워치는 서명이 같아야 서로 주고받음)
@@ -25,10 +26,21 @@ android {
             keyPassword = "android"
         }
     }
+    // 출시용 서명 (구글 플레이 업로드 키). GitHub 비밀값에서 받아 쓰고, 없으면 출시용 빌드는 서명 없이 만들어짐
+    val upload = System.getenv("SPLITS8_UPLOAD_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    if (upload != null) {
+        signingConfigs.create("release") {
+            storeFile = upload
+            storePassword = System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")
+            keyAlias = System.getenv("SPLITS8_UPLOAD_KEY_ALIAS") ?: "upload"
+            keyPassword = System.getenv("SPLITS8_UPLOAD_KEY_PASSWORD") ?: System.getenv("SPLITS8_UPLOAD_STORE_PASSWORD")
+        }
+    }
     buildTypes {
         debug { signingConfig = signingConfigs.getByName("debug") }
         release {
             isMinifyEnabled = false
+            if (upload != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -77,6 +89,8 @@ androidComponents {
 }
 
 dependencies {
+    // 예전 라이브러리가 끌고 오는 오래된 Fragment(1.2) 대신 새 것 — 권한 요청(registerForActivityResult)이 제대로 돌게 (출시용 빌드 검사)
+    implementation(libs.androidx.fragment)
     implementation(project(":shared"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

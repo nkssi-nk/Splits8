@@ -126,7 +126,8 @@ private fun GoalCard() {
     Column(Modifier.fillMaxWidth().card8().padding(top = 20.dp, start = 18.dp, end = 18.dp, bottom = 18.dp).testTag("race.goal"),
         verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // 빌드 26: 큰 목표 시간을 누르면 목표 시간 시트
+            Column(Modifier.weight(1f).tap { Router.raceSheet = "goal" }.testTag("race.goalTime"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Label8("GOAL")
                 T(Fm.t(goal), F.num(52, tracking = -2.34f), maxLines = 1, translate = false)
             }

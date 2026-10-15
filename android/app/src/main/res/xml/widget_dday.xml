@@ -9,4 +9,6 @@
     android:initialLayout="@layout/widget_image"
     android:previewImage="@drawable/widget_dday_preview"
     android:description="@string/widget_dday_desc"
+    android:configure="com.nkssi.splits8.WidgetLookActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
     android:widgetCategory="home_screen" />

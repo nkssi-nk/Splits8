@@ -106,7 +106,7 @@ fun SettingsView() {
 
             SectionLabel("FRIENDS")
             Column(Modifier.fillMaxWidth().card8()) {
-                SettingRow("Friends", friendsValue(), Modifier.testTag("settings.friends"), last = true, badge = Store.incoming.size) {
+                SettingRow("Friends", friendsValue(), Modifier.testTag("settings.friends"), last = true, badge = Store.incoming.size + Store.unseenCheers) {
                     Router.friendsFrom = Scr.Settings; Router.go(Scr.Friends)
                 }
             }
@@ -350,9 +350,20 @@ fun SetHrView() {
                 Seg8(listOf("age" to "By age", "manual" to "Manual"), s.hrMode, Modifier.fillMaxWidth().testTag("hr.mode")) { k ->
                     Store.update { it.copy(hrMode = k) }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    T(if (age) "Age" else "Max heart rate", F.t(15), Modifier.weight(1f), maxLines = 1)
-                    Stepper8("${if (age) s.age else s.manualHr}", Modifier.testTag("hr.stepper"), minWidth = 40.dp, down = { bump(-1) }, up = { bump(1) })
+                val y = s.birthYear
+                if (age && y != null) {
+                    // 빌드 24: 나이는 태어난 해에서 자동 (두 군데서 따로 받지 않음) → 누르면 태어난 해 고치기
+                    Row(Modifier.fillMaxWidth().tap { Router.editProfile(3) }.testTag("hr.ageFromYear"), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        T("Age", F.t(15), Modifier.weight(1f), maxLines = 1)
+                        T(L10n.t("%lld · born %@", s.age, y.toString()), F.num(17, color = C.text2), maxLines = 1, translate = false)
+                        Glyph("i_chevR", 13.dp, C.text3)
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        T(if (age) "Age" else "Max heart rate", F.t(15), Modifier.weight(1f), maxLines = 1)
+                        Stepper8("${if (age) s.age else s.manualHr}", Modifier.testTag("hr.stepper"), minWidth = 40.dp, down = { bump(-1) }, up = { bump(1) })
+                    }
                 }
             }
             SectionLabel("ZONES")
@@ -436,22 +447,30 @@ fun AccountView() {
                 }
             }
 
+            // 빌드 24: Division 은 아래 ABOUT YOU 로 옮김(가입 순서와 같게). 나이는 태어난 해에서 자동 → 여기엔 최대 심박만
             SectionLabel("ATHLETE")
             Column(Modifier.fillMaxWidth().card8()) {
-                SettingRow("Division", s.div.name, Modifier.testTag("profile.division")) { Router.editProfile(2) }
-                val hr = (if (s.hrMode == "age") L10n.t("Age %lld", s.age) + " · " else "") + "${s.maxHR} BPM"
-                SettingRow("Age · Max heart rate", hr, Modifier.testTag("profile.hr"), numeric = true, last = true) { Router.sub(Scr.SetHr, Scr.Account) }
+                val hr = (if (s.hrMode == "age" && s.birthYear == null) L10n.t("Age %lld", s.age) + " · " else "") + "${s.maxHR} BPM"
+                SettingRow(if (s.birthYear == null) "Age · Max heart rate" else "Max heart rate", hr, Modifier.testTag("profile.hr"), numeric = true, last = true) { Router.sub(Scr.SetHr, Scr.Account) }
             }
 
             // 가입 프로필과 같은 구성 (빌드 24): 대회 경험 · 태어난 해 · 키 · 몸무게. 성별은 디비전에서 정해짐
             SectionLabel("ABOUT YOU")
             Column(Modifier.fillMaxWidth().card8()) {
-                val race = ProfileText.race(s.raced, s.raceDivision).l10n + (s.bestFinish?.let { " · " + com.nkssi.splits8.shared.Fm.t(it) } ?: "")
+                val race = when {
+                    s.raced == null -> "Not set".l10n
+                    s.raced != true -> "Not yet".l10n
+                    s.bestFinish != null -> "Best".l10n + " " + com.nkssi.splits8.shared.Fm.t(s.bestFinish!!)
+                    else -> "Yes".l10n
+                }
                 SettingRow("Race experience", race, Modifier.testTag("profile.about.race")) { Router.editProfile(1) }
-                SettingRow("Birth year", s.birthYear?.let { "$it · " + ageGroup(it) } ?: "Not set".l10n, Modifier.testTag("profile.about.year"), numeric = true) { Router.editProfile(3) }
+                val div = s.div.name + if (s.division == "dblX" && s.sex != null) " · " + ProfileText.sex(s.sex).l10n else ""
+                SettingRow("Division", div, Modifier.testTag("profile.division")) { Router.editProfile(2) }
+                SettingRow("Birth year", s.birthYear?.toString() ?: "Not set".l10n, Modifier.testTag("profile.about.year"), numeric = true) { Router.editProfile(3) }
                 SettingRow("Height · Weight", ProfileText.body(s.heightCm, s.weightKg).l10n, Modifier.testTag("profile.about.body"), numeric = true, last = true) { Router.editProfile(4) }
             }
             Note8("Only you can see these. They're used for your division and age-group comparisons.")
+            BadgesCard()                // 빌드 24: 배지 모음
 
             if (signed) {
                 SectionLabel("ACCOUNT")

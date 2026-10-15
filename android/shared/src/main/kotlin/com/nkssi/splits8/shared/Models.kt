@@ -167,25 +167,51 @@ enum class Mode(val title: String, val icon: String, val calendarHex: Long) {
 
 /** 등급: Gold 22:00 미만 · Silver 22:00–26:00 · Bronze 26:00 초과 (SPLITS8 자체 기준) */
 @Serializable
+/**
+ * 등급: Gold 22:00 미만 · Silver 22:00–26:00 · Bronze 26:00 초과–30:00 · Iron 30:00 초과–35:00 · Unranked 35:00 초과 (남녀 같음).
+ * Gold · Silver · Bronze 는 공식 기준 그대로, Iron · Unranked 는 SPLITS8 이 덧붙인 단계 (아이폰 빌드 26).
+ */
 enum class PFTGrade(val hex1: Long, val hex2: Long, val inkHex: Long) {
     @SerialName("gold") Gold(0xFFE08A, 0xC9981E, 0x201600),
     @SerialName("silver") Silver(0xEEF1F4, 0x9098A1, 0x15181C),
-    @SerialName("bronze") Bronze(0xE8A66E, 0x9A5A28, 0x1D0F04);
+    @SerialName("bronze") Bronze(0xE8A66E, 0x9A5A28, 0x1D0F04),
+    @SerialName("iron") Iron(0xA9B6C6, 0x4A5868, 0x0E1318),
+    @SerialName("unranked") Unranked(0x6E6E6A, 0x3A3A37, 0xB8B8B2);
 
     val label: String get() = name.uppercase()
-    /** Gold / Silver / Bronze (문장 안에서) */
+    /** Gold / Silver / Bronze / Iron / Unranked (문장 안에서) */
     val word: String get() = name
+    /** 높을수록 좋은 등급 (Gold 4 … Unranked 0) */
+    val rank: Int get() = when (this) { Gold -> 4; Silver -> 3; Bronze -> 2; Iron -> 1; Unranked -> 0 }
+    /** 한 단계 위 등급 (Gold 는 null) */
+    val next: PFTGrade? get() = when (this) { Gold -> null; Silver -> Gold; Bronze -> Silver; Iron -> Bronze; Unranked -> Iron }
 }
 
 object PFT {
     const val title = "PFT"
     const val goldLimit = 22 * 60
+    /** 이 시간 이하이면 Silver, 넘으면 Bronze */
     const val silverLimit = 26 * 60
+    /** 이 시간 이하이면 Bronze, 넘으면 Iron */
+    const val bronzeLimit = 30 * 60
+    /** 이 시간 이하이면 Iron, 넘으면 Unranked */
+    const val ironLimit = 35 * 60
 
     fun grade(total: Int): PFTGrade = when {
         total < goldLimit -> PFTGrade.Gold
         total <= silverLimit -> PFTGrade.Silver
-        else -> PFTGrade.Bronze
+        total <= bronzeLimit -> PFTGrade.Bronze
+        total <= ironLimit -> PFTGrade.Iron
+        else -> PFTGrade.Unranked
+    }
+
+    /** 그 등급 안에 들려면 이 시간 이하여야 함 (Gold 는 goldLimit - 1) */
+    fun limit(g: PFTGrade): Int = when (g) {
+        PFTGrade.Gold -> goldLimit - 1
+        PFTGrade.Silver -> silverLimit
+        PFTGrade.Bronze -> bronzeLimit
+        PFTGrade.Iron -> ironLimit
+        PFTGrade.Unranked -> Int.MAX_VALUE
     }
 
     /** 여자 체급은 월볼 4 kg, 그 외 6 kg */
@@ -878,16 +904,16 @@ object SeqBuilder {
         val o = ArrayList<Seg>()
         for (i in 0 until 8) {
             o.add(Seg("run", "Run ${i + 1}", "1KM", SegKind.Run, targets16[i * 2]))
-            if (rox) o.add(Seg("roxzone", "Roxzone", "TRANSITION", SegKind.Rox, roxTarget))
+            if (rox) o.add(Seg("roxzone", "Roxzone", "Transition", SegKind.Rox, roxTarget))
             val s = Station.all[i]
             o.add(Seg(s.key, s.name, s.detail(div), SegKind.St, targets16[i * 2 + 1]))
-            if (rox && i < 7) o.add(Seg("roxzone", "Roxzone", "TRANSITION", SegKind.Rox, roxTarget))
+            if (rox && i < 7) o.add(Seg("roxzone", "Roxzone", "Transition", SegKind.Rox, roxTarget))
         }
         return o
     }
 
     /** HIIT 라운드 (끝 없이 늘어남, 목표 없음) */
-    fun hiitRound(n: Int) = Seg("hiit", "Round $n", "INTERVAL", SegKind.St, 0)
+    fun hiitRound(n: Int) = Seg("hiit", "Round $n", "Interval", SegKind.St, 0)
 
     /** 러닝 1km 구간 */
     fun runKm(n: Int, target: Int = 0) = Seg("run", "KM $n", "1KM", SegKind.Run, target)

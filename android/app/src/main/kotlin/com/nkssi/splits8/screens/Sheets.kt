@@ -81,6 +81,7 @@ fun Overlays() {
     }
     Sheet8(Router.userMenu, onClose = { Router.userMenu = null }) { u -> UserMenuSheet(u) }
     Sheet8(Router.partnerFor, onClose = { Router.partnerFor = null }) { id -> PartnerSheet(id) }
+    Sheet8(Router.cheerTo, onClose = { Router.cheerTo = null }, bg = androidx.compose.ui.graphics.Color(0xFF1C1C1E)) { f -> CheerSheet(f) }
     Sheet8(Router.finish, onClose = { Router.finish = null }) { rec -> FinishSheet(rec) }
     ToastHost()
     AskHost()
@@ -144,7 +145,20 @@ private fun BonusSheet(req: BonusRequest) {
                 T("Saved: 1 km splits · pace · heart rate · route map outdoors", F.t(F.foot, color = C.text2))
             }
         }
-        YellowButton("Save (add to watch list)", tag = "bonus.save") { save() }
+        // 빌드 25 (66번): 같은 설정이 이미 목록(= 워치 목록)에 있으면 저장 단추 대신 "워치 목록에 있음"
+        val onWatch = req.existing?.let { e -> hiit || (e.runKm == km && (e.indoor ?: false) == indoor) }
+            ?: Store.programs.any { p -> if (hiit) p.isHIIT else (p.isRun && p.runKm == km && (p.indoor ?: false) == indoor) }
+        if (onWatch) {
+            Row(
+                Modifier.fillMaxWidth().height(54.dp).card8(16.dp).testTag("bonus.onWatch"),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            ) {
+                Check8(C.good, 18.dp)
+                T("Already on your watch list", F.t(17, W600, C.good), maxLines = 1)
+            }
+        } else {
+            YellowButton(if (req.existing != null) "Save changes" else "Save (add to watch list)", tag = "bonus.save") { save() }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (req.existing != null) {
                 T("Delete", F.t(F.sub, W600, C.bad), Modifier.tap {

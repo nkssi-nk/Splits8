@@ -72,6 +72,11 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- 빌드 24: 위젯 바탕 고르기 (위젯 길게 누르기 → 설정) -->
+        <activity android:name=".WidgetLookActivity" android:exported="true" android:theme="@style/Theme.Splits8">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
+        </activity>
+
         <!-- 홈 화면 위젯: 다음 대회 · 이번 주 -->
         <receiver android:name=".DdayWidget" android:exported="false" android:label="@string/widget_dday_name">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

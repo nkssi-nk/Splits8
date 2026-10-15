@@ -256,6 +256,13 @@ class Shots {
         demoTraining(lang)
         Store.useDemo(Store.settings, Store.programs, Store.records, Demo.friends(), req = Demo.requests(), me = "demo.me")
         Store.update { it.copy(friendId = Demo.friends().first { f -> f.hasSplits }.id) }
+        Store.cheers = Demo.cheers()
+    }
+
+    // 빌드 24: 응원 보내기 시트
+    @Test fun cheerSheetKo() {
+        demoFriends("ko"); Router.cheerTo = Demo.friends().first()
+        shot("63_cheer_sheet_ko", "ko", Scr.Friends); Router.cheerTo = null
     }
 
     @Config(sdk = [35], qualifiers = "w412dp-h1700dp-xxhdpi")

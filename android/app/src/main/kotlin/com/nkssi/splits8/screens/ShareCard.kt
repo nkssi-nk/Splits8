@@ -117,7 +117,7 @@ data class ShareData(
 
         /** 스테이션 이름 옆 사양: "50M · 152KG" · "1K" · "100 REPS · 6KG". 사양이 아닌 말(INTERVAL 등)은 뺌 */
         fun spec(detail: String): String {
-            val skip = setOf("INTERVAL", "TRANSITION", "")
+            val skip = setOf("INTERVAL", "TRANSITION", "Transition", "Interval", "")
             return detail.split(" · ").map { it.trim() }
                 .filter { it.uppercase() !in skip && it.lowercase() != "shared" }
                 .take(2).joinToString(" · ")
@@ -173,7 +173,7 @@ data class ShareOpts(
     val photo: ImageBitmap? = null,
     val placeholder: Boolean = false,
     val textBlack: Boolean = false,
-    val mono: Boolean = true,
+    val mono: Boolean = false,
     val gradient: Boolean = true,
     /** "" 이면 닉네임 숨김 (@ 없이) */
     val nick: String = "",

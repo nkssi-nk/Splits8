@@ -122,7 +122,8 @@ private fun ProfileCard() {
     val nick = s.nickname.orEmpty()
     val grade = Store.book.pftGrade
     Row(
-        Modifier.fillMaxWidth().card8().gradeBorder(grade).padding(vertical = 14.dp, horizontal = 16.dp).testTag("home.profile"),
+        // 빌드 26: 카드를 누르면 설정 › 프로필 (사진은 크게 보기 그대로)
+        Modifier.fillMaxWidth().card8().gradeBorder(grade).tap { Router.go(Scr.Account) }.padding(vertical = 14.dp, horizontal = 16.dp).testTag("home.profile"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Avatar8(52.dp, if (signed) nick.take(1).uppercase() else "?", photo = Store.photo, bg = if (signed) C.accent else C.control,

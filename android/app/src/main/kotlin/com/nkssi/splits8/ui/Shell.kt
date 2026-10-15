@@ -162,7 +162,10 @@ fun TopBar8() {
                         T(back.first, F.t(17, color = C.accent), maxLines = 1)
                     }
                 } else {
-                    Wordmark(17f)
+                    // 빌드 26: 로고를 누르면 홈으로
+                    Box(Modifier.height(44.dp).tap { if (Router.scr != Scr.Home) Router.go(Scr.Home) }.testTag("bar.logo"), contentAlignment = Alignment.CenterStart) {
+                        Wordmark(17f)
+                    }
                 }
                 Spacer(Modifier.weight(1f).width(12.dp))
                 T(Router.barTitle, F.t(17, W600, tracking = -0.17f), maxLines = 1)

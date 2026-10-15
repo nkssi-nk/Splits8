@@ -60,6 +60,12 @@ import com.nkssi.splits8.ui.press
 import com.nkssi.splits8.ui.rowLine
 import com.nkssi.splits8.ui.tap
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.nkssi.splits8.CheerKind
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 // 아이폰 FriendsViews.swift (빌드 22 친구 요청 · 빌드 23) + 빌드 24 친구 최대 10명
 
@@ -77,13 +83,15 @@ fun friendSearchable(q: String): Boolean =
 
 /** "최대 10명까지 추가할 수 있어요" (유료 · Pro 말은 안 씀) */
 private fun limitAsk() {
-    Router.ask = Ask(L10n.t("You can add up to %lld friends.", Store.FRIEND_LIMIT), null, cancel = null)
+    Router.ask = Ask(L10n.t("You can add up to %lld friends", Store.FRIEND_LIMIT), "Remove a friend or cancel a request to add someone new.".l10n, cancel = null)
 }
 
 @Composable
 fun FriendsView() {
     // 열 때마다 친구 목록 · 요청 새로 받기
     LaunchedEffect(Unit) { com.nkssi.splits8.Cloud.refreshSocial() }
+    // 받은 응원은 화면을 열고 잠깐 뒤 읽음으로 (빨간 점이 바로 사라지지 않게)
+    LaunchedEffect(Unit) { delay(2000); Store.markCheersSeen() }
     var query by remember { mutableStateOf("") }
     var hit by remember { mutableStateOf<RemoteProfile?>(null) }
     /** "" 없음 / searching / none / error */
@@ -119,15 +127,18 @@ fun FriendsView() {
             }
 
             Requests()
+            Cheers()
 
+            if (Store.signedIn) {
+                // 빌드 24: MY FRIENDS · n / 10 (수락된 친구 + 보낸 요청, 꽉 차면 노랑)
+                Row(Modifier.fillMaxWidth().padding(top = 14.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.Bottom) {
+                    T(SectionText.shown("MY FRIENDS"), F.t(F.sub, W600), Modifier.weight(1f), maxLines = 1, translate = false)
+                    T("${Store.friendCount} / ${Store.FRIEND_LIMIT}", F.num(13, W400, if (Store.friendsFull) C.accent else C.text2), Modifier.testTag("friends.count"),
+                        maxLines = 1, translate = false)
+                }
+            }
             Note8("The selected friend's records are used as the Full Simulation comparison and as Training split targets.", Modifier.padding(bottom = 4.dp), C.text2)
             if (Store.friends.isNotEmpty()) {
-                // 친구 n / 10 (꽉 차면 노랑)
-                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.End) {
-                    val n = Store.friends.size
-                    T("$n / ${Store.FRIEND_LIMIT}", F.num(13, W400, if (n >= Store.FRIEND_LIMIT) C.accent else C.text2), Modifier.testTag("friends.count"),
-                        translate = false)
-                }
                 Column(Modifier.fillMaxWidth().card8()) {
                     Store.friends.forEachIndexed { i, f -> FriendRow(f, i == Store.friends.size - 1) }
                 }
@@ -164,6 +175,96 @@ private fun Requests() {
         }
     }
     Note8("Records are shared only after you accept.")
+}
+
+/** 빌드 24: 받은 응원 (최근 8개) — 누가 · 뭘 · 언제 */
+@Composable
+private fun Cheers() {
+    val list = Store.cheers.take(8)
+    if (!Store.signedIn || list.isEmpty()) return
+    Row(Modifier.fillMaxWidth().padding(top = 14.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        T(SectionText.shown("CHEERS"), F.t(F.sub, W600), maxLines = 1, translate = false)
+        if (Store.unseenCheers > 0) Box(Modifier.size(8.dp).clip(CircleShape).background(C.bad).testTag("friends.cheerDot"))
+    }
+    Column(Modifier.fillMaxWidth().card8().testTag("friends.cheers")) {
+        list.forEachIndexed { i, c ->
+            val k = CheerKind.of(c.kind)
+            Row(Modifier.fillMaxWidth().rowLine(i < list.size - 1).padding(vertical = 11.dp, horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Avatar8(34.dp, c.nickname.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(c.avatarUrl))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    T("@" + c.nickname, F.t(15, W600), maxLines = 1, translate = false)
+                    T(if (k.isEmoji) L10n.t("Sent you %@", k.emoji) else k.emoji + " " + k.line.l10n, F.t(13, color = if (c.seen) C.text2 else Color.White),
+                        maxLines = 1, translate = false)
+                }
+                T(cheerAgo(c.createdAt), F.t(12, color = C.text3), maxLines = 1, translate = false)
+                if (!c.seen) Box(Modifier.size(6.dp).clip(CircleShape).background(C.bad))
+            }
+        }
+    }
+}
+
+/** 방금 · 5분 · 3시간 · 2일 */
+fun cheerAgo(d: java.time.Instant, now: java.time.Instant = java.time.Instant.now()): String {
+    val s = maxOf(0L, now.epochSecond - d.epochSecond)
+    return when {
+        s < 60 -> "now".l10n
+        s < 3600 -> L10n.t("%lldm", s / 60)
+        s < 86400 -> L10n.t("%lldh", s / 3600)
+        else -> L10n.t("%lldd", s / 86400)
+    }
+}
+
+/** 빌드 24: 응원 고르기 (이모지 3개 + 문구 4개). 누르면 바로 보냄 */
+@Composable
+fun CheerSheet(friend: Friend) {
+    var sending by remember(friend.id) { mutableStateOf(false) }
+    var sent by remember(friend.id) { mutableStateOf(false) }
+    var error by remember(friend.id) { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    fun send(k: CheerKind) {
+        if (sending) return
+        sending = true; error = null
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        scope.launch {
+            val e = Store.sendCheer(k, friend)
+            sending = false
+            if (e != null) { error = e; return@launch }
+            sent = true
+            delay(900)
+            if (Router.cheerTo?.id == friend.id) Router.cheerTo = null
+        }
+    }
+    Column(Modifier.fillMaxWidth().height(400.dp).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        T(L10n.t("Cheer @%@", friend.name), F.t(20, W600), maxLines = 1, translate = false)
+        if (sent) {
+            Spacer(Modifier.weight(1f))
+            Check8(C.good, 44.dp)
+            T("Sent!", F.t(17, W600), maxLines = 1)
+            Spacer(Modifier.weight(1f))
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                for (k in CheerKind.entries.filter { it.isEmoji }) {
+                    Box(Modifier.weight(1f).height(72.dp).clip(RoundedCornerShape(18.dp)).background(C.card).press(0.94f) { send(k) }.testTag("cheer.${k.raw}"),
+                        contentAlignment = Alignment.Center) { T(k.emoji, F.t(34), maxLines = 1, translate = false) }
+                }
+            }
+            val lines = CheerKind.entries.filter { !it.isEmoji }
+            Column(Modifier.fillMaxWidth().card8()) {
+                lines.forEachIndexed { i, k ->
+                    Row(Modifier.fillMaxWidth().rowLine(i < lines.size - 1).tap { send(k) }.padding(vertical = 12.dp, horizontal = 16.dp).testTag("cheer.${k.raw}"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        T(k.emoji, F.t(18), maxLines = 1, translate = false)
+                        T(k.line, F.t(16), Modifier.weight(1f), maxLines = 1)
+                    }
+                }
+            }
+            error?.let { T(it, F.t(13, color = C.bad), Modifier.fillMaxWidth().testTag("cheer.error"), align = TextAlign.Center, translate = false) }
+        }
+    }
 }
 
 /** 보낸 요청: 상대가 수락할 때까지 · Cancel 로 취소 */
@@ -257,6 +358,10 @@ private fun FriendRow(f: Friend, last: Boolean) {
                 if (d != null) T(Fm.d(d), F.num(11, color = if (d > 0) C.good else if (d < 0) C.bad else C.text2), maxLines = 1, translate = false)
             }
             if (on) Check8(size = 20.dp) else Spacer(Modifier.size(20.dp))
+        }
+        // 빌드 24: 응원 보내기 (정해진 이모지 · 문구만)
+        Box(Modifier.size(36.dp, 44.dp).press(0.9f) { Router.cheerTo = f }.testTag("friends.cheer"), contentAlignment = Alignment.Center) {
+            T("👏", F.t(16), maxLines = 1, translate = false)
         }
         Box(Modifier.padding(end = 6.dp)) { MoreButton(f.id, f.name) }
     }

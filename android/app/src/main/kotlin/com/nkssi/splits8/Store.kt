@@ -80,12 +80,26 @@ object Store {
     /** 로그인함 = 닉네임이 있고 서버 로그인 정보도 있음 (예시 화면은 닉네임만) */
     val signedIn: Boolean get() = settings.signedIn && (demo || Supabase.session != null)
 
+
+    /**
+     * 빌드 24: 켤 때 설정 바로잡기 (아이폰 Store.init 과 같음)
+     * - 태어난 해가 있으면 나이는 늘 그 해로 계산 (프로필의 나이와 태어난 해가 따로 놀지 않게)
+     * - 예전 '대회 경험 디비전'(raceDivision)은 Division 하나로 합침
+     */
+    fun fixSettings(s0: Settings, thisYear: Int = java.time.Year.now().value): Settings {
+        var s = s0
+        s.birthYear?.let { y -> val a = thisYear - y; if (a in 10..100 && s.age != a) s = s.copy(age = a) }
+        val k = s.raceDivision
+        if (s.divPicked != true && k != null && com.nkssi.splits8.shared.Division.all.any { it.key == k }) s = s.copy(division = k, divPicked = true)
+        return s
+    }
+
     fun init(context: Context) {
         if (dir != null) return
         dir = context.filesDir
         Reminders.context = context.applicationContext
         prefs = context.getSharedPreferences("splits8", Context.MODE_PRIVATE)
-        settings = load("settings.json", Settings.serializer()) ?: Settings()
+        settings = fixSettings(load("settings.json", Settings.serializer()) ?: Settings())
         programs = load("programs.json", ListSerializer(Program.serializer())) ?: Program.presets()
         records = load("records.json", ListSerializer(Record.serializer())) ?: emptyList()
         friends = load("friends.json", ListSerializer(Friend.serializer())) ?: emptyList()
@@ -117,7 +131,7 @@ object Store {
     ) {
         demo = true
         settings = s; programs = p; records = r; friends = f; plans = pl
-        leaderboard = lb; requests = req; myId = me; memPrefs.clear()
+        leaderboard = lb; requests = req; myId = me; memPrefs.clear(); cheers = emptyList()
         applyLang()
         rebuild()
     }
@@ -228,7 +242,38 @@ object Store {
     /** 이번에 요청을 보낸 사람 (서버 목록이 다시 오기 전까지 "Requested" 로 보이게) */
     var requested by mutableStateOf<Set<String>>(emptySet())
 
-    val friendsFull: Boolean get() = friends.size >= FRIEND_LIMIT
+    /** 친구 수 (수락된 친구 + 보낸 요청) — 10명 제한에 씀 (아이폰 · 서버 friend_limit 과 같은 셈) */
+    val friendCount: Int get() = friends.size + outgoing.size
+    val friendsFull: Boolean get() = friendCount >= FRIEND_LIMIT
+
+    /** 빌드 24: 받은 응원 (서버에 표가 아직 없으면 빈 목록) */
+    var cheers by mutableStateOf<List<CheerRow>>(emptyList())
+    val unseenCheers: Int get() = cheers.count { !it.seen }
+
+    /** 받은 응원을 읽음으로 (친구 화면을 열면) */
+    fun markCheersSeen() {
+        if (cheers.none { !it.seen }) return
+        cheers = cheers.map { it.copy(seen = true) }
+        if (!demo) socialCall { Supabase.markCheersSeen() }
+    }
+
+    /** 응원 보내기. 실패하면 이유 (null = 보냄) */
+    suspend fun sendCheer(k: CheerKind, to: Friend): String? {
+        if (demo) return null
+        return try {
+            Supabase.sendCheer(to.id, k.raw); null
+        } catch (e: ServerError) {
+            val m = e.message ?: ""
+            when {
+                "daily limit" in m -> L10n.t("You've sent a lot of cheers today. Try again tomorrow.")
+                "too fast" in m -> L10n.t("Give it a minute before cheering the same friend again.")
+                "send_cheer" in m || "function" in m -> L10n.t("Cheers aren't available yet.")
+                else -> L10n.t("Couldn't send. Check your connection and try again.")
+            }
+        } catch (e: Exception) {
+            L10n.t("Couldn't send. Check your connection and try again.")
+        }
+    }
 
     /** 친구를 고르면 Full Sim 비교 · 트레이닝 목표에 씀. 다시 누르면 풂 */
     fun toggleFriend(f: Friend) {

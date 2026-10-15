@@ -63,6 +63,11 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nkssi.splits8.Ask
+import com.nkssi.splits8.shared.newId
+import com.nkssi.splits8.shared.Program
+import com.nkssi.splits8.shared.ProgItem
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.nkssi.splits8.R
 import com.nkssi.splits8.Config
 import com.nkssi.splits8.Router
@@ -100,6 +105,9 @@ import com.nkssi.splits8.ui.AmbientLayer
 import com.nkssi.splits8.ui.Avatar8
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.Check8
+import com.nkssi.splits8.ui.LightMode
+import com.nkssi.splits8.ui.borderLight
+import com.nkssi.splits8.ui.outerGlow
 import com.nkssi.splits8.ui.F
 import com.nkssi.splits8.ui.FlagPill
 import com.nkssi.splits8.ui.Glyph
@@ -218,11 +226,52 @@ private fun DetailContent(rec: Record) {
     // SPLITS 라벨: margin 20 4 0
     Row(Modifier.fillMaxWidth().padding(top = 20.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.Bottom) {
         T(SectionText.shown("SPLITS"), F.t(F.sub, W600), Modifier.weight(1f), maxLines = 1, translate = false)
-        if (rec.mode == Mode.Training) T("vs your best", F.t(11, W500, C.text3), maxLines = 1)
+        if (rec.mode == Mode.Training) T("VS YOUR BEST", F.t(11, W600, C.text3, tracking = 0.6f), maxLines = 1)
     }
     Splits(rec)
     BenchSection(rec)
+    // 빌드 25 (66번): 워치 Quick 은 한 번 쓰는 운동 → 마음에 들면 여기서 정식 트레이닝으로
+    if (rec.mode == Mode.Training && rec.kind == null && rec.title.startsWith("Quick") && rec.segs.isNotEmpty())
+        SaveQuickCard(rec, Modifier.padding(top = 10.dp))
     DeleteCard(rec, Modifier.padding(top = 10.dp))
+}
+
+// MARK: Quick → 내 트레이닝으로 저장 (빌드 25 · 66번)
+
+object QuickSave {
+    /** 이 기록의 구간 순서로 만든 트레이닝 (Roxzone 은 뺌) */
+    fun program(rec: Record): Program {
+        val items = rec.segs.filter { it.kind != SegKind.Rox }.map { s -> if (s.icon == "run") ProgItem("run", s.detail) else ProgItem(s.icon) }
+        return Program(id = "t" + newId().take(8), name = rec.title, sets = 1, seq = items)
+    }
+
+    /** 같은 구간 순서의 트레이닝이 이미 목록에 있는지 */
+    fun saved(rec: Record, programs: List<Program>): Boolean {
+        val seq = program(rec).seq
+        return programs.any { it.kind == null && it.sets == 1 && it.seq == seq }
+    }
+}
+
+@Composable
+private fun SaveQuickCard(rec: Record, modifier: Modifier) {
+    var justSaved by remember(rec.id) { mutableStateOf(false) }
+    val done = justSaved || QuickSave.saved(rec, Store.programs)
+    val haptic = LocalHapticFeedback.current
+    Row(
+        modifier.fillMaxWidth().height(50.dp).card8(14.dp).press(enabled = !done) {
+            if (Store.programs.size >= Program.freeLimit) {
+                Router.ask = Ask(L10n.t("You can save up to %lld trainings", Program.freeLimit), "", cancel = null)
+                return@press
+            }
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            Store.saveProgram(QuickSave.program(rec))
+            justSaved = true
+        }.testTag("detail.saveQuick"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        if (done) Check8(C.good, 18.dp)
+        T(if (done) "Saved to My Trainings" else "Save to My Trainings", F.t(17, W600, if (done) C.good else C.accent), maxLines = 1)
+    }
 }
 
 // MARK: 머리 (배지 · 날짜 · 큰 제목), padding 0 4 8
@@ -494,7 +543,9 @@ private fun RowScope.TileView(t: DetailTile) {
 private fun pftRule(g: PFTGrade): String = when (g) {
     PFTGrade.Gold -> "Gold is under 22:00"
     PFTGrade.Silver -> "Silver is within 26:00"
-    PFTGrade.Bronze -> "Bronze is over 26:00"
+    PFTGrade.Bronze -> "Bronze is within 30:00"
+    PFTGrade.Iron -> "Iron is within 35:00"
+    PFTGrade.Unranked -> "Finish within 35:00 for Iron"
 }
 
 @Composable
@@ -511,7 +562,11 @@ private fun PftCard(rec: Record) {
         0f to hex(g.hex1, 0.9f), 0.45f to hex(g.hex2, 0.25f), 1f to Color.White.copy(alpha = 0.08f),
     )
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(Color(0xFF121210))
+        Modifier.fillMaxWidth()
+            // 빌드 26: 등급 색으로 은은하게 빛남 + 테두리 빛 한 바퀴 (Unranked · 등급 없음은 없음)
+            .then(if (g != null && g != PFTGrade.Unranked) Modifier.outerGlow(hex(g.hex1, 0.28f), 20.dp, 18.dp) else Modifier)
+            .borderLight(hex((g ?: PFTGrade.Unranked).hex1), if (g == null || g == PFTGrade.Unranked) LightMode.Off else LightMode.Once, 20.dp)
+            .clip(shape).background(Color(0xFF121210))
             .border(1.dp, border, shape).testTag("detail.pft")
             .padding(top = 20.dp, start = 18.dp, end = 18.dp, bottom = 18.dp),
     ) {

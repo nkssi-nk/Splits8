@@ -410,7 +410,7 @@ fun SearchField8(placeholder: String, text: String, modifier: Modifier = Modifie
 
 // MARK: PFT 등급 뱃지
 
-/** GOLD / SILVER / BRONZE (기본 78 × 22). 점은 왼쪽 같은 자리, 글자는 남은 칸 가운데 */
+/** GOLD / SILVER / BRONZE / IRON / UNRANKED (기본 78 × 22). 점은 왼쪽 같은 자리, 글자는 남은 칸 가운데 */
 @Composable
 fun PFTBadge(grade: PFTGrade, modifier: Modifier = Modifier, width: Dp = 78.dp, height: Dp = 22.dp, fontSize: Float = 12f) {
     val shape = RoundedCornerShape(height * 0.32f)
@@ -418,7 +418,9 @@ fun PFTBadge(grade: PFTGrade, modifier: Modifier = Modifier, width: Dp = 78.dp, 
     val lead = (height - dot) / 2 + 1.dp
     Row(
         modifier.size(width, height).clip(shape)
-            .background(Brush.linearGradient(listOf(hex(grade.hex1), hex(grade.hex2)))),
+            // Unranked = 회색 테두리만 (바탕 없음) — 아이폰 빌드 26
+            .then(if (grade == PFTGrade.Unranked) Modifier.border(1.2.dp, hex(grade.hex1), shape)
+                  else Modifier.background(Brush.linearGradient(listOf(hex(grade.hex1), hex(grade.hex2))))),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

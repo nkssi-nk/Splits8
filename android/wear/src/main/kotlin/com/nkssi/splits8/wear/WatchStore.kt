@@ -82,8 +82,9 @@ object WatchStore {
         dir = context.filesDir
         ctx = load(CTX_FILE, WatchContext.serializer()) ?: WatchContext(Settings(), Program.presets())
         pending = load(PENDING_FILE, ListSerializer(Record.serializer())) ?: emptyList()
-        // 워치에는 마지막 Quick 하나만 남김
-        quickSaved = (load(QUICK_FILE, ListSerializer(Program.serializer())) ?: emptyList()).take(1)
+        // 빌드 25 (66번): Quick 은 한 번 쓰는 운동 → 워치 목록에 남기지 않음 (예전에 남은 파일도 지움)
+        quickSaved = emptyList()
+        java.io.File(context.filesDir, QUICK_FILE).delete()
         applyLang()
         wire(engine)
     }
@@ -117,20 +118,19 @@ object WatchStore {
         init(context)
     }
 
-    /** 목록: 폰 트레이닝 목록이 원본. 워치에는 '방금 만든 Quick' 하나만 위에 붙음 */
+    /** 목록: 폰 트레이닝 목록이 원본 (quickSaved 는 시험 · 화면 사진용으로만 채움) */
     val programs: List<Program>
         get() {
             val ids = ctx.programs.map { it.id }.toSet()
             return quickSaved.filter { it.id !in ids } + ctx.programs
         }
 
-    /** Quick training: 이번 운동에 쓰는 것. 폰 목록에는 안 쌓음, 워치에는 마지막 것 하나만 */
-    fun saveQuick(seq: List<ProgItem>, now: Instant = Instant.now()): Program {
-        val p = Program(id = "q" + newId().take(8), name = "Quick · " + Fm.dm(now), sets = 1, seq = seq, quick = true)
-        quickSaved = listOf(p)
-        save(QUICK_FILE, ListSerializer(Program.serializer()), quickSaved)
-        return p
-    }
+    /**
+     * Quick training: 이번 운동에 쓰는 것. 폰 목록에도 워치 목록에도 안 남김 (빌드 25 · 66번 — 폰 목록과 늘 같게).
+     * 같은 구성을 다시 하려면 폰 기록 화면의 "내 트레이닝으로 저장"
+     */
+    fun saveQuick(seq: List<ProgItem>, now: Instant = Instant.now()): Program =
+        Program(id = "q" + newId().take(8), name = "Quick · " + Fm.dm(now), sets = 1, seq = seq, quick = true)
 
     // MARK: 구간 목표
 

@@ -219,7 +219,10 @@ fun PFTBadge(grade: PFTGrade, width: Dp, height: Dp, fontSize: Float) {
     val dot = (fontSize * 0.92f).dp
     val lead = (height - dot) / 2 + 1.dp
     Row(
-        Modifier.size(width, height).clip(shape).background(Brush.linearGradient(listOf(hex(grade.hex1), hex(grade.hex2)))),
+        Modifier.size(width, height).clip(shape)
+            // Unranked = 회색 테두리만 (바탕 없음) — 아이폰 빌드 26
+            .then(if (grade == PFTGrade.Unranked) Modifier.border(1.2.dp, hex(grade.hex1), shape)
+                  else Modifier.background(Brush.linearGradient(listOf(hex(grade.hex1), hex(grade.hex2))))),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.padding(start = lead).size(dot).clip(CircleShape).background(Color.Black.copy(alpha = 0.28f))

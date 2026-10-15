@@ -20,6 +20,24 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** 서버 설정 (아이폰 Config.swift 와 같은 서버 — 아이폰 ↔ 안드로이드 친구 · 순위표가 이어짐) */
+/** 받은 응원 한 줄 (빌드 24, 서버 my_cheers) */
+data class CheerRow(
+    val id: Long, val sender: String, val nickname: String, val avatarUrl: String?,
+    val kind: String, val createdAt: java.time.Instant, val seen: Boolean,
+)
+
+/** 응원 종류 (정해진 것만 — 자유 글 없음). 서버 check 목록과 같아야 함 (아이폰 CheerKind) */
+enum class CheerKind(val emoji: String, val line: String) {
+    Fire("🔥", "🔥"), Clap("👏", "👏"), Muscle("💪", "💪"),
+    Pb("🏆", "Nice PB!"), Race("🏁", "Good luck at the race!"), Together("🤝", "Let's train together"), Go("⚡️", "You've got this");
+
+    val raw: String get() = name.lowercase()
+    /** 이모지만 보내는 것 (나머지는 문구) */
+    val isEmoji: Boolean get() = this == Fire || this == Clap || this == Muscle
+
+    companion object { fun of(raw: String): CheerKind = entries.firstOrNull { it.raw == raw } ?: Clap }
+}
+
 object Config {
     const val supabaseURL = "https://hzkixqmtpillcaqsouwr.supabase.co"
     const val supabaseAnonKey = "sb_publishable_U2rt8t0plmtMDsE-KLb4Pw_Ku0JLOno"
@@ -283,6 +301,26 @@ object Supabase {
         request("/rest/v1/friendships?requester=eq.$me&addressee=eq.$other", "DELETE", headers = mapOf("Prefer" to "return=minimal"))
         request("/rest/v1/friendships?requester=eq.$other&addressee=eq.$me", "DELETE", headers = mapOf("Prefer" to "return=minimal"))
     }
+
+    // MARK: 빌드 24 · 응원 (supabase/build24_cheers.sql)
+
+    suspend fun sendCheer(other: String, kind: String) {
+        request("/rest/v1/rpc/send_cheer", "POST", buildJsonObject { put("other", other); put("kind", kind) })
+    }
+
+    /** 받은 응원 최근 50개. 시각은 "2026-10-14T06:30:12.123456+00:00" 처럼 소수점 6자리 → 소수점 부분을 떼고 읽음 */
+    suspend fun cheers(): List<CheerRow> =
+        arr(request("/rest/v1/rpc/my_cheers", "POST", JsonObject(emptyMap()))).mapNotNull { o ->
+            val t = (o.str("created_at") ?: "").replace(Regex("\\.[0-9]+"), "")
+            val at = runCatching { java.time.OffsetDateTime.parse(t).toInstant() }.getOrNull() ?: java.time.Instant.now()
+            CheerRow(
+                (o["id"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: return@mapNotNull null,
+                o.str("sender") ?: return@mapNotNull null, o.str("nickname") ?: "", o.str("avatar_url"),
+                o.str("kind") ?: "clap", at, (o["seen"] as? JsonPrimitive)?.contentOrNull == "true",
+            )
+        }
+
+    suspend fun markCheersSeen() { request("/rest/v1/rpc/mark_cheers_seen", "POST", JsonObject(emptyMap())) }
 
     /** 친구 + 각자의 최고 Full Simulation */
     suspend fun friends(): List<FriendRow> =

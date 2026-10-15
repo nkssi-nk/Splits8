@@ -70,12 +70,13 @@ class WatchStoreTest {
         assertEquals(3900, WatchStore.engine.settings.goalTime)
     }
 
-    @Test fun onlyLastQuickKept() {
-        WatchStore.saveQuick(listOf(ProgItem("run", "1KM"), ProgItem("sledPush")))
-        val p2 = WatchStore.saveQuick(listOf(ProgItem("wallBalls")))
-        assertEquals(listOf(p2.id), WatchStore.quickSaved.map { it.id })
-        assertEquals(p2.id, WatchStore.programs.first().id)  // 목록 맨 위에 방금 만든 것
+    @Test fun quickNotKept() {
+        // 빌드 25 (66번): Quick 은 워치 목록에 남지 않음 (이번 운동에만 씀)
+        val p = WatchStore.saveQuick(listOf(ProgItem("run", "1KM"), ProgItem("sledPush")))
+        assertTrue(p.quick)
+        assertTrue(WatchStore.quickSaved.isEmpty())
+        assertTrue(WatchStore.programs.none { it.id == p.id })
         WatchStore.reloadForTest(app)
-        assertEquals(listOf(p2.id), WatchStore.quickSaved.map { it.id })
+        assertTrue(WatchStore.quickSaved.isEmpty())
     }
 }

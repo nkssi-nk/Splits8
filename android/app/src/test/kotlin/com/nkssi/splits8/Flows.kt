@@ -168,8 +168,10 @@ class Flows {
 
     @Test fun pftScalePositions() {
         assertEquals(0f, com.nkssi.splits8.screens.pftPos(12 * 60), 0.001f)
-        assertEquals(0.44f, com.nkssi.splits8.screens.pftPos(22 * 60), 0.001f)
-        assertEquals(0.70f, com.nkssi.splits8.screens.pftPos(26 * 60), 0.001f)
+        assertEquals(0.30f, com.nkssi.splits8.screens.pftPos(22 * 60), 0.001f)
+        assertEquals(0.50f, com.nkssi.splits8.screens.pftPos(26 * 60), 0.001f)
+        assertEquals(0.68f, com.nkssi.splits8.screens.pftPos(30 * 60), 0.001f)
+        assertEquals(0.86f, com.nkssi.splits8.screens.pftPos(35 * 60), 0.001f)
         assertEquals(1f, com.nkssi.splits8.screens.pftPos(40 * 60), 0.001f)
     }
 

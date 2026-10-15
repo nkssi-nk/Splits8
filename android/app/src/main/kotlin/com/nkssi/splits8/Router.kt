@@ -166,6 +166,8 @@ object Router {
     /** ··· 메뉴 (신고 · 차단)를 띄울 사람 */
     var userMenu by mutableStateOf<com.nkssi.splits8.shared.BlockedUser?>(null)
     /** 기록 상세의 파트너 고르기 시트 (기록 id) */
+    /** 빌드 24: 응원 보낼 친구 (시트) */
+    var cheerTo by mutableStateOf<com.nkssi.splits8.shared.Friend?>(null)
     var partnerFor by mutableStateOf<String?>(null)
     /** Test 탭 설명 시트: "pft" / "sim" / null */
     var testInfo by mutableStateOf<String?>(null)

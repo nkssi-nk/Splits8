@@ -357,7 +357,9 @@ fun FinishSheet(rec: Record) {
         view.performHapticFeedback(if (c.tone == Cheer.Tone.Check) HapticFeedbackConstants.LONG_PRESS
             else if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.LONG_PRESS)
     }
-    Box(Modifier.fillMaxWidth().height(400.dp)) {
+    // 빌드 24: 이 기록으로 새로 받은 배지 (있으면 카드가 그만큼 길어짐)
+    val nb = remember(rec.id, Store.records) { com.nkssi.splits8.shared.Badges.new(rec, Store.records) }
+    Box(Modifier.fillMaxWidth().height(if (nb.isEmpty()) 400.dp else 470.dp)) {
         if (isGold) {
             // 카드 위쪽 금색 빛 (축하)
             androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(300.dp)) {
@@ -374,6 +376,7 @@ fun FinishSheet(rec: Record) {
             Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for ((l, v, u) in finishTiles(rec)) FinishTile(l, v, u)
             }
+            if (nb.isNotEmpty()) NewBadgesRow(nb, Modifier.padding(top = 12.dp))
             Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(

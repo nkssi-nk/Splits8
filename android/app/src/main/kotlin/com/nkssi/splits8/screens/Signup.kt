@@ -69,6 +69,7 @@ import com.nkssi.splits8.Scr
 import com.nkssi.splits8.Store
 import com.nkssi.splits8.shared.Division
 import com.nkssi.splits8.shared.Fm
+import com.nkssi.splits8.shared.Defaults
 import com.nkssi.splits8.shared.GoalSplit
 import com.nkssi.splits8.shared.HyroxBench
 import com.nkssi.splits8.shared.L10n
@@ -592,16 +593,22 @@ fun ProfileSetupView() {
     fun saveStep(withTime: Boolean = true) {
         when (step) {
             1 -> Store.update { st ->
-                var n = st.copy(raced = raced, bestFinish = if (raced == true && withTime) bh * 3600 + bm * 60 + bs else if (raced == false) null else st.bestFinish)
-                // 최고 완주 시간 → 목표 시간 기본값 · 구간 나누기 (실제 중간값 비율)
-                val best = n.bestFinish
-                if (best != null && best > 600 && withTime) {
-                    val rox = HyroxBench.roxEach(best, n.division)
-                    n = n.copy(goalTime = best, roxGoal = rox, goals = GoalSplit.split(best, "balanced", n.goals, null, n.division, rox))
+                val sec = bh * 3600 + bm * 60 + bs
+                var n = st.copy(raced = raced)
+                if (raced == true && withTime && sec >= 30 * 60) {
+                    val fresh = st.bestFinish != sec
+                    n = n.copy(bestFinish = sec)
+                    // 목표 시간을 아직 안 정했으면 최고 기록을 목표 시간 기본값으로 + 구간 목표도 그 시간대 실제 중간값으로 (아이폰과 같음)
+                    if (fresh && st.goalTime == Defaults.goalTime) {
+                        val rox = HyroxBench.roxEach(sec, n.division)
+                        n = n.copy(goalTime = sec, roxGoal = rox, goals = GoalSplit.split(sec, "balanced", n.goals, null, n.division, rox))
+                    }
+                } else if (raced != true || !withTime) {
+                    n = n.copy(bestFinish = null)
                 }
                 n
             }
-            2 -> div?.let { d -> Store.update { it.copy(division = d, divPicked = true, sex = sexOf(d) ?: mixedSex, raceDivision = if (it.raced == true) d else null) } }
+            2 -> div?.let { d -> Store.update { it.copy(division = d, divPicked = true, sex = sexOf(d) ?: mixedSex, raceDivision = d) } }
             3 -> Store.update { it.copy(birthYear = year, age = (thisYear - year).coerceIn(10, 99)) }   // 설정의 나이는 태어난 해로 계산
             4 -> Store.update { it.copy(heightCm = height, weightKg = weight.toDouble()) }
         }

@@ -107,7 +107,7 @@ fun ShareView() {
     var variant by remember { mutableStateOf("poster") }
     var splits by remember { mutableStateOf(true) }
     var textColor by remember { mutableStateOf("white") }
-    var mono by remember { mutableStateOf(!(ShareDemo.colorDemo && ShareDemo.photo != null)) }
+    var mono by remember { mutableStateOf(false) }   // 빌드 24: 흑백 사진은 기본 꺼짐
     var gradient by remember { mutableStateOf(true) }
     var nickOn by remember { mutableStateOf(true) }
     var glow by remember { mutableStateOf(Store.settings.glow) }

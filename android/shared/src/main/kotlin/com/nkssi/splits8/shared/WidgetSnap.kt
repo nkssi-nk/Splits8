@@ -25,6 +25,8 @@ data class WidgetSnap(
     val dayMode: List<String> = List(7) { "" },
     /** 요일 7칸: 운동한 분 */
     val dayMin: List<Int> = List(7) { 0 },
+    /** 빌드 24: 앱 빛 색 (위젯 바탕 '테마 색'에 씀) */
+    val themeHex: Long? = null,
 ) {
     /** 남은 날 (오늘 = 0). 대회가 없거나 지났으면 null */
     fun daysLeft(now: Instant): Int? {
@@ -71,7 +73,7 @@ data class WidgetSnap(
                 division = settings.div.name, goal = settings.goalTime.takeIf { it > 0 }, best = best,
                 weekStart = wk, weekCount = these.size, weekSec = these.sumOf { it.total }, weekKcal = these.sumOf { it.kcal },
                 weekRunKm = these.flatMap { it.runs }.sumOf { it.dist ?: runMeters(it.detail) } / 1000,
-                dayMode = dayMode, dayMin = dayMin,
+                dayMode = dayMode, dayMin = dayMin, themeHex = settings.glow.hex,
             )
         }
 

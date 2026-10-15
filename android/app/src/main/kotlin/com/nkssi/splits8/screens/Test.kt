@@ -145,13 +145,17 @@ private object PFTText {
         PFTGrade.Gold -> L10n.t("%@ inside Gold", Fm.t(PFT.goldLimit - total))
         PFTGrade.Silver -> L10n.t("%@ to Gold", Fm.t(total - PFT.goldLimit + 1))
         PFTGrade.Bronze -> L10n.t("%@ to Silver", Fm.t(total - PFT.silverLimit))
+        PFTGrade.Iron -> L10n.t("%@ to Bronze", Fm.t(total - PFT.bronzeLimit))
+        PFTGrade.Unranked -> L10n.t("%@ to Iron", Fm.t(total - PFT.ironLimit))
     }
 
     /** 설명 카드의 등급 기준 */
     fun range(g: PFTGrade): String = when (g) {
         PFTGrade.Gold -> "Under 22:00".l10n
         PFTGrade.Silver -> "Within 26:00".l10n
-        PFTGrade.Bronze -> "Over 26:00".l10n
+        PFTGrade.Bronze -> "Within 30:00".l10n
+        PFTGrade.Iron -> "Within 35:00".l10n
+        PFTGrade.Unranked -> "Over 35:00".l10n
     }
 }
 
@@ -257,35 +261,39 @@ private fun PFTMovesCard(div: Division) {
     }
 }
 
-// MARK: 등급 막대 (Gold | Silver | Bronze + 내 기록 위치)
+// MARK: 등급 막대 (Gold | Silver | Bronze | Iron | Unranked + 내 기록 위치) — 아이폰 빌드 26
 
-private const val GOLD_END = 0.44f
-private const val SILVER_END = 0.70f
+/** 칸 끝 위치 */
+private val PFT_ENDS = listOf(0.30f, 0.50f, 0.68f, 0.86f, 1.0f)
+/** 칸 경계 시간(초): 12:00 · 22:00 · 26:00 · 30:00 · 35:00 · 40:00 */
+private val PFT_MARKS = listOf(12 * 60f, PFT.goldLimit.toFloat(), PFT.silverLimit.toFloat(), PFT.bronzeLimit.toFloat(), PFT.ironLimit.toFloat(), 40 * 60f)
 
-/** 기록 위치 0…1 (Gold 12:00–22:00 · Silver 22:00–26:00 · Bronze 26:00–36:00) */
+/** 기록 위치 0…1 */
 internal fun pftPos(t: Int): Float {
     val x = t.toFloat()
-    val g = PFT.goldLimit.toFloat()
-    val s = PFT.silverLimit.toFloat()
-    val lo = 12 * 60f
-    val hi = 36 * 60f
-    if (x < g) return GOLD_END * maxOf(0f, (x - lo) / (g - lo))
-    if (x <= s) return GOLD_END + (SILVER_END - GOLD_END) * (x - g) / (s - g)
-    return SILVER_END + (1 - SILVER_END) * minOf(1f, (x - s) / (hi - s))
+    var start = 0f
+    for (i in PFT_ENDS.indices) {
+        val a = PFT_MARKS[i]
+        val b = PFT_MARKS[i + 1]
+        if (x <= b || i == PFT_ENDS.size - 1) {
+            val f = ((x - a) / (b - a)).coerceIn(0f, 1f)
+            return start + (PFT_ENDS[i] - start) * f
+        }
+        start = PFT_ENDS[i]
+    }
+    return 1f
 }
 
 @Composable
 private fun PFTScale(total: Int?, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val w = maxWidth
-        val gw = w * GOLD_END
-        val sw = w * (SILVER_END - GOLD_END)
-        val bw = w - gw - sw
+        val widths = PFT_ENDS.indices.map { w * (PFT_ENDS[it] - (if (it == 0) 0f else PFT_ENDS[it - 1])) }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.CenterStart) {
                 Row(Modifier.fillMaxWidth().height(10.dp).clip(CircleShape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    for ((g, ww) in listOf(PFTGrade.Gold to gw - 1.dp, PFTGrade.Silver to sw - 2.dp, PFTGrade.Bronze to bw - 1.dp)) {
-                        Box(Modifier.width(ww).height(10.dp).background(Brush.horizontalGradient(listOf(hex(g.hex2), hex(g.hex1)))))
+                    PFTGrade.entries.forEachIndexed { i, g ->
+                        Box(Modifier.width(widths[i] - 2.dp).height(10.dp).background(Brush.horizontalGradient(listOf(hex(g.hex2), hex(g.hex1)))))
                     }
                 }
                 if (total != null) {
@@ -298,8 +306,8 @@ private fun PFTScale(total: Int?, modifier: Modifier = Modifier) {
                 }
             }
             Row {
-                for ((s, ww) in listOf("Gold" to gw, "22:00 · Silver" to sw, "26:00 · Bronze" to bw)) {
-                    T(s, F.num(F.cap2, color = C.text2), Modifier.width(ww), maxLines = 1, translate = false)
+                listOf("Gold", "22:00", "26:00", "30:00", "35:00").forEachIndexed { i, s ->
+                    T(s, F.num(F.cap2, color = C.text2), Modifier.width(widths[i]), maxLines = 1, translate = false)
                 }
             }
         }
@@ -390,7 +398,8 @@ private fun SimView() {
         val prev = if (pts.size >= 2) pts[pts.size - 2].second else null
         val rf = simRef(cur, prev)
         Row(verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // 빌드 26: 큰 시간을 누르면 목표 시간 시트
+            Column(Modifier.weight(1f).tap { Router.raceSheet = "goal" }.testTag("sim.bigTime"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 // 종목 칸은 "SkiErg · 최근" (이름은 영어 그대로 — 아이폰과 같음)
                 val cap = if (cur.st == null) cur.caption.l10n else cur.caption.substringBefore(" · ") + " · " + "latest".l10n
                 T(cap, F.t(13, color = C.text2), maxLines = 1, translate = false)

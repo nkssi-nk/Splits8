@@ -56,6 +56,13 @@ class WidgetFlows {
         save("82_widget_norace", WidgetArt.dday(app, WidgetSnap(), now, 170f, 170f, k))
         save("83_widget_week_small", WidgetArt.week(app, WidgetSnap.demo(now), now, 170f, 170f, k))
         save("84_widget_week_medium", WidgetArt.week(app, WidgetSnap.demo(now), now, 360f, 170f, k))
+        // 빌드 24: 바탕 고르기 — 흰색 · 테마 색 (주황)
+        save("88_widget_dday_white", WidgetArt.dday(app, WidgetSnap.demo(now, 10), now, 360f, 170f, k, WidgetPal.light))
+        save("88_widget_week_white", WidgetArt.week(app, WidgetSnap.demo(now), now, 360f, 170f, k, WidgetPal.light))
+        save("89_widget_dday_theme", WidgetArt.dday(app, WidgetSnap.demo(now, 10), now, 360f, 170f, k, WidgetPal.theme(0xFF8C1A)))
+        assertEquals(0xFF0C0C0C.toInt(), WidgetPal.of("auto", true, null).bg)
+        assertEquals(android.graphics.Color.WHITE, WidgetPal.of("auto", false, null).bg)
+        assertEquals(0x472707L, WidgetPal.blend(0xFF8C1A, 0x000000, 0.72))
         L10n.lang = "ko"
         save("85_widget_dday_medium_ko", WidgetArt.dday(app, WidgetSnap.demo(now, 3), now, 360f, 170f, k))
         save("86_widget_week_medium_ko", WidgetArt.week(app, WidgetSnap.demo(now), now, 360f, 170f, k))

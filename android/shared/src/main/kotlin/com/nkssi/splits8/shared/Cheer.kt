@@ -115,19 +115,23 @@ object CheerPicker {
             PFTGrade.Gold -> Cheer(L10n.t("Gold on your first try. Impressive."), c, tag)
             PFTGrade.Silver -> Cheer(L10n.t("Silver on your first try. Strong start."), c, tag)
             PFTGrade.Bronze -> Cheer(L10n.t("Bronze on your first try. Not bad at all."), c, tag)
+            PFTGrade.Iron -> Cheer(L10n.t("Iron on your first try. Bronze is next."), c, tag)
+            PFTGrade.Unranked -> Cheer(L10n.t("First PFT done. Iron is within 35:00."), n, tag)
         }
         val pg = PFT.grade(prev)
-        fun rank(v: PFTGrade) = when (v) { PFTGrade.Gold -> 2; PFTGrade.Silver -> 1; PFTGrade.Bronze -> 0 }
+        fun rank(v: PFTGrade) = v.rank
         if (g == PFTGrade.Gold && !x.pftEverGold) return Cheer(L10n.t("Gold. Well earned."), c, tag)
-        if (rank(g) > rank(pg)) return Cheer(L10n.t("Up to %@. Gold is next.", g.word.l10n), c, tag)
-        if (g != PFTGrade.Gold) {
-            val limit = if (g == PFTGrade.Silver) PFT.goldLimit - 1 else PFT.silverLimit
-            val gap = x.total - limit
-            if (gap in 1..30) {
-                val next = if (g == PFTGrade.Silver) PFTGrade.Gold else PFTGrade.Silver
-                return Cheer(L10n.t("%@ — just %llds from %@.", g.word.l10n, gap, next.word.l10n), n, tag)
-            }
+        if (rank(g) > rank(pg)) {
+            val nx = g.next
+            if (nx != null && nx != PFTGrade.Gold) return Cheer(L10n.t("Up to %@. Next: %@.", g.word.l10n, nx.word.l10n), c, tag)
+            return Cheer(L10n.t("Up to %@. Gold is next.", g.word.l10n), c, tag)
         }
+        // 다음 등급까지 30초 안
+        g.next?.let { next ->
+            val gap = x.total - PFT.limit(next)
+            if (gap in 1..30) return Cheer(L10n.t("%@ — just %llds from %@.", g.word.l10n, gap, next.word.l10n), n, tag)
+        }
+        if (g == PFTGrade.Unranked) return Cheer(L10n.t("PFT done. Iron is within 35:00."), n, tag)
         if (rank(g) == rank(pg) && x.total < prev && g != PFTGrade.Gold) {
             return Cheer(L10n.t("Still %@, but %@ faster.", g.word.l10n, Fm.t(prev - x.total)), n, tag)
         }

@@ -116,6 +116,7 @@ object Cloud {
             val (fs, rq) = mergeFriends(rows, links, me) { Store.isBlocked(it) }
             Store.setSocial(fs, rq)
         }
+        runCatching { Supabase.cheers() }.getOrNull()?.let { cs -> Store.cheers = cs.filter { !Store.isBlocked(it.sender) } }
         refreshLeaderboard()
     }
 

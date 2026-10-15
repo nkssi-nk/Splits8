@@ -57,6 +57,13 @@ object Demo {
         Friend("demo.2", "minseo", "Open Women", "", emptyList()),
     )
 
+    /** 받은 응원 예시 (빌드 24, 아이폰 Demo.cheers 와 같음) */
+    fun cheers(now: java.time.Instant = java.time.Instant.now()): List<CheerRow> = listOf(
+        CheerRow(3, "demo.1", "jiho", null, "pb", now.minusSeconds(600), false),
+        CheerRow(2, "demo.2", "minseo", null, "fire", now.minusSeconds(7200), false),
+        CheerRow(1, "demo.1", "jiho", null, "race", now.minusSeconds(90000), true),
+    )
+
     fun requests(): List<FriendReq> = listOf(
         FriendReq("demo.4", "hana", "Open Women", null, incoming = true),
         FriendReq("demo.5", "woojin", "Pro Men", null, incoming = false),
@@ -84,11 +91,11 @@ object Demo {
                 val r = (runs[i] * scale).toInt()
                 val s = (stT[i] * scale).toInt()
                 segs.add(SegResult("run", "Run ${i + 1}", "1KM", SegKind.Run, r, 270, hr = 158 + (i % 3) * 3, dist = 1000.0))
-                segs.add(SegResult("roxzone", "Roxzone", "TRANSITION", SegKind.Rox, 18, 30, hr = 150))
+                segs.add(SegResult("roxzone", "Roxzone", "Transition", SegKind.Rox, 18, 30, hr = 150))
                 val st = Station.all[i]
                 val reps = mapOf("skiErg" to 118, "row" to 104, "wallBalls" to 97)[st.key]
                 segs.add(SegResult(st.key, st.name, st.detail(div), SegKind.St, s, Defaults.stationGoals[i], hr = 165 + (i % 4) * 4, reps = reps))
-                if (i < 7) segs.add(SegResult("roxzone", "Roxzone", "TRANSITION", SegKind.Rox, 18, 30, hr = 150))
+                if (i < 7) segs.add(SegResult("roxzone", "Roxzone", "Transition", SegKind.Rox, 18, 30, hr = 150))
             }
             val fix = want - segs.sumOf { it.time }
             val li = segs.indexOfLast { it.kind == SegKind.St }

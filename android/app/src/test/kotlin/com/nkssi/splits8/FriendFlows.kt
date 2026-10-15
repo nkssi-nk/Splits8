@@ -99,9 +99,11 @@ class FriendFlows {
         val many = (1..10).map { Friend("f$it", "friend$it", "Open Men", "", emptyList()) }
         Store.useDemo(Store.settings, Store.programs, Store.records, many, req = Demo.requests(), me = "demo.me")
         show()
-        rule.onNodeWithTag("friends.count").assertTextEquals("10 / 10")
+        // 빌드 24: 수락된 친구 10 + 보낸 요청 1 (woojin) = 11 — 아이폰 · 서버와 같은 셈
+        rule.onNodeWithTag("friends.count").assertTextEquals("11 / 10")
         tap("friends.accept")
-        assertEquals("You can add up to 10 friends.", Router.ask?.title)
+        assertEquals("You can add up to 10 friends", Router.ask?.title)
+        assertEquals("Remove a friend or cancel a request to add someone new.", Router.ask?.message)
         assertEquals(10, Store.friends.size)
         assertTrue(Store.incoming.isNotEmpty())            // 거절된 게 아니라 그대로 남음
     }

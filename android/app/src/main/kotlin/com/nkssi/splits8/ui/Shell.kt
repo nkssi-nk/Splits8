@@ -126,11 +126,14 @@ fun Scroll8(bottom: Dp = 120.dp, content: @Composable ColumnScope.() -> Unit) {
     val s = Router.scr
     val top = statusTop() + if (s.showsBar || s.pinsNav) 52.dp else 4.dp
     Column(
-        Modifier.fillMaxSize().nestedScroll(conn).verticalScroll(state)
+        Modifier.fillMaxSize().nestedScroll(conn).verticalScroll(state, enabled = !MapTouch.down)
             .padding(top = top, bottom = bottom + navBottom()),
         content = content,
     )
 }
+
+/** 지도를 손가락으로 누르고 있는 동안은 화면 스크롤을 멈춤 (지도를 위아래로 끌어도 화면이 안 따라가게) */
+object MapTouch { var down by mutableStateOf(false) }
 
 // MARK: 위 고정 바
 

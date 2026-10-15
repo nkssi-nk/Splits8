@@ -115,5 +115,7 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/share_paths" />
         </provider>
+        <!-- 구글 지도 키 (build.gradle.kts → gradle.properties splits8.mapsKey) -->
+        <meta-data android:name="com.google.android.geo.API_KEY" android:value="${mapsKey}" />
     </application>
 </manifest>

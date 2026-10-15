@@ -3,6 +3,7 @@ package com.nkssi.splits8.screens
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nkssi.splits8.Ask
 import com.nkssi.splits8.R
+import com.nkssi.splits8.Config
 import com.nkssi.splits8.Router
 import com.nkssi.splits8.Scr
 import com.nkssi.splits8.Store
@@ -132,7 +134,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 // 기록 상세 (아이폰 DetailView.swift · Insights.swift 카드 · RunRouteViews.swift · BenchViews.swift)
-// 아이폰 지도(MapKit) 자리는 지도 없이 경로만 그림 — 구글 지도는 6단계에서
+// 아이폰 지도(MapKit) 자리는 구글 지도 (RouteMap.kt). 키가 없으면 지도 없이 경로만 그림
 
 /** 빠르면 초록, 느리면 빨강, 같거나 없으면 회색 */
 fun deltaColor(v: Int?): Color = when {
@@ -931,6 +933,16 @@ object RouteSpeed {
 private fun RouteCard(route: List<RoutePt>) {
     val chunks = remember(route) { RouteSpeed.chunks(route) }
     Box(Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF1B1C1E)).testTag("detail.route")) {
+        // 구글 지도 (키가 있을 때). 지도가 뜨기 전 · 키가 없을 때는 지도 없이 그린 경로
+        if (Config.hasMaps) GoogleRouteMap(route, chunks, Modifier.matchParentSize()) { RouteDrawing(route, chunks) }
+        else RouteDrawing(route, chunks)
+        if (chunks != null) RouteSpeedLegend(Modifier.align(Alignment.BottomStart))
+    }
+}
+
+/** 지도 없이 그린 경로 (옅은 격자 + 속도별 노란 선) */
+@Composable
+private fun BoxScope.RouteDrawing(route: List<RoutePt>, chunks: List<Triple<Int, Int, Double>>?) {
         Canvas(Modifier.matchParentSize()) {
             // 옅은 격자 (지도 느낌)
             val g = 28.dp.toPx()
@@ -967,10 +979,13 @@ private fun RouteCard(route: List<RoutePt>) {
             drawCircle(Color.White, 5.dp.toPx(), pt(0))
             drawCircle(C.accent, 6.dp.toPx(), pt(route.size - 1))
         }
-        if (chunks != null) {
-            // 왼쪽 아래 작은 안내: SLOW ▬▬ FAST
+}
+
+/** 왼쪽 아래 작은 안내: SLOW ▬▬ FAST */
+@Composable
+private fun RouteSpeedLegend(modifier: Modifier) {
             Row(
-                Modifier.align(Alignment.BottomStart).padding(10.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
+                modifier.padding(10.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
                     .padding(vertical = 5.dp, horizontal = 9.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -979,8 +994,6 @@ private fun RouteCard(route: List<RoutePt>) {
                     .background(Brush.horizontalGradient(listOf(RouteSpeed.color(0.0), RouteSpeed.color(1.0)))))
                 T("FAST", F.t(10, W600, C.accent), maxLines = 1)
             }
-        }
-    }
 }
 
 // MARK: 높이 그래프 (경로 아래, 가로 = km)

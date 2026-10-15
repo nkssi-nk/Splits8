@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.nkssi.splits8.Ask
+import com.nkssi.splits8.Config
 import com.nkssi.splits8.Router
 import com.nkssi.splits8.Scr
 import com.nkssi.splits8.Store
@@ -113,6 +114,7 @@ fun ShareView() {
     var photo by remember { mutableStateOf(ShareDemo.photo) }
     var saved by remember { mutableStateOf(false) }
     var mapOn by remember { mutableStateOf(false) }
+    var mapShotH by remember { mutableStateOf(0) }
     var smoke by remember { mutableStateOf("off") }
     var layout by remember { mutableStateOf(PosterLayout()) }
     var blockRects by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
@@ -207,6 +209,11 @@ fun ShareView() {
             }
             // 저장용 (보이지 않음)
             CaptureCard(layer) { ShareCard(data, opts(false)) }
+            // 경로 지도 그림 만들기 (보이지 않음, 구글 지도 키가 있을 때)
+            if (route != null && mapOn && mapShotH > 0 && Config.hasMaps) {
+                val h = mapShotH
+                RouteMapShot(route, h) { img -> if (img != null && mapOn && mapShotH == h) { photo = img.asImageBitmap(); mono = false } }
+            }
             if (variant == "poster") MoveHint(layout != PosterLayout()) { layout = PosterLayout() }
             Seg8(listOf("story" to "Story 9:16", "post" to "Post 4:5"), ratio, track = Color(0xFF141414)) { ratio = it }
             VariantButtons(variant) { variant = it }
@@ -215,8 +222,9 @@ fun ShareView() {
                 if (route != null) OptionRow("Route map") {
                     Toggle8(mapOn, Modifier.testTag("share.map"), w = 50.dp, h = 30.dp) { on ->
                         mapOn = on
-                        // 실외 러닝: 경로를 배경으로 (구글 지도는 6단계 — 지금은 지도 없이 경로만)
-                        if (on) { photo = routeImage(route, if (post) 1350 else 1920).asImageBitmap(); mono = false } else photo = null
+                        // 실외 러닝: 경로를 배경으로. 먼저 지도 없이 그린 경로 → 구글 지도 그림이 만들어지면 바꿈
+                        if (on) { photo = routeImage(route, if (post) 1350 else 1920).asImageBitmap(); mono = false; mapShotH = if (post) 1350 else 1920 }
+                        else { photo = null; mapShotH = 0 }
                     }
                 }
                 OptionRow("Text color") { MiniSeg(listOf("white" to "White", "black" to "Black"), textColor, 64, "share.text") { textColor = it } }

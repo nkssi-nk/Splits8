@@ -16,6 +16,10 @@ android {
         // 워치와 겹치지 않게: 폰은 끝자리 1, 워치는 끝자리 2
         versionCode = 101
         versionName = "1.0.0"
+        // 구글 지도 키: gradle.properties 의 splits8.mapsKey (또는 환경 변수 MAPS_API_KEY)
+        val mapsKey = (providers.gradleProperty("splits8.mapsKey").orNull ?: "").ifBlank { System.getenv("MAPS_API_KEY") ?: "" }
+        manifestPlaceholders["mapsKey"] = mapsKey
+        buildConfigField("String", "MAPS_KEY", "\"$mapsKey\"")
     }
     // 고정 디버그 서명 키 (GitHub 빌드마다 키가 바뀌면 구글 로그인 등록(SHA-1)이 매번 안 맞음). 디버그용이라 비밀 아님
     signingConfigs {
@@ -36,7 +40,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
@@ -60,6 +64,8 @@ dependencies {
     implementation(libs.androidx.credentials.play)
     implementation(libs.googleid)
     implementation(libs.health.connect)
+    // 러닝 경로 지도 (구글 지도)
+    implementation(libs.maps.compose)
     // 갤럭시 워치와 주고받기 (Wearable Data Layer)
     implementation(libs.play.wearable)
     implementation(libs.kotlinx.coroutines.play)

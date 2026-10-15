@@ -30,6 +30,8 @@ object Config {
     const val googleWebClientId = ""
     const val supportEmail = "nkssi1981@gmail.com"
     val hasSupabase: Boolean get() = supabaseURL.isNotEmpty() && supabaseAnonKey.isNotEmpty()
+    /** 구글 지도를 쓸지 (키가 있고, 컴퓨터 시험(Robolectric)이 아닐 때). 아니면 지도 없이 경로만 그림 */
+    val hasMaps: Boolean get() = BuildConfig.MAPS_KEY.isNotEmpty() && android.os.Build.FINGERPRINT != "robolectric"
 }
 
 @Serializable

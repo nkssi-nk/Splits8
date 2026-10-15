@@ -1,0 +1,81 @@
+package com.nkssi.splits8.wear
+
+import android.app.Application
+import androidx.test.core.app.ApplicationProvider
+import com.nkssi.splits8.shared.L10n
+import com.nkssi.splits8.shared.Mode
+import com.nkssi.splits8.shared.ProgItem
+import com.nkssi.splits8.shared.Program
+import com.nkssi.splits8.shared.Record
+import com.nkssi.splits8.shared.Settings
+import com.nkssi.splits8.shared.WatchContext
+import com.nkssi.splits8.shared.WatchWire
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.time.Instant
+
+/** 워치 저장소: 폰 묶음 받기 · 기록 보관함(폰 확인 전까지) · 빠른 트레이닝 하나만 */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w225dp-h225dp-round-watch-xhdpi")
+class WatchStoreTest {
+    private val app: Application = ApplicationProvider.getApplicationContext()
+    private val sent = ArrayList<Record>()
+
+    @Before fun setUp() {
+        WatchStore.resetForTest(app)
+        WatchStore.testRecordSink = { sent.add(it) }
+    }
+
+    @After fun tearDown() { WatchStore.testRecordSink = null; L10n.lang = "en" }
+
+    private fun rec(i: Int) = Record(mode = Mode.Training, title = "T$i", date = Instant.ofEpochSecond(1_790_000_000L + i), total = 60,
+        segs = emptyList(), hr = emptyList(), kcal = 0, avgHR = 0, maxHR = 0, division = "Open Men", vsWord = "VS BEST")
+
+    @Test fun outboxKeepsUntilPhoneConfirms() {
+        val r = rec(1)
+        WatchStore.send(r)
+        assertEquals(listOf(r), sent)
+        assertEquals(1, WatchStore.pending.size)
+        // 앱을 껐다 켜도 남아 있음
+        WatchStore.reloadForTest(app)
+        assertEquals(listOf(r.id), WatchStore.pending.map { it.id })
+        WatchStore.send(rec(2))
+        WatchStore.delivered(r.id)                          // 폰이 받았다고 확인
+        assertEquals(listOf("T2"), WatchStore.pending.map { it.title })
+    }
+
+    @Test fun outboxKeepsLast20() {
+        repeat(25) { WatchStore.send(rec(it)) }
+        assertEquals(20, WatchStore.pending.size)
+        assertEquals("T5", WatchStore.pending.first().title)
+    }
+
+    @Test fun phoneContextAppliesButNotDuringWorkout() {
+        val c = WatchContext(Settings(goalTime = 3900, lang = "ko"), listOf(Program.hiit()))
+        WatchStore.apply(WatchWire.ctxJson(c))
+        assertEquals(3900, WatchStore.settings.goalTime)
+        assertEquals("ko", L10n.lang)                       // 언어가 바로 바뀜
+        assertEquals(3900, WatchStore.engine.settings.goalTime)
+        assertTrue(WatchStore.programs.single().isHIIT)
+        // 운동 중에는 엔진 설정을 덮지 않음
+        WatchStore.engine.start(Mode.Sim, "Full Simulation", seq = WatchStore.seq(Mode.Sim, null))
+        WatchStore.apply(WatchWire.ctxJson(c.copy(settings = c.settings.copy(goalTime = 3600))))
+        assertEquals(3600, WatchStore.settings.goalTime)
+        assertEquals(3900, WatchStore.engine.settings.goalTime)
+    }
+
+    @Test fun onlyLastQuickKept() {
+        WatchStore.saveQuick(listOf(ProgItem("run", "1KM"), ProgItem("sledPush")))
+        val p2 = WatchStore.saveQuick(listOf(ProgItem("wallBalls")))
+        assertEquals(listOf(p2.id), WatchStore.quickSaved.map { it.id })
+        assertEquals(p2.id, WatchStore.programs.first().id)  // 목록 맨 위에 방금 만든 것
+        WatchStore.reloadForTest(app)
+        assertEquals(listOf(p2.id), WatchStore.quickSaved.map { it.id })
+    }
+}

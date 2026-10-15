@@ -32,7 +32,12 @@ class MainActivity : ComponentActivity() {
 
     /** 위젯을 눌러서 열었을 때 (다음 대회 → Race 탭, 이번 주 → 홈). 폰으로 기록 중이면 그 화면 그대로 */
     private fun openFrom(i: android.content.Intent?) {
-        val to = when (i?.getStringExtra("open")) { "race" -> Scr.Race; "home" -> Scr.Home; else -> return }
+        val to = when (i?.getStringExtra("open")) {
+            "race" -> Scr.Race; "home" -> Scr.Home
+            // 진행 중 알림(워치 운동)을 눌렀을 때
+            "watchLive" -> if (WatchMirror.on || WatchMirror.ended) Scr.WatchLive else return
+            else -> return
+        }
         if (Router.scr == Scr.PhoneLive || !Store.settings.hasOnboarded) return
         Router.go(to)
     }
@@ -48,6 +53,8 @@ class MainActivity : ComponentActivity() {
         if (Supabase.isConfigured) Accounts.api = SupabaseAccounts
         GoogleSignIn.activity = java.lang.ref.WeakReference(this)
         if (savedInstanceState == null) Router.start()
+        // 워치: 상태 확인 · 묶음 보내기 · 앱이 꺼져 있던 동안 도착한 기록 받기
+        WatchSync.start()
         openFrom(intent)
         setContent { App(showLogo = savedInstanceState == null) }
     }
@@ -65,6 +72,7 @@ fun App(showLogo: Boolean = true) {
     val life = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(life) {
         life.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            WatchSync.refreshState()
             if (!Cloud.live) return@repeatOnLifecycle
             Cloud.checkDevice()
             Cloud.refreshSocial()

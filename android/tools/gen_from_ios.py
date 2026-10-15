@@ -7,6 +7,7 @@
   - L10nKo.kt : Resources/iOS·Watch/ko.lproj/Localizable.strings → 한국어 표
   - BenchData.kt : Shared/Benchmarks.swift 의 중간값 표 (HyroxBench)
   - 그림       : Resources/iOS/Assets.xcassets → app/res/drawable-nodpi + IconRes.kt
+  - 워치 그림 표 : IconRes.kt → wear 의 WIconRes.kt (그림 파일은 워치 빌드가 폰 폴더에서 복사해 감)
 
 아이폰 문구나 표가 바뀌면 이 스크립트를 다시 돌리면 됨.
 
@@ -195,11 +196,43 @@ def gen_images():
     return len(names)
 
 
+WEAR_SKIP = {"splash", "widget_dday_preview", "widget_week_preview"}  # wordmark_yellow 는 워치 폴더에 따로 있음 (표에는 넣음)
+
+
+def gen_wear_icons():
+    """폰 IconRes.kt 의 이름 표를 워치용(WIconRes.kt)으로. 워치 빌드가 쓰지 않는 큰 그림은 뺌 (wear/build.gradle.kts 와 같게)"""
+    src = os.path.join(ROOT, "android/app/src/main/kotlin/com/nkssi/splits8/ui/IconRes.kt")
+    pairs = re.findall(r'^\s+("[^"]+") to R\.drawable\.(\w+),$', open(src, encoding="utf-8").read(), re.M)
+    lines = [
+        "// 자동 생성 — 직접 고치지 말 것. android/tools/gen_from_ios.py (gen_wear_icons)",
+        "// 아이폰 그림 이름 → 워치 그림 번호 (그림 파일은 폰 app/res 에서 빌드할 때 복사해 옴)",
+        "package com.nkssi.splits8.wear",
+        "",
+        "object WIconRes {",
+        "    private val map: Map<String, Int> = mapOf(",
+    ]
+    n = 0
+    for ios, rn in pairs:
+        if rn in WEAR_SKIP:
+            continue
+        lines.append("        %s to R.drawable.%s," % (ios, rn))
+        n += 1
+    lines += ["    )", "", "    /** 없으면 null */", "    fun of(name: String): Int? = map[name]", "}"]
+    out = os.path.join(ROOT, "android/wear/src/main/kotlin/com/nkssi/splits8/wear/WIconRes.kt")
+    with open(out, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    return n
+
+
 if __name__ == "__main__":
+    if "--wear-icons" in sys.argv:
+        print("Wear icons:", gen_wear_icons())
+        sys.exit(0)
     n = gen_l10n()
     b = gen_bench()
     print("L10nKo:", n, "entries")
     print("WidgetKo:", gen_widget_l10n(), "entries")
     print("Bench rows:", b)
     print("Images:", gen_images())
+    print("Wear icons:", gen_wear_icons())
     sys.exit(0)

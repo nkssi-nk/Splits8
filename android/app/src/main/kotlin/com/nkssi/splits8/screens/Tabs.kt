@@ -53,6 +53,7 @@ fun ScreenFor(s: Scr) {
         Scr.Detail -> DetailView()
         Scr.Share -> ShareView()
         Scr.PhoneLive -> PhoneLiveView()
+        Scr.WatchLive -> WatchLiveView()
         Scr.Ob1 -> Onboarding1()
         Scr.Ob2 -> Onboarding2()
         Scr.Ob3 -> Onboarding3()

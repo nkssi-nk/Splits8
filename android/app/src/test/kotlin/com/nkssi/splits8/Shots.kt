@@ -372,6 +372,22 @@ class Shots {
     @Test fun phoneLiveKo() = demoPhone("75_phone_live_ko", "ko", pause = true)
     @Test fun phoneCount() = demoPhone("76_phone_count", "en", count = true)
 
+    /** 워치 운동 같이 보기 (빌드 24 머리 · SPLIT | GOAL · 심박) */
+    private fun demoWatchLive(name: String, lang: String, idx: Int, el: Int, reconnect: Boolean = false, finished: Boolean = false) {
+        val seq = com.nkssi.splits8.shared.SeqBuilder.full(com.nkssi.splits8.shared.Division.of("openM"), true, com.nkssi.splits8.shared.Defaults.goals)
+        val t = 1_790_000_000_000L
+        WatchMirror.clock = { t }
+        WatchMirror.demo(com.nkssi.splits8.shared.LiveState(com.nkssi.splits8.shared.Mode.Sim, "Full Simulation", seq, idx,
+            seq.take(idx).map { (it.target * 1.03).toInt() }, el, true, 165, 286, 4, true, finished, "VS GOAL", delta = 14), reconnect)
+        shot(name, lang, Scr.WatchLive)
+        WatchMirror.reset(); WatchMirror.clock = { System.currentTimeMillis() }
+    }
+
+    @Test fun watchLive() = demoWatchLive("80_watch_live", "en", 6, 80)
+    @Test fun watchLiveKo() = demoWatchLive("80_watch_live_ko", "ko", 4, 150)
+    @Test fun watchLiveRox() = demoWatchLive("81_watch_live_rox_reconnect", "en", 7, 22, reconnect = true)
+    @Test fun watchLiveSaving() = demoWatchLive("82_watch_live_saving_ko", "ko", 30, 10, finished = true)
+
     private fun demoFinish(name: String, lang: String, pick: (List<com.nkssi.splits8.shared.Record>) -> com.nkssi.splits8.shared.Record) {
         val now = java.time.Instant.parse("2026-10-05T03:00:00Z")
         Store.now = { now }

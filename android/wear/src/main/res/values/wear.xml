@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- 폰 앱이 "워치 앱이 깔려 있다"를 알아보는 이름 (폰 WatchSync.CAPABILITY 와 같아야 함) -->
+    <string-array name="android_wear_capabilities">
+        <item>splits8_wear</item>
+    </string-array>
+</resources>

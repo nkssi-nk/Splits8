@@ -63,3 +63,20 @@
 "Install Health Connect" = "헬스 커넥트 설치 필요";
 "Not available on this phone" = "이 폰에서는 쓸 수 없어요";
 "Filled in from Health Connect. Change anything that isn't right." = "헬스 커넥트에서 가져왔어요. 다른 부분이 있으면 고쳐 주세요.";
+
+/* 7단계 · 갤럭시 워치 — 폰 쪽 (워치 운동 같이 보기 · 진행 중 알림) */
+"Watch workout" = "워치 운동";
+"Watch · Live" = "워치 · 실시간";
+"Watch · Reconnecting…" = "워치 · 다시 연결 중…";
+"Connecting to your watch…" = "워치와 연결 중…";
+"Saving on your watch…" = "워치에서 저장 중…";
+"The workout ends on your watch and is saved there." = "워치의 운동이 끝나고 워치에서 저장돼요.";
+"Paused" = "일시정지됨";
+
+/* 7단계 · 갤럭시 워치 — 워치 화면 */
+"Edit names on your phone" = "이름은 폰에서 바꿀 수 있어요";
+"Add a race in the Race tab of the phone app and it will show up here." = "폰 앱 레이스 탭에서 대회를 등록하면 여기에 표시돼요.";
+"It won't be saved here, on your phone or in Health Connect." = "워치 · 폰 · 헬스 커넥트 어디에도 저장되지 않아요.";
+"Another app is recording a workout. Starting here will end it." = "다른 앱이 운동을 기록하고 있어요. 여기서 시작하면 그 운동은 끝나요.";
+"Start anyway" = "그래도 시작";
+"Recording a workout" = "운동 기록 중";

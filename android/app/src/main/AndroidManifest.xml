@@ -89,6 +89,22 @@
         </receiver>
         <service android:name=".RunService" android:exported="false" android:foregroundServiceType="location" />
 
+        <!-- 갤럭시 워치에서 오는 것: 끝난 기록(/record/…) · 운동 중 상태(/live) · 워치 앱 설치 여부 -->
+        <service android:name=".PhoneWearService" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/record" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/live" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:path="/splits8_wear" />
+            </intent-filter>
+        </service>
+
         <!-- 공유 그림을 다른 앱(인스타그램 · 카카오톡 등)에 넘길 때 -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -33,6 +33,8 @@ data class LiveState(
     /** 지금 구간에서 달린 거리(m) · 운동 전체 거리(m) */
     val segDist: Double? = null,
     val dist: Double? = null,
+    /** 안드로이드: 워치에서 버림 (아이폰은 미러링 세션이 끝나는 것으로 알지만, 안드로이드는 메시지로 알림) */
+    val discarded: Boolean = false,
 ) {
     val cur: Seg? get() = seq.getOrNull(idx) ?: seq.lastOrNull()
     val nextSeg: Seg? get() = seq.getOrNull(idx + 1)

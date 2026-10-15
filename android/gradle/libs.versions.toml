@@ -14,6 +14,11 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 healthConnect = "1.1.0"
 roborazzi = "1.76.0"
+playWearable = "19.0.0"
+healthServices = "1.1.0"
+wear = "1.4.0"
+wearOngoing = "1.1.0"
+complications = "1.3.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -31,6 +36,12 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 androidx-credentials-play = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+play-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playWearable" }
+kotlinx-coroutines-play = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
+health-services = { module = "androidx.health:health-services-client", version.ref = "healthServices" }
+androidx-wear = { module = "androidx.wear:wear", version.ref = "wear" }
+wear-complications = { module = "androidx.wear.watchface:watchface-complications-data-source-ktx", version.ref = "complications" }
+wear-ongoing = { module = "androidx.wear:wear-ongoing", version.ref = "wearOngoing" }
 health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 junit = { module = "junit:junit", version.ref = "junit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }

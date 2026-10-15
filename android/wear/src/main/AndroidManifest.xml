@@ -3,11 +3,25 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
 
+    <!-- 운동 측정: 심박 (Wear OS 6 부터는 건강 권한), 걸음 · 활동, 야외 러닝 위치 -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" android:maxSdkVersion="35" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- 운동 중 화면이 꺼져도 계속 (운동 서비스 + 시계 화면 아래 "운동 중" 표시) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@android:style/Theme.DeviceDefault">
+        android:theme="@style/Theme.Splits8Wear">
 
         <!-- 폰 앱이 있어야 쓰는 워치 앱 (애플워치판과 같음) -->
         <meta-data
@@ -16,11 +30,48 @@
 
         <activity
             android:name=".WearActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 운동 중: 측정 · 1초 시계 · "운동 중" 표시 -->
+        <service
+            android:name=".WorkoutService"
+            android:exported="false"
+            android:foregroundServiceType="health|location" />
+
+        <!-- 폰에서 오는 것: 설정 묶음(/ctx) · 기록 받음 확인(/record 지워짐) · 운동 중 단추(/live) -->
+        <service android:name=".WearSyncService" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:path="/ctx" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/record" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/live" />
+            </intent-filter>
+        </service>
+
+        <!-- 시계 화면 칸: 다음 대회 D-day -->
+        <service
+            android:name=".RaceComplicationService"
+            android:exported="true"
+            android:icon="@drawable/i_race"
+            android:label="@string/complication_race"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data android:name="android.support.wearable.complications.SUPPORTED_TYPES" android:value="SHORT_TEXT" />
+            <meta-data android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS" android:value="3600" />
+        </service>
     </application>
 </manifest>

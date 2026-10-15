@@ -23,7 +23,7 @@ import java.io.File
 /**
  * 폰 저장소 (아이폰 Store.swift): 설정 · 트레이닝 · 기록 · 친구 · 예약.
  * 아이폰과 같은 파일 이름 · 같은 JSON 모양으로 앱 폴더에 저장.
- * 서버(Supabase)와 맞추는 일은 Cloud 가 함. 워치 · 알림은 다음 단계에서 붙임.
+ * 서버(Supabase)와 맞추는 일은 Cloud 가 함. 워치로 보내는 일은 WatchSync (바뀔 때마다 묶음을 다시 보냄).
  */
 object Store {
     private var dir: File? = null
@@ -145,11 +145,13 @@ object Store {
     fun saveProgram(p: Program) {
         programs = if (programs.any { it.id == p.id }) programs.map { if (it.id == p.id) p else it } else listOf(p) + programs
         save("programs.json", ListSerializer(Program.serializer()), programs)
+        WatchSync.dirty()
     }
 
     fun deleteProgram(id: String) {
         programs = programs.filterNot { it.id == id }
         save("programs.json", ListSerializer(Program.serializer()), programs)
+        WatchSync.dirty()
     }
 
     /** 운동 예약 추가 · 수정 (같은 id 면 바꿈) + 알림 */
@@ -307,7 +309,7 @@ object Store {
             fresh.forEach { Cloud.upload(it) }
             widgets()
         }
-        if (np > 0) { programs = p; save("programs.json", ListSerializer(Program.serializer()), programs) }
+        if (np > 0) { programs = p; save("programs.json", ListSerializer(Program.serializer()), programs); WatchSync.dirty() }
         return nr to np
     }
 
@@ -328,8 +330,7 @@ object Store {
         return x
     }
 
-    /** 폰으로 기록한 것 (source = "phone") */
-    /** 폰으로 끝낸 기록 — Health Connect 에도 저장 (워치 기록은 워치 앱 단계에서 같은 방식으로) */
+    /** 폰으로 끝낸 기록 (source = "phone") — Health Connect 에도 저장 (워치 기록은 WatchSync 가 같은 방식으로) */
     fun addPhoneRecord(r: Record) {
         val x = r.copy(source = "phone")
         if (records.any { it.id.equals(x.id, ignoreCase = true) }) return
@@ -366,8 +367,10 @@ object Store {
     /** 홈 화면 위젯 새로 그리기 */
     private fun widgets() { if (!demo) Reminders.context?.let { Widgets.refresh(it) } }
 
+    /** 기록 계산을 새로 하고, 워치에도 새 묶음 (설정 · 친구 · 최고 기록이 바뀌었을 수 있음) */
     private fun rebuild() {
         book = RecordBook(records, settings, friend)
+        WatchSync.dirty()
     }
 
     /** 앱 언어: 설정에서 고른 것 → 없으면 기기 언어 */

@@ -4,7 +4,7 @@ package com.nkssi.splits8.shared
 
 internal object L10nKo {
     private val map: Map<String, String> by lazy {
-        HashMap<String, String>(1536).apply {
+        HashMap<String, String>(1562).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -87,6 +87,7 @@ internal object L10nKo {
         m["Add Roxzone"] = "Roxzone 추가"
         m["Add a race"] = "대회 추가"
         m["Add a race in the Race tab of the iPhone app and it will show up here."] = "iPhone 앱 레이스 탭에서 대회를 등록하면 여기에 표시돼요."
+        m["Add a race in the Race tab of the phone app and it will show up here."] = "폰 앱 레이스 탭에서 대회를 등록하면 여기에 표시돼요."
         m["Add event"] = "대회 추가"
         m["Add friends by nickname to see rankings for Full Sim, races and each station."] = "닉네임으로 친구를 추가하면 풀 시뮬·대회·스테이션별 순위를 볼 수 있어요."
         m["Add partner"] = "파트너 추가"
@@ -106,6 +107,7 @@ internal object L10nKo {
         m["Allowed · heart rate, workouts"] = "허용됨 · 심박, 운동"
         m["Allowed · outdoor runs"] = "허용됨 · 야외 러닝"
         m["Americas"] = "아메리카"
+        m["Another app is recording a workout. Starting here will end it."] = "다른 앱이 운동을 기록하고 있어요. 여기서 시작하면 그 운동은 끝나요."
         m["Another one in the books."] = "오늘도 기록 하나를 남겼어요."
         m["Anyone who knows your nickname can see your best records."] = "닉네임을 아는 누구나 내 최고 기록을 볼 수 있어요."
         m["Apple Watch alerts you with a vibration during workouts."] = "운동 중에 Apple Watch가 진동으로 알려줘요."
@@ -166,10 +168,10 @@ internal object L10nKo {
         m["Check splits"] = "구간 확인"
         m["Check your email"] = "이메일을 확인하세요"
         m["Checking…"] = "확인 중…"
-        m["Choose"] = "선택"
-        m["City or venue"] = "도시 또는 장소"
     }
     private fun part1(m: HashMap<String, String>) {
+        m["Choose"] = "선택"
+        m["City or venue"] = "도시 또는 장소"
         m["Clear"] = "지우기"
         m["Clear all"] = "모두 지우기"
         m["Close"] = "닫기"
@@ -181,6 +183,7 @@ internal object L10nKo {
         m["Connect your watch"] = "워치 연결"
         m["Connected"] = "연결됨"
         m["Connecting to Apple Watch…"] = "Apple Watch 와 연결 중…"
+        m["Connecting to your watch…"] = "워치와 연결 중…"
         m["Connects with the watch app"] = "워치 앱과 함께 연결돼요"
         m["Continue"] = "계속"
         m["Continue with Google"] = "Google로 계속하기"
@@ -240,6 +243,7 @@ internal object L10nKo {
         m["Early start. Nice work."] = "이른 아침부터 수고했어요!"
         m["Edit"] = "편집"
         m["Edit names on iPhone"] = "이름은 iPhone에서 바꿀 수 있어요"
+        m["Edit names on your phone"] = "이름은 폰에서 바꿀 수 있어요"
         m["Edit plan"] = "예약 편집"
         m["Edit training"] = "트레이닝 편집"
         m["Email"] = "이메일"
@@ -316,12 +320,12 @@ internal object L10nKo {
         m["Have you raced HYROX? We'll set your division to match."] = "HYROX 대회에 나가 본 적 있나요? 나간 디비전에 맞춰 설정해 드려요."
         m["Haze"] = "헤이즈"
         m["Health Connect"] = "헬스 커넥트"
+    }
+    private fun part2(m: HashMap<String, String>) {
         m["Health data"] = "건강 데이터"
         m["Heart rate peaked on [y]%@[/y] (%lld)."] = "심박이 가장 높았던 곳: [y]%1\$@[/y] (%2\$lld)."
         m["Heart rate rose [r]%lld bpm[/r] in the second half while your pace held."] = "페이스는 그대로인데 후반 심박이 [r]%lld[/r] 올랐어요."
         m["Heart rate zone change"] = "심박 존이 바뀔 때"
-    }
-    private fun part2(m: HashMap<String, String>) {
         m["Heart rate zones"] = "심박 존"
         m["Heart rate, workouts, distance"] = "심박, 운동, 거리"
         m["Heavy"] = "짙게"
@@ -342,6 +346,7 @@ internal object L10nKo {
         m["Intervals"] = "인터벌"
         m["Intervals · heart rate · calories"] = "인터벌 · 심박 · 칼로리"
         m["It won't be saved here, on iPhone or in Health."] = "워치 · 아이폰 · 건강 앱 어디에도 저장되지 않습니다."
+        m["It won't be saved here, on your phone or in Health Connect."] = "워치 · 폰 · 헬스 커넥트 어디에도 저장되지 않아요."
         m["KCAL"] = "KCAL"
         m["Keeps the ratio of your current split goals."] = "지금 구간 목표의 비율을 그대로 써요."
         m["Korea"] = "한국"
@@ -446,6 +451,7 @@ internal object L10nKo {
         m["PREDICTED FINISH"] = "예상 완주 시간"
         m["Partner"] = "파트너"
         m["Pause"] = "일시정지"
+        m["Paused"] = "일시정지됨"
         m["Personal best"] = "개인 최고 기록"
         m["Phone · No HR"] = "폰 · 심박 없음"
         m["Physical Fitness Test"] = "PFT 체력 테스트"
@@ -466,14 +472,14 @@ internal object L10nKo {
         m["Purple"] = "보라"
         m["Quick training"] = "빠른 트레이닝"
         m["Quick, short steps help when your legs get tired."] = "다리가 지칠 땐 짧고 빠른 걸음이 도움이 돼요."
+    }
+    private fun part3(m: HashMap<String, String>) {
         m["RACE"] = "레이스"
         m["RACE DAY"] = "대회 날"
         m["RECENT"] = "최근 기록"
         m["REMINDER"] = "알림"
         m["REPS"] = "개"
         m["REQUESTS"] = "받은 요청"
-    }
-    private fun part3(m: HashMap<String, String>) {
         m["RUN"] = "러닝"
         m["RUN AVG"] = "평균 러닝"
         m["RUN FATIGUE"] = "러닝 피로도"
@@ -489,6 +495,7 @@ internal object L10nKo {
         m["Real race medians at your goal time."] = "같은 완주 시간대 실제 대회 중간값대로 나눠요."
         m["Recommended"] = "추천"
         m["Reconnecting…"] = "다시 연결 중…"
+        m["Recording a workout"] = "운동 기록 중"
         m["Recording on iPhone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "아이폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
         m["Recording on your phone"] = "폰으로 기록하고 있어요"
         m["Recording on your phone can't measure heart rate, calories or HR zones, and there are no watch vibration alerts. Only split times are recorded (plus GPS distance for outdoor runs)."] = "폰으로 기록하면 심박수·칼로리·심박 존 측정과 워치 진동 알림을 쓸 수 없어요. 구간 시간만 기록돼요 (야외 러닝은 GPS 거리 포함)."
@@ -553,6 +560,7 @@ internal object L10nKo {
         m["Saved: 1 km splits · pace · heart rate · route map outdoors"] = "저장: 1km 스플릿 · 페이스 · 심박 · 실외는 지도 경로"
         m["Saved: time per round · average heart rate · calories"] = "저장: 라운드별 시간 · 평균 심박 · 칼로리"
         m["Saving on Apple Watch…"] = "Apple Watch 에서 저장 중…"
+        m["Saving on your watch…"] = "워치에서 저장 중…"
         m["Search nickname"] = "닉네임 검색"
         m["Second half"] = "후반부"
         m["Server error %lld: %@"] = "서버 오류 %lld: %@"
@@ -601,6 +609,7 @@ internal object L10nKo {
         m["Splits8 not installed"] = "Splits8 설치 안 됨"
         m["Start"] = "시작"
         m["Start a workout on your watch and your records will show up here."] = "워치에서 운동을 시작하면 여기에 기록이 쌓여요."
+        m["Start anyway"] = "그래도 시작"
         m["Start on iPhone"] = "iPhone으로 시작"
         m["Start on iPhone?"] = "iPhone으로 시작할까요?"
         m["Start on phone"] = "폰으로 시작"
@@ -615,6 +624,8 @@ internal object L10nKo {
         m["Steady pacing there is easy time."] = "일정하게만 해도 시간이 줄어요."
         m["Still %@, but %@ faster."] = "아직 %1\$@지만 %2\$@ 빨라졌어요."
         m["Story 9:16"] = "스토리 9:16"
+    }
+    private fun part4(m: HashMap<String, String>) {
         m["Strong"] = "근력형"
         m["Strongest: [g]%@[/g] (−%llds). Weakest: [r]%@[/r] (+%llds)."] = "가장 잘한 곳: [g]%1\$@[/g] (−%2\$lld초), 가장 아쉬운 곳: [r]%3\$@[/r] (+%4\$lld초)."
         m["Strongest: [y]%@[/y], [g]%llds under[/g] Gold pace."] = "가장 강한 종목: [y]%1\$@[/y], 골드 기준보다 [g]%2\$lld초 빨라요[/g]."
@@ -624,8 +635,6 @@ internal object L10nKo {
         m["THIS MONTH"] = "이번 달"
         m["THIS WEEK"] = "이번 주"
         m["TIME IN ZONES"] = "존별 시간"
-    }
-    private fun part4(m: HashMap<String, String>) {
         m["TOTAL"] = "합계"
         m["TOTAL "] = "합계 "
         m["TOTAL TIME"] = "총 시간"
@@ -653,6 +662,7 @@ internal object L10nKo {
         m["The selected friend's records are used as the Full Simulation comparison and as Training split targets."] = "선택한 친구의 기록이 풀 시뮬레이션 비교 대상과 트레이닝 구간 목표로 쓰여요."
         m["The server isn't set up yet (Config.swift)"] = "서버 설정이 아직 없어요 (Config.swift)"
         m["The workout ends on Apple Watch and is saved there."] = "Apple Watch 의 운동이 끝나고 워치에서 저장돼요."
+        m["The workout ends on your watch and is saved there."] = "워치의 운동이 끝나고 워치에서 저장돼요."
         m["They are removed from your friends and hidden from your search and rankings. You can unblock them here later."] = "친구 목록에서 빠지고, 검색과 순위표에 보이지 않아요. 나중에 이 화면에서 차단을 풀 수 있어요."
         m["They'll see your request in Friends. Records are shared once they accept."] = "상대의 친구 화면에 요청이 보여요. 수락하면 서로 기록이 보여요."
         m["This can't be undone."] = "이 기록은 되돌릴 수 없어요."
@@ -693,7 +703,10 @@ internal object L10nKo {
         m["WEIGHT"] = "몸무게"
         m["WHO CAN SEE MY RECORDS"] = "내 기록 공개 범위"
         m["Watch"] = "워치"
+        m["Watch workout"] = "워치 운동"
         m["Watch workouts, live"] = "워치 운동을 실시간으로"
+        m["Watch · Live"] = "워치 · 실시간"
+        m["Watch · Reconnecting…"] = "워치 · 다시 연결 중…"
         m["We use it for your default goal time, split targets and predicted finish."] = "목표 시간 기본값 · 구간 목표 · 예상 완주 시간에 바로 써요."
         m["We'll send a code to the email you signed up with."] = "가입한 이메일로 코드를 보내드려요."
         m["Website"] = "홈페이지"
@@ -763,6 +776,8 @@ internal object L10nKo {
         m["[y]%@[/y] varies the most between your sims (±%llds)."] = "기록마다 가장 들쭉날쭉한 곳: [y]%1\$@[/y] (±%2\$lld초)."
         m["[y]%@[/y] was your longest station (%@) — %lld%% of your total."] = "가장 오래 걸린 스테이션: [y]%1\$@[/y] (%2\$@) — 전체의 %3\$lld%%."
         m["[y]%@[/y]: about %lld strokes a minute."] = "[y]%1\$@[/y]: 1분에 약 %2\$lld번."
+    }
+    private fun part5(m: HashMap<String, String>) {
         m["[y]%@[/y]: about one rep every %@s."] = "[y]%1\$@[/y]: 약 %2\$@초에 한 개."
         m["[y]%lld days[/y] to race. Your full sim #%lld this month."] = "대회까지 [y]%1\$lld일[/y]. 이번 달 %2\$lld번째 풀 시뮬이에요."
         m["[y]%lld kcal[/y] per km · %lld kcal per hour."] = "1km 에 [y]%1\$lld kcal[/y] · 1시간에 %2\$lld kcal."
@@ -776,8 +791,6 @@ internal object L10nKo {
         m["or"] = "또는"
         m["or start PFT on your Apple Watch"] = "또는 Apple Watch에서 PFT를 시작하세요"
         m["or start PFT on your watch"] = "또는 워치에서 PFT를 시작하세요"
-    }
-    private fun part5(m: HashMap<String, String>) {
         m["per km"] = "km당"
         m["races"] = "레이스"
         m["sims"] = "풀 시뮬"

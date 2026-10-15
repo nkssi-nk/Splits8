@@ -128,17 +128,24 @@ fun SettingsView() {
 
             SectionLabel("DEVICE")
             Column(Modifier.fillMaxWidth().card8()) {
-                // 워치 연결 확인은 워치 앱 단계(7)에서. 지금은 늘 "연결 안 됨"
+                // 워치 연결 (아이폰 deviceCard): 워치가 연결돼 있고 SPLITS8 워치 앱이 깔려 있으면 "Connected"
+                val ws = com.nkssi.splits8.WatchSync.state
+                val on = ws == com.nkssi.splits8.WatchSync.State.Ready
+                val sub = when (ws) {
+                    com.nkssi.splits8.WatchSync.State.Ready -> "Splits8 installed"
+                    com.nkssi.splits8.WatchSync.State.NoApp -> "Splits8 not installed"
+                    else -> "Not paired"
+                }
                 Row(Modifier.fillMaxWidth().rowLine(true).padding(vertical = 14.dp, horizontal = 18.dp).testTag("settings.device"),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Glyph("i_device", 22.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         T("Watch", F.t(17), maxLines = 1)
-                        T("Not paired", F.t(13, color = C.text2), maxLines = 1)
+                        T(sub, F.t(13, color = C.text2), maxLines = 1)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(C.text3))
-                        T("Not connected", F.t(13, W600, C.text3), maxLines = 1)
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(if (on) C.good else C.text3))
+                        T(if (on) "Connected" else "Not connected", F.t(13, W600, if (on) C.good else C.text3), maxLines = 1)
                     }
                 }
                 ToggleRow("Show on phone", "Watch workouts, live", s.mirror, true, "settings.mirror") { v -> Store.update { it.withMirror(v) } }

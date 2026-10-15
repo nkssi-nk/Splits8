@@ -60,6 +60,9 @@ dependencies {
     implementation(libs.androidx.credentials.play)
     implementation(libs.googleid)
     implementation(libs.health.connect)
+    // 갤럭시 워치와 주고받기 (Wearable Data Layer)
+    implementation(libs.play.wearable)
+    implementation(libs.kotlinx.coroutines.play)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 

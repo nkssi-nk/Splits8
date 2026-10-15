@@ -95,7 +95,7 @@ import kotlin.math.min
 // 끝나면 기록 상세 위로 "수고했어요" 카드 (아이폰 FinishSheet.swift)
 
 /** 화면 높이별 크기 (760 기준 1.0, 작은 폰은 줄이고 큰 폰은 키움) */
-private class LiveMetrics(h: Float) {
+internal class LiveMetrics(h: Float) {
     val k = max(0.8f, min(1.14f, h / 760f))
     private val kk = min(k, 1.08f)
     val totalFont = 76 * k
@@ -189,14 +189,11 @@ fun PhoneLiveView() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val m = LiveMetrics(maxHeight.value)
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-            // Full Simulation (15/600 노랑) · Phone · No HR (13 회색)
-            Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
-                T(if (eng.mode == Mode.Training) eng.title else eng.mode.title, F.t(15, W600, C.accent), Modifier.weight(1f), maxLines = 1)
-                Spacer(Modifier.width(12.dp))
-                T("Phone · No HR", F.t(13, color = C.text2), maxLines = 1)
-            }
-            Live(eng, m, now, Modifier.padding(top = m.top.dp))
-            NextRow(eng, m)
+            // 빌드 24: 제목 / ● Phone · No HR / n / 16 / 막대 (워치 같이 보기 화면과 같은 머리)
+            val frame = phoneFrame(eng, now)
+            LiveHeader(frame, "Phone · No HR", live = false, tagPrefix = "phone")
+            LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
+            LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
             Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
             // Next 버튼 (GPS 러닝은 1 km 마다 저절로)
             val gpsRun = eng.isRunKind && eng.useGPS
@@ -235,81 +232,17 @@ fun PhoneLiveView() {
     }
 }
 
-/** TOTAL · 큰 전체 시간 · [아이콘 이름] · 구간 시간 | 페이스 또는 목표 대비 · 설명 줄 */
-@Composable
-private fun Live(eng: PhoneRunEngine, m: LiveMetrics, now: Long, modifier: Modifier) {
-    val cur = eng.cur
-    val el = eng.segEl(now)
-    val timeColor = if (eng.running) Color.White else C.text2
-    // 지금 하는 구간의 시간은 노랑 (전체 시간은 흰색) — 두 숫자가 헷갈리지 않게
-    val segColor = if (eng.running) C.accent else C.text2
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        T("TOTAL", F.t(12, W600, C.text2, tracking = 1.44f), maxLines = 1)
-        FitText(Fm.t(eng.total(now)), F.num(m.totalFont, color = timeColor, tracking = -0.02f * m.totalFont),
-            Modifier.testTag("phone.total"), minScale = 0.6f)
-        Row(Modifier.padding(top = (m.segTop * 0.6f).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon8(cur.icon, (m.icon * 0.7f).dp, if (cur.kind == SegKind.Rox) C.text3 else C.accent)
-            FitText(cur.name, F.t(m.nameFont, W600), minScale = 0.7f)
-        }
-        Row(Modifier.padding(top = m.nameTop.dp).fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            LiveCol("SPLIT", Fm.t(el), segColor, m.segFont * 0.8f, Modifier.testTag("phone.seg"))
-            Box(Modifier.padding(top = 20.dp).width(1.dp).height(m.segFont.dp).background(Color.White.copy(alpha = 0.14f)))
-            when {
-                cur.kind == SegKind.Run ->
-                    LiveCol("PACE /KM", LivePace.text(el, if (eng.useGPS) eng.segDist else null), timeColor, m.segFont * 0.8f)
-                cur.target > 0 && cur.kind != SegKind.Rox -> {
-                    val d = el - cur.target
-                    LiveCol(if (eng.mode == Mode.Training) "VS BEST" else "VS GOAL", Fm.d(d), if (d <= 0) C.good else C.bad, m.segFont * 0.8f)
-                }
-                else -> LiveCol("", cur.detail, C.text2, m.nameFont)
-            }
-        }
-        FitText(detailLine(eng), F.num(m.detailFont, androidx.compose.ui.text.font.FontWeight.Normal, C.aeb), Modifier.padding(top = 6.dp), minScale = 0.7f)
-    }
-}
-
-/** 50M · 152KG · 4 / 16  /  러닝: 1KM (GPS면 0.38 KM / 1KM) · 3 / 16  /  Roxzone: TRANSITION */
-private fun detailLine(eng: PhoneRunEngine): String {
-    val cur = eng.cur
-    if (cur.kind == SegKind.Rox) return cur.detail
-    var head = cur.detail
-    if (cur.kind == SegKind.Run && eng.useGPS) head = String.format(Locale.US, "%.2f KM / ", eng.segDist / 1000) + cur.detail
-    if (cur.kind == SegKind.Run && eng.useGPS && eng.isRunKind && eng.totalDist >= 10) {
-        return head + " · " + L10n.t("Total %@ km", String.format(Locale.US, "%.2f", eng.totalDist / 1000))
-    }
-    return head + " · ${eng.countNow} / ${eng.countTotal}"
-}
-
-@Composable
-private fun RowScope.LiveCol(label: String, value: String, color: Color, size: Float, modifier: Modifier = Modifier) {
-    Column(modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Box(Modifier.height(16.dp), contentAlignment = Alignment.Center) { T(label, F.t(12, W600, C.text3, tracking = 1f), maxLines = 1) }
-        FitText(value, F.num(size, color = color, tracking = -0.01f * size), minScale = 0.5f)
-    }
-}
-
-/** 선 · NEXT [아이콘] 이름 */
-@Composable
-private fun NextRow(eng: PhoneRunEngine, m: LiveMetrics) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.padding(top = m.dividerTop.dp, bottom = (14 * m.k).dp).padding(horizontal = 20.dp).fillMaxWidth().height(1.dp)
-            .background(Color.White.copy(alpha = 0.12f)))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            T("NEXT", F.t(m.nextLabel, color = C.text2, tracking = 0.1f * m.nextLabel), maxLines = 1)
-            val nx = eng.nextSeg
-            if (nx != null) {
-                Icon8(nx.icon, m.nextIcon.dp, if (nx.kind == SegKind.Rox) C.text3 else C.accent)
-                T(nx.name, F.t(m.nextFont, W600), Modifier.testTag("phone.nextName"), maxLines = 1)
-            } else {
-                T("Finish", F.t(m.nextFont, W600, C.accent), maxLines = 1)
-            }
-        }
-    }
-}
+/** 엔진 → 화면 한 장면 */
+private fun phoneFrame(eng: PhoneRunEngine, now: Long) = LiveFrame(
+    mode = eng.mode, title = eng.title, seq = eng.seq, idx = eng.idx, segEl = eng.segEl(now), total = eng.total(now),
+    running = eng.running, open = eng.growsOpen,
+    segDist = if (eng.useGPS) eng.segDist else null, totalDist = if (eng.useGPS) eng.totalDist else null,
+    runKind = eng.isRunKind, next = eng.nextSeg,
+)
 
 /** ■ End · ↩ Undo · ❚❚ Pause (둥근 알약) */
 @Composable
-private fun RowScope.Pill(icon: Int, label: String, fg: Color, bg: Color, h: Float, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun RowScope.Pill(icon: Int, label: String, fg: Color, bg: Color, h: Float, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
         Modifier.weight(1f).height(h.dp).clip(RoundedCornerShape(50)).background(bg).press(0.97f, enabled = enabled, tag = tag, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,

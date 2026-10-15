@@ -27,7 +27,7 @@ object Config {
      * 구글 로그인용 "웹 클라이언트 ID" (Google Cloud → API 및 서비스 → 사용자 인증 정보, Supabase 의 Google 공급자에 넣은 것과 같은 값).
      * 비어 있으면 구글 로그인 단추가 "아직 준비 중" 안내를 띄움
      */
-    const val googleWebClientId = ""
+    const val googleWebClientId = "796080987668-u2nes4a0mj5pj4kc7in71ic7rppajlei.apps.googleusercontent.com"
     const val supportEmail = "nkssi1981@gmail.com"
     val hasSupabase: Boolean get() = supabaseURL.isNotEmpty() && supabaseAnonKey.isNotEmpty()
     /** 구글 지도를 쓸지 (키가 있고, 컴퓨터 시험(Robolectric)이 아닐 때). 아니면 지도 없이 경로만 그림 */

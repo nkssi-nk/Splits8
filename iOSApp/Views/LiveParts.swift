@@ -24,6 +24,8 @@ struct LiveFrame {
     var totalDist: Double?
     /// 러닝 카드(트레이닝 러닝)인지
     var runKind: Bool
+    /// 빌드 27: 지금 속도(m/s) — 실시간 페이스. nil · 0 = 모름
+    var speed: Double? = nil
 
     var cur: Seg { seq.indices.contains(idx) ? seq[idx] : (seq.last ?? Seg(icon: "run", name: "Run", detail: "1KM", kind: .run, target: 0)) }
     var countTotal: Int { seq.liveCountTotal }
@@ -34,20 +36,25 @@ struct LiveFrame {
     /// 목표를 넘겼는지 (SPLIT 빨강)
     var over: Bool { cur.target > 0 && segEl > cur.target }
 
+    /// 빌드 27: lb · mi 로 보여 주는지 (설정 > Units)
+    var imperial: Bool { Store.shared.settings.imperial }
+
     /// 아래 줄: 러닝 = "0.62 / 1.00 KM (· 총 x km)", 스테이션 = 세부(50M · 152KG), Roxzone · 목표 없는 구간 = 빈 줄
     var detailLine: String {
         let c: Seg = cur
+        let imp: Bool = imperial
         if c.kind == .rox { return "" }
         if c.kind == .run {
-            guard let sd = segDist else { return c.detail }
-            let km: Double = runMeters(c.detail) / 1000
-            var s: String = String(format: "%.2f / %.2f KM", min(km, sd / 1000), km)
+            guard let sd = segDist else { return Units.detail(c.detail, imp) }
+            let segM: Double = runMeters(c.detail)
+            var s: String = Units.dist(min(segM, sd), imp) + " / " + Units.dist(segM, imp) + " " + Units.distUnit(imp)
             if open || runKind, let td = totalDist, td >= 10 {
-                s += " · " + String(localized: "Total \(String(format: "%.2f", td / 1000)) km")
+                s += " · " + (imp ? String(localized: "Total \(Units.dist(td, true)) mi")
+                                  : String(localized: "Total \(String(format: "%.2f", td / 1000)) km"))
             }
             return s
         }
-        return c.target > 0 ? c.detail : ""
+        return c.target > 0 ? Units.detail(c.detail, imp) : ""
     }
 }
 
@@ -115,12 +122,12 @@ struct LiveBody: View {
                 // 가운데 세로선: 숫자 높이에 맞춤 (예전엔 숫자보다 아래로 길게 내려왔음)
                 Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: size * 0.82).padding(.top, 18 + size * 0.14)
                 if cur.kind == .run {
-                    LiveCol(label: "PACE /KM", value: LivePace.text(el: f.segEl, dist: f.segDist), color: timeColor, size: size)
+                    LiveCol(label: f.imperial ? "PACE /MI" : "PACE /KM", value: LivePace.text(el: f.segEl, dist: f.segDist, imperial: f.imperial, speed: f.speed), color: timeColor, size: size)
                 } else if cur.target > 0 {
                     LiveCol(label: f.goalWord, value: Fm.t(cur.target), color: timeColor, size: size)
                         .accessibilityIdentifier("\(idPrefix).goal")
                 } else {
-                    LiveCol(label: "", value: cur.detail, color: C.text2, size: m.nameFont)
+                    LiveCol(label: "", value: Units.detail(cur.detail, f.imperial), color: C.text2, size: m.nameFont)
                 }
             }
             .padding(.top, m.nameTop)

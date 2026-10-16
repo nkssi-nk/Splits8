@@ -93,7 +93,7 @@ struct TrainingView: View {
             PagedCard(ids: recs.map(\.id)) { i, last in
                 let rec: Record = recs[i]
                 HistoryRow(title: rec.kind != nil ? rec.title.l10n : "\(rec.title.l10n) × \(rec.sets)", sub: Fm.wdm.string(from: rec.date), subTracking: 0.26,
-                           time: Fm.t(rec.total), last: last, pb: store.isPB(rec), flag: rec.flag, partner: rec.partner,
+                           time: Fm.t(rec.total), last: last, pb: store.isPB(rec), pbLabel: store.runPBLabel(rec), flag: rec.flag, partner: rec.partner,
                            onDelete: { store.delete(rec) }) { r.open(rec, from: .training) }
             }
         } else {
@@ -274,6 +274,8 @@ struct HistoryRow: View {
     var deltaColor: Color
     var last: Bool
     var pb: Bool
+    /// 빌드 27: PB 알약 글자 (러닝 기록 "5K PB"). nil = "PB"
+    var pbLabel: String?
     var flag: RecordFlag?
     /// PFT 등급 뱃지 (제목 옆)
     var grade: PFTGrade?
@@ -282,13 +284,13 @@ struct HistoryRow: View {
 
     /// partner: 더블 파트너 닉네임 (@ 없이) — 있으면 아래 줄 끝에 " · with @닉네임"
     init(title: String, sub: String, subColor: Color = C.text2, subTracking: CGFloat = 0, time: String, delta: String? = nil,
-         deltaColor: Color = C.good, last: Bool = false, pb: Bool = false, flag: RecordFlag? = nil,
+         deltaColor: Color = C.good, last: Bool = false, pb: Bool = false, pbLabel: String? = nil, flag: RecordFlag? = nil,
          grade: PFTGrade? = nil, partner: String? = nil,
          onDelete: (() -> Void)? = nil, action: @escaping () -> Void) {
         let nick: String = (partner ?? "").trimmingCharacters(in: .whitespaces)
         self.title = title; self.sub = nick.isEmpty ? sub : sub + " · " + String(localized: "with @\(nick)")
         self.subColor = subColor; self.subTracking = subTracking; self.time = time
-        self.delta = delta; self.deltaColor = deltaColor; self.last = last; self.pb = pb; self.flag = flag
+        self.delta = delta; self.deltaColor = deltaColor; self.last = last; self.pb = pb; self.pbLabel = pbLabel; self.flag = flag
         self.grade = grade
         self.onDelete = onDelete; self.action = action
     }
@@ -311,7 +313,7 @@ struct HistoryRow: View {
                 HStack(spacing: 8) {
                     Text(title).font(F.t(17, .medium)).lineLimit(1)
                     if let grade { PFTBadge(grade: grade) }
-                    if pb { PBPill() }
+                    if pb { PBPill(label: pbLabel) }
                     if let flag { FlagPill(flag: flag) }
                 }
                 Text(sub).font(F.t(13)).tracking(subTracking).monospacedDigit().foregroundStyle(subColor).lineLimit(1)
@@ -532,7 +534,7 @@ struct BuilderView: View {
             Icon8(it.icon, 24, tint: .yellow)
             VStack(alignment: .leading, spacing: 1) {
                 Text(it.name()).font(F.t(17)).lineLimit(1)
-                Text(it.detail(store.div)).font(F.t(11, .semibold)).tracking(0.66).foregroundStyle(C.text2).lineLimit(1)
+                Text(Units.detail(it.detail(store.div), Store.shared.settings.imperial)).font(F.t(11, .semibold)).tracking(0.66).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Button { remove(i) } label: { removeIcon }
@@ -691,10 +693,16 @@ struct SaveSheet: View {
 
 /// ★ PB 알약 (높이 20, 반경 6, 노랑 0.14 바탕, 노란 글자 11/600, 별 10)
 struct PBPill: View {
+    /// 빌드 27: 러닝 기록은 거리까지 ("5K PB"). nil = 그냥 "PB"
+    var label: String? = nil
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold))
-            Text("PB").font(F.t(11, .semibold)).tracking(0.22)
+            if let label {
+                Text(label).font(F.t(11, .semibold)).tracking(0.22)
+            } else {
+                Text("PB").font(F.t(11, .semibold)).tracking(0.22)
+            }
         }
         .foregroundStyle(C.accent)
         .padding(.horizontal, 7)

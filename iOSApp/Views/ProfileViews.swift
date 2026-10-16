@@ -171,6 +171,15 @@ struct ProfileSetupView: View {
     @State private var skipping = false
     /// 건강 앱에서 채운 값이 있음 (안내 한 줄)
     @State private var fromHealth = false
+    /// 빌드 27: 온보딩에서 디비전을 이미 골랐으면 가입 흐름에서 디비전 단계를 건너뜀 (Mixed 는 성별을 물어야 해서 보여 줌)
+    @State private var skipDiv: Bool
+
+    /// 빌드 27: 가입 흐름에서 디비전 단계를 건너뛰는지 (프로필 화면에서 고칠 때는 항상 보임)
+    static func skipsDivision(_ s: Settings) -> Bool {
+        s.divPicked == true && s.division != "dblX"
+    }
+    /// 가입 흐름 단계 수 (닉네임 제외)
+    static func stepCount(_ s: Settings) -> Int { skipsDivision(s) ? 3 : 4 }
 
     private static let thisYear: Int = Calendar.current.component(.year, from: Date())
     private static let years: [Int] = Array((1930...(ProfileSetupView.thisYear - 10)).reversed())
@@ -190,7 +199,16 @@ struct ProfileSetupView: View {
         _height = State(initialValue: s.heightCm ?? (s.sex == "W" ? 163 : 175))
         _weight = State(initialValue: Int((s.weightKg ?? (s.sex == "W" ? 58 : 75)).rounded()))
         _hasBody = State(initialValue: s.heightCm != nil || s.weightKg != nil)
+        let skip: Bool = !Router.shared.profileEdit && ProfileSetupView.skipsDivision(s)
+        _skipDiv = State(initialValue: skip)
+        // 건너뛰는 단계에서 시작하라고 하면 다음 단계로
+        if skip && Router.shared.profileStep == 2 { _step = State(initialValue: 3) }
     }
+
+    /// 이번 흐름에서 보여 줄 단계 (1 대회 경험 · 2 디비전 · 3 태어난 해 · 4 키/몸무게)
+    private var flow: [Int] { skipDiv ? [1, 3, 4] : [1, 2, 3, 4] }
+    /// 지금 단계가 흐름에서 몇 번째인지 (1부터)
+    private var stepIndex: Int { (flow.firstIndex(of: step) ?? 0) + 1 }
 
     private var editing: Bool { r.profileEdit }
     /// 점 단계: 새 계정이면 닉네임이 1번이라 하나 밀림
@@ -242,13 +260,16 @@ struct ProfileSetupView: View {
         if editing {
             BackLink(label: "Profile") { r.go(.account) }
         } else {
-            ProfileDots(now: step + offset, total: 4 + offset)
+            ProfileDots(now: stepIndex + offset, total: flow.count + offset)
         }
     }
 
     private func setBack() {
         if editing { r.backAction = { Router.shared.go(.account) }; return }
-        r.backAction = step > 1 ? { withAnimation(.easeInOut(duration: 0.2)) { step -= 1 } } : nil
+        let i: Int = stepIndex - 1
+        guard i > 0, i - 1 < flow.count else { r.backAction = nil; return }
+        let prev: Int = flow[i - 1]
+        r.backAction = { withAnimation(.easeInOut(duration: 0.2)) { step = prev } }
     }
 
     private var title: String {
@@ -502,13 +523,15 @@ struct ProfileSetupView: View {
     }
 
     private func advance() {
-        withAnimation(.easeInOut(duration: 0.2)) { step += 1 }
+        let i: Int = stepIndex      // 다음 단계의 자리 (0부터 셈)
+        let to: Int = i < flow.count ? flow[i] : 4
+        withAnimation(.easeInOut(duration: 0.2)) { step = to }
     }
 
     /// 고른 값을 저장하고 다음 화면으로 (건너뛴 단계 값은 그대로 둠)
     private func save() {
         var s = store.settings
-        let steps: [Int] = editing ? [step] : [1, 2, 3, 4].filter { !skipped.contains($0) }
+        let steps: [Int] = editing ? [step] : flow.filter { !skipped.contains($0) }
         for st in steps {
             switch st {
             case 1:
@@ -540,6 +563,11 @@ struct ProfileSetupView: View {
                 s.heightCm = hasBody ? height : nil
                 s.weightKg = hasBody ? Double(weight) : nil
             }
+        }
+        // 빌드 27: 온보딩에서 고른 디비전으로 성별을 정함 (Mixed 가 아니면 묻지 않음)
+        if !editing && skipDiv {
+            if let x = Self.sexOf(s.division) { s.sex = x }
+            if s.raceDivision == nil { s.raceDivision = s.division }
         }
         s.profileDone = true
         store.saveProfile(s)

@@ -347,7 +347,7 @@ struct NickView: View {
         Page8(spacing: 12) {
             // 빌드 24: 새 계정 가입 흐름이면 닉네임이 1단계 (1 / 5)
             if !editing && r.profileDotOffset == 1 {
-                ProfileDots(now: 1, total: 5)
+                ProfileDots(now: 1, total: ProfileSetupView.stepCount(store.settings) + 1)
             } else {
                 Color.clear.frame(height: 44)
             }

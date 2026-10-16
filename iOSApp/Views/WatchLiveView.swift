@@ -82,7 +82,8 @@ struct WatchLiveView: View {
         LiveFrame(mode: st.mode, title: st.title, seq: st.seq, idx: st.idx,
                   segEl: st.segEl(now, received: mirror.received), total: st.total(now, received: mirror.received),
                   running: st.running, open: st.open, segDist: st.segDist, totalDist: st.dist,
-                  runKind: st.mode == .training && st.cur?.icon == "run")
+                  runKind: st.mode == .training && st.cur?.icon == "run",
+                  speed: st.running ? st.spd : nil)
     }
 
     /// 다음 구간 (HIIT · 자유 러닝은 아직 순서에 없는 다음 라운드/km)

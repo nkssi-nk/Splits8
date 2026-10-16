@@ -19,6 +19,7 @@ struct ShareData {
     var vsWord = ""         // VS GOAL
     var vsValue = ""        // −0:27
     var pb = false          // ★ PB
+    var pbText = "PB"       // 빌드 27: 러닝 기록은 "5K PB" 처럼 거리까지
     var pairs: [Pair] = []
     var seq: [Part] = []
     var runTotal = ""
@@ -45,15 +46,17 @@ struct ShareData {
         vsWord = v.word
         vsValue = v.value.map(Fm.d) ?? "--:--"
         pb = store.isPB(r)
+        pbText = store.runPBLabel(r) ?? "PB"
         let runs = r.runs
         let sts = r.segs.filter { $0.kind == .st }
+        let imp: Bool = store.settings.imperial      // 빌드 27: 무게를 lb 로 (설정 > Units)
         pairs = (0..<max(runs.count, sts.count)).map { i in
             Pair(no: String(format: "%02d", i + 1),
                  icon: i < sts.count ? sts[i].icon : "run",
                  sn: i < sts.count ? ShareData.short(sts[i].name) : "",
                  rt: i < runs.count ? Fm.t(runs[i].time) : "",
                  st: i < sts.count ? Fm.t(sts[i].time) : "",
-                 spec: i < sts.count ? ShareData.spec(sts[i].detail) : "")
+                 spec: i < sts.count ? ShareData.spec(Units.detail(sts[i].detail, imp)) : "")
         }
         seq = r.mainSegs.map { Part(t: $0.time, run: $0.kind == .run, icon: $0.icon) }
         runTotal = Fm.t(r.runTotal)
@@ -226,7 +229,7 @@ struct ShareCard: View {
     private func pbPill(fill: Color, ring: Color, fg: Color) -> some View {
         HStack(spacing: 3) {
             Image(systemName: "star.fill").font(F.t(9, .semibold))
-            Text("PB").font(F.t(11, .semibold))
+            Text(d.pbText).font(F.t(11, .semibold))
         }
         .foregroundStyle(fg)
         .padding(.horizontal, 8)

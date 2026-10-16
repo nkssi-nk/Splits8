@@ -260,6 +260,8 @@ struct DetailView: View {
                     .padding(.vertical, 3).padding(.horizontal, 8)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Label8(Fm.wdmy.string(from: rec.date))
+                // 빌드 27: 러닝 PB 는 머리에 거리까지 ("★ 5K PB")
+                if let pbl = store.runPBLabel(rec) { PBPill(label: pbl) }
                 if let f = rec.flag { FlagPill(flag: f) }
             }
             if rec.mode != .pft {        // PFT 는 제목이 위 알약과 같아서 큰 제목을 뺌
@@ -299,7 +301,8 @@ struct DetailView: View {
 
     private func tiles(_ rec: Record) -> [DetailTile] {
         let vs = store.vs(rec)
-        let pace: String = rec.runPace.map { Fm.t($0) } ?? "--:--"
+        let imp: Bool = store.settings.imperial
+        let pace: String = rec.runPace.map { Fm.t(Units.pace($0, imp)) } ?? "--:--"
         // PFT 는 총 시간·최고 기록 대비를 위의 큰 카드(pftCard)가 보여 줌
         let head: [DetailTile]
         if rec.mode == .pft {
@@ -307,7 +310,7 @@ struct DetailView: View {
         } else if rec.mode == .training {
             // 64번: VS BEST 는 풀 시뮬 · 레이스에서만. 러닝은 거리, 그 외 트레이닝은 구간 수
             let second: DetailTile = rec.isRunKind
-                ? DetailTile(label: "DISTANCE", value: String(format: "%.2f", rec.runDistance / 1000), unit: "KM", color: .white, unitColor: C.text2)
+                ? DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: .white, unitColor: C.text2)
                 : DetailTile(label: "SEGMENTS", value: "\(rec.mainSegs.count)", unit: "", color: .white, unitColor: .clear)
             head = [DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear), second]
         } else {
@@ -320,7 +323,7 @@ struct DetailView: View {
             DetailTile(label: "AVG HR", value: rec.avgHR > 0 ? "\(rec.avgHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "MAX HR", value: rec.maxHR > 0 ? "\(rec.maxHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "CALORIES", value: grouped(rec.kcal), unit: "KCAL", color: .white, unitColor: C.text2),
-            DetailTile(label: "RUN PACE", value: pace, unit: "/KM", color: .white, unitColor: C.text2),
+            DetailTile(label: "RUN PACE", value: pace, unit: Units.paceUnit(imp), color: .white, unitColor: C.text2),
         ] + runTiles(rec) + repTiles(rec) + bestTiles(rec)
     }
 
@@ -675,13 +678,14 @@ struct DetailView: View {
     // MARK: 러닝 페이스 (막대 8개, 가장 빠른 것 노랑)
 
     private func paceCard(_ rec: Record) -> some View {
-        let paces: [Int] = rec.runs.map { rec.pace($0) }
-        let avg: String = rec.runPace.map { Fm.t($0) } ?? "--:--"
+        let imp: Bool = store.settings.imperial
+        let paces: [Int] = rec.runs.map { Units.pace(rec.pace($0), imp) }
+        let avg: String = rec.runPace.map { Fm.t(Units.pace($0, imp)) } ?? "--:--"
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Label8("RUN PACE")
                 Spacer(minLength: 8)
-                Text(String(localized: "AVG \(avg) /KM")).font(F.num(15)).lineLimit(1)
+                Text(imp ? String(localized: "AVG \(avg) /MI") : String(localized: "AVG \(avg) /KM")).font(F.num(15)).lineLimit(1)
             }
             paceBars(paces)
                 .frame(height: 110)
@@ -718,22 +722,28 @@ struct DetailView: View {
 
     private func splits(_ rec: Record) -> some View {
         let segs = rec.mainSegs
+        // 빌드 27: 트레이닝은 저장된 목표(s.target) 대신 이 기록 전까지의 구간별 최고와 비교 (한 번만 계산)
+        let prior: [String: Int] = rec.mode == .training ? store.segBestsBefore(rec) : [:]
         return VStack(spacing: 0) {
             ForEach(segs.indices, id: \.self) { i in
-                splitRow(rec, segs[i], last: i == segs.count - 1)
+                splitRow(rec, segs[i], last: i == segs.count - 1, prior: prior)
             }
         }
         .card8()
     }
 
-    private func splitRow(_ rec: Record, _ s: SegResult, last: Bool) -> some View {
-        // 트레이닝: 그 구간 내 최고 기록과 비교. 최고 기록이 없었거나(0) 예전 잘못된 값이면 비교 안 함
+    private func splitRow(_ rec: Record, _ s: SegResult, last: Bool, prior: [String: Int]) -> some View {
+        // 트레이닝: 이 기록 전까지 같은 구간(SegKey)의 최고 기록과 비교 (빌드 27: 저장된 s.target 은 안 씀).
+        //  이전 최고가 없으면 "–". Full Sim · Race · PFT 는 예전처럼 s.target 과 비교
         // 64번: 러닝 기록은 목표가 없어서 '시간 − 0'(+5:48 등)이 나왔음 → 내 평균 페이스 대비 (빠르면 초록, 느리면 빨강)
         let runAvg: Int? = (rec.mode == .training && rec.isRunKind && s.kind == .run) ? rec.avgKmPace : nil
-        let showDelta: Bool = runAvg != nil || rec.mode != .training
-            || (s.target > 0 && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.target))
-        let d: Int = runAvg.map { rec.pace(s) - $0 } ?? (s.time - s.target)
-        let first: String = s.kind == .run ? "\(Fm.t(rec.pace(s))) /KM" : s.detail
+        let priorBest: Int? = (rec.mode == .training && s.kind != .rox) ? prior[SegKey.of(icon: s.icon, detail: s.detail)] : nil
+        let showDelta: Bool = runAvg != nil || rec.mode != .training || priorBest != nil
+        let imp: Bool = store.settings.imperial
+        // 러닝 평균 대비 차이도 보이는 페이스 단위(/KM · /MI)로
+        let base: Int = rec.mode == .training ? (priorBest ?? s.time) : s.target
+        let d: Int = runAvg.map { Units.pace(rec.pace(s), imp) - Units.pace($0, imp) } ?? (s.time - base)
+        let first: String = s.kind == .run ? "\(Fm.t(Units.pace(rec.pace(s), imp))) \(Units.paceUnit(imp))" : Units.detail(s.detail, imp)
         let bpm: String = s.hr.map { String($0) } ?? "--"
         // 스키 · 로잉 · 월볼: 워치가 팔 움직임으로 센 횟수를 참고용으로 덧붙임 ("~" = 짐작값, 한국어 "약")
         let reps: String = s.reps.map { n in

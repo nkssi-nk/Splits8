@@ -30,6 +30,8 @@ struct LiveState: Codable, Equatable {
     /// 64번: 지금 구간에서 달린 거리(m) · 운동 전체 거리(m). 아이폰 화면의 페이스 계산용 (예전 워치 앱은 안 보냄 → nil)
     var segDist: Double? = nil
     var dist: Double? = nil
+    /// 빌드 27: 지금 속도(m/s, 실시간 페이스용). 0 · nil = 아직 모름 (예전 워치 앱은 안 보냄 → nil)
+    var spd: Double? = nil
 
     var cur: Seg? { seq.indices.contains(idx) ? seq[idx] : seq.last }
     var nextSeg: Seg? { seq.indices.contains(idx + 1) ? seq[idx + 1] : nil }
@@ -62,13 +64,45 @@ extension Settings {
     }
 }
 
-/// 64번: "5:12" 처럼 1 km 페이스 글자 (거리가 10 m 미만이면 "–:––")
+/// 64번: "5:12" 처럼 1 km 페이스 글자
+/// 빌드 27: 실시간 페이스 (애플 운동 앱 · 나이키처럼 지금 속도로 계산)
+///  1) 지금 속도가 0.5 m/s 넘으면 → 그 속도로 페이스
+///  2) 아니면 구간 거리가 50 m 미만 → "Measuring" (측정 중)
+///  3) 아니면 → 이 구간 평균 페이스 (예전 방식)
+///  거리를 아예 못 재면(nil) "–:––"
 enum LivePace {
-    static func text(el: Int, dist: Double?) -> String {
-        guard let dist, dist >= 10, el > 0 else { return "–:––" }
-        let p: Int = Int((Double(el) / (dist / 1000)).rounded())
-        guard p < 3600 else { return "–:––" }
-        return "\(p / 60):" + String(format: "%02d", p % 60)
+    enum Reading: Equatable {
+        case pace(Int)        // 초 (1 km 또는 1 mi 당)
+        case measuring
+        case unknown
+    }
+
+    static func reading(el: Int, dist: Double?, imperial: Bool = false, speed: Double? = nil) -> Reading {
+        let unitM: Double = imperial ? Units.mPerMile : 1000
+        if let sp = speed, sp > 0.5 {
+            let p: Double = unitM / sp
+            if p < 3600 { return .pace(Int(p.rounded())) }
+        }
+        guard let d = dist else { return .unknown }
+        if d < 50 { return .measuring }
+        guard el > 0 else { return .unknown }
+        let p: Int = Int((Double(el) / (d / unitM)).rounded())
+        guard p < 3600 else { return .unknown }
+        return .pace(p)
+    }
+
+    /// 초 → "5:12"
+    static func fmt(_ p: Int) -> String {
+        "\(p / 60):" + String(format: "%02d", p % 60)
+    }
+
+    /// imperial = true 면 1 mi 당 페이스 (빌드 27 단위 설정) · speed = 지금 속도(m/s)
+    static func text(el: Int, dist: Double?, imperial: Bool = false, speed: Double? = nil) -> String {
+        switch reading(el: el, dist: dist, imperial: imperial, speed: speed) {
+        case .pace(let p): return fmt(p)
+        case .measuring: return String(localized: "Measuring")
+        case .unknown: return "–:––"
+        }
     }
 }
 

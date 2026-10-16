@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Observation
+import StoreKit
 
 @main
 struct Splits8App: App {
@@ -72,6 +73,13 @@ enum Scr: String {
     case widgets            // 화면 확인용: 위젯 · 잠금 화면 미리보기 (--demo 에서만)
 }
 
+/// 링크로 받은 더블 계획 (보낸 사람 입장의 계획 + 보낸 사람 닉네임)
+struct IncomingDoubles: Identifiable {
+    let id = UUID()
+    var plan: DoublesPlan
+    var sender: String?
+}
+
 /// 운동 예약 시트 요청 (달력 날짜 / 홈 UPCOMING 에서 엶)
 struct PlanRequest: Equatable {
     var date: Date
@@ -113,14 +121,38 @@ final class Router {
     var linkError = false
     var linkFull = false
 
-    /// splits8://t?d=…  로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함
+    // 빌드 27: 링크로 받은 더블 계획 (보낸 사람 입장 그대로 · nil 이면 닫힘) · 읽을 수 없는 더블 링크
+    var incomingDoubles: IncomingDoubles? = nil
+    var dblLinkError = false
+
+    /// splits8://t?d=… (트레이닝) · splits8://d?d=… (더블 계획) 로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함
     func handle(url: URL) {
+        // 더블 계획: splits8://d?d=d1.…  또는  https://…/t.html#d1.…
+        let isDoubles: Bool = (url.scheme?.lowercased() == ProgramLink.scheme && url.host?.lowercased() == DoublesLink.host)
+            || (url.fragment?.hasPrefix(DoublesLink.prefix) ?? false)
+        if isDoubles {
+            guard let token = DoublesLink.token(from: url), let got = DoublesLink.read(token) else {
+                dblLinkError = true
+                return
+            }
+            incomingDoubles = IncomingDoubles(plan: got.plan, sender: got.sender)
+            return
+        }
         guard url.scheme?.lowercased() == ProgramLink.scheme, url.host?.lowercased() == "t" else { return }
         guard let token = ProgramLink.token(from: url), let p = ProgramLink.program(from: token) else {
             linkError = true
             return
         }
         incoming = p
+    }
+
+    /// 받은 더블 계획을 내 계획으로 저장 (확인창에서 받기를 눌렀을 때). 먼저 하는 사람을 바꾸고 파트너 = 보낸 사람
+    func acceptIncomingDoubles(_ d: IncomingDoubles) {
+        incomingDoubles = nil
+        let store = Store.shared
+        store.settings.doublesPlan = d.plan.swapped(sender: d.sender)
+        // 처음 안내 화면 · 운동 중에는 화면을 옮기지 않음
+        if store.settings.hasOnboarded && scr != .phoneLive && scr != .builder { go(.race) }
     }
 
     /// 받은 트레이닝을 내 목록에 더함 (확인창에서 Add 를 눌렀을 때)
@@ -185,6 +217,10 @@ final class Router {
     // 운동 끝 카드 (51번): 지금 띄운 기록 · 앱이 뒤에 있을 때 도착해 기다리는 워치 기록
     var finish: Record? = nil
     var pendingFinish: Record? = nil
+    /// 빌드 27: 마지막으로 띄운 운동 끝 카드의 기록 (카드를 닫은 뒤 앱 평가 요청을 볼 때 씀)
+    @ObservationIgnored var finishShown: Record? = nil
+    /// 빌드 27: 앱을 열 때 받은 응원 · 친구 요청 알림 띠 (nil = 안 보임)
+    var notice: AppNotice? = nil
     /// 워치 운동을 아이폰에 같이 보여 주는 중 (52번)
     var liveMirror = false
 
@@ -332,6 +368,19 @@ struct IncomingTrainingAlerts: ViewModifier {
             } message: { p in
                 Text(IncomingTrainingAlerts.summary(p))
             }
+            .alert(IncomingTrainingAlerts.doublesTitle(r.incomingDoubles),
+                   isPresented: Binding(get: { r.incomingDoubles != nil }, set: { if !$0 { r.incomingDoubles = nil } }),
+                   presenting: r.incomingDoubles) { d in
+                Button("Get plan") { r.acceptIncomingDoubles(d) }
+                Button("Cancel", role: .cancel) { r.incomingDoubles = nil }
+            } message: { _ in
+                Text("Your doubles plan will be replaced. Who goes first is swapped so it fits you.")
+            }
+            .alert("This doubles plan link can't be read", isPresented: $r.dblLinkError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("The link may be cut off. Ask for it again.")
+            }
             .alert("This training link can't be read", isPresented: $r.linkError) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -342,6 +391,13 @@ struct IncomingTrainingAlerts: ViewModifier {
             } message: {
                 Text("Delete one to make a new training.")
             }
+    }
+
+    /// "가테부님의 더블 계획을 받을까요?"
+    static func doublesTitle(_ d: IncomingDoubles?) -> String {
+        let n: String = d?.sender ?? ""
+        if n.isEmpty { return "Get this doubles plan?".l10n }
+        return String(format: "Get %@'s doubles plan?".l10n, n)
     }
 
     /// "Leg day\n8 segments × 2 sets"
@@ -429,6 +485,7 @@ extension Scr {
 struct PhoneRoot: View {
     let r = Router.shared
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
     @State private var edgeDrag: CGFloat = 0
 
     /// 왼쪽 끝에서 밀어 뒤로: 화면 안 ‹/Cancel 이 등록한 동작, 없으면 고정 바의 뒤로
@@ -507,6 +564,16 @@ struct PhoneRoot: View {
 
             if r.saveOpen { SaveSheet() }
 
+            // 빌드 27: 받은 응원 · 친구 요청 알림 띠 (누르면 친구 화면)
+            if let n = r.notice {
+                NoticeBanner(text: n.text) { r.openNotice() }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 50)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(8)
+            }
+
             if let p = r.photoView {
                 PhotoViewer(item: p)
                     .transition(.opacity)
@@ -528,8 +595,9 @@ struct PhoneRoot: View {
                     .preferredColorScheme(.dark)
             }
         }
-        .sheet(item: Binding(get: { r.finish }, set: { r.finish = $0 })) { rec in
+        .sheet(item: Binding(get: { r.finish }, set: { r.finish = $0 }), onDismiss: askReviewAfterFinish) { rec in
             FinishSheet(rec: rec)
+                .onAppear { r.finishShown = rec }
                 .presentationDetents([.height(440), .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(hex: 0x1C1C1E))
@@ -547,6 +615,7 @@ struct PhoneRoot: View {
             guard scenePhase == .active, !Demo.enabled else { return }
             await Store.shared.checkDevice()
             await r.askProfileIfNeeded()
+            await r.checkNotice()
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 180_000_000_000)
                 if Task.isCancelled { break }
@@ -558,6 +627,23 @@ struct PhoneRoot: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Your records stay on this iPhone. Sign in again to use friends and leaderboards here.")
+        }
+    }
+
+    /// 빌드 27: 운동 끝 카드를 닫은 뒤, 좋은 순간이면 0.6초 뒤 App Store 평가 요청 (버전당 한 번 · 60일 간격)
+    private func askReviewAfterFinish() {
+        guard let rec = r.finishShown else { return }
+        r.finishShown = nil
+        guard ReviewAsk.allowed, ReviewAsk.goodMoment(rec) else { return }
+        let router: Router = r
+        let ask: RequestReviewAction = requestReview
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            // 운동 중 · 공유 화면으로 넘어갔거나 다른 카드가 떠 있으면 다음 기회에
+            guard UIApplication.shared.applicationState == .active, router.finish == nil, !router.liveMirror,
+                  router.scr.showsTabs || router.scr == .detail else { return }
+            ReviewAsk.markAsked()
+            ask()
         }
     }
 
@@ -765,6 +851,10 @@ struct TabBar8: View {
     private static let lineH: CGFloat = 3
 
     private var selected: Int? { tabs.firstIndex { $0.scr == r.scr.tab } }
+    private var socialDot: Bool {
+        let store = Store.shared
+        return store.signedIn && (store.unseenCheers > 0 || !store.incoming.isEmpty)
+    }
     private var barH: CGFloat { scroll.compact ? 50 : 64 }
 
     private var row: some View {
@@ -778,6 +868,13 @@ struct TabBar8: View {
                             if t.icon == "modeTraining" { Icon8(t.icon, 25, c) } else { Glyph(t.icon, 24, c) }
                         }
                         .frame(width: 25, height: 24)
+                        // 빌드 27: 받은 응원 · 친구 요청이 있으면 설정 탭에 빨간 점 (친구 화면이 설정 안에 있음)
+                        .overlay(alignment: .topTrailing) {
+                            if t.scr == .settings && socialDot {
+                                Circle().fill(C.bad).frame(width: 8, height: 8).offset(x: 3, y: -1)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                         .scaleEffect(pop == i ? 1.14 : 1)
                         .offset(y: pop == i ? -2 : 0)
                         if !scroll.compact {   // 아래로 읽어 내려갈 땐 아이콘만, 위로 올리면 글자까지

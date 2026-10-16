@@ -333,6 +333,18 @@ final class Store: NSObject, WCSessionDelegate {
         return b
     }
 
+    /// 빌드 27: 이 기록 '전'까지의 트레이닝 구간별 최고 (이 기록은 뺌). 기록 화면의 구간 차이(±)에 씀
+    func segBestsBefore(_ rec: Record) -> [String: Int] {
+        var b: [String: Int] = [:]
+        for r in records where r.mode == .training && r.counts && r.id != rec.id && r.date < rec.date {
+            for s in r.segs where s.kind != .rox && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.time) {
+                let k: String = SegKey.of(icon: s.icon, detail: s.detail)
+                b[k] = min(b[k] ?? Int.max, s.time)
+            }
+        }
+        return b
+    }
+
     /// 같은 프로그램 이전 최고 (VS BEST)
     func previousBest(for r: Record) -> Int? {
         records.filter { $0.mode == r.mode && $0.title == r.title && $0.id != r.id && $0.date < r.date && $0.counts }.map(\.total).min()
@@ -701,6 +713,11 @@ final class Store: NSObject, WCSessionDelegate {
         s.heightCm = p.height_cm ?? s.heightCm
         s.weightKg = p.weight_kg ?? s.weightKg
         s.birthYear = p.birth_year ?? s.birthYear
+        // 빌드 27: 태어난 해로 심박 계산용 나이도 맞춤 (나이로 계산할 때만)
+        if let y = s.birthYear, s.hrMode == "age" {
+            let age: Int = Calendar.current.component(.year, from: Date()) - y
+            if (10...100).contains(age) { s.age = age }
+        }
         s.raced = p.raced ?? s.raced
         s.raceDivision = p.race_division ?? s.raceDivision
         s.profileDone = true            // 다른 기기에서 이미 답함 → 다시 묻지 않음
@@ -755,7 +772,7 @@ final class Store: NSObject, WCSessionDelegate {
         let ctx = WatchContext(settings: settings, programs: programs, friend: friend?.hasSplits == true ? friend : nil,
                                simBest: best?.splits16, simBestTotal: best?.total, segBests: segBests,
                                pftBest: pft?.pftSplits, pftBestTotal: pft?.total,
-                               simLast: simLast?.splits16)
+                               simLast: simLast?.splits16, doublesPlan: settings.doublesPlan)
         guard let d = try? JSONStore.enc.encode(ctx) else { return }
         do {
             try WCSession.default.updateApplicationContext([SyncKey.context: d])
@@ -794,6 +811,7 @@ final class Store: NSObject, WCSessionDelegate {
                 let fresh: Bool = !self.records.contains { $0.id == r.id }
                 self.add(r)
                 if fresh { Router.shared.queueFinish(r) }      // 운동 끝 카드 (51번)
+                WatchMirror.shared.recordArrived()              // 빌드 27: 남은 잠금 화면 카드 정리
             }
         }
         // 63번: 예전 워치 앱이 보내는 Quick 은 트레이닝 목록에 넣지 않음 (목록이 계속 늘어나던 원인)

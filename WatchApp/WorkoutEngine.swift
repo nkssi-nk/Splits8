@@ -62,6 +62,13 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var segStepStart: Double = 0
     @ObservationIgnored private var segSteps: [Double?] = []
     @ObservationIgnored private var strideAvg: Double? = nil      // 평균 보폭(m), 워치가 재 줄 때만
+    // 빌드 27: 실시간 속도 (애플 운동 앱 · 나이키처럼 "지금" 페이스)
+    /// 지금 속도(m/s). 0 = 모름 (일시정지 · 10초 넘게 새 값 없음)
+    private(set) var curSpeed: Double = 0
+    /// 건강 앱(runningSpeed)에서 마지막으로 받은 때 — 최근에 받았으면 GPS 속도는 안 씀
+    @ObservationIgnored private var lastHKSpeedAt: Date = .distantPast
+    /// 아무 쪽에서든 마지막으로 속도를 받은 때 (오래되면 0 으로)
+    @ObservationIgnored private var lastSpeedAt: Date = .distantPast
 
     // 시간 (일시정지 제외)
     private(set) var startDate = Date()
@@ -111,7 +118,8 @@ final class WorkoutEngine: NSObject {
         // 62번: 걸음 수 · 보폭 (러닝 카드 케이던스)
         let read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned),
                                        HKQuantityType(.distanceWalkingRunning), HKObjectType.workoutType(),
-                                       HKQuantityType(.stepCount), HKQuantityType(.runningStrideLength)]
+                                       HKQuantityType(.stepCount), HKQuantityType(.runningStrideLength),
+                                       HKQuantityType(.runningSpeed)]      // 빌드 27: 실시간 페이스
         health.requestAuthorization(toShare: share, read: read) { _, _ in }
         location.requestWhenInUseAuthorization()
     }
@@ -139,6 +147,35 @@ final class WorkoutEngine: NSObject {
 
     /// 현재 러닝 구간 거리(m)
     var segDist: Double { max(0, distance - segDistStart) }
+
+    /// 빌드 27: 지금 속도로 계산한 1 km 페이스(초). 속도를 모르거나 0.5 m/s 이하면 nil
+    var livePaceSec: Int? {
+        let sp: Double = curSpeed
+        guard sp > 0.5 else { return nil }
+        return Int(1000 / sp)
+    }
+
+    /// 빌드 27: 워치 화면의 PACE 글자 (1 km 당, imperial = true 면 1 mi 당).
+    ///  - "5:12": 지금 속도로 계산한 페이스 (속도를 모르면 이 구간 평균 페이스)
+    ///  - nil: 아직 측정 중 → 화면에서 "Measuring"(측정 중) 으로 보여 줄 것
+    ///         (속도도 모르고 이 구간에서 50 m 도 안 달렸을 때)
+    ///  - "–:––": 계산할 수 없음
+    ///  예: `engine.paceText(el: engine.segEl(now), dist: engine.segDist)`
+    func paceText(el: Int, dist: Double, imperial: Bool = false) -> String? {
+        switch LivePace.reading(el: el, dist: dist, imperial: imperial, speed: curSpeed) {
+        case .pace(let p): return LivePace.fmt(p)
+        case .measuring: return nil
+        case .unknown: return "–:––"
+        }
+    }
+
+    /// 속도 하나 받음: 부드럽게(지수 이동 평균 alpha 0.3). 처음 값은 그대로
+    private func blendSpeed(_ v: Double, _ now: Date) {
+        guard v >= 0, v.isFinite else { return }
+        let fresh: Bool = curSpeed <= 0 || now.timeIntervalSince(lastSpeedAt) > 10
+        curSpeed = fresh ? v : (0.3 * v + 0.7 * curSpeed)
+        lastSpeedAt = now
+    }
 
     // MARK: 시작 전 3 · 2 · 1
 
@@ -207,6 +244,7 @@ final class WorkoutEngine: NSObject {
         segReps = Array(repeating: nil, count: seq.count)
         segSteps = Array(repeating: nil, count: seq.count)
         steps = 0; segStepStart = 0; strideAvg = nil
+        curSpeed = 0; lastHKSpeedAt = .distantPast; lastSpeedAt = .distantPast
         segDistStart = 0; segPaused = 0; pauseAt = nil
         undoPoint = nil; canUndo = false
         let now = Date()
@@ -236,6 +274,10 @@ final class WorkoutEngine: NSObject {
             if isRunKind {
                 src.enableCollection(for: HKQuantityType(.stepCount), predicate: nil)
                 src.enableCollection(for: HKQuantityType(.runningStrideLength), predicate: nil)
+            }
+            // 빌드 27: 러닝 속도 (실시간 페이스) — 러닝 운동이면 모두
+            if cfg.activityType == .running {
+                src.enableCollection(for: HKQuantityType(.runningSpeed), predicate: nil)
             }
             b.dataSource = src
             s.delegate = self
@@ -302,6 +344,12 @@ final class WorkoutEngine: NSObject {
             p.name(for: first) { [weak self] name in self?.place = name; self?.placeLookup = nil }
         }
         guard running else { return }
+        // 빌드 27: GPS 속도 — 건강 앱 속도(runningSpeed)가 10초 넘게 안 올 때만 씀
+        if Date().timeIntervalSince(lastHKSpeedAt) > 10 {
+            for l in good where l.speed >= 0 && l.horizontalAccuracy < 20 {
+                blendSpeed(l.speed, Date())
+            }
+        }
         for l in good {
             if let prev = lastRouteLoc, l.distance(from: prev) < 8 { continue }
             lastRouteLoc = l
@@ -422,6 +470,7 @@ final class WorkoutEngine: NSObject {
         guard active else { return }
         if running {
             pauseAt = Date(); running = false
+            curSpeed = 0                                // 빌드 27: 멈추면 속도 모름
             session?.pause()
             repCounter.setPaused(true)
         } else {
@@ -486,6 +535,8 @@ final class WorkoutEngine: NSObject {
     private func tick() {
         // 아이폰에 5초마다 심박 · 칼로리 · 시간 맞추기
         liveTicks += 1
+        // 빌드 27: 10초 넘게 새 속도가 없으면 모름(0) — 멈춰 섰는데 예전 페이스가 남지 않게
+        if curSpeed > 0 && Date().timeIntervalSince(lastSpeedAt) > 10 { curSpeed = 0 }
         if mirroring && liveTicks % 5 == 0 { pushLive() }
         if mirrorLost && active && !finished && liveTicks % 30 == 0, let s = session {
             Task { @MainActor in
@@ -591,6 +642,7 @@ final class WorkoutEngine: NSObject {
         segReps = Array(repeating: nil, count: seq.count)
         segSteps = Array(repeating: nil, count: seq.count)
         steps = 0; segStepStart = 0; strideAvg = nil
+        curSpeed = 0
         segDistStart = 0; segPaused = 0; pauseAt = nil
         undoPoint = nil; canUndo = !done && idx > 0      // 화면 캡처에서 Undo 가 켜진 모습
         let now = Date()
@@ -647,7 +699,7 @@ final class WorkoutEngine: NSObject {
                            running: running, hr: Int(hr.rounded()), kcal: Int(kcal.rounded()), zone: hr > 0 ? zone : 0,
                            canUndo: canUndo, finished: finished, vsWord: deltaWord,
                            delta: hasTarget ? delta(now) : nil, open: growsOpen, autoSplit: isRunKind && !(distance <= 0 && !outdoorRun),
-                           segDist: segDist, dist: distance)
+                           segDist: segDist, dist: distance, spd: curSpeed > 0 ? curSpeed : nil)
         guard let d = LivePacket(state: st).data() else { return }
         s.sendToRemoteWorkoutSession(data: d) { _, _ in }
     }
@@ -690,6 +742,13 @@ final class WorkoutEngine: NSObject {
     fileprivate func gotSteps(_ v: Double) {
         guard active, !finished else { return }
         steps = v
+    }
+    /// 빌드 27: 건강 앱이 잰 지금 러닝 속도(m/s)
+    fileprivate func gotSpeed(_ v: Double) {
+        guard active, !finished, running else { return }
+        let now = Date()
+        lastHKSpeedAt = now
+        blendSpeed(v, now)
     }
     /// 62번: 평균 보폭(m)
     fileprivate func gotStride(_ v: Double) {
@@ -750,6 +809,12 @@ extension WorkoutEngine: HKLiveWorkoutBuilderDelegate {
                 // 62번: 걸음 수는 누적(합계)
                 if let v = st.sumQuantity()?.doubleValue(for: .count()) {
                     DispatchQueue.main.async { self.gotSteps(v) }
+                }
+            } else if qt == HKQuantityType(.runningSpeed) {
+                // 빌드 27: 지금 속도 (가장 최근 값, m/s)
+                let mps: HKUnit = HKUnit.meter().unitDivided(by: HKUnit.second())
+                if let v = st.mostRecentQuantity()?.doubleValue(for: mps) {
+                    DispatchQueue.main.async { self.gotSpeed(v) }
                 }
             } else if qt == HKQuantityType(.runningStrideLength) {
                 // 62번: 보폭은 그때그때 재는 값 → 지금까지 평균

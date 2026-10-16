@@ -96,8 +96,22 @@ final class WatchStore: NSObject, WCSessionDelegate {
 
     /// Full Simulation 목표 16개와 비교 이름: 아이폰 Full Sim 화면의 "Compare with" (Goal / Last / 친구) 를 따름
     var simPick: (targets: [Int], word: String) {
-        SimTarget.pick(cmp: ctx.settings.simCmp, goals: ctx.settings.goals, last: ctx.simLast,
-                       friend: ctx.friend?.splits, friendFirst: ctx.friend?.first, best: ctx.simBest)
+        // 빌드 27 (68-①): 워치에서 목표 완주 시간을 고르면 그 시간으로 16구간을 나눔 (아이폰과 같은 계산)
+        if let g = watchGoal {
+            let t: [Int] = GoalSplit.split(total: g, style: "balanced", current: ctx.settings.goals, best: ctx.simBest,
+                                           division: ctx.settings.division, rox: ctx.settings.roxTarget)
+            return (t, "GOAL")
+        }
+        return SimTarget.pick(cmp: ctx.settings.simCmp, goals: ctx.settings.goals, last: ctx.simLast,
+                              friend: ctx.friend?.splits, friendFirst: ctx.friend?.first, best: ctx.simBest)
+    }
+
+    /// 워치에서 고른 Full Sim 목표 완주 시간(초). nil = 아이폰 설정을 따름. 워치에만 저장
+    var watchGoal: Int? = UserDefaults.standard.object(forKey: "watchSimGoal") as? Int {
+        didSet {
+            if let g = watchGoal { UserDefaults.standard.set(g, forKey: "watchSimGoal") }
+            else { UserDefaults.standard.removeObject(forKey: "watchSimGoal") }
+        }
     }
     var simTargets: [Int] { simPick.targets }
 

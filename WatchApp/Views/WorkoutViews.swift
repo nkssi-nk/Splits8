@@ -64,18 +64,40 @@ enum WSegmentFlash {
 
 /// 화면 높이별 크기 (45mm 기준 디자인, 41mm 이하에서는 줄임)
 struct WLiveMetrics {
-    let top: CGFloat        // 위쪽 여백
-    let totalH: CGFloat     // TOTAL 블록 높이 (고정)
+    let top: CGFloat        // 위쪽 여백 (TOTAL 이름표 위)
     let totalFont: CGFloat  // 전체 시간 글자
-    let icon: CGFloat       // 현재 구간 아이콘
-    let seg: CGFloat        // 현재 구간 시간 글자
-    let nameTop: CGFloat    // 구간 이름 위 여백
+    let icon: CGFloat       // 지금 구간 아이콘
+    let name: CGFloat       // 지금 구간 이름 글자
+    let seg: CGFloat        // SPLIT · PACE 숫자
+    let nextName: CGFloat   // NEXT 아래 다음 구간 이름
+    let main: CGFloat       // 가운데 노란 버튼 지름
+    let side: CGFloat       // 양옆 작은 버튼 지름
 
+    /// 빌드 27 (68 · 71번 확정안): 위 정보는 그대로, 아래에 NEXT 이름 + 컨트롤 줄 → 전체 글자를 조금 줄이고 간격을 고르게
     static var current: WLiveMetrics {
         let h: CGFloat = WKInterfaceDevice.current().screenBounds.height
-        if h >= 230 { return WLiveMetrics(top: 24, totalH: 80, totalFont: 40, icon: 36, seg: 34, nameTop: 8) }
-        if h >= 205 { return WLiveMetrics(top: 20, totalH: 64, totalFont: 36, icon: 30, seg: 30, nameTop: 5) }
-        return WLiveMetrics(top: 16, totalH: 56, totalFont: 32, icon: 26, seg: 26, nameTop: 4)
+        if h >= 240 { return WLiveMetrics(top: 16, totalFont: 30, icon: 18, name: 15, seg: 28, nextName: 17, main: 48, side: 34) }
+        if h >= 220 { return WLiveMetrics(top: 14, totalFont: 28, icon: 17, name: 14, seg: 26, nextName: 16, main: 44, side: 32) }
+        return WLiveMetrics(top: 12, totalFont: 24, icon: 15, name: 13, seg: 22, nextName: 14, main: 40, side: 28)
+    }
+}
+
+/// 삼각형 머리 화살표 (3-A) — 가운데 노란 버튼 안
+struct TriArrow: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let w: CGFloat = r.width, h: CGFloat = r.height
+        let bar: CGFloat = h * 0.18
+        let headW: CGFloat = w * 0.42
+        // 막대
+        p.addRoundedRect(in: CGRect(x: r.minX + w * 0.06, y: r.midY - bar / 2, width: w - headW - w * 0.02, height: bar),
+                         cornerSize: CGSize(width: bar * 0.35, height: bar * 0.35))
+        // 머리 (삼각형)
+        p.move(to: CGPoint(x: r.maxX - headW - w * 0.02, y: r.minY + h * 0.14))
+        p.addLine(to: CGPoint(x: r.maxX - w * 0.02, y: r.midY))
+        p.addLine(to: CGPoint(x: r.maxX - headW - w * 0.02, y: r.maxY - h * 0.14))
+        p.closeSubpath()
+        return p
     }
 }
 
@@ -134,7 +156,7 @@ struct WLive: View {
                     .id(engine.idx)
                     .transition(slide)
             }
-            .padding(.top, m.top).padding(.horizontal, 18).padding(.bottom, 10)
+            .padding(.top, m.top).padding(.horizontal, 14).padding(.bottom, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .contentShape(Rectangle())
@@ -176,89 +198,102 @@ struct WLive: View {
     // MARK: TOTAL (고정, 움직이지 않음)
 
     private func totalBlock(now: Date) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 0) {
             Text("TOTAL")
-                .font(F.t(12, .semibold)).tracking(1.08)
+                .font(F.t(10, .semibold)).tracking(1.0)
                 .foregroundStyle(C.text2)
             Text(Fm.t(engine.total(now)))
                 .font(F.num(m.totalFont)).tracking(-0.02 * m.totalFont)
-                .foregroundStyle(aod ? C.text2 : Color.white)
+                .foregroundStyle(aod ? C.text2 : (isRox ? C.d1 : Color.white))
                 .lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: m.totalH)
     }
 
-    // MARK: 현재 + 다음 (밀리는 부분)
+    // MARK: 지금 구간 + NEXT + 컨트롤 줄 (빌드 27 확정안: 위아래 간격을 고르게)
 
     private func lower(now: Date) -> some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
+            Spacer(minLength: 2)
             current(now: now)
-            Spacer(minLength: 0)
-            if !aod { nextRow }
+            Spacer(minLength: 4)
+            if !aod {
+                nextLabel
+                Spacer(minLength: 4)
+                controls
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var fg: Color { aod ? C.text3 : Color.white }
+    private var isRox: Bool { engine.cur.kind == .rox }
+    private var fg: Color { aod ? C.text3 : (isRox ? C.d1 : Color.white) }
 
     private var curTint: IconTint {
         if aod { return .dim }
-        return engine.cur.kind == .rox ? .mute : .yellow
+        return isRox ? .mute : .yellow
     }
 
-    /// 64번: 구간 이름 줄 아래에 '지금 구간 시간 | 지금 페이스'를 같은 크기로 가로에 (세로로 쌓으면 NEXT 가 밀림)
-    /// 러닝 = 페이스(/km), 스테이션 = 목표 대비 ±(목표가 없으면 세부 내용)
+    /// 구간 이름 · SPLIT | PACE(러닝) / GOAL·BEST(스테이션) · 아래 줄
+    /// Roxzone 은 같은 모양인데 이름 · 숫자가 회색 (점선 테두리 안 씀 — 대표님 결정)
     private func current(now: Date) -> some View {
         let cur: Seg = engine.cur
         let el: Int = engine.segEl(now)
         let isRun: Bool = cur.icon == "run"
+        let splitColor: Color = aod ? C.text3 : (isRox ? C.d1 : (cur.target > 0 && el > cur.target ? C.bad : C.accent))
+        let rightColor: Color = isRox ? C.text2 : fg
         return VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Icon8(cur.icon, max(18, m.icon * 0.6), tint: curTint)
+            HStack(spacing: 5) {
+                Icon8(cur.icon, m.icon, tint: curTint)
                 Text(cur.name)
-                    .font(F.t(16, .semibold))
-                    .foregroundStyle(fg)
+                    .font(F.t(m.name, .semibold))
+                    .foregroundStyle(isRox ? C.text2 : fg)
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
-            .frame(height: 24)
+            .frame(height: m.name + 6)
             HStack(alignment: .top, spacing: 0) {
-                // 빌드 24: 목표를 넘기면 SPLIT 빨강 (진동은 그대로)
-                col("SPLIT", Fm.t(el), aod ? C.text3 : (cur.target > 0 && el > cur.target ? C.bad : C.accent))
-                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.seg * 1.1)
-                    .padding(.top, 16)
+                col("SPLIT", Fm.t(el), splitColor)
+                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.seg * 1.05)
+                    .padding(.top, 12)
                 if isRun {
-                    col(curvedRun ? "PACE ≈" : "PACE", pace(el: el, dist: engine.segDist), fg)
+                    col(engine.settings.imperial ? (curvedRun ? "PACE/MI ≈" : "PACE /MI") : (curvedRun ? "PACE ≈" : "PACE"),
+                        pace(el: el, dist: engine.segDist), rightColor)
                 } else if cur.target > 0 {
-                    // 빌드 24: 차이(±) 대신 목표 시간 그대로 (Roxzone 도). 트레이닝은 최고 기록 = BEST
-                    col(engine.mode == .training ? "BEST" : "GOAL", Fm.t(cur.target), fg)
+                    col(engine.mode == .training ? "BEST" : "GOAL", Fm.t(cur.target), rightColor)
                 } else {
                     col("", cur.detail, C.text2, small: true)
                 }
             }
-            .padding(.top, m.nameTop)
-            Text(isRun ? runLine(cur: cur) : (cur.target > 0 && cur.kind != .rox ? cur.detail : ""))
-                .font(isRun ? F.num(13, .medium) : F.t(13, .medium))
+            .padding(.top, 2)
+            Text(detailLine(cur))
+                .font(isRun ? F.num(11, .medium) : F.t(11, .medium))
                 .foregroundStyle(C.text2)
-                .lineLimit(1).minimumScaleFactor(0.8)
-                .frame(height: 18)
-                .padding(.top, 2)
+                .lineLimit(1).minimumScaleFactor(0.75)
+                .frame(height: 14)
+                .padding(.top, 1)
         }
         .frame(maxWidth: .infinity)
     }
 
+    /// 아래 줄: 러닝 = 거리, 스테이션 = 무게 · 거리 (더블이고 계획이 있으면 "나 150 → 파트너 150 · 7번 교대")
+    private func detailLine(_ cur: Seg) -> String {
+        if cur.icon == "run" { return runLine(cur: cur) }
+        if cur.kind == .rox { return "" }
+        if let d = doublesLine(for: cur, plan: WatchStore.shared.ctx.doublesPlan, division: engine.settings.division) { return d }
+        return cur.target > 0 ? Units.detail(cur.detail, engine.settings.imperial) : ""
+    }
+
     /// 작은 이름표 + 큰 숫자 (두 칸이 같은 크기)
     private func col(_ label: String, _ value: String, _ color: Color, small: Bool = false) -> some View {
-        VStack(spacing: 1) {
-            Text(label.l10n).font(F.t(11, .semibold)).tracking(0.8).foregroundStyle(C.text3)
+        VStack(spacing: 0) {
+            Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(C.text3)
                 .lineLimit(1).minimumScaleFactor(0.7)
-                .frame(height: 15)
+                .frame(height: 12)
             Text(value)
-                .font(small ? F.t(14, .semibold) : F.num(m.seg)).tracking(small ? 0 : -0.01 * m.seg)
+                .font(small ? F.t(13, .semibold) : F.num(m.seg)).tracking(small ? 0 : -0.01 * m.seg)
                 .foregroundStyle(color)
                 .lineLimit(1).minimumScaleFactor(0.55)
-                .frame(height: m.seg * 1.15)
+                .frame(height: m.seg * 1.12)
         }
         .frame(maxWidth: .infinity)
     }
@@ -267,21 +302,24 @@ struct WLive: View {
 
     /// 러닝 아래 줄: "0.62 / 1.00 km · 총 7.62 km" (러닝 모드에서 몇 km 뛰었는지가 바로 보이게)
     private func runLine(cur: Seg) -> String {
-        let km: Double = runMeters(cur.detail) / 1000
-        let d: Double = min(km, engine.segDist / 1000)
-        let seg: String = String(format: "%.2f / %.2f km", d, km)
+        // 빌드 27: 설정 > Units 가 lb · mi 면 마일로
+        let imp: Bool = engine.settings.imperial
+        let segM: Double = runMeters(cur.detail)
+        let unit: String = imp ? "mi" : "km"
+        let seg: String = Units.dist(min(segM, engine.segDist), imp) + " / " + Units.dist(segM, imp) + " " + unit
         guard engine.isRunKind, engine.distance >= 10 else { return seg }
-        return seg + " · " + String(format: "Total %@ km".l10n, String(format: "%.2f", engine.distance / 1000))
+        return seg + " · " + String(format: (imp ? "Total %@ mi" : "Total %@ km").l10n, Units.dist(engine.distance, imp))
     }
 
+    /// 빌드 27: 지금 속도(애플 운동 앱과 같은 실시간 러닝 속도)로 페이스. 아직 모르면 "측정 중"
     private func pace(el: Int, dist: Double) -> String {
-        guard dist >= 10, el > 0 else { return "–:––" }
-        let p: Double = Double(el) / (dist / 1000)
-        let total: Int = Int(p.rounded())
-        return "\(total / 60):" + String(format: "%02d", total % 60)
+        engine.paceText(el: el, dist: dist, imperial: engine.settings.imperial) ?? "Measuring".l10n
     }
 
     private var isLast: Bool { engine.idx >= engine.seq.count - 1 && !engine.growsOpen }
+
+    /// 러닝 모드(GPS · 거리 있음)는 1 km 마다 자동으로 넘어감 → 가운데 버튼 대신 안내
+    private var autoSplit: Bool { engine.isRunKind && engine.distance > 0 }
 
     /// 다음 구간 (HIIT·자유 러닝은 아직 순서에 없는 다음 라운드/km)
     private var nextSeg: Seg {
@@ -292,34 +330,89 @@ struct WLive: View {
         return engine.next
     }
 
-    /// NEXT + 다음 아이콘 22 + 이름 14 (탭 = 다음 구간)
-    private var nextRow: some View {
+    /// NEXT (작게) + 다음 구간 그림 · 이름 (크게) + 그 목표 (회색). 마지막이면 FINISH 운동 끝내기
+    private var nextLabel: some View {
         let nx: Seg = nextSeg
-        return Button(action: next) {
-            HStack(spacing: 8) {
-                Text("NEXT")
-                    .font(F.t(13, .semibold)).tracking(0.8)
-                    .foregroundStyle(C.text3)
+        return VStack(spacing: 1) {
+            Text(isLast ? "FINISH" : "NEXT")
+                .font(F.t(9, .semibold)).tracking(1.0)
+                .foregroundStyle(C.text3)
+            HStack(spacing: 5) {
                 if isLast {
-                    Icon8("i_check", 22, C.d1)
-                    Text("Finish")
-                        .font(F.t(16, .semibold)).foregroundStyle(C.d1).lineLimit(1).minimumScaleFactor(0.85)
+                    Image(systemName: "checkmark").font(.system(size: m.nextName * 0.8, weight: .bold)).foregroundStyle(C.good)
+                    Text("End workout").font(F.t(m.nextName, .bold)).foregroundStyle(.white)
+                        .lineLimit(1).minimumScaleFactor(0.7)
                 } else {
-                    Icon8(nx.icon, 22, tint: nx.kind == .rox ? .mute : .yellow)
-                    Text(nx.name)
-                        .font(F.t(16, .semibold)).foregroundStyle(C.d1).lineLimit(1).minimumScaleFactor(0.85)
+                    Icon8(nx.icon, m.nextName, tint: nx.kind == .rox ? .mute : .yellow)
+                    Text(nx.name).font(F.t(m.nextName, .bold)).foregroundStyle(.white)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                    if nx.target > 0 && !autoSplit {
+                        Text(Fm.t(nx.target)).font(F.num(m.nextName * 0.72, .medium)).foregroundStyle(C.text2)
+                            .lineLimit(1)
+                    }
                 }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 40)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Color.white.opacity(0.10)).frame(height: 1)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("w.nextName")
+    }
+
+    /// 컨트롤 줄: 되돌리기 (작은 회색) · 다음 (큰 노란, 삼각형 머리 화살표) · 일시정지 (작은 회색)
+    private var controls: some View {
+        HStack(spacing: 0) {
+            sideButton(symbol: "arrow.uturn.backward", on: engine.canUndo, id: "w.undoLive") {
+                withAnimation(WLive.slideCurve) { engine.undo() }
             }
-            .contentShape(Rectangle())
+            Spacer(minLength: 0)
+            mainButton
+            Spacer(minLength: 0)
+            sideButton(symbol: engine.running ? "pause.fill" : "play.fill", on: true, id: "w.pauseLive") {
+                engine.togglePause()
+            }
+        }
+        .padding(.horizontal, 6)
+    }
+
+    @ViewBuilder private var mainButton: some View {
+        if autoSplit {
+            // 러닝은 1 km 마다 자동 → 누를 수 없음, 안내만
+            Text("Auto split every 1 km".l10n)
+                .font(F.t(10, .semibold)).foregroundStyle(C.text2)
+                .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
+                .frame(width: m.main * 1.6, height: m.main)
+        } else {
+            Button(action: next) {
+                ZStack {
+                    Circle().fill(isLast ? C.good : C.accent)
+                    if isLast {
+                        Image(systemName: "checkmark").font(.system(size: m.main * 0.42, weight: .heavy)).foregroundStyle(.black)
+                    } else {
+                        TriArrow().fill(Color.black).frame(width: m.main * 0.5, height: m.main * 0.42)
+                    }
+                }
+                .frame(width: m.main, height: m.main)
+                .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .modifier(DoubleTapNext())
+            .accessibilityLabel(Text(isLast ? "Finish" : "Next"))
+            .accessibilityIdentifier("w.next")
+        }
+    }
+
+    private func sideButton(symbol: String, on: Bool, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: m.side * 0.42, weight: .semibold))
+                .foregroundStyle(on ? Color.white : C.text3)
+                .frame(width: m.side, height: m.side)
+                .background(Circle().fill(Color.white.opacity(on ? 0.16 : 0.07)))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .modifier(DoubleTapNext())
-        .accessibilityIdentifier("w.next")
+        .disabled(!on)
+        .accessibilityIdentifier(id)
     }
 }
 

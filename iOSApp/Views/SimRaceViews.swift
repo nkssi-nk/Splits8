@@ -437,9 +437,11 @@ struct RaceView: View {
         return e.isSet ? "\(e.name) · \(Fm.wdmy.string(from: e.date)) ›" : "Not set".l10n + " ›"
     }
 
-    /// 더블 구간 나누기 줄의 값: 반반이면 50:50, 고쳤으면 Custom
+    /// 더블 계획 줄의 값: 안 정했으면 Not set, 파트너가 있으면 그 이름, 아니면 Custom
     private var doublesValue: String {
-        (store.settings.doublesPlan?.isDefault ?? true) ? "50:50 ›" : "Custom".l10n + " ›"
+        guard let p = store.settings.doublesPlan else { return "Not set".l10n + " ›" }
+        if let n = p.partnerName, !n.isEmpty { return n + " ›" }
+        return "Custom".l10n + " ›"
     }
 
     private var rowsCard: some View {
@@ -608,20 +610,60 @@ struct RaceLeaderboard: View {
         }
     }
 
+    /// 빌드 27: 기록이 아직 없는 친구 (순위표는 기록 있는 사람만 옴) — 이름 · 사진만, 시간 대신 "아직 없음"
+    private var noRecordFriends: [Friend] {
+        let ranked: Set<String> = Set(store.leaderboard.map(\.user_id))
+        let divName: String = store.div.name
+        return store.friends.filter { f in
+            !ranked.contains(f.id) && (store.settings.lbAllDivisions || f.div == divName)
+        }
+    }
+
+    private var noRecordText: String {
+        switch store.settings.lbTab {
+        case "sim": return String(localized: "No Full Sim yet")
+        case "race": return String(localized: "No race yet")
+        default: return String(localized: "No record yet")
+        }
+    }
+
     private var rowsCard: some View {
         let rows: [LBRow] = store.leaderboard
+        let extra: [Friend] = noRecordFriends
         let meT: Int? = rows.first { $0.user_id == store.myId }?.t
         return VStack(spacing: 0) {
-            if rows.isEmpty {
+            if rows.isEmpty && extra.isEmpty {
                 Text("No records yet. Finish a Full Simulation once and it will show up here.")
                     .font(F.t(13)).foregroundStyle(C.text2).multilineTextAlignment(.center).lineSpacing(3)
                     .frame(maxWidth: .infinity).padding(.vertical, 22).padding(.horizontal, 18)
             }
             ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
-                lbRow(i, row, meT: meT, last: i == rows.count - 1)
+                lbRow(i, row, meT: meT, last: i == rows.count - 1 && extra.isEmpty)
+            }
+            ForEach(Array(extra.enumerated()), id: \.element.id) { i, f in
+                friendRow(f, last: i == extra.count - 1)
             }
         }
         .card8()
+    }
+
+    /// 기록 없는 친구 한 줄 (순위 번호 자리는 "–")
+    private func friendRow(_ f: Friend, last: Bool) -> some View {
+        HStack(spacing: 12) {
+            Text(verbatim: "–").font(F.num(17)).foregroundStyle(C.text3)
+                .frame(width: 22, alignment: .leading)
+            RaceLbAvatar(me: false, photo: nil, url: f.avatarUrl, initial: f.ini)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: "@" + f.name).font(F.t(15, .medium)).foregroundStyle(Color.white).lineLimit(1)
+                Text(f.div).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(noRecordText).font(F.t(13)).foregroundStyle(C.text3).lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.vertical, 12).padding(.horizontal, 18)
+        .rowLine(!last)
+        .accessibilityIdentifier("lb.friend." + f.id)
     }
 
     private func lbRow(_ i: Int, _ row: LBRow, meT: Int?, last: Bool) -> some View {

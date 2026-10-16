@@ -737,19 +737,27 @@
 "You held your pace — both halves within [g]%llds/km[/g]." = "페이스를 지켰어요 — 전반과 후반 차이 [g]1km 에 %lld초[/g].";
 "Your second half was [r]%llds/km slower[/r] than the first." = "후반이 전반보다 [r]1km 에 %lld초 느렸어요[/r].";
 
-/* build23 · 더블 구간 나누기 (Doubles plan) */
-"Doubles plan" = "더블 구간 나누기";
+/* build27 · 더블 계획 (번갈아 하기) */
+"Doubles plan" = "더블 계획";
 "Custom" = "직접 설정";
-"Set how much of each station you take — your partner does the rest. 10% steps." = "스테이션마다 내가 맡을 몫을 정하세요 — 나머지는 파트너 몫이에요. 10% 단위.";
 "In Doubles, you run all 8 runs together. Only stations are split." = "더블에서 러닝 8개는 둘이 같이 뛰어요. 스테이션만 나눠요.";
-"Reset 50:50" = "반반으로 되돌리기";
-"Share as text" = "글로 공유";
-"You %lld m · Partner %lld m" = "나 %1$lld m · 파트너 %2$lld m";
-"You %lld · Partner %lld reps" = "나 %1$lld개 · 파트너 %2$lld개";
-"me %lld m / you %lld m" = "나 %1$lld m / 너 %2$lld m";
-"me %lld / you %lld reps" = "나 %1$lld개 / 너 %2$lld개";
-"SPLITS8 Doubles plan" = "SPLITS8 더블 구간 나누기";
-"Runs: together" = "러닝: 같이 뜁니다";
+"SPLITS8 Doubles plan" = "SPLITS8 더블 계획";
+"Choose how much each of you does per turn and who goes first. Tap a station to change it." = "한 번에 몇 m씩 할지, 누가 먼저 할지 정하세요. 스테이션을 누르면 바꿀 수 있어요.";
+"Or pick a friend" = "또는 친구 중에서 고르기";
+"%@ reps" = "%@개";
+"%@ each" = "%@씩";
+"1 length (12.5 m)" = "한 바퀴(12.5 m)씩";
+"Me first" = "나 먼저";
+"%@ first" = "%@ 먼저";
+"%lld turns" = "%lld번 교대";
+"EACH TURN" = "한 번에";
+"WHO GOES FIRST" = "누가 먼저";
+"Our doubles plan" = "우리 더블 계획";
+"Get plan" = "받기";
+"Get this doubles plan?" = "이 더블 계획을 받을까요?";
+"Get %@'s doubles plan?" = "%@님의 더블 계획을 받을까요?";
+"Your doubles plan will be replaced. Who goes first is swapped so it fits you." = "지금 더블 계획이 바뀌어요. 누가 먼저 할지는 내 입장에 맞게 바꿔서 저장해요.";
+"This doubles plan link can't be read" = "더블 계획 링크를 읽을 수 없어요";
 
 /* build23 · 같은 기록대 선수 비교 · 예상 완주 시간 */
 "VS ATHLETES AT YOUR TIME" = "같은 기록대 선수들과 비교";
@@ -861,3 +869,23 @@
 "Beat your best Full Simulation for the first time." = "풀 시뮬 최고 기록을 처음으로 깨요.";
 
 "HYROX RACE" = "HYROX 대회";
+
+/* 빌드 27: 단위 설정 (kg · km / lb · mi) */
+"UNITS" = "단위";
+"Units" = "단위";
+"Weights and run distance and pace. Station distances stay in meters." = "무게와 러닝 거리 · 페이스에 적용돼요. 스테이션 거리는 미터 그대로예요.";
+"PACE /MI" = "페이스 /MI";
+"Total %@ mi" = "총 %@ mi";
+"AVG %@ /MI" = "평균 %@ /MI";
+"per mi" = "마일당";
+/* build27 · 앱 열 때 알림 띠 · 기록 없는 친구 */
+"1 new cheer" = "새 응원 1개";
+"%lld new cheers" = "새 응원 %lld개";
+"1 friend request" = "친구 요청 1개";
+"%lld friend requests" = "친구 요청 %lld개";
+"No Full Sim yet" = "아직 풀 시뮬 없음";
+"No race yet" = "아직 대회 기록 없음";
+"No record yet" = "아직 기록 없음";
+
+/* build27 · 실시간 페이스: 속도를 아직 모르고 50 m 도 안 달렸을 때 */
+"Measuring" = "측정 중";

@@ -205,7 +205,8 @@ struct FinishSheet: View {
         var o: [(String, String, String)] = []
         if rec.kcal > 0 { o.append(("CALORIES", grouped(rec.kcal), "KCAL")) }
         if rec.avgHR > 0 { o.append(("AVG HR", "\(rec.avgHR)", "BPM")) }
-        if let p = rec.runPace, rec.mode != .pft { o.append(("RUN PACE", Fm.t(p), "/KM")) }
+        let imp: Bool = store.settings.imperial
+        if let p = rec.runPace, rec.mode != .pft { o.append(("RUN PACE", Fm.t(Units.pace(p, imp)), Units.paceUnit(imp))) }
         else if rec.maxHR > 0 { o.append(("MAX HR", "\(rec.maxHR)", "BPM")) }
         if o.count < 3 { o.append(("SPLITS", "\(rec.mainSegs.count)", "")) }
         return Array(o.prefix(3))
@@ -227,7 +228,9 @@ struct FinishSheet: View {
     private func tagView(_ tag: String, tone: Cheer.Tone) -> some View {
         let fill: Color = tone == .check ? C.bad.opacity(0.18) : tone == .celebrate ? Color(hex: 0xFFD54A) : Color.white.opacity(0.12)
         let ink: Color = tone == .check ? C.bad : tone == .celebrate ? .black : .white
-        let text: String = tag == "CHECK" ? "Check".l10n : tag.l10n
+        var text: String = tag == "CHECK" ? "Check".l10n : tag.l10n
+        // 빌드 27: 러닝 기록의 PB 는 거리까지 ("★ 5K PB")
+        if tag == "★ PB", rec.isRunKind, let pbl = store.runPBLabel(rec) { text = "★ " + pbl }
         return Text(text).font(F.t(F.cap1, .bold)).tracking(0.06 * 12).foregroundStyle(ink)
             .padding(.horizontal, 10).frame(height: 24)
             .background(fill, in: Capsule())

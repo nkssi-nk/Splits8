@@ -13,6 +13,15 @@ enum RunPB {
     ]
     /// 이보다 빠른 페이스(1 km 2:30 미만)는 잘못 잰 기록으로 보고 뺌
     static let minPace: Double = 150
+
+    /// 빌드 27: PB 알약 글자 ("5K PB" 등). 기록 목록 · 기록 화면 · 끝 카드 · 공유 카드
+    static func pbName(_ m: Double) -> String {
+        if m >= 42000 { return "FULL PB" }
+        if m >= 21000 { return "HALF PB" }
+        if m >= 10000 { return "10K PB" }
+        if m >= 5000 { return "5K PB" }
+        return "1KM PB"
+    }
 }
 
 extension Record {
@@ -77,6 +86,21 @@ extension Store {
             guard let mine = r.bestEffort(d.m), let b = table[d.m], b.n >= 2, mine <= b.best else { return nil }
             return d.m
         }
+    }
+
+    /// 빌드 27: 러닝 기록의 PB 이름 — PB 인 거리 중 가장 긴 것 ("5K PB"). 러닝 PB 가 아니면 nil
+    func runPBLabel(_ r: Record) -> String? {
+        guard let m = runPBs(r).max() else { return nil }
+        return RunPB.pbName(m)
+    }
+
+    /// 빌드 27: 홈 프로필 카드용 — 러닝 PB 중 가장 긴 거리 (거리 m, 시간 초). 같은 거리를 2번 이상 뛰었을 때만
+    func longestRunPB() -> (m: Double, time: Int)? {
+        let table: [Double: (best: Int, n: Int)] = runBestTable()
+        for d in RunPB.distances.reversed() {
+            if let b = table[d.m], b.n >= 2 { return (d.m, b.best) }
+        }
+        return nil
     }
 
     /// 거리별 (가장 빠른 시간, 그 거리를 뛴 기록 수). 목록을 그릴 때마다 다시 세지 않게 기록이 바뀔 때만 계산

@@ -41,6 +41,7 @@ struct SettingsView: View {
             languageSection
 
             Group {
+                unitsSection
                 themeSection
 
                 SectionLabel(text: "DEVICE", top: 14)
@@ -168,6 +169,21 @@ struct SettingsView: View {
         }
         .alert("Restart the app to apply the language.", isPresented: $askRestart) {
             Button("OK", role: .cancel) {}
+        }
+    }
+
+    // MARK: 단위 (빌드 27) — kg · km / lb · mi. 화면에 보일 때만 바꿈, 저장 값은 그대로. 워치도 같은 단위
+
+    private var unitsSection: some View {
+        VStack(spacing: 10) {
+            SectionLabel(text: "UNITS", top: 14)
+            Seg8(items: [("metric", "kg · km"), ("imperial", "lb · mi")],
+                 selected: store.settings.imperial ? "imperial" : "metric",
+                 height: 34, radius: 11, fontSize: 14) { k in
+                store.settings.units = k == "imperial" ? "imperial" : nil
+            }
+            .accessibilityIdentifier("settings.units")
+            Note8(text: "Weights and run distance and pace. Station distances stay in meters.")
         }
     }
 
@@ -487,7 +503,7 @@ struct SetGoalsView: View {
             Icon8(run ? "run" : st.key, 20, tint: run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 0) {
                 Text(run ? "Run \(i / 2 + 1)" : st.name).font(F.t(15, .medium)).lineLimit(1)
-                Text(run ? "1KM" : st.detail(store.div)).font(F.num(11, .regular)).foregroundStyle(C.text2).lineLimit(1)
+                Text(Units.detail(run ? "1KM" : st.detail(store.div), store.settings.imperial)).font(F.num(11, .regular)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Stepper8(value: Fm.t(t), minWidth: 46, fontSize: 17, button: 30, radius: 9, gap: 12,

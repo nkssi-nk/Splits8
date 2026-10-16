@@ -43,6 +43,8 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
 
     /// 앱을 켤 때 한 번 (워치가 미러링을 시작하면 이 처리기가 불림)
     func setUp() {
+        // 빌드 27: 지난번에 끝내지 못하고 남은 잠금 화면 카드 정리 (앱을 켤 때)
+        if !Demo.enabled { endLeftoverActivities() }
         guard HKHealthStore.isHealthDataAvailable(), !Demo.enabled else { return }
         health.workoutSessionMirroringStartHandler = { [weak self] s in
             DispatchQueue.main.async { self?.attach(s) }
@@ -73,15 +75,27 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
         state = st
         received = Date()
         reconnecting = false
-        if st.finished { ended = true }
-        updateActivity(force: first || st.finished)
+        if st.finished {
+            // 빌드 27: 워치가 끝냄 → 세션 종료 소식을 기다리지 않고 잠금 화면 카드를 바로 끝냄 (5초 뒤 사라짐)
+            ended = true
+            endActivity()
+        } else {
+            updateActivity(force: first)
+        }
     }
 
     /// 아이폰 화면을 처음 열었을 때 (앱이 뒤에서 켜졌다가 앞으로 나옴)
     func appBecameActive() {
         let r = Router.shared
         if on && !ended && r.scr != .phoneLive && r.scr != .watchLive && r.finish == nil { r.go(.watchLive) }
+        endLeftoverActivities()
         updateActivity(force: true)
+    }
+
+    /// 빌드 27: 워치 기록이 도착했을 때 (Store 의 WCSession 받기에서 부름)
+    func recordArrived() {
+        guard !Demo.enabled else { return }
+        endLeftoverActivities()
     }
 
     private func startWatchdog() {
@@ -184,14 +198,16 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
         guard force || changed || Date().timeIntervalSince(lastCardAt) >= 15 else { return }
         lastCard = c
         lastCardAt = Date()
+        // 빌드 27: 3분 동안 새 소식이 없으면 잠금 화면 카드가 흐려짐 (staleDate)
+        let stale: Date = Date().addingTimeInterval(180)
         if let a = activity {
-            Task { await a.update(ActivityContent(state: c, staleDate: nil)) }
+            Task { await a.update(ActivityContent(state: c, staleDate: stale)) }
             return
         }
         guard !ended, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         // 시작은 앱이 앞에 있을 때만 됨 (아이폰 규칙) → 안 되면 앱을 열 때 다시 시도
         activity = try? Activity.request(attributes: Splits8Activity(title: liveTitle),
-                                         content: ActivityContent(state: c, staleDate: nil), pushType: nil)
+                                         content: ActivityContent(state: c, staleDate: stale), pushType: nil)
         #endif
     }
 
@@ -202,7 +218,25 @@ final class WatchMirror: NSObject, HKWorkoutSessionDelegate {
         var c: LiveCardState = card() ?? lastCard ?? a.content.state
         c.finished = true
         c.paused = true
-        Task { await a.end(ActivityContent(state: c, staleDate: nil), dismissalPolicy: .after(Date().addingTimeInterval(120))) }
+        // 빌드 27: 운동이 끝나고 5초 뒤 잠금 화면에서 사라짐 (예전엔 2분)
+        let gone: Date = Date().addingTimeInterval(5)
+        Task { await a.end(ActivityContent(state: c, staleDate: nil), dismissalPolicy: .after(gone)) }
+        #endif
+    }
+
+    /// 빌드 27: 지금 쓰는 카드가 아닌 Splits8 잠금 화면 카드를 모두 바로 끝냄
+    /// (앱이 꺼졌거나 세션 종료 소식을 못 받아 남아 있던 카드)
+    private func endLeftoverActivities() {
+        #if canImport(ActivityKit)
+        let keepID: String? = activity?.id
+        for a in Activity<Splits8Activity>.activities where a.id != keepID {
+            // 이미 끝낸 카드(방금 운동이 끝나 5초 뒤 사라질 카드 포함)는 그대로 둠
+            if a.activityState == .ended || a.activityState == .dismissed { continue }
+            var c: LiveCardState = a.content.state
+            c.finished = true
+            c.paused = true
+            Task { await a.end(ActivityContent(state: c, staleDate: nil), dismissalPolicy: .immediate) }
+        }
         #endif
     }
 

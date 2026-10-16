@@ -463,7 +463,7 @@ struct SimInfoSheet: View {
             Icon8(s.key, 24, tint: .yellow)
             Text("\(i + 1). " + s.name).font(F.t(F.body)).lineLimit(1).minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(s.detail(div)).font(F.num(F.foot)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
+            Text(Units.detail(s.detail(div), Store.shared.settings.imperial)).font(F.num(F.foot)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
         }
         .padding(.vertical, 12).padding(.horizontal, 16)
         .rowLine(i < Station.all.count - 1)

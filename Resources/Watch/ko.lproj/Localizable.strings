@@ -140,3 +140,25 @@
 "Up to %@. Next: %@." = "%1$@ 등급으로 올라갔어요. 다음은 %2$@!";
 
 "HYROX RACE" = "HYROX 대회";
+
+/* 빌드 27: 단위 설정 (lb · mi) */
+"PACE /MI" = "페이스 /MI";
+"PACE/MI ≈" = "페이스/MI ≈";
+"Total %@ mi" = "총 %@ mi";
+/* build27 · 더블 계획 한 줄 (doublesLine) */
+"Me" = "나";
+"Partner" = "파트너";
+"%lld turns" = "%lld번 교대";
+
+/* build27 · 실시간 페이스: 속도를 아직 모르고 50 m 도 안 달렸을 때 */
+"Measuring" = "측정 중";
+
+/* 빌드 27 · 워치 운동 화면 새 배치 */
+"FINISH" = "마지막";
+"End workout" = "운동 끝내기";
+"Auto split every 1 km" = "1km마다 자동으로 넘어가요";
+
+/* 빌드 27 · 워치에서 Full Sim 목표 정하기 */
+"Goal time" = "목표 시간";
+"Set" = "정하기";
+"Use iPhone setting" = "아이폰 설정 따르기";

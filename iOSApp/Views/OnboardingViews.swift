@@ -151,23 +151,26 @@ struct ObFrame<Content: View>: View {
         }
         .onAppear {
             // 왼쪽 끝에서 밀면 이전 단계로
-            let prev: Scr = step == 1 ? .splash : step == 2 ? .ob1 : .ob2
+            // 빌드 27: 온보딩은 2단계 (디비전 → 워치). 나이 · 심박 화면은 빠짐 (설정 › 최대 심박에서 그대로)
+            let prev: Scr = step == 1 ? .splash : .ob1
             Router.shared.backAction = { Router.shared.go(prev) }
         }
     }
 
-    /// 점 3개 (선택 22×6 노랑, 나머지 6×6 #2C2C2E) · "1 / 3" 13/600 자간 0.1em
+    static var total: Int { 2 }
+
+    /// 점 2개 (선택 22×6 노랑, 나머지 6×6 #2C2C2E) · "1 / 2" 13/600 자간 0.1em
     private var header: some View {
         HStack {
             HStack(spacing: 6) {
-                ForEach(1...3, id: \.self) { n in
+                ForEach(1...ObFrame<Content>.total, id: \.self) { n in
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .fill(n == step ? C.accent : C.control)
                         .frame(width: n == step ? 22 : 6, height: 6)
                 }
             }
             Spacer()
-            Text("\(step) / 3").font(F.t(13, .semibold)).tracking(0.1 * 13).foregroundStyle(C.text2).lineLimit(1)
+            Text(verbatim: "\(step) / \(ObFrame<Content>.total)").font(F.t(13, .semibold)).tracking(0.1 * 13).foregroundStyle(C.text2).lineLimit(1)
         }
         .frame(height: 44)
     }
@@ -212,13 +215,13 @@ struct DivisionList: View {
 struct Onboarding1: View {
     var body: some View {
         ObFrame(step: 1, title: "Your division", sub: "This sets your default weights and reps. You can change it anytime in Settings.",
-                button: "Continue", action: { Router.shared.go(.ob2) }) {
+                button: "Continue", action: { Router.shared.go(.ob3) }) {
             DivisionList(checkSize: 20)
         }
     }
 }
 
-// MARK: - I0b Heart rate zones
+// MARK: - I0b Heart rate zones (빌드 27: 온보딩에서 빠짐 — 나이는 가입 프로필의 태어난 해로 맞춤. 화면은 남겨 둠)
 
 struct Onboarding2: View {
     let store = Store.shared
@@ -288,7 +291,7 @@ struct Onboarding3: View {
     @State private var loc = CLLocationManager()
 
     var body: some View {
-        ObFrame(step: 3, title: "Connect Apple Watch",
+        ObFrame(step: 2, title: "Connect Apple Watch",
                 sub: "Workouts and heart rate are measured on Apple Watch. Please allow access to Health data.",
                 button: granted ? "Start training" : "Allow & connect", action: tap) {
             VStack(spacing: 0) {

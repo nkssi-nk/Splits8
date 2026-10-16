@@ -518,6 +518,7 @@ struct WConfirm: View {
     let store = WatchStore.shared
     let nav = WNav.shared
     let engine = WorkoutEngine.shared
+    @State private var goalSheet = false
 
     private var mode: Mode { nav.mode }
     private var program: Program { nav.program ?? Program.presets()[0] }
@@ -638,17 +639,37 @@ struct WConfirm: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// 빌드 27 (71-1): Full Sim 은 맨 위 제목과 겹치던 큰 제목을 빼고 목표 시간을 크게. 목표를 누르면 워치에서 바로 바꿈(68-①)
     private var simple: some View {
         VStack(spacing: 4) {
-            Text(mode == .race ? ev.name : "Full Simulation".l10n)
-                .font(F.t(18, .semibold)).tracking(-0.36)
-                .multilineTextAlignment(.center).lineLimit(2)
+            if mode == .race {
+                Text(ev.name)
+                    .font(F.t(18, .semibold)).tracking(-0.36)
+                    .multilineTextAlignment(.center).lineLimit(2)
+            }
             Text(small).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
-            Text(goal).font(F.num(30)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 8)
-            Text(goalWord.l10n).font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+            if mode == .sim {
+                Button { goalSheet = true } label: {
+                    VStack(spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(goal).font(F.num(34)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.85)
+                            Image(systemName: "pencil").font(.system(size: 13, weight: .semibold)).foregroundStyle(C.accent)
+                        }
+                        Text(goalWord.l10n).font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 6)
+                .accessibilityIdentifier("w.simGoal")
+            } else {
+                Text(goal).font(F.num(30)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 8)
+                Text(goalWord.l10n).font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+            }
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $goalSheet) { WGoalPicker() }
     }
 
     private var startButton: some View {
@@ -693,6 +714,51 @@ struct WConfirm: View {
         // 3 · 2 · 1 을 센 뒤 시작
         engine.startAfterCountdown(mode: mode, title: title, sets: mode == .training ? program.sets : 1, seq: seq,
                                    program: mode == .training ? program : nil)
+    }
+}
+
+/// 빌드 27 (68-①): 워치에서 Full Sim 목표 완주 시간 고르기 (크라운으로 1분 단위). 고르면 16구간을 다시 나눔
+struct WGoalPicker: View {
+    let store = WatchStore.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var minutes: Int = 90
+
+    private static let range: [Int] = Array(45...180)
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("Goal time").font(F.t(13, .semibold)).foregroundStyle(C.text2)
+            Picker("", selection: $minutes) {
+                ForEach(Self.range, id: \.self) { v in
+                    Text(Fm.t(v * 60)).font(F.num(22)).tag(v)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 70)
+            Button {
+                store.watchGoal = minutes * 60
+                dismiss()
+            } label: {
+                Text("Set").font(F.t(14, .semibold)).foregroundStyle(.black)
+                    .frame(maxWidth: .infinity).frame(height: 36)
+                    .background(C.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            if store.watchGoal != nil {
+                Button {
+                    store.watchGoal = nil
+                    dismiss()
+                } label: {
+                    Text("Use iPhone setting").font(F.t(12)).foregroundStyle(C.text2)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .onAppear {
+            let cur: Int = store.watchGoal ?? store.simTargets.reduce(0, +) + 8 * store.settings.roxTarget
+            minutes = min(180, max(45, Int((Double(cur) / 60).rounded())))
+        }
     }
 }
 

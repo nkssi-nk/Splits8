@@ -33,6 +33,14 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     private(set) var useGPS = false
     private(set) var segDist: Double = 0
     @ObservationIgnored private var segDists: [Double?] = []
+    /// 빌드 27: GPS 로 잰 지금 속도(m/s, 부드럽게). 0 = 모름 (일시정지 · GPS 안 씀)
+    private(set) var curSpeed: Double = 0
+    @ObservationIgnored private var lastSpeedAt: Date = .distantPast
+    /// 화면용 지금 속도: 10초 넘게 새 값이 없으면 0 (멈춰 섰는데 예전 페이스가 남지 않게)
+    func speedNow(_ now: Date) -> Double {
+        guard useGPS, running, curSpeed > 0, now.timeIntervalSince(lastSpeedAt) <= 10 else { return 0 }
+        return curSpeed
+    }
 
     @ObservationIgnored private var settings = Settings()
     /// Full Sim 비교 이름 (시작할 때 정함: VS GOAL / VS LAST / VS 친구 / VS BEST)
@@ -157,6 +165,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         idx = 0; splits = []; running = true; finished = false
         segDists = Array(repeating: nil, count: seq.count)
         segDist = 0; lastLoc = nil
+        curSpeed = 0; lastSpeedAt = .distantPast
         segPaused = 0; pauseAt = nil
         undoPoint = nil; canUndo = false
         let now = Date()
@@ -253,6 +262,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         guard active, !finished else { return }
         if running {
             pauseAt = Date(); running = false
+            curSpeed = 0                                // 빌드 27: 멈추면 속도 모름
             pauseStepAt = rawSteps
         } else {
             if let p = pauseAt { segPaused += Date().timeIntervalSince(p) }
@@ -403,6 +413,13 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             p.name(for: loc) { [weak self] name in self?.place = name; self?.placeLookup = nil }
         }
         guard running, cur.kind == .run else { lastLoc = nil; return }
+        // 빌드 27: 실시간 속도 — CLLocation.speed (정확도 20 m 미만만), 지수 이동 평균 alpha 0.3
+        if loc.speed >= 0, loc.horizontalAccuracy < 20 {
+            let now = Date()
+            let fresh: Bool = curSpeed <= 0 || now.timeIntervalSince(lastSpeedAt) > 10
+            curSpeed = fresh ? loc.speed : (0.3 * loc.speed + 0.7 * curSpeed)
+            lastSpeedAt = now
+        }
         if let prev = lastLoc {
             let d: Double = loc.distance(from: prev)
             if d < 100 { segDist += d }       // 튀는 값은 버림
@@ -623,7 +640,8 @@ struct PhoneLiveView: View {
         LiveFrame(mode: eng.mode, title: eng.title, seq: eng.seq, idx: eng.idx, segEl: eng.segEl(now), total: eng.total(now),
                   running: eng.running, open: eng.growsOpen,
                   segDist: eng.useGPS ? eng.segDist : nil, totalDist: eng.useGPS ? eng.totalDist : nil,
-                  runKind: eng.isRunKind)
+                  runKind: eng.isRunKind,
+                  speed: eng.useGPS ? eng.speedNow(now) : nil)
     }
 
     // MARK: 아래 버튼

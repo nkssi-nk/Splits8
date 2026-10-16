@@ -111,8 +111,6 @@ final class ScreenshotTests: XCTestCase {
         id("splash.start")
         shot("I0a_division")
         id("ob.next")
-        shot("I0b_heart_rate")
-        id("ob.next")
         shot("I0c_connect_watch")
     }
 

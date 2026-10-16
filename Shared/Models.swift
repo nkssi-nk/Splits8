@@ -803,8 +803,10 @@ struct Settings: Codable, Hashable {
     var bestFinish: Int? = nil
     /// 사용자가 디비전 목록에서 직접 고른 적 있는지 (없으면 프로필의 대회 디비전으로 채워도 됨)
     var divPicked: Bool? = nil
-    /// 빌드 23: 더블 구간 나누기 계획 (폰에만 저장) — 예전 저장 파일과 호환되도록 옵셔널, 반반이면 nil
+    /// 더블 계획 (빌드 27: 몇 m씩 번갈아 · 누가 먼저 · 파트너). 예전 저장 파일과 호환되도록 옵셔널, 안 정했으면 nil
     var doublesPlan: DoublesPlan? = nil
+    /// 빌드 27: 단위. nil / "metric" = kg · km, "imperial" = lb · mi (화면에만 적용, Units.swift)
+    var units: String? = nil
 
     var glow: GlowTheme {
         get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }
@@ -942,6 +944,8 @@ struct WatchContext: Codable {
     var pftBest: [Int]? = nil     // 최고 PFT 6구간 (예전 저장 파일엔 없음)
     var pftBestTotal: Int? = nil
     var simLast: [Int]? = nil     // 가장 최근 Full Simulation 16구간 ("Compare with: Last" 일 때 목표)
+    /// 빌드 27: 더블 계획 (번갈아 하기). 예전 저장 파일엔 없음 — 워치 화면의 doublesLine(for:plan:division:) 에 씀
+    var doublesPlan: DoublesPlan? = nil
 }
 
 /// Full Simulation 을 할 때 구간 목표 16개와 비교 이름. Full Sim 화면의 "Compare with" 를 그대로 따름

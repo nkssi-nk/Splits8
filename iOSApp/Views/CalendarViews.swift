@@ -353,7 +353,7 @@ struct HistoryCalendar: View {
         let title: String = rec.mode == .training ? (rec.kind != nil ? rec.title.l10n : "\(rec.title.l10n) × \(rec.sets)") : (rec.mode == .sim ? "Full Simulation" : rec.title.l10n)
         let sub: String = Fm.wdm.string(from: rec.date) + " · " + Self.timeFmt.string(from: rec.date)
         let from: Scr = backScreen(rec)
-        return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec), flag: rec.flag,
+        return HistoryRow(title: title, sub: sub, time: Fm.t(rec.total), last: last, pb: store.isPB(rec), pbLabel: store.runPBLabel(rec), flag: rec.flag,
                           grade: rec.pftGrade, partner: rec.partner,
                           onDelete: { store.delete(rec) }) { r.open(rec, from: from) }
     }

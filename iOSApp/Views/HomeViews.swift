@@ -77,17 +77,25 @@ struct HomeView: View {
     }
 
     /// 오른쪽 두 줄 (왼쪽 아이디 / 체급 두 줄과 줄을 맞춤):
-    /// 기록이 있으면 시간 / "★ PB · Full Sim" (Race 최고면 Race), 없으면 목표 시간 / "Race goal"
+    /// 기록이 있으면 시간 / "★ PB · Full Sim" (Race 최고면 Race),
+    /// 빌드 27: 둘 다 없고 러닝 PB 가 있으면 가장 긴 거리 PB 시간 / "★ 5K PB", 그것도 없으면 목표 시간 / "Race goal"
     @ViewBuilder private var profileBest: some View {
         let sim: Record? = store.simBest
         let best: Record? = sim ?? store.raceBest
+        let runPB: (m: Double, time: Int)? = best == nil ? store.longestRunPB() : nil
         VStack(alignment: .trailing, spacing: 2) {
-            Text(Fm.t(best?.total ?? store.settings.goalTime)).font(F.num(22)).tracking(-0.44).lineLimit(1)
+            Text(Fm.t(best?.total ?? runPB?.time ?? store.settings.goalTime)).font(F.num(22)).tracking(-0.44).lineLimit(1)
             if best != nil {
                 HStack(spacing: 3) {
                     Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(C.accent)
                     Text("PB").font(F.t(F.foot, .semibold)).foregroundStyle(C.accent)
                     Text("· " + (sim != nil ? "Full Sim" : "Race").l10n).font(F.t(F.foot)).foregroundStyle(C.text2)
+                }
+                .lineLimit(1)
+            } else if let rp = runPB {
+                HStack(spacing: 3) {
+                    Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(C.accent)
+                    Text(RunPB.pbName(rp.m)).font(F.t(F.foot, .semibold)).foregroundStyle(C.accent)
                 }
                 .lineLimit(1)
             } else {
@@ -163,10 +171,11 @@ struct HomeView: View {
     private var bests: some View {
         let sim = store.simBest, race = store.raceBest
         let pace = (store.records(.sim) + store.records(.race)).filter(\.counts).compactMap(\.runPace).min()
+        let imp: Bool = store.settings.imperial
         return HStack(spacing: 8) {
             bestTile("FULL SIM", sim.map { Fm.t($0.total) } ?? "--", sim.map { Fm.dm.string(from: $0.date) } ?? "No record")
             bestTile("RACE", race.map { Fm.t($0.total) } ?? "--", race?.title ?? "No record")
-            bestTile("RUN AVG", pace.map { Fm.t($0) } ?? "--", "per km")
+            bestTile("RUN AVG", pace.map { Fm.t(Units.pace($0, imp)) } ?? "--", imp ? "per mi" : "per km")
         }
     }
     private func bestTile(_ label: String, _ value: String, _ sub: String) -> some View {

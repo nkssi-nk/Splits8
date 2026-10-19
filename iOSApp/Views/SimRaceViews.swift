@@ -11,6 +11,8 @@ struct SimView: View {
     @State private var chipsOpen = false
     /// 빌드 26: 큰 시간을 누르면 목표 시간 시트
     @State private var goalSheet = false
+    /// 87번(빌드 28): Full Sim 도 Race 처럼 더블 계획 줄
+    @State private var dblSheet = false
     fileprivate struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
     private static let stationMetrics: [(String, String, String)] = [
         ("skiErg", "SKIERG", "SkiErg"), ("sledPush", "SLED PUSH", "Sled Push"), ("sledPull", "SLED PULL", "Sled Pull"),
@@ -101,8 +103,8 @@ struct SimView: View {
             bestCard
             PredictCard()
             settingsCard
-            // "풀 시뮬 목표는 어디서 정하나요?" → 여기 Compare with 가 운동 중 구간 목표도 정함
-            Note8(text: "Compare with also sets your split targets during a Full Simulation: Goal uses your Race split targets, Last uses your latest Full Sim.")
+            // 87번: 목표 시간 · 구간 목표는 Race 와 같은 값 (한쪽에서 바꾸면 둘 다)
+            Note8(text: "Goal time and split targets are shared with Race. Compare with sets what you race against during a Full Simulation: Goal, your latest Full Sim, or a friend.")
             StartOnPhoneButton(mode: .sim)          // 워치 없이 아이폰으로 기록
                 .frame(maxWidth: .infinity, alignment: .trailing)
             if let f = Fatigue.analyze(store.records(.sim).filter(\.counts)) {
@@ -113,6 +115,7 @@ struct SimView: View {
         }
         .padding(.horizontal, 16)
         .sheet(isPresented: $goalSheet) { GoalTimeSheet().presentationDetents([.height(GoalTimeSheet.height)]) }
+        .sheet(isPresented: $dblSheet) { DoublesPlanSheet() }
         .sheet(isPresented: $info) {
             SimInfoSheet()
                 .presentationDetents([.large])
@@ -231,6 +234,15 @@ struct SimView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("sim.division")
             .rowLine(true)
+            // 87번(빌드 28): Race 와 같은 줄 — 더블 계획(더블일 때) · 목표 시간 · 구간 목표. 목표는 Race 와 같은 값을 씀
+            if store.settings.division.hasPrefix("dbl") {
+                simRow("Doubles plan", value: simDoublesValue) { dblSheet = true }
+            }
+            simRow("Goal time", value: Fm.t(store.settings.goalTime) + " ›", numeric: true) { goalSheet = true }
+            Button { r.sub(.setGoals, from: .sim) } label: { simSplitTargets }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("sim.splitTargets")
+                .rowLine(true)
             HStack(spacing: 12) {
                 Text("Compare with").font(F.t(17))
                 Spacer()
@@ -249,6 +261,49 @@ struct SimView: View {
             .frame(minHeight: 52).padding(.horizontal, 18)
         }
         .card8()
+    }
+
+    private var simDoublesValue: String {
+        guard let p = store.settings.doublesPlan else { return "Not set".l10n + " ›" }
+        if let n = p.partnerName, !n.isEmpty { return n + " ›" }
+        return "Custom".l10n + " ›"
+    }
+
+    private func simRow(_ t: String, value: String, numeric: Bool = false, _ a: @escaping () -> Void) -> some View {
+        Button(action: a) {
+            HStack(spacing: 12) {
+                Text(t.l10n).font(F.t(17))
+                Spacer(minLength: 8)
+                Text(value).font(numeric ? F.num(17, .regular) : F.t(17)).foregroundStyle(C.text2).lineLimit(1)
+            }
+            .frame(minHeight: 52).padding(.horizontal, 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("sim." + t)
+        .rowLine(true)
+    }
+
+    /// 16 막대 (Race 의 구간 목표와 같은 모양)
+    private var simSplitTargets: some View {
+        let goals: [Int] = store.settings.goals
+        return VStack(spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Split targets").font(F.t(17))
+                Spacer()
+                Text("Edit".l10n + " ›").font(F.t(17)).foregroundStyle(C.text2)
+            }
+            HStack(alignment: .bottom, spacing: 3) {
+                ForEach(Array(goals.enumerated()), id: \.offset) { i, t in
+                    Rectangle().fill(i % 2 == 0 ? C.control : C.accent)
+                        .frame(height: 40 * min(1, max(0, CGFloat(t) / 335)))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 40, alignment: .bottom)
+        }
+        .padding(.top, 14).padding(.horizontal, 18).padding(.bottom, 16)
+        .contentShape(Rectangle())
     }
 
     // MARK: HISTORY
@@ -390,7 +445,9 @@ struct RaceView: View {
                 }
                 .padding(.top, 2)
             }
-            VStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
+                // 89번(빌드 28): 막대 뜻이 안 보였음 → 한 줄 설명 (막대 길이 = 시간, 짧을수록 빠름)
+                Text("Goal vs your best race · shorter bar = faster".l10n).font(F.t(12)).foregroundStyle(C.text3)
                 bar("Goal", frac: best.map { min(1, Double(goal) / Double(max(1, $0))) } ?? 1, fill: C.accent,
                     value: Fm.t(goal), valueColor: .white)
                 bar("Best", frac: best == nil ? 0 : 1, fill: Color.white.opacity(0.35),
@@ -476,7 +533,7 @@ struct RaceView: View {
     /// 16 막대 (40 높이, gap 3) · 러닝 #2C2C2E · 스테이션 노랑 · 높이 = 목표/335
     /// 누르면 구간별 목표 고치는 화면 (목표는 여기 한 곳에서만 — 설정의 "Split goals" 줄은 없앰)
     private var splitTargets: some View {
-        Button { r.go(.setGoals) } label: { splitTargetsLabel }
+        Button { r.sub(.setGoals, from: .race) } label: { splitTargetsLabel }
             .buttonStyle(.plain)
             .accessibilityIdentifier("race.splitTargets")
     }

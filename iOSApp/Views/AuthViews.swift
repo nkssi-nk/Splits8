@@ -529,10 +529,34 @@ struct AccountView: View {
         // 빌드 24: Division 은 아래 ABOUT YOU 로 옮김(가입 순서와 같게). 나이는 태어난 해에서 자동 → 여기엔 최대 심박만
         let hr: String = (s.hrMode == "age" && s.birthYear == nil ? String(localized: "Age \(s.age)") + " · " : "") + "\(s.maxHR) BPM"
         return VStack(spacing: 0) {
-            SettingRow(title: s.birthYear == nil ? "Age · Max heart rate" : "Max heart rate", value: hr, numeric: true, last: true) { r.sub(.setHr, from: .account) }
+            SettingRow(title: s.birthYear == nil ? "Age · Max heart rate" : "Max heart rate", value: hr, numeric: true) { r.sub(.setHr, from: .account) }
                 .accessibilityIdentifier("profile.hr")
+            homeShowRow
         }
         .card8()
+    }
+
+    /// 91번(빌드 28): 홈 프로필 카드 오른쪽에 보일 기록 고르기
+    private var homeShowRow: some View {
+        let cur: String = store.settings.homeShow ?? "auto"
+        return Menu {
+            ForEach(HomeShow.keys, id: \.self) { k in
+                Button {
+                    store.settings.homeShow = k == "auto" ? nil : k
+                } label: {
+                    if k == cur { Label(HomeShow.name(k).l10n, systemImage: "checkmark") } else { Text(HomeShow.name(k).l10n) }
+                }
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Text("On home card".l10n).font(F.t(17)).foregroundStyle(.white).frame(maxWidth: .infinity, alignment: .leading)
+                Text(HomeShow.name(cur).l10n).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
+                Chevron8()
+            }
+            .padding(.vertical, 14).padding(.horizontal, 18)
+            .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("profile.homeShow")
     }
 
     /// 가입 전: 설명 13 회색 + Sign up 노란 알약 (padding 16×18, margin-top 10)

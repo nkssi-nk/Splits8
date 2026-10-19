@@ -308,7 +308,14 @@ struct WLive: View {
         let unit: String = imp ? "mi" : "km"
         let seg: String = Units.dist(min(segM, engine.segDist), imp) + " / " + Units.dist(segM, imp) + " " + unit
         guard engine.isRunKind, engine.distance >= 10 else { return seg }
-        return seg + " · " + String(format: (imp ? "Total %@ mi" : "Total %@ km").l10n, Units.dist(engine.distance, imp))
+        var line: String = seg + " · " + String(format: (imp ? "Total %@ mi" : "Total %@ km").l10n, Units.dist(engine.distance, imp))
+        // 84번(빌드 28): 운동 전체 평균 페이스 (1 km 마다 끊지 않고 처음부터 계속) — 200 m 뛴 뒤부터
+        if engine.distance >= 200 {
+            let t: Double = Double(engine.total(Date()))
+            let avg: Int = Units.pace(Int((t / engine.distance * 1000).rounded()), imp)
+            if avg > 0 && avg < 3600 { line += " · " + String(format: "Avg %@".l10n, Fm.t(avg)) }
+        }
+        return line
     }
 
     /// 빌드 27: 지금 속도(애플 운동 앱과 같은 실시간 러닝 속도)로 페이스. 아직 모르면 "측정 중"

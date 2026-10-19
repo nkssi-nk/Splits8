@@ -651,6 +651,8 @@ struct Record: Codable, Hashable, Identifiable {
     /// 평균 보폭(m). 주의: Record 안에서 전역 stride(from:to:by:) 를 부르면 이 이름에 가려지니 Swift.stride 로 부를 것
     var stride: Double? = nil
     var ascent: Double? = nil  // 오른 높이 합계(m)
+    /// 94번(빌드 28): 러닝 카드를 실내(GPS 없음)로 뛴 기록. 거리는 손목 움직임 짐작값 → "실내 · 추정 거리", 러닝 PB 에서 뺌. 예전 기록엔 없음
+    var indoor: Bool? = nil
 
     /// 시작–끝
     var end: Date { endDate ?? date.addingTimeInterval(Double(total)) }
@@ -807,6 +809,10 @@ struct Settings: Codable, Hashable {
     var doublesPlan: DoublesPlan? = nil
     /// 빌드 27: 단위. nil / "metric" = kg · km, "imperial" = lb · mi (화면에만 적용, Units.swift)
     var units: String? = nil
+    /// 98번(빌드 28): 횟수 세기 보정값 (종목 아이콘 → 기준값). 없으면 기본값. 워치에서 20회 해서 만듦
+    var repCal: [String: RepTune]? = nil
+    /// 91번(빌드 28): 홈 프로필 카드 오른쪽에 보일 것. nil / "auto" = 가장 최근에 세운 최고 기록, sim · race · pft · run · goal
+    var homeShow: String? = nil
 
     var glow: GlowTheme {
         get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }
@@ -824,6 +830,67 @@ struct Settings: Codable, Hashable {
     func zone(_ bpm: Double) -> Int {
         let p = bpm / Double(max(1, maxHR))
         return p >= 0.9 ? 5 : p >= 0.8 ? 4 : p >= 0.7 ? 3 : p >= 0.6 ? 2 : 1
+    }
+}
+
+/// 98번(빌드 28): 스키 · 로잉 · 월볼 횟수 세기 기준값 (RepCounter). 워치 보정(20회)으로 사람마다 맞춤
+struct RepTune: Codable, Hashable {
+    /// 팔 움직임 세기(g)가 이 값을 넘으면 한 번
+    var threshold: Double
+    /// 이 값 아래로 내려와야 다음 것을 셀 준비
+    var release: Double
+    /// 두 번 사이 최소 간격(초)
+    var minGap: Double
+    /// 떨림 고르게 하기 (0~1)
+    var smooth: Double
+    /// 보정한 날 (기본값이면 nil)
+    var date: Date? = nil
+
+    /// 보정할 수 있는 종목 (아이콘 키)
+    static let icons: [String] = ["skiErg", "row", "wallBalls"]
+
+    /// 기본값. 97번(빌드 28): 월볼이 절반도 못 세서(40 → 17) 기준을 낮추고 고르게 하기를 줄임
+    static let defaults: [String: RepTune] = [
+        "skiErg": RepTune(threshold: 0.45, release: 0.20, minGap: 0.80, smooth: 0.80),
+        "row": RepTune(threshold: 0.45, release: 0.18, minGap: 1.50, smooth: 0.85),
+        "wallBalls": RepTune(threshold: 0.45, release: 0.30, minGap: 1.00, smooth: 0.70),
+    ]
+
+    /// 보정 기록(가속도 크기 · 시각)을 이 기준으로 세면 몇 번인지
+    static func count(_ mags: [Double], times: [Double], tune: RepTune) -> Int {
+        var level: Double = 0, armed = true, last: Double = -1000, n = 0
+        for i in mags.indices {
+            level = tune.smooth * level + (1 - tune.smooth) * mags[i]
+            if armed {
+                if level >= tune.threshold && times[i] - last >= tune.minGap { n += 1; last = times[i]; armed = false }
+            } else if level <= tune.release {
+                armed = true
+            }
+        }
+        return n
+    }
+
+    /// 실제로 한 횟수(actual)가 나오게 기준을 찾음. 맞는 값이 여럿이면 그 가운데(가장 안정적인 값),
+    /// 딱 맞는 값이 없으면 가장 가까운 값. 간격 · 고르게 하기는 기본값 그대로, 놓는 값은 기준의 45%
+    static func fit(icon: String, mags: [Double], times: [Double], actual: Int) -> RepTune? {
+        guard actual > 0, mags.count > 50, let base = defaults[icon] else { return nil }
+        var best: [(th: Double, diff: Int)] = []
+        var th: Double = 0.15
+        while th <= 1.6 {
+            var t: RepTune = base
+            t.threshold = th; t.release = th * 0.45
+            let d: Int = abs(count(mags, times: times, tune: t) - actual)
+            best.append((th, d))
+            th += 0.01
+        }
+        guard let minD = best.map({ $0.diff }).min() else { return nil }
+        let good: [Double] = best.filter { $0.diff == minD }.map { $0.th }
+        let pick: Double = good[good.count / 2]
+        var out: RepTune = base
+        out.threshold = (pick * 100).rounded() / 100
+        out.release = (pick * 0.45 * 100).rounded() / 100
+        out.date = Date()
+        return out
     }
 }
 
@@ -971,6 +1038,8 @@ enum SyncKey {
     static let context = "ctx"
     static let record = "record"
     static let quick = "quick"     // 워치에서 만든 Quick training → 아이폰
+    static let calib = "calib"     // 98번: 아이폰 → 워치 "이 종목 보정 시작" (아이콘 키)
+    static let calibDone = "calibDone"   // 98번: 워치 → 아이폰 보정 결과 {"icon": …, "tune": RepTune JSON}
 }
 
 enum JSONStore {

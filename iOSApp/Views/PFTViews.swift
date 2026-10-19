@@ -22,8 +22,9 @@ struct TestView: View {
 struct TestSeg: View {
     let selected: String
     let onSelect: (String) -> Void
-    private let keys: [String] = ["pft", "sim"]
-    private let labels: [String] = ["PFT", "Full Sim"]
+    // 88번(빌드 28): Full Sim 이 메인 → 왼쪽
+    private let keys: [String] = ["sim", "pft"]
+    private let labels: [String] = ["Full Sim", "PFT"]
 
     var body: some View {
         HStack(spacing: 0) {

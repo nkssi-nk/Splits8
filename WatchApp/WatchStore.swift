@@ -136,6 +136,32 @@ final class WatchStore: NSObject, WCSessionDelegate {
         apply(applicationContext)
     }
 
+    // MARK: 98번(빌드 28) 횟수 보정
+
+    /// 아이폰이 "이 종목 보정 시작"을 보냄 (앱이 켜져 있을 때는 메시지, 아니면 다음에 켤 때 userInfo)
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        if let icon = message[SyncKey.calib] as? String { DispatchQueue.main.async { Calib.shared.request(icon) } }
+    }
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        guard let icon = userInfo[SyncKey.calib] as? String else { return }
+        // 오래된 요청(10분 넘음)은 무시 — 나중에 워치 앱을 열었을 때 갑자기 뜨지 않게
+        if let at = userInfo["at"] as? Double, Date().timeIntervalSince1970 - at > 600 { return }
+        DispatchQueue.main.async { Calib.shared.request(icon) }
+    }
+
+    /// 보정 결과를 워치에 바로 쓰고 아이폰으로 보냄 (아이폰이 저장한 설정이 다시 내려오면 같은 값)
+    func applyCalibration(icon: String, tune: RepTune) {
+        var c: WatchContext = ctx
+        var m: [String: RepTune] = c.settings.repCal ?? [:]
+        m[icon] = tune
+        c.settings.repCal = m
+        ctx = c
+        JSONStore.save(c, ctxFile)
+        if !WorkoutEngine.shared.active { WorkoutEngine.shared.settings = c.settings }
+        guard WCSession.isSupported(), let d = try? JSONStore.enc.encode(tune) else { return }
+        WCSession.default.transferUserInfo([SyncKey.calibDone: d, "icon": icon])
+    }
+
     /// 63번: 아이폰 앱에서 고른 언어를 워치에도. 워치 앱을 다음에 열 때부터 적용됨(언어는 앱이 켜질 때 정해짐)
     static func applyLanguage(_ lang: String?) {
         let d = UserDefaults.standard
@@ -153,6 +179,14 @@ final class WatchStore: NSObject, WCSessionDelegate {
             GlowTheme.current = v.settings.glow      // 아이폰에서 고른 배경 빛 색 (화면보다 먼저 넣어 둠)
             WatchStore.applyLanguage(v.settings.lang)
             L10n.set(v.settings.lang)                // 앱을 다시 켜지 않아도 번역이 바로 바뀜
+            // 98번: 방금(10분 안) 워치에서 보정한 값이 아직 아이폰을 다녀오지 않았으면 지우지 않고 둠
+            var v = v
+            let mine: [String: RepTune] = self.ctx.settings.repCal ?? [:]
+            var incoming: [String: RepTune] = v.settings.repCal ?? [:]
+            for (k, t) in mine where incoming[k] == nil {
+                if let d = t.date, Date().timeIntervalSince(d) < 600 { incoming[k] = t }
+            }
+            v.settings.repCal = incoming.isEmpty ? nil : incoming
             self.ctx = v
             JSONStore.save(v, self.ctxFile)
             // 운동 중에는 설정을 바꾸지 않음 (목표·구분이 운동 도중에 바뀌면 기록이 틀어짐)

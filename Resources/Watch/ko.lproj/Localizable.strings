@@ -162,3 +162,22 @@
 "Goal time" = "목표 시간";
 "Set" = "정하기";
 "Use iPhone setting" = "아이폰 설정 따르기";
+
+/* 빌드 28 · 83 러닝 실내/실외 · 98 횟수 보정 */
+"Indoor" = "실내";
+"Outdoor" = "실외";
+"No GPS" = "GPS 없음";
+"GPS" = "GPS";
+"Save" = "저장";
+"Close" = "닫기";
+"reps" = "개";
+"pulls" = "번";
+"Calibrate" = "보정";
+"Do 20 %@ as usual, then tap Done." = "평소처럼 20%@ 하고 완료를 눌러 주세요.";
+"Do 20 %@, then tap Done" = "20%@ 하고 완료";
+"How many did you do?" = "실제로 몇 회 했어요?";
+"Saved" = "저장됐어요";
+"Counting now fits your movement. You can redo it anytime from the iPhone." = "이제 내 동작에 맞춰 세요. 아이폰에서 언제든 다시 할 수 있어요.";
+"Not enough movement" = "움직임이 부족해요";
+"Try again from the iPhone and keep the watch on the hand that moves." = "아이폰에서 다시 시작해 주세요. 워치는 움직이는 손목에 차 주세요.";
+"Avg %@" = "평균 %@";

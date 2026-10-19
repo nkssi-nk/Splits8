@@ -889,3 +889,65 @@
 
 /* build27 · 실시간 페이스: 속도를 아직 모르고 50 m 도 안 달렸을 때 */
 "Measuring" = "측정 중";
+
+/* 빌드 28 · 98 설정 › 운동 · 측정 · 횟수 보정 */
+"Workout & tracking" = "운동 · 측정";
+"RUNNING" = "러닝";
+"Running place" = "러닝 장소";
+"Run cards ask Outdoor or Indoor when you start on the watch. Indoors there is no GPS, so distance is estimated from arm motion. A few outdoor runs with GPS make indoor distance more accurate." = "러닝 카드는 워치에서 시작할 때 실외 · 실내를 골라요. 실내는 GPS가 없어 팔 움직임으로 거리를 짐작해요. 실외에서 GPS로 몇 번 뛰면 실내 거리도 정확해져요.";
+"REP COUNT CALIBRATION" = "횟수 보정";
+"Do 20 reps with your watch and counting fits your own movement." = "워치로 20회 해 보면 내 동작에 맞춰 횟수를 더 정확하게 세요.";
+"Calibrated · %@" = "보정됨 · %@";
+"Default" = "기본값";
+"Calibrate" = "보정";
+"CALIBRATE · %@" = "횟수 보정 · %@";
+"Do 20 wall balls as usual" = "월볼 20개를 평소처럼 해 주세요";
+"Do 20 row strokes as usual" = "로잉 20번을 평소처럼 당겨 주세요";
+"Do 20 SkiErg pulls as usual" = "스키 20번을 평소처럼 당겨 주세요";
+"We measure how hard your arm moves on each rep and set counting to match you." = "한 번 할 때마다 팔이 얼마나 세게 움직이는지 재서, 내 동작에 맞게 세는 기준을 만들어요.";
+"HOW" = "방법";
+"Tap the button below. The calibration screen opens on your watch." = "아래 버튼을 누르면 워치에 보정 화면이 떠요.";
+"Start on the watch, then do exactly 20." = "워치에서 시작을 누르고 딱 20회 해 주세요.";
+"Tap Done and confirm how many you did. That's it." = "완료를 누르고 실제 몇 회 했는지 확인하면 끝이에요.";
+"Wear the watch on the wrist that moves. You can redo it or go back to default anytime." = "워치는 움직이는 손목에 차 주세요. 언제든 다시 하거나 기본값으로 돌릴 수 있어요.";
+"Start on watch" = "워치에서 시작";
+"Sent to watch" = "워치로 보냈어요";
+"If nothing shows on the watch, open SPLITS8 on the watch." = "워치에 아무것도 안 뜨면 워치에서 SPLITS8을 열어 주세요.";
+"Reset to default" = "기본값으로 되돌리기";
+"Reset to default?" = "기본값으로 되돌릴까요?";
+
+/* 빌드 28 · 93 · 94 · 95 기록 화면 */
+"BEST %@" = "최고 %@";
+"Last %@ %@" = "마지막 %@ %@";
+"Indoor · est." = "실내 · 추정";
+"Indoor run: distance is estimated from arm motion without GPS, so pace can look faster than it was. Indoor runs don't count toward running PBs." = "실내 러닝이라 GPS 없이 팔 움직임으로 거리를 짐작했어요. 실제보다 빠르게 나올 수 있고, 러닝 PB에는 들어가지 않아요.";
+
+/* 빌드 28 · 87 Full Sim 목표 */
+"Goal time and split targets are shared with Race. Compare with sets what you race against during a Full Simulation: Goal, your latest Full Sim, or a friend." = "목표 시간과 구간 목표는 Race와 같이 써요. 비교 대상은 Full Sim 중에 무엇과 겨룰지 정해요: 목표, 지난 Full Sim, 또는 친구.";
+"NAME" = "이름";
+"Goal vs your best race · shorter bar = faster" = "목표와 내 최고 대회 기록 · 막대가 짧을수록 빨라요";
+
+/* 빌드 28 · 91 홈 카드 기록 */
+"On home card" = "홈 카드에 보일 기록";
+"Latest best" = "최근 최고 기록";
+"Full Sim PB" = "Full Sim 최고";
+"Race PB" = "Race 최고";
+"PFT best" = "PFT 최고";
+"Running PB" = "러닝 PB";
+
+/* 빌드 28 · 80 상위 몇 % */
+"WHERE YOU STAND" = "내 위치";
+"Elite" = "엘리트급";
+"Advanced" = "상급";
+"Intermediate" = "중급";
+"Beginner" = "초급";
+"First finish" = "첫 완주권";
+"Elite 15 level" = "Elite 15 수준";
+"World level" = "세계 수준";
+"Competitive level" = "경쟁 수준";
+"Faster than Pro average" = "Pro 평균보다 빠름";
+"Slower than Pro average" = "Pro 평균보다 느림";
+"Top ~%lld%% of %@ finishers" = "%2$@ 출전자 중 상위 약 %1$lld%%";
+"%@ to %@ (%@) — about %lld sec per split" = "%2$@(%3$@)까지 %1$@ — 16구간으로 나누면 구간마다 약 %4$lld초";
+"Rough position from published worldwide race results (2025/26) — not an official ranking." = "공개된 전 세계 대회 결과(2025/26)로 계산한 대략의 위치예요. 공식 순위가 아니에요.";
+"Top %lld%%" = "상위 %lld%%";

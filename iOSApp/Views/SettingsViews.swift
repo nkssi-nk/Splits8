@@ -16,8 +16,9 @@ struct SettingsView: View {
             profileCard
             VStack(spacing: 0) {
                 // 구간 목표는 Race 탭의 "Split targets" 한 곳에서만 고침 (빌드 20)
-                SettingRow(title: "Running", value: RunModes.name(store.settings.runMode), last: true) { r.go(.setRun) }
-                    .accessibilityIdentifier("settings.running")
+                // 98번(빌드 28): 러닝 · 횟수 보정 · 심박 · 진동을 "운동 · 측정" 한 줄로 묶음 (다른 줄과 같은 모양, 값 글자 없음)
+                SettingRow(title: "Workout & tracking", value: "", last: true) { r.go(.setWorkout) }
+                    .accessibilityIdentifier("settings.workout")
             }
             .card8()
 
@@ -27,16 +28,6 @@ struct SettingsView: View {
                     .accessibilityIdentifier("settings.friends")
             }
             .card8()
-
-            SectionLabel(text: "VIBRATION", top: 14)
-            VStack(spacing: 0) {
-                hapticRow("Heart rate zone change", sub: nil, on: zoneBinding, last: false)
-                    .accessibilityIdentifier("settings.hapticZone")
-                hapticRow("Behind target pace", sub: "Race · Full Sim", on: paceBinding, last: true)
-                    .accessibilityIdentifier("settings.hapticPace")
-            }
-            .card8()
-            Note8(text: "Apple Watch alerts you with a vibration during workouts.")
 
             languageSection
 

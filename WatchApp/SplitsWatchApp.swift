@@ -4,6 +4,8 @@ import WatchKit
 
 @main
 struct Splits8WatchApp: App {
+    /// 98번: 아이폰의 "워치에서 시작"(보정)으로 켜질 때 운동 설정을 받음
+    @WKApplicationDelegateAdaptor(WDelegate.self) var delegate
     init() {
         if WatchDemo.enabled { WatchDemo.apply(); return }
         WatchStore.shared.activate()
@@ -46,11 +48,14 @@ final class WNav {
 struct WRoot: View {
     @Bindable var nav = WNav.shared
     let engine = WorkoutEngine.shared
+    let calib = Calib.shared
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if engine.active && engine.finished {
+            if calib.icon != nil && !engine.active && engine.countdown == nil {
+                WCalibView()
+            } else if engine.active && engine.finished {
                 WSummary()
             } else if engine.active {
                 WWorkoutPager()
@@ -217,9 +222,12 @@ struct WHome: View {
         // 57번 → 66번(빌드 25): 카드 4개를 화면 세로 가운데에 고정.
         // 예전엔 ScrollView 라 실제 워치에서 위 로고 줄 때문에 내용이 살짝 커져 스크롤되고 놓은 자리에 멈췄음.
         // 이제 화면에 다 들어가면 스크롤 없이 가운데 + 끌면 따라오고 놓으면 제자리(스프링). 안 들어가는 작은 워치만 스크롤.
-        ViewThatFits(in: .vertical) {
-            WHomeFixed(cards: cards)
-            ScrollView { cards.padding(.vertical, 4) }
+        // 96번(빌드 28): ViewThatFits 는 카드 4개(약 178pt)가 조금만 넘쳐도 ScrollView 를 골라서
+        // 실제 워치에서 늘 스크롤 화면이 나왔음 → 항상 가운데 고정. 남는 높이를 재서 모자라면 카드 여백 · 간격만 줄임
+        GeometryReader { geo in
+            let fit = Self.fit(geo.size.height)
+            WHomeFixed(cards: cards(pad: fit.pad, gap: fit.gap))
+                .frame(width: geo.size.width, height: geo.size.height)
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -229,10 +237,20 @@ struct WHome: View {
         .wNavBG(Ambient.y(0.22, 0.9, 0.4, 0.5, -0.06))
     }
 
-    private var cards: some View {
-        VStack(spacing: 6) {
+    /// 카드 하나 = 위아래 여백 × 2 + 22(아이콘 · 버튼). 기본 여백 9 · 간격 6, 모자라면 여백 4 · 간격 3 까지 줄임
+    static func fit(_ h: CGFloat) -> (pad: CGFloat, gap: CGFloat) {
+        let need: CGFloat = 4 * (22 + 18) + 3 * 6 + 8
+        if h >= need { return (9, 6) }
+        let room: CGFloat = max(0, h - 4 * 22 - 8)              // 여백 8개 + 간격 3개에 쓸 수 있는 높이
+        let gap: CGFloat = max(3, min(6, room * 0.1))
+        let pad: CGFloat = max(4, min(9, (room - 3 * gap) / 8))
+        return (pad, gap)
+    }
+
+    private func cards(pad: CGFloat, gap: CGFloat) -> some View {
+        VStack(spacing: gap) {
             ForEach(Mode.allCases) { m in
-                Button { open(m) } label: { card(m) }
+                Button { open(m) } label: { card(m, pad: pad) }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("w.mode." + m.rawValue)
             }
@@ -261,7 +279,7 @@ struct WHome: View {
         }
     }
 
-    private func card(_ m: Mode) -> some View {
+    private func card(_ m: Mode, pad: CGFloat) -> some View {
         // 설명 줄 없음: 아이콘 · 이름 · 버튼만 (카드 4개가 한 화면에 들어오게)
         // 버튼(22)은 크기 고정 — 이름이 길면 글자만 조금 줄어듦
         HStack(spacing: 10) {
@@ -272,7 +290,7 @@ struct WHome: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             action(m)
         }
-        .padding(.vertical, 9).padding(.horizontal, 12)
+        .padding(.vertical, pad).padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .wCard(18)
     }
@@ -540,7 +558,12 @@ struct WConfirm: View {
                     simple
                 }
 
-                if !noEvent { startButton }
+                if noEvent {
+                } else if mode == .training && program.isRun {
+                    runStartButtons
+                } else {
+                    startButton
+                }
         }
         .padding(.bottom, 4)
         .navigationTitle(Text((mode == .training ? program.name : mode.name).l10n))
@@ -672,6 +695,31 @@ struct WConfirm: View {
         .sheet(isPresented: $goalSheet) { WGoalPicker() }
     }
 
+    /// 83번(빌드 28): 러닝은 시작할 때 실외(GPS) / 실내를 고름 — 애플 운동 앱처럼.
+    /// 카드에 저장된 쪽이 노란 버튼, 다른 쪽은 회색. 실내는 GPS 없이 손목 움직임으로 거리를 짐작
+    private var runStartButtons: some View {
+        let cardIndoor: Bool = program.indoor ?? false
+        return HStack(spacing: 6) {
+            runButton(indoor: false, main: !cardIndoor)
+            runButton(indoor: true, main: cardIndoor)
+        }
+        .padding(.horizontal, 14).padding(.top, 6)
+    }
+
+    private func runButton(indoor: Bool, main: Bool) -> some View {
+        Button { start(indoor: indoor) } label: {
+            VStack(spacing: 1) {
+                Text((indoor ? "Indoor" : "Outdoor").l10n).font(F.t(14, .semibold))
+                Text((indoor ? "No GPS" : "GPS").l10n).font(F.t(10, .medium)).opacity(0.7)
+            }
+            .foregroundStyle(main ? .black : .white)
+            .frame(maxWidth: .infinity).frame(height: 44)
+            .background(main ? C.accent : Color(hex: 0x262626), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(indoor ? "w.startIndoor" : "w.startOutdoor")
+    }
+
     private var startButton: some View {
         Button { start() } label: {
             Text("Start").font(F.t(14, .semibold)).foregroundStyle(.black)
@@ -693,7 +741,12 @@ struct WConfirm: View {
     /// Full Sim: 이번에 겨룰 기준의 합계 시간 (아이폰 Full Sim 화면의 "Compare with" 를 따름 — 구간 목표와 같은 기준)
     private var goal: String {
         if mode == .race { return Fm.t(store.settings.goalTime) }
-        return Fm.t(seq.map(\.target).reduce(0, +))
+        // 86번: 워치에서 고른 목표는 그 숫자 그대로 보여 줌.
+        // 예전엔 16칸 합(= 목표 − Roxzone 8번)만 보여서, Roxzone 을 안 켜면 고른 1:30 이 1:26 처럼 다르게 보였음
+        if let g = store.watchGoal { return Fm.t(g) }
+        let segs: [Seg] = seq
+        let hasRox: Bool = segs.contains { $0.kind == .rox }
+        return Fm.t(segs.map(\.target).reduce(0, +) + (hasRox ? 0 : 8 * store.settings.roxTarget))
     }
     /// GOAL / VS LAST / VS JIHO / VS BEST
     private var goalWord: String {
@@ -702,7 +755,10 @@ struct WConfirm: View {
         return w == "VS GOAL" ? "GOAL" : w
     }
 
-    private func start() {
+    private func start(indoor: Bool? = nil) {
+        // 83번: 러닝은 고른 실내/실외로 이번 운동만 바꿔서 시작 (카드 자체는 그대로)
+        var prog: Program = program
+        if let indoor { prog.indoor = indoor }
         let title: String
         switch mode {
         case .training: title = program.name
@@ -712,8 +768,8 @@ struct WConfirm: View {
         }
         engine.settings = store.settings
         // 3 · 2 · 1 을 센 뒤 시작
-        engine.startAfterCountdown(mode: mode, title: title, sets: mode == .training ? program.sets : 1, seq: seq,
-                                   program: mode == .training ? program : nil)
+        engine.startAfterCountdown(mode: mode, title: title, sets: mode == .training ? prog.sets : 1, seq: seq,
+                                   program: mode == .training ? prog : nil)
     }
 }
 

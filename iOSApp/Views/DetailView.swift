@@ -22,6 +22,18 @@ extension Record {
     /// Roxzone 뺀 구간
     var mainSegs: [SegResult] { segs.filter { $0.kind != .rox } }
 
+    /// 95번(빌드 28): 러닝 카드의 마지막 덜 뛴 구간 (계획 거리의 90% 미만에서 끝냄, 예: KM 7 · 0:08)
+    func isPartialRun(_ s: SegResult) -> Bool {
+        guard isRunKind, s.kind == .run, let last = segs.last(where: { $0.kind == .run }), last == s else { return false }
+        let plan: Double = runMeters(s.detail)
+        guard plan > 0 else { return false }
+        return (s.dist ?? plan) < plan * 0.9
+    }
+    /// 95번: 100 m 또는 30초도 안 되는 마지막 조각 → 구간 줄 · 페이스 막대에서 숨김 (총시간 · 총거리에는 들어감)
+    func isTinyRun(_ s: SegResult) -> Bool {
+        isPartialRun(s) && ((s.dist ?? 0) < 100 || s.time < 30)
+    }
+
     /// 러닝 1KM당 페이스(초)
     func pace(_ s: SegResult) -> Int {
         let m = s.dist ?? runMeters(s.detail)
@@ -115,6 +127,10 @@ struct DetailView: View {
             }
             if rec.mode == .pft { pftCard(rec) }
             tilesGrid(rec)
+            // 94번(빌드 28): 실내 러닝 — 거리는 손목 움직임 짐작값이라 빠르게 나올 수 있음 · 러닝 PB 에서 뺌
+            if rec.mode == .training && rec.isRunKind && rec.indoor == true {
+                Note8(text: "Indoor run: distance is estimated from arm motion without GPS, so pace can look faster than it was. Indoor runs don't count toward running PBs.")
+            }
             // 55번: 이 기록의 숫자로 고른 분석 2~4줄
             let ins: [Insight] = Insights.make(rec, store: store)
             if !ins.isEmpty { InsightsCard(items: ins) }
@@ -310,7 +326,8 @@ struct DetailView: View {
         } else if rec.mode == .training {
             // 64번: VS BEST 는 풀 시뮬 · 레이스에서만. 러닝은 거리, 그 외 트레이닝은 구간 수
             let second: DetailTile = rec.isRunKind
-                ? DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: .white, unitColor: C.text2)
+                ? DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: .white, unitColor: C.text2,
+                             sub: rec.indoor == true ? "Indoor · est.".l10n : "")
                 : DetailTile(label: "SEGMENTS", value: "\(rec.mainSegs.count)", unit: "", color: .white, unitColor: .clear)
             head = [DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear), second]
         } else {
@@ -679,7 +696,8 @@ struct DetailView: View {
 
     private func paceCard(_ rec: Record) -> some View {
         let imp: Bool = store.settings.imperial
-        let paces: [Int] = rec.runs.map { Units.pace(rec.pace($0), imp) }
+        // 95번: 마지막 덜 뛴 조각은 막대에서 뺌
+        let paces: [Int] = rec.runs.filter { !rec.isPartialRun($0) }.map { Units.pace(rec.pace($0), imp) }
         let avg: String = rec.runPace.map { Fm.t(Units.pace($0, imp)) } ?? "--:--"
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
@@ -721,7 +739,7 @@ struct DetailView: View {
     // MARK: 구간 기록 (padding 11×18)
 
     private func splits(_ rec: Record) -> some View {
-        let segs = rec.mainSegs
+        let segs = rec.mainSegs.filter { !rec.isTinyRun($0) }
         // 빌드 27: 트레이닝은 저장된 목표(s.target) 대신 이 기록 전까지의 구간별 최고와 비교 (한 번만 계산)
         let prior: [String: Int] = rec.mode == .training ? store.segBestsBefore(rec) : [:]
         return VStack(spacing: 0) {
@@ -738,12 +756,18 @@ struct DetailView: View {
         // 64번: 러닝 기록은 목표가 없어서 '시간 − 0'(+5:48 등)이 나왔음 → 내 평균 페이스 대비 (빠르면 초록, 느리면 빨강)
         let runAvg: Int? = (rec.mode == .training && rec.isRunKind && s.kind == .run) ? rec.avgKmPace : nil
         let priorBest: Int? = (rec.mode == .training && s.kind != .rox) ? prior[SegKey.of(icon: s.icon, detail: s.detail)] : nil
-        let showDelta: Bool = runAvg != nil || rec.mode != .training || priorBest != nil
+        let partial: Bool = rec.isPartialRun(s)
+        let showDelta: Bool = !partial && (runAvg != nil || rec.mode != .training || priorBest != nil)
         let imp: Bool = store.settings.imperial
         // 러닝 평균 대비 차이도 보이는 페이스 단위(/KM · /MI)로
         let base: Int = rec.mode == .training ? (priorBest ?? s.time) : s.target
         let d: Int = runAvg.map { Units.pace(rec.pace(s), imp) - Units.pace($0, imp) } ?? (s.time - base)
-        let first: String = s.kind == .run ? "\(Fm.t(Units.pace(rec.pace(s), imp))) \(Units.paceUnit(imp))" : Units.detail(s.detail, imp)
+        var first: String = s.kind == .run ? "\(Fm.t(Units.pace(rec.pace(s), imp))) \(Units.paceUnit(imp))" : Units.detail(s.detail, imp)
+        // 93번: 스테이션 섞인 트레이닝의 러닝 구간 — 워치가 잰 거리가 계획(1 km 등)과 3% 넘게 다르면 실제 거리를 앞에 붙임
+        //  (시간 5:33 인데 페이스 5:14 처럼 달라 보이는 이유가 보이게)
+        if s.kind == .run, !rec.isRunKind, let m = s.dist, runMeters(s.detail) > 0, abs(m - runMeters(s.detail)) > runMeters(s.detail) * 0.03 {
+            first = "\(Units.dist(m, imp)) \(Units.distUnit(imp)) · " + first
+        }
         let bpm: String = s.hr.map { String($0) } ?? "--"
         // 스키 · 로잉 · 월볼: 워치가 팔 움직임으로 센 횟수를 참고용으로 덧붙임 ("~" = 짐작값, 한국어 "약")
         let reps: String = s.reps.map { n in
@@ -755,11 +779,15 @@ struct DetailView: View {
             if let c = s.cad { runExtra += " · \(c) SPM" }
             if let u = s.up, u >= 1 { runExtra += " · +\(Int(u.rounded())) m" }
         }
-        let sub = "\(first) · \(bpm) BPM" + reps + runExtra
+        // 93번: 무엇과 비교했는지 보이게 — 트레이닝은 이전 최고 시간을 같이 ("BEST 4:15")
+        let bestNote: String = (priorBest != nil && runAvg == nil && !partial) ? " · " + String(localized: "BEST \(Fm.t(priorBest ?? 0))") : ""
+        let sub = "\(first) · \(bpm) BPM" + reps + runExtra + bestNote
+        // 95번: 마지막 덜 뛴 구간은 "KM 7" 대신 실제 거리로 ("마지막 0.42 km")
+        let title: String = partial ? String(localized: "Last \(Units.dist(s.dist ?? 0, imp)) \(Units.distUnit(imp).lowercased())") : s.name
         return HStack(spacing: 12) {
             Icon8(s.icon, 24, tint: s.kind == .run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 1) {
-                Text(s.name).font(F.t(15, .medium)).lineLimit(1)
+                Text(title).font(F.t(15, .medium)).lineLimit(1)
                 Text(sub).font(F.num(11, .medium)).tracking(0.02 * 11)
                     .foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
             }

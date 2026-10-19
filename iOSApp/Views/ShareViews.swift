@@ -25,6 +25,10 @@ struct ShareData {
     var runTotal = ""
     var stationTotal = ""
     var partner = ""        // 더블 파트너 닉네임 (@ 없이) · 없으면 ""
+    /// 85번(빌드 28): 러닝 카드 기록 — 총거리 · 총시간 · 평균 페이스 3개만 크게 (구간 표 없음)
+    var isRun = false
+    var distance = ""       // "7.02 KM"
+    var avgPace = ""        // "4:32 /KM"
 
     /// "with @jiho" · 파트너 없으면 ""
     var partnerText: String { partner.isEmpty ? "" : "with @" + partner }
@@ -62,6 +66,13 @@ struct ShareData {
         runTotal = Fm.t(r.runTotal)
         stationTotal = Fm.t(r.stationTotal)
         partner = (r.partner ?? "").trimmingCharacters(in: .whitespaces)
+        if r.isRunKind {
+            isRun = true
+            distance = Units.dist(r.runDistance, imp) + " " + Units.distUnit(imp)
+            avgPace = (r.runPace.map { Fm.t(Units.pace($0, imp)) } ?? "--:--") + " " + Units.paceUnit(imp)
+            pairs = []
+            seq = []
+        }
     }
 
     static func short(_ n: String) -> String { n == "Farmers Carry" ? "Farmers" : n }
@@ -459,11 +470,16 @@ struct ShareCard: View {
                 Text(d.partnerText).font(F.t(12, .medium))
                     .foregroundStyle(tc.opacity(0.75)).lineLimit(1).padding(.top, 2)
             }
-            big(d.total, post ? 64 : 76, track: -0.045, color: tc).padding(.top, 6)
+            big(d.isRun ? d.distance : d.total, post ? 64 : 76, track: -0.045, color: tc).padding(.top, 6)
             HStack(alignment: .top, spacing: 12) {
-                posterStat("AVG HR", d.avgHR, ha, fa)
-                if d.hasRox { posterStat("ROXZONE", d.rox, ha, fa) }
-                posterStat("KCAL", d.kcal, ha, fa)
+                if d.isRun {
+                    posterStat("TIME", d.total, ha, fa, size: 26)
+                    posterStat("AVG PACE", d.avgPace, ha, fa, size: 26)
+                } else {
+                    posterStat("AVG HR", d.avgHR, ha, fa)
+                    if d.hasRox { posterStat("ROXZONE", d.rox, ha, fa) }
+                    posterStat("KCAL", d.kcal, ha, fa)
+                }
             }
             .padding(.top, 14)
         }
@@ -471,10 +487,10 @@ struct ShareCard: View {
     }
 
     private func posterStat(_ label: String, _ value: String, _ ha: HorizontalAlignment = .leading,
-                            _ fa: Alignment = .leading) -> some View {
+                            _ fa: Alignment = .leading, size: CGFloat = 18) -> some View {
         VStack(alignment: ha, spacing: 0) {
             tinyLabel(label, color: tc)
-            Text(value).font(F.num(18, .semibold)).tracking(-0.01 * 18)
+            Text(value).font(F.num(size, .semibold)).tracking(-0.01 * size)
                 .foregroundStyle(tc).lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: fa)
@@ -670,11 +686,11 @@ struct ShareCard: View {
             }
             .font(F.t(12, .medium)).foregroundStyle(C.text2)
             HStack(alignment: .bottom) {
-                big(d.total, post ? 48 : 56, track: -0.04)
+                big(d.isRun ? d.distance : d.total, post ? 48 : 56, track: -0.04)
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(d.vsValue).foregroundStyle(C.accent)
-                    Text("\(d.avgHR) BPM").foregroundStyle(C.text2)
+                    Text(d.isRun ? d.avgPace : d.vsValue).foregroundStyle(C.accent)
+                    Text(d.isRun ? d.total : "\(d.avgHR) BPM").foregroundStyle(d.isRun ? Color.white : C.text2)
                 }
                 .font(F.num(14, .semibold)).lineLimit(1).fixedSize()
             }
@@ -760,11 +776,16 @@ struct ShareCard: View {
         VStack(alignment: .leading, spacing: 0) {
             blockHeader
             Spacer(minLength: 0)
-            big(d.total, post ? 56 : 76, track: -0.045)
+            big(d.isRun ? d.distance : d.total, post ? 56 : 76, track: -0.045)
             HStack(spacing: 6) {
-                blockTile(d.vsWord, d.vsValue, color: C.accent)
-                blockTile("AVG HR", d.avgHR, color: .white)
-                if d.hasRox { blockTile("ROXZONE", d.rox, color: .white) }
+                if d.isRun {
+                    blockTile("TIME", d.total, color: .white)
+                    blockTile("AVG PACE", d.avgPace, color: C.accent)
+                } else {
+                    blockTile(d.vsWord, d.vsValue, color: C.accent)
+                    blockTile("AVG HR", d.avgHR, color: .white)
+                    if d.hasRox { blockTile("ROXZONE", d.rox, color: .white) }
+                }
             }
             .padding(.top, 14)
             if showSplits && !d.pairs.isEmpty {

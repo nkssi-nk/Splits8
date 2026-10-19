@@ -9,6 +9,8 @@ struct BonusSheet: View {
 
     @State private var km: Int
     @State private var indoor: Bool
+    /// 82번(빌드 28): 카드 이름 (비우면 기본 이름 "HIIT" · "Run 5K" · "Free run")
+    @State private var name: String
     /// 새로 만들 때 쓸 id (저장·아이폰 시작이 같은 id 를 쓰게)
     @State private var fresh: String = String(UUID().uuidString.prefix(6))
 
@@ -16,29 +18,38 @@ struct BonusSheet: View {
         self.req = req
         _km = State(initialValue: req.existing?.runKm ?? 5)
         _indoor = State(initialValue: req.existing?.indoor ?? false)
+        // 기본 이름 그대로면 칸은 비워 둠 (자리 글자로 기본 이름이 보임)
+        let n: String = req.existing?.name ?? ""
+        let isDefault: Bool = n == "HIIT" || n == "Free run" || n.hasPrefix("Run ") && n.hasSuffix("K")
+        _name = State(initialValue: isDefault ? "" : n)
     }
+
+    /// 지금 거리로 만든 기본 이름
+    private var defaultName: String { isHIIT ? "HIIT" : Program.runName(km) }
+    private var cleanName: String { String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(24)) }
 
     private var isHIIT: Bool { req.kind == "hiit" }
 
     /// 지금 고른 값으로 만든 프로그램 (편집이면 같은 id)
     private var program: Program {
+        var p: Program
         if isHIIT {
-            if let e = req.existing { return e }
-            var p = Program.hiit()
-            p.id = "hiit." + fresh
-            return p
+            if let e = req.existing { p = e } else { p = Program.hiit(); p.id = "hiit." + fresh }
+        } else {
+            p = Program.run(km: km, indoor: indoor, id: req.existing?.id ?? ("run." + fresh))
         }
-        return Program.run(km: km, indoor: indoor, id: req.existing?.id ?? ("run." + fresh))
+        p.name = cleanName.isEmpty ? defaultName : cleanName
+        return p
     }
 
     /// 지금 고른 설정과 같은 것이 이미 목록(= 워치 목록)에 있는지
     private var onWatch: Bool {
         if let e = req.existing {
             // 저장된 카드를 연 경우: 값을 바꾸지 않았으면 이미 있음
-            return isHIIT || (e.runKm == km && (e.indoor ?? false) == indoor)
+            return e.name == program.name && (isHIIT || (e.runKm == km && (e.indoor ?? false) == indoor))
         }
         return store.programs.contains { p in
-            isHIIT ? p.isHIIT : (p.isRun && p.runKm == km && (p.indoor ?? false) == indoor)
+            p.name == program.name && (isHIIT ? p.isHIIT : (p.isRun && p.runKm == km && (p.indoor ?? false) == indoor))
         }
     }
 
@@ -59,6 +70,7 @@ struct BonusSheet: View {
                     .accessibilityIdentifier("bonus.close")
                 }
 
+                nameField
                 if isHIIT { hiitBody } else { runBody }
 
                 // 66번(빌드 25): 이미 워치 목록에 있는 것(같은 설정)이면 저장 버튼 대신 "워치 목록에 있음"
@@ -90,6 +102,20 @@ struct BonusSheet: View {
                 }
             }
             .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 24)
+        }
+    }
+
+    // MARK: 이름 (82번)
+
+    private var nameField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label8("NAME")
+            TextField(defaultName.l10n, text: $name)
+                .font(F.t(17)).textInputAutocapitalization(.words).autocorrectionDisabled()
+                .submitLabel(.done)
+                .padding(.horizontal, 14).frame(height: 46)
+                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .accessibilityIdentifier("bonus.name")
         }
     }
 

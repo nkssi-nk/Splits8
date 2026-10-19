@@ -4,3 +4,6 @@ DerivedData/
 .DS_Store
 *.p8
 cert_key*
+# 서명 키 (PC 에만, 절대 올리지 않음)
+_upload-key/
+*.jks

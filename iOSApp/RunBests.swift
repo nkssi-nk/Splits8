@@ -80,7 +80,8 @@ extension Record {
 extension Store {
     /// 이 러닝 기록이 최고 기록인 거리들 (같은 거리를 뛴 러닝 기록이 2개 이상일 때만 PB 로 셈)
     func runPBs(_ r: Record) -> [Double] {
-        guard r.isRunKind, r.counts else { return [] }
+        // 94번: 실내 러닝은 거리가 짐작값이라 PB 에서 뺌
+        guard r.isRunKind, r.counts, r.indoor != true else { return [] }
         let table: [Double: (best: Int, n: Int)] = runBestTable()
         return RunPB.distances.compactMap { d in
             guard let mine = r.bestEffort(d.m), let b = table[d.m], b.n >= 2, mine <= b.best else { return nil }
@@ -105,7 +106,7 @@ extension Store {
 
     /// 거리별 (가장 빠른 시간, 그 거리를 뛴 기록 수). 목록을 그릴 때마다 다시 세지 않게 기록이 바뀔 때만 계산
     private func runBestTable() -> [Double: (best: Int, n: Int)] {
-        let runs: [Record] = records.filter { $0.mode == .training && $0.isRunKind && $0.counts }
+        let runs: [Record] = records.filter { $0.mode == .training && $0.isRunKind && $0.counts && $0.indoor != true }
         let key: String = "\(records.count)|" + runs.map { "\($0.id)" }.joined(separator: ",")
         if let c = runBestCache, c.key == key { return c.table }
         var t: [Double: (best: Int, n: Int)] = [:]

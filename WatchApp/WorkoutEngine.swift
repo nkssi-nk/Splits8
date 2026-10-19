@@ -602,6 +602,7 @@ final class WorkoutEngine: NSObject {
         r.endDate = startDate.addingTimeInterval(Double(total))
         r.place = place
         r.kind = kind
+        if isRunKind && !outdoorRun { r.indoor = true }     // 94번
         if outdoorRun && routePts.count >= 2 { r.route = routePts }
         // 62번: 러닝 카드 — 케이던스 · 보폭 · 오르막 (경로 높이로)
         if isRunKind { RunMetrics.fill(&r, segSteps: segSteps, strideHK: strideAvg) }

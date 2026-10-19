@@ -76,30 +76,23 @@ struct HomeView: View {
         .accessibilityIdentifier("home.profile")
     }
 
-    /// 오른쪽 두 줄 (왼쪽 아이디 / 체급 두 줄과 줄을 맞춤):
-    /// 기록이 있으면 시간 / "★ PB · Full Sim" (Race 최고면 Race),
-    /// 빌드 27: 둘 다 없고 러닝 PB 가 있으면 가장 긴 거리 PB 시간 / "★ 5K PB", 그것도 없으면 목표 시간 / "Race goal"
+    /// 오른쪽 두 줄 (왼쪽 아이디 / 체급 두 줄과 줄을 맞춤): 시간 / "★ PB · Full Sim" 등.
+    /// 91번(빌드 28): 무엇을 보일지 설정 › 프로필에서 고름 (HomeShow). 기본(자동) = 가장 최근에 세운 최고 기록, 없으면 목표 시간
     @ViewBuilder private var profileBest: some View {
-        let sim: Record? = store.simBest
-        let best: Record? = sim ?? store.raceBest
-        let runPB: (m: Double, time: Int)? = best == nil ? store.longestRunPB() : nil
+        let b: HomeBest = store.homeBest()
         VStack(alignment: .trailing, spacing: 2) {
-            Text(Fm.t(best?.total ?? runPB?.time ?? store.settings.goalTime)).font(F.num(22)).tracking(-0.44).lineLimit(1)
-            if best != nil {
+            Text(Fm.t(b.time)).font(F.num(22)).tracking(-0.44).lineLimit(1)
+            if b.star {
                 HStack(spacing: 3) {
                     Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(C.accent)
-                    Text("PB").font(F.t(F.foot, .semibold)).foregroundStyle(C.accent)
-                    Text("· " + (sim != nil ? "Full Sim" : "Race").l10n).font(F.t(F.foot)).foregroundStyle(C.text2)
-                }
-                .lineLimit(1)
-            } else if let rp = runPB {
-                HStack(spacing: 3) {
-                    Image(systemName: "star.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(C.accent)
-                    Text(RunPB.pbName(rp.m)).font(F.t(F.foot, .semibold)).foregroundStyle(C.accent)
+                    Text(b.tag.l10n).font(F.t(F.foot, .semibold)).foregroundStyle(C.accent)
+                    if !b.sub.isEmpty {
+                        Text("· " + b.sub.l10n).font(F.t(F.foot)).foregroundStyle(C.text2)
+                    }
                 }
                 .lineLimit(1)
             } else {
-                Text("Race goal").font(F.t(F.foot)).foregroundStyle(C.text2).lineLimit(1)
+                Text(b.tag.l10n).font(F.t(F.foot)).foregroundStyle(C.text2).lineLimit(1)
             }
         }
         .fixedSize()
@@ -612,5 +605,44 @@ struct HomeView: View {
         let cal = Calendar.current
         let n = cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: cal.startOfDay(for: d)).day ?? 0
         return n == 0 ? "D-DAY" : n > 0 ? "D-\(n)" : "D+\(-n)"
+    }
+}
+
+// MARK: - 91번(빌드 28): 홈 프로필 카드 오른쪽 기록 고르기
+
+enum HomeShow {
+    static let keys: [String] = ["auto", "sim", "race", "pft", "run", "goal"]
+    static func name(_ k: String) -> String {
+        ["auto": "Latest best", "sim": "Full Sim PB", "race": "Race PB", "pft": "PFT best",
+         "run": "Running PB", "goal": "Race goal"][k] ?? "Latest best"
+    }
+}
+
+struct HomeBest {
+    let time: Int
+    let tag: String         // "PB" · "5K PB" · "PFT" · "Race goal"
+    let sub: String         // "Full Sim" · "Race" · ""
+    let star: Bool
+}
+
+extension Store {
+    /// 홈 프로필 카드 오른쪽 (설정 › 프로필의 "홈 카드에 보일 기록")
+    func homeBest() -> HomeBest {
+        let goal = HomeBest(time: settings.goalTime, tag: "Race goal", sub: "", star: false)
+        var c: [String: (b: HomeBest, date: Date)] = [:]
+        if let r = simBest { c["sim"] = (HomeBest(time: r.total, tag: "PB", sub: "Full Sim", star: true), r.date) }
+        if let r = raceBest { c["race"] = (HomeBest(time: r.total, tag: "PB", sub: "Race", star: true), r.date) }
+        if let r = pftBest { c["pft"] = (HomeBest(time: r.total, tag: "PB", sub: "PFT", star: true), r.date) }
+        if let rp = longestRunPB() {
+            // 그 거리 최고를 세운 기록의 날짜 (실내 러닝은 뺌)
+            let when: Date = records.filter { $0.mode == .training && $0.isRunKind && $0.counts && $0.indoor != true }
+                .filter { $0.bestEffort(rp.m) == rp.time }.map(\.date).max() ?? .distantPast
+            c["run"] = (HomeBest(time: rp.time, tag: RunPB.pbName(rp.m), sub: "", star: true), when)
+        }
+        let k: String = settings.homeShow ?? "auto"
+        if k == "goal" { return goal }
+        if k != "auto", let x = c[k] { return x.b }
+        // 자동: 가장 최근에 세운 최고 기록
+        return c.values.max { $0.date < $1.date }?.b ?? goal
     }
 }

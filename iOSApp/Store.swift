@@ -324,7 +324,8 @@ final class Store: NSObject, WCSessionDelegate {
     /// 트레이닝 구간별 최고
     var segBests: [String: Int] {
         var b: [String: Int] = [:]
-        for r in records where r.mode == .training && r.counts {
+        // 93번: 러닝 카드 · HIIT 기록은 빼고 (스테이션 섞인 트레이닝끼리만 — 워치의 BEST 도 같은 기준)
+        for r in records where r.mode == .training && r.counts && !r.isRunKind && !r.isHIIT {
             for s in r.segs where s.kind != .rox && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.time) {
                 let k = SegKey.of(icon: s.icon, detail: s.detail)
                 b[k] = min(b[k] ?? .max, s.time)
@@ -336,7 +337,8 @@ final class Store: NSObject, WCSessionDelegate {
     /// 빌드 27: 이 기록 '전'까지의 트레이닝 구간별 최고 (이 기록은 뺌). 기록 화면의 구간 차이(±)에 씀
     func segBestsBefore(_ rec: Record) -> [String: Int] {
         var b: [String: Int] = [:]
-        for r in records where r.mode == .training && r.counts && r.id != rec.id && r.date < rec.date {
+        // 93번(빌드 28): 자유러닝 · 러닝 카드 기록의 1 km 는 다리가 멀쩡할 때 뛴 것이라 빼고, 스테이션이 섞인 트레이닝끼리만 비교
+        for r in records where r.mode == .training && r.counts && !r.isRunKind && !r.isHIIT && r.id != rec.id && r.date < rec.date {
             for s in r.segs where s.kind != .rox && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.time) {
                 let k: String = SegKey.of(icon: s.icon, detail: s.detail)
                 b[k] = min(b[k] ?? Int.max, s.time)
@@ -816,6 +818,16 @@ final class Store: NSObject, WCSessionDelegate {
         }
         // 63번: 예전 워치 앱이 보내는 Quick 은 트레이닝 목록에 넣지 않음 (목록이 계속 늘어나던 원인)
         _ = userInfo[SyncKey.quick]
+        // 98번(빌드 28): 워치에서 끝낸 횟수 보정 결과 → 설정에 저장 (설정이 바뀌면 워치로 다시 내려감)
+        if let d = userInfo[SyncKey.calibDone] as? Data, let icon = userInfo["icon"] as? String,
+           let tune = try? JSONStore.dec.decode(RepTune.self, from: d) {
+            DispatchQueue.main.async {
+                var m: [String: RepTune] = self.settings.repCal ?? [:]
+                m[icon] = tune
+                self.settings.repCal = m
+                self.pushToWatch()
+            }
+        }
     }
 
     private func status(_ s: WCSession) {

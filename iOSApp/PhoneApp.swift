@@ -65,6 +65,7 @@ enum Scr: String {
     case splash, ob1, ob2, ob3
     case home, training, builder, sim, race, settings
     case setHr, setDiv, setRun, setGoals, setEvent, friends
+    case setWorkout, setCalib   // 98번(빌드 28): 설정 › 운동 · 측정 · 종목 보정
     case auth, code, nick, findEvent, account
     case profileSetup       // 빌드 23: 가입 프로필 (성별 · 키/몸무게 · 태어난 해 · 대회 경험) — ProfileViews.swift
     case detail, share
@@ -112,6 +113,8 @@ final class Router {
     var detailFrom: Scr = .race
     /// Division · 심박 화면을 어디서 열었는지 (돌아갈 곳)
     var subFrom: Scr = .account
+    /// 98번: 설정 › 운동 · 측정 에서 고른 보정 종목 (skiErg · row · wallBalls)
+    var calibIcon: String = "wallBalls"
     var setDivFrom: Scr { get { subFrom } set { subFrom = newValue } }
     /// Friends 화면을 어디서 열었는지: 홈의 순위표(+ Add friends) 또는 설정
     var friendsFrom: Scr = .settings
@@ -191,7 +194,8 @@ final class Router {
     }
     private static var savedTestTab: String {
         if Demo.enabled { return "pft" }
-        return UserDefaults.standard.string(forKey: "test.tab") == "sim" ? "sim" : "pft"
+        // 88번: 처음엔 Full Sim (예전에 PFT 를 골라 둔 사람은 그대로)
+        return UserDefaults.standard.string(forKey: "test.tab") == "pft" ? "pft" : "sim"
     }
     /// Test 탭의 PFT / Full Sim 으로 바로 가기
     func goTest(_ tab: String) {
@@ -312,6 +316,7 @@ final class Router {
         case .race: return "Race"
         case .sim: return "Full Sim"
         case .home: return "Home"
+        case .setWorkout: return "Workout & tracking"
         default: return "Profile"
         }
     }
@@ -332,6 +337,8 @@ final class Router {
         case .setGoals: return "Split goals"
         case .setDiv: return "Division"
         case .setRun: return "Running"
+        case .setWorkout: return "Workout & tracking"
+        case .setCalib: return "Calibrate"
         case .friends: return "Friends"
         default: return ""
         }
@@ -340,8 +347,12 @@ final class Router {
     var barBack: (label: String, action: () -> Void)? {
         switch scr {
         case .findEvent: return ("Race event", { self.go(.setEvent) })
-        case .account, .setRun: return ("Settings", { self.go(.settings) })
-        case .setGoals: return ("Race", { self.go(.race) })
+        case .account, .setWorkout: return ("Settings", { self.go(.settings) })
+        case .setRun, .setCalib: return ("Workout & tracking", { self.go(.setWorkout) })
+        case .setGoals:
+            // 87번: Full Sim 에서 들어왔으면 Full Sim 으로
+            if subFrom == .sim { return ("Full Sim", { self.goTest("sim") }) }
+            return ("Race", { self.go(.race) })
         case .friends:
             let home: Bool = friendsFrom == .home
             return (home ? "Home" : "Settings", { self.go(home ? .home : .settings) })
@@ -441,6 +452,7 @@ extension Scr {
         case .setGoals: return .y(0.18, 1.2, 0.55, 0.5, 0.4)
         case .setDiv: return .y(0.18, 1.2, 0.55, 0.5, 0.2)
         case .setRun: return Ambient(hex: 0x0A84FF, alpha: 0.20, rx: 1.2, ry: 0.55, cx: 0.5, cy: 0.2)
+        case .setWorkout, .setCalib: return .y(0.18, 1.2, 0.55, 0.5, 0.2)
         case .setEvent: return .y(0.22, 1.2, 0.55, 0.5, 0.2)
         case .friends: return Ambient(hex: 0x30D158, alpha: 0.16, rx: 1.2, ry: 0.55, cx: 0.5, cy: 0.2)
         case .detail: return .y(0.24, 1.3, 0.5, 0.5, 0.1)
@@ -462,21 +474,22 @@ extension Scr {
         case .home: return .home
         case .training, .builder: return .training
         case .sim: return .sim
-        case .race, .setEvent, .findEvent, .setGoals: return .race
+        case .setGoals: return Router.shared.subFrom == .sim ? .sim : .race
+        case .race, .setEvent, .findEvent: return .race
         case .friends: return Router.shared.friendsFrom == .home ? .home : .settings
-        case .settings, .setHr, .setDiv, .setRun, .account: return .settings
+        case .settings, .setHr, .setDiv, .setRun, .account, .setWorkout, .setCalib: return .settings
         default: return nil
         }
     }
 
     var showsTabs: Bool {
-        [.home, .training, .sim, .race, .settings, .findEvent, .account, .setHr, .setGoals, .setDiv, .setRun, .setEvent, .friends].contains(self)
+        [.home, .training, .sim, .race, .settings, .findEvent, .account, .setHr, .setGoals, .setDiv, .setRun, .setEvent, .friends, .setWorkout, .setCalib].contains(self)
     }
     /// 화면 자체 머리줄(Cancel · 제목 · Save)을 맨 위에 고정하는 화면
     var pinsNav: Bool { self == .builder }
     /// 위 고정 바 (44pt, 반투명 검정 + 흐림, 스크롤해도 제자리)
     var showsBar: Bool {
-        [.home, .training, .sim, .race, .settings, .findEvent, .account, .setHr, .setGoals, .setDiv, .setRun, .friends].contains(self)
+        [.home, .training, .sim, .race, .settings, .findEvent, .account, .setHr, .setGoals, .setDiv, .setRun, .friends, .setWorkout, .setCalib].contains(self)
     }
 }
 
@@ -662,6 +675,8 @@ struct PhoneRoot: View {
         case .setHr: Scroll8 { SetHrView() }
         case .setDiv: Scroll8 { SetDivView() }
         case .setRun: Scroll8 { SetRunView() }
+        case .setWorkout: Scroll8 { SetWorkoutView() }
+        case .setCalib: Scroll8 { SetCalibView() }
         case .setGoals: Scroll8 { SetGoalsView() }
         case .setEvent: Scroll8 { SetEventView() }
         case .friends: Scroll8 { FriendsView() }

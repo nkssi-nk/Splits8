@@ -3,6 +3,8 @@ package com.nkssi.splits8
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.nkssi.splits8.screens.ScreenFor
@@ -253,14 +255,41 @@ class Flows {
         rule.waitForIdle()
         tap("race.Doubles plan")
         assertEquals("doubles", Router.raceSheet)
-        tap("nav.right")                                    // 반반 그대로 저장 → 비워 둠
-        assertNull(Store.settings.doublesPlan)
+        // 빌드 27: 스테이션을 누르면 같은 시트 안에서 고침 (150 m씩 · 파트너 먼저)
+        tap("dbl.skiErg")
+        rule.onNodeWithTag("dbl.chunk").assertExists()
+        tap("nav.left")                                     // 고치기 취소 → 계획 화면
+        tap("dbl.reset")
+        tap("nav.right")                                    // 저장하면 워치로도 감
+        assertEquals(com.nkssi.splits8.shared.DoublesPlan(), Store.settings.doublesPlan)
+    }
+
+    @Test fun doublesPlanStationEdit() {
+        useRaceDemo()
+        Store.update { it.copy(division = "dblM") }
+        show(Scr.Race)
+        tap("race.Doubles plan")
+        tap("dbl.wallBalls")
+        rule.onAllNodesWithText("10 reps").onFirst().performClick()
+        rule.onAllNodesWithText("Partner").onFirst().performClick()   // 누가 먼저 → 파트너
+        rule.waitForIdle()
+        tap("nav.right")                                    // Done
+        tap("nav.right")                                    // Save
+        val p = Store.settings.doublesPlan!!
+        assertEquals(10.0, p.chunk(7), 0.001)
+        assertEquals(false, p.meFirst(7))
+        assertEquals(10, p.turns(7))
     }
 
     @Test fun settingsToggles() {
         show(Scr.Settings)
+        // 98번(빌드 28): 진동은 설정 › 운동 · 측정 안으로
+        tap("settings.workout")
+        assertEquals(Scr.SetWorkout, Router.scr)
         tap("settings.hapticZone")
         assertEquals(false, Store.settings.hapticZone)
+        tap("back")
+        assertEquals(Scr.Settings, Router.scr)
         tap("settings.mirror")
         assertEquals(false, Store.settings.mirror)
         tap("settings.theme.blue")

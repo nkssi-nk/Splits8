@@ -95,6 +95,13 @@ import com.nkssi.splits8.shared.SegResult
 import com.nkssi.splits8.shared.Station
 import com.nkssi.splits8.shared.avgKmPace
 import com.nkssi.splits8.shared.bestEffort
+import com.nkssi.splits8.shared.HyroxRank
+import com.nkssi.splits8.shared.Units
+import com.nkssi.splits8.shared.isPartialRun
+import com.nkssi.splits8.shared.isTinyRun
+import com.nkssi.splits8.shared.runMeters
+import com.nkssi.splits8.ui.PBPill
+import androidx.compose.ui.unit.sp
 import com.nkssi.splits8.shared.l10n
 import com.nkssi.splits8.shared.mainSegs
 import com.nkssi.splits8.shared.pace
@@ -201,6 +208,10 @@ private fun DetailContent(rec: Record) {
     }
     if (rec.mode == Mode.Pft) PftCard(rec)
     TilesGrid(rec)
+    // 94번(빌드 28): 실내 러닝 — 거리는 손목 움직임 짐작값이라 빠르게 나올 수 있음 · 러닝 PB 에서 뺌
+    if (rec.mode == Mode.Training && rec.isRunKind && rec.indoor == true) {
+        Note8("Indoor run: distance is estimated from arm motion without GPS, so pace can look faster than it was. Indoor runs don't count toward running PBs.")
+    }
     // 이 기록의 숫자로 고른 분석 2~4줄
     val ins = remember(rec, book) { Insights.make(rec, book) }
     if (ins.isNotEmpty()) InsightsCard(ins)
@@ -287,6 +298,8 @@ private fun Header(rec: Record) {
                     T(rec.mode.title, F.t(11, W600, Color.Black), maxLines = 1)
                 }
                 Label8(Fm.wdmy(rec.date))
+                // 빌드 27: 러닝 PB 는 머리에 거리까지 ("★ 5K PB")
+                Store.book.runPBLabel(rec)?.let { PBPill(it) }
                 rec.flag?.let { FlagPill(it) }
             }
             // PFT 는 제목이 위 알약과 같아서 큰 제목을 뺌
@@ -455,13 +468,15 @@ fun PartnerSheet(recordId: String) {
 private fun tiles(rec: Record): List<DetailTile> {
     val book = Store.book
     val (word, value) = book.vs(rec)
-    val pace = rec.runPace?.let { Fm.t(it) } ?: "--:--"
+    val imp = Store.settings.imperial
+    val pace = rec.runPace?.let { Fm.t(Units.pace(it, imp)) } ?: "--:--"
     // PFT 는 총 시간·최고 기록 대비를 위의 큰 카드가 보여 줌
     val head: List<DetailTile> = when (rec.mode) {
         Mode.Pft -> emptyList()
         Mode.Training -> {
             // VS BEST 는 풀 시뮬 · 레이스에서만. 러닝은 거리, 그 외 트레이닝은 구간 수
-            val second = if (rec.isRunKind) DetailTile("DISTANCE", String.format(Locale.US, "%.2f", rec.runDistance / 1000), "KM", unitColor = C.text2)
+            val second = if (rec.isRunKind) DetailTile("DISTANCE", Units.dist(rec.runDistance, imp), Units.distUnit(imp), unitColor = C.text2,
+                sub = if (rec.indoor == true) "Indoor · est.".l10n else "")
             else DetailTile("SEGMENTS", "${rec.mainSegs.size}")
             listOf(DetailTile("TOTAL", Fm.t(rec.total)), second)
         }
@@ -474,7 +489,7 @@ private fun tiles(rec: Record): List<DetailTile> {
         DetailTile("AVG HR", if (rec.avgHR > 0) "${rec.avgHR}" else "--", "BPM", unitColor = C.bad),
         DetailTile("MAX HR", if (rec.maxHR > 0) "${rec.maxHR}" else "--", "BPM", unitColor = C.bad),
         DetailTile("CALORIES", grouped(rec.kcal), "KCAL", unitColor = C.text2),
-        DetailTile("RUN PACE", pace, "/KM", unitColor = C.text2),
+        DetailTile("RUN PACE", pace, Units.paceUnit(imp), unitColor = C.text2),
     ) + runTiles(rec) + repTiles(rec) + bestTiles(rec)
 }
 
@@ -816,14 +831,16 @@ private fun ZonesCard(rec: Record) {
 
 @Composable
 private fun PaceCard(rec: Record) {
-    val paces = rec.runs.map { rec.pace(it) }
-    val avg = rec.runPace?.let { Fm.t(it) } ?: "--:--"
+    val imp = Store.settings.imperial
+    // 95번: 마지막 덜 뛴 조각은 막대에서 뺌
+    val paces = rec.runs.filter { !rec.isPartialRun(it) }.map { Units.pace(rec.pace(it), imp) }
+    val avg = rec.runPace?.let { Fm.t(Units.pace(it, imp)) } ?: "--:--"
     val mn = paces.minOrNull() ?: 0
     val mx = paces.maxOrNull() ?: 0
     Column(Modifier.fillMaxWidth().card8().testTag("detail.pace").padding(18.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Label8("RUN PACE", Modifier.weight(1f))
-            T(L10n.t("AVG %@ /KM", avg), F.num(15), maxLines = 1, translate = false)
+            T(if (imp) L10n.t("AVG %@ /MI", avg) else L10n.t("AVG %@ /KM", avg), F.num(15), maxLines = 1, translate = false)
         }
         Row(Modifier.padding(top = 16.dp).fillMaxWidth().height(110.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Bottom) {
@@ -845,21 +862,34 @@ private fun PaceCard(rec: Record) {
 
 @Composable
 private fun Splits(rec: Record) {
-    val segs = rec.mainSegs
+    val segs = rec.mainSegs.filter { !rec.isTinyRun(it) }
+    // 빌드 27: 트레이닝은 저장된 목표(s.target) 대신 이 기록 전까지의 구간별 최고와 비교 (한 번만 계산)
+    val prior = remember(rec, Store.book) { if (rec.mode == Mode.Training) Store.book.segBestsBefore(rec) else emptyMap() }
     Column(Modifier.fillMaxWidth().card8().testTag("detail.splits")) {
-        segs.forEachIndexed { i, s -> SplitRow(rec, s, i == segs.size - 1) }
+        segs.forEachIndexed { i, s -> SplitRow(rec, s, i == segs.size - 1, prior) }
     }
 }
 
 @Composable
-private fun SplitRow(rec: Record, s: SegResult, last: Boolean) {
-    // 트레이닝: 그 구간 내 최고 기록과 비교. 최고 기록이 없었거나(0) 예전 잘못된 값이면 비교 안 함
+private fun SplitRow(rec: Record, s: SegResult, last: Boolean, prior: Map<String, Int>) {
+    // 트레이닝: 이 기록 전까지 같은 구간(SegKey)의 최고 기록과 비교 (빌드 27: 저장된 s.target 은 안 씀).
+    //  이전 최고가 없으면 "–". Full Sim · Race · PFT 는 예전처럼 s.target 과 비교
     // 러닝 기록은 목표가 없어서 내 평균 페이스 대비 (빠르면 초록, 느리면 빨강)
     val runAvg = if (rec.mode == Mode.Training && rec.isRunKind && s.kind == SegKind.Run) rec.avgKmPace else null
-    val showDelta = runAvg != null || rec.mode != Mode.Training ||
-        (s.target > 0 && SegKey.plausible(s.icon, s.detail, s.target))
-    val d = runAvg?.let { rec.pace(s) - it } ?: (s.time - s.target)
-    val first = if (s.kind == SegKind.Run) "${Fm.t(rec.pace(s))} /KM" else s.detail
+    val priorBest = if (rec.mode == Mode.Training && s.kind != SegKind.Rox) prior[SegKey.of(s.icon, s.detail)] else null
+    val partial = rec.isPartialRun(s)
+    val showDelta = !partial && (runAvg != null || rec.mode != Mode.Training || priorBest != null)
+    val imp = Store.settings.imperial
+    // 러닝 평균 대비 차이도 보이는 페이스 단위(/KM · /MI)로
+    val base = if (rec.mode == Mode.Training) (priorBest ?: s.time) else s.target
+    val d = runAvg?.let { Units.pace(rec.pace(s), imp) - Units.pace(it, imp) } ?: (s.time - base)
+    var first = if (s.kind == SegKind.Run) "${Fm.t(Units.pace(rec.pace(s), imp))} ${Units.paceUnit(imp)}" else Units.detail(s.detail, imp)
+    // 93번: 스테이션 섞인 트레이닝의 러닝 구간 — 워치가 잰 거리가 계획(1 km 등)과 3% 넘게 다르면 실제 거리를 앞에 붙임
+    val plan = runMeters(s.detail)
+    val m = s.dist
+    if (s.kind == SegKind.Run && !rec.isRunKind && m != null && plan > 0 && abs(m - plan) > plan * 0.03) {
+        first = "${Units.dist(m, imp)} ${Units.distUnit(imp)} · " + first
+    }
     val bpm = s.hr?.toString() ?: "--"
     // 스키 · 로잉 · 월볼: 워치가 팔 움직임으로 센 횟수 ("~" = 짐작값)
     val reps = s.reps?.let { n -> " · " + (if (s.icon == "wallBalls") L10n.t("~%lld reps", n) else L10n.t("~%lld strokes", n)) } ?: ""
@@ -868,14 +898,18 @@ private fun SplitRow(rec: Record, s: SegResult, last: Boolean) {
         s.cad?.let { runExtra += " · $it SPM" }
         s.up?.let { if (it >= 1) runExtra += " · +${it.roundToInt()} m" }
     }
-    val sub = "$first · $bpm BPM$reps$runExtra"
+    // 93번: 무엇과 비교했는지 보이게 — 트레이닝은 이전 최고 시간을 같이 ("BEST 4:15")
+    val bestNote = if (priorBest != null && runAvg == null && !partial) " · " + L10n.t("BEST %@", Fm.t(priorBest)) else ""
+    val sub = "$first · $bpm BPM$reps$runExtra$bestNote"
+    // 95번: 마지막 덜 뛴 구간은 "KM 7" 대신 실제 거리로 ("마지막 0.42 km")
+    val title = if (partial) L10n.t("Last %@ %@", Units.dist(s.dist ?: 0.0, imp), Units.distUnit(imp).lowercase()) else s.name
     Row(
         Modifier.fillMaxWidth().rowLine(!last).padding(vertical = 11.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon8(s.icon, 24.dp, if (s.kind == SegKind.Run) Color.White else C.accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            T(s.name, F.t(15, W500), maxLines = 1)
+            T(title, F.t(15, W500), maxLines = 1, translate = !partial)
             T(sub, F.num(11, W500, C.text2, tracking = 0.22f), maxLines = 1, translate = false)
         }
         Column(horizontalAlignment = Alignment.End) {
@@ -893,6 +927,11 @@ private val benchFr = listOf(1.25f, 1f, 1f, 1f)
 private fun BenchSection(rec: Record) {
     val me = rec.splits16 ?: return
     if (rec.mode != Mode.Sim && rec.mode != Mode.Race) return
+    // 80번(빌드 28): 전 세계 출전자 중 대략 위치 (홈페이지 '내 기록 분석'과 같은 기준 · 같은 계산)
+    HyroxRank.of(rec.division, rec.total)?.let { rk ->
+        SectionLabel("WHERE YOU STAND", top = 20.dp)
+        RankCard(rk)
+    }
     SectionLabel("VS ATHLETES AT YOUR TIME", top = 20.dp)
     val (run, st) = HyroxBench.bench(rec.division, rec.total)
     Column(Modifier.fillMaxWidth().card8().testTag("detail.bench").padding(18.dp)) {
@@ -908,6 +947,48 @@ private fun BenchSection(rec: Record) {
         }
         T("Worldwide medians (2025/26 season) at this finish time — not an official ranking.",
             F.t(F.foot, color = C.text3), Modifier.padding(top = 14.dp))
+    }
+}
+
+/** 80번: 상위 몇 % 카드 — 단계 이름 30 노랑 · "Open Men 완주자 중 상위 약 33%" · 눈금 막대 · 다음 단계까지 */
+@Composable
+private fun RankCard(rank: HyroxRank) {
+    Column(Modifier.fillMaxWidth().card8().testTag("detail.rank").padding(18.dp)) {
+        T(rank.level, F.t(30, W700, C.accent, tracking = -0.6f), maxLines = 1)
+        rank.pct?.let { p ->
+            T(L10n.t("Top ~%lld%% of %@ finishers", p, rank.group.l10n), F.t(16), Modifier.padding(top = 4.dp), translate = false)
+            RankBar(p, Modifier.padding(top = 16.dp))
+        }
+        rank.next?.let { (name, time) ->
+            val gap = rank.total - time + 1
+            T(L10n.t("%@ to %@ (%@) — about %lld sec per split", Fm.t(gap), name.l10n, Fm.t(time), ceil(gap / 16.0).toInt()),
+                F.t(14, color = C.text2), Modifier.padding(top = 14.dp), translate = false)
+        }
+        T("Rough position from published worldwide race results (2025/26) — not an official ranking.",
+            F.t(F.foot, color = C.text3).copy(lineHeight = 17.sp), Modifier.padding(top = 14.dp))
+    }
+}
+
+/** 상위 10 · 25 · 50 · 75% 눈금 + 내 위치 (흰 막대 5×18) */
+@Composable
+private fun RankBar(p: Int, modifier: Modifier = Modifier) {
+    val tm = rememberTextMeasurer()
+    val style = F.t(11, color = C.text3)
+    val labels = listOf(10, 25, 50, 75).map { m -> m to (if (m == 10) L10n.t("Top %lld%%", m) else "$m%") }
+    Canvas(modifier.fillMaxWidth().height(34.dp)) {
+        val w = size.width
+        val barH = 10.dp.toPx()
+        val top = 4.dp.toPx()
+        drawRoundRect(Brush.horizontalGradient(listOf(C.accent, Color(0xFF6E6A3A), Color(0xFF2A2924))), Offset(0f, top),
+            androidx.compose.ui.geometry.Size(w, barH), androidx.compose.ui.geometry.CornerRadius(barH / 2))
+        val x = w * p.coerceIn(0, 100) / 100f
+        drawRoundRect(Color.White, Offset(x - 2.5.dp.toPx(), top + barH / 2 - 9.dp.toPx()), androidx.compose.ui.geometry.Size(5.dp.toPx(), 18.dp.toPx()),
+            androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+        for ((m, t) in labels) {
+            val lay = tm.measure(t, style)
+            val cx = w * m / 100f
+            drawText(lay, topLeft = Offset((cx - lay.size.width / 2f).coerceIn(0f, w - lay.size.width), top + barH + 6.dp.toPx()))
+        }
     }
 }
 

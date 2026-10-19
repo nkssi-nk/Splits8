@@ -615,6 +615,8 @@ data class Record(
     val stride: Double? = null,
     /** 오른 높이 합계(m) */
     val ascent: Double? = null,
+    /** 94번(빌드 28): 러닝 카드를 실내(GPS 없음)로 뛴 기록. 거리는 손목 움직임 짐작값 → "실내 · 추정 거리", 러닝 PB 에서 뺌 */
+    val indoor: Boolean? = null,
 ) {
     val end: Instant get() = endDate ?: date.plusSeconds(total.toLong())
     val isHIIT: Boolean get() = kind == "hiit"
@@ -828,9 +830,17 @@ data class Settings(
     /** 대회 최고 완주 시간(초) — 가입 프로필 ① 에서 (빌드 24). 목표 시간 기본값에 씀 */
     val bestFinish: Int? = null,
     val divPicked: Boolean? = null,
-    /** 더블 구간 나누기 계획 (폰에만). 반반이면 null */
+    /** 더블 계획 (빌드 27: 몇 m씩 번갈아 · 누가 먼저 · 파트너). 안 정했으면 null. 워치로도 감 */
     val doublesPlan: DoublesPlan? = null,
+    /** 빌드 27: 단위. null / "metric" = kg · km, "imperial" = lb · mi (화면에만 적용, Units.kt) */
+    val units: String? = null,
+    /** 98번(빌드 28): 횟수 세기 보정값 (종목 아이콘 → 기준값). 없으면 기본값. 워치에서 20회 해서 만듦 */
+    val repCal: Map<String, RepTune>? = null,
+    /** 91번(빌드 28): 홈 프로필 카드 오른쪽에 보일 것. null / "auto" = 가장 최근에 세운 최고 기록, sim · race · pft · run · goal */
+    val homeShow: String? = null,
 ) {
+    /** lb · mi 로 보여 주는지 */
+    val imperial: Boolean get() = units == "imperial"
     val hapticZone: Boolean get() = hapticZoneOpt ?: true
     val hapticPace: Boolean get() = hapticPaceOpt ?: true
     val blocked: List<BlockedUser> get() = blockedOpt ?: emptyList()
@@ -858,6 +868,76 @@ data class Settings(
             p >= 0.7 -> 3
             p >= 0.6 -> 2
             else -> 1
+        }
+    }
+}
+
+/** 98번(빌드 28): 스키 · 로잉 · 월볼 횟수 세기 기준값 (RepCounter). 워치 보정(20회)으로 사람마다 맞춤 */
+@Serializable
+data class RepTune(
+    /** 팔 움직임 세기(g)가 이 값을 넘으면 한 번 */
+    val threshold: Double,
+    /** 이 값 아래로 내려와야 다음 것을 셀 준비 */
+    val release: Double,
+    /** 두 번 사이 최소 간격(초) */
+    val minGap: Double,
+    /** 떨림 고르게 하기 (0~1) */
+    val smooth: Double,
+    /** 보정한 날 (기본값이면 null) */
+    @Serializable(with = InstantIso::class) val date: Instant? = null,
+) {
+    companion object {
+        /** 보정할 수 있는 종목 (아이콘 키) */
+        val icons = listOf("skiErg", "row", "wallBalls")
+
+        /** 기본값. 97번(빌드 28): 월볼이 절반도 못 세서(40 → 17) 기준을 낮추고 고르게 하기를 줄임 */
+        val defaults: Map<String, RepTune> = mapOf(
+            "skiErg" to RepTune(0.45, 0.20, 0.80, 0.80),
+            "row" to RepTune(0.45, 0.18, 1.50, 0.85),
+            "wallBalls" to RepTune(0.45, 0.30, 1.00, 0.70),
+        )
+
+        /** 보정 기록(가속도 크기 · 시각 초)을 이 기준으로 세면 몇 번인지 */
+        fun count(mags: List<Double>, times: List<Double>, tune: RepTune): Int {
+            var level = 0.0
+            var armed = true
+            var last = -1000.0
+            var n = 0
+            for (i in mags.indices) {
+                level = tune.smooth * level + (1 - tune.smooth) * mags[i]
+                if (armed) {
+                    if (level >= tune.threshold && times[i] - last >= tune.minGap) { n++; last = times[i]; armed = false }
+                } else if (level <= tune.release) {
+                    armed = true
+                }
+            }
+            return n
+        }
+
+        /**
+         * 실제로 한 횟수(actual)가 나오게 기준을 찾음. 맞는 값이 여럿이면 그 가운데(가장 안정적인 값),
+         * 딱 맞는 값이 없으면 가장 가까운 값. 간격 · 고르게 하기는 기본값 그대로, 놓는 값은 기준의 45%
+         */
+        fun fit(icon: String, mags: List<Double>, times: List<Double>, actual: Int, now: Instant = Instant.now()): RepTune? {
+            val base = defaults[icon] ?: return null
+            if (actual <= 0 || mags.size <= 50) return null
+            val all = ArrayList<Pair<Double, Int>>()
+            var k = 0
+            while (true) {
+                val th = 0.15 + k * 0.01
+                if (th > 1.6 + 1e-9) break
+                val t = base.copy(threshold = th, release = th * 0.45)
+                all.add(th to kotlin.math.abs(count(mags, times, t) - actual))
+                k++
+            }
+            val minD = all.minOfOrNull { it.second } ?: return null
+            val good = all.filter { it.second == minD }.map { it.first }
+            val pick = good[good.size / 2]
+            return base.copy(
+                threshold = (pick * 100).r() / 100.0,
+                release = (pick * 0.45 * 100).r() / 100.0,
+                date = now,
+            )
         }
     }
 }
@@ -964,6 +1044,8 @@ data class WatchContext(
     val pftBest: List<Int>? = null,
     val pftBestTotal: Int? = null,
     val simLast: List<Int>? = null,
+    /** 빌드 27: 더블 계획 (번갈아 하기) — 워치 스테이션 화면 아래 줄 */
+    val doublesPlan: DoublesPlan? = null,
 )
 
 /** Full Simulation 구간 목표 16개와 비교 이름. "Compare with" 를 그대로 따름 */
@@ -992,7 +1074,15 @@ object SyncKey {
     const val recordAck = "/record-ack"
     const val quick = "/quick"
     const val live = "/live"
+    /** 98번: 폰 → 워치 "이 종목 보정 시작" (아이콘 키) */
+    const val calib = "/calib"
+    /** 98번: 워치 → 폰 보정 결과 (CalibResult JSON) */
+    const val calibDone = "/calib-done"
 }
+
+/** 98번: 워치 → 폰 보정 결과 */
+@Serializable
+data class CalibResult(val icon: String, val tune: RepTune)
 
 // MARK: 운동 예약
 

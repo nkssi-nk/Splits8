@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.nkssi.splits8.shared.Defaults
 import com.nkssi.splits8.shared.Division
+import com.nkssi.splits8.shared.DoublesPlan
 import com.nkssi.splits8.shared.Fm
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.Mode
@@ -144,4 +145,71 @@ class WShots {
         WatchStore.engine.demoRun(Mode.Pft, PFT.title, PFT.seq(div, listOf(150, 95, 120, 210, 260, 180)), 0, 0, 150.0, done = true, vsBest = true)
         shot("w11_summary_pft_ko", "ko")
     }
+
+    // 빌드 27 · 28
+
+    @Test fun w12LiveLast() = live("w12_live_last", idx = 30, el = 300)                     // 마지막 구간 → ✓ FINISH
+    @Test fun w12LiveRoxKo() = live("w12_live_rox_ko", "ko", idx = 1, el = 18, mode = Mode.Race)
+    @Test fun w12LiveRunSpeed() {
+        WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", sim(), 4, 168, 158.0, done = false, dist = 900.0, segDist = 560.0, speed = 3.4)
+        shot("w12_live_run_speed")
+    }
+    @Test fun w12LiveRunMeasuringKo() {
+        WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", sim(), 4, 8, 158.0, done = false, dist = 900.0, segDist = 20.0)
+        shot("w12_live_run_measuring_ko", "ko")
+    }
+    @Config(sdk = [35], qualifiers = "w198dp-h198dp-round-watch-xhdpi")
+    @Test fun w12LiveRunCardSmall() {
+        val p = Program.run(5, indoor = false)
+        WatchStore.engine.demoRun(Mode.Training, p.name, SeqBuilder.training(p, div, emptyMap()) + SeqBuilder.runKm(2) + SeqBuilder.runKm(3),
+            1, 230, 162.0, done = false, kind = "run", dist = 1620.0, segDist = 620.0, speed = 3.1)
+        shot("w12_live_runcard_40mm")
+    }
+    @Test fun w12LiveImperial() {
+        WatchStore.useDemo(ctx().copy(settings = ctx().settings.copy(units = "imperial")))
+        WatchStore.engine.settings = WatchStore.settings
+        WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", sim(), 6, 100, 158.0, done = false)
+        shot("w12_live_imperial")
+    }
+    @Test fun w12LiveDoubles() {
+        val d = Division.of("dblX")
+        WatchStore.useDemo(ctx().copy(settings = ctx().settings.copy(division = "dblX"), doublesPlan = DoublesPlan(partnerName = "Jihoon")))
+        WatchStore.engine.settings = WatchStore.settings
+        WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", SeqBuilder.full(d, true, Defaults.goals), 2, 100, 158.0, done = false)
+        shot("w12_live_doubles")
+    }
+    @Test fun w12LiveDoublesKo() {
+        val d = Division.of("dblX")
+        WatchStore.useDemo(ctx().copy(settings = ctx().settings.copy(division = "dblX"), doublesPlan = DoublesPlan(partnerName = "지훈이형님")))
+        WatchStore.engine.settings = WatchStore.settings
+        WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", SeqBuilder.full(d, true, Defaults.goals), 14, 100, 158.0, done = false)
+        shot("w12_live_doubles_ko", "ko")
+    }
+
+    @Test fun w13ConfirmSimGoal() {
+        WatchStore.pickWatchGoal(5400)
+        WNav.mode = Mode.Sim; WNav.open(WScreen.Confirm); shot("w13_confirm_sim_goal")
+    }
+    @Test fun w13GoalPicker() { WNav.mode = Mode.Sim; WNav.open(WScreen.Goal); shot("w13_goal_picker") }
+    @Test fun w13GoalPickerKo() { WatchStore.pickWatchGoal(5400); WNav.mode = Mode.Sim; WNav.open(WScreen.Goal); shot("w13_goal_picker_ko", "ko") }
+    @Test fun w14RunStart() {
+        WNav.mode = Mode.Training; WNav.program = Program.run(5, indoor = false, id = "run5"); WNav.open(WScreen.Confirm); shot("w14_run_start")
+    }
+    @Test fun w14RunStartIndoorKo() {
+        WNav.mode = Mode.Training; WNav.program = Program.run(5, indoor = true, id = "run5i"); WNav.open(WScreen.Confirm); shot("w14_run_start_indoor_ko", "ko")
+    }
+
+    private fun calib(name: String, phase: Calib.Phase, lang: String = "en", icon: String = "wallBalls", live: Int = 0,
+                      saved: com.nkssi.splits8.shared.RepTune? = null) {
+        Calib.demo(icon, phase, live, saved)
+        try { shot(name, lang) } finally { Calib.close() }
+    }
+    @Test fun w15CalibReady() = calib("w15_calib_ready", Calib.Phase.Ready)
+    @Test fun w15CalibReadyKo() = calib("w15_calib_ready_ko", Calib.Phase.Ready, "ko", icon = "skiErg")
+    @Test fun w15CalibCounting() = calib("w15_calib_counting", Calib.Phase.Counting, live = 14)
+    @Test fun w15CalibConfirm() = calib("w15_calib_confirm", Calib.Phase.Confirm)
+    @Test fun w15CalibSavedKo() = calib("w15_calib_saved_ko", Calib.Phase.Saved, "ko", saved = com.nkssi.splits8.shared.RepTune.defaults["row"])
+    @Test fun w15CalibFailed() = calib("w15_calib_failed", Calib.Phase.Saved, icon = "row")
+    @Config(sdk = [35], qualifiers = "w198dp-h198dp-round-watch-xhdpi")
+    @Test fun w15CalibConfirmSmall() = calib("w15_calib_confirm_40mm", Calib.Phase.Confirm)
 }

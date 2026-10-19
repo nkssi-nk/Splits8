@@ -70,6 +70,8 @@ class HealthSensors(private val context: Context) : WorkoutSensors {
             m.getData(DataType.CALORIES_TOTAL)?.total?.let { v -> main.post { s.gotEnergy(v) } }
             m.getData(DataType.DISTANCE_TOTAL)?.total?.let { v -> main.post { s.gotDistance(v) } }
             m.getData(DataType.STEPS_TOTAL)?.total?.let { v -> main.post { s.gotSteps(v.toDouble()) } }
+            // 빌드 27: 지금 러닝 속도 (m/s, 가장 최근 값) — 실시간 페이스
+            m.getData(DataType.SPEED).lastOrNull()?.let { p -> main.post { s.gotSpeed(p.value) } }
             for (p in m.getData(DataType.LOCATION)) {
                 val loc = p.value
                 val acc = (p.accuracy as? LocationAccuracy)?.horizontalPositionErrorMeters?.toFloat() ?: 10f
@@ -102,6 +104,7 @@ class HealthSensors(private val context: Context) : WorkoutSensors {
                 val want = buildSet<DataType<*, *>> {
                     add(DataType.HEART_RATE_BPM); add(DataType.CALORIES_TOTAL); add(DataType.DISTANCE_TOTAL)
                     if (cfg.steps) add(DataType.STEPS_TOTAL)
+                    if (!cfg.hiit) add(DataType.SPEED)       // 빌드 27: 실시간 페이스 (러닝 운동이면 모두)
                     if (cfg.gps) add(DataType.LOCATION)
                 }.filter { it in supported }.toSet()
                 val config = ExerciseConfig.builder(type)

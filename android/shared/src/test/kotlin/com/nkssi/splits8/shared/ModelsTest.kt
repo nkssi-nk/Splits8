@@ -136,16 +136,116 @@ class ModelsTest {
     @Test fun doublesPlan() {
         var p = DoublesPlan()
         assertTrue(p.isDefault)
-        p = p.set(0, 60)
-        assertEquals(600, p.mine(0))
-        assertEquals(400, p.partners(0))
-        assertEquals(50, DoublesPlan(listOf(70)).share(5))
-        assertEquals(100, p.set(1, 150).share(1))
+        // 스키 1000 m 를 150 m 씩, 내가 먼저 → 7번 교대 (나 4번 · 파트너 3번, 마지막 100 m)
+        p = p.setChunk(0, 150.0)
+        assertEquals(7, p.turns(0))
+        assertEquals(4, p.myTurns(0))
+        assertEquals(550.0, p.mine(0), 0.001)
+        assertEquals(450.0, p.partners(0), 0.001)
+        assertEquals(100.0, p.sequence(0).last().amount, 0.001)
+        // 고를 수 없는 값은 무시
+        assertEquals(150.0, p.setChunk(0, 333.0).chunk(0), 0.001)
+        assertEquals(12.5, p.chunk(1), 0.001)
+        assertEquals("12.5", DoublesPlan.num(12.5))
+        assertEquals("250", DoublesPlan.num(250.0))
+        // 받은 계획: 먼저 하는 사람이 바뀌고 파트너 = 보낸 사람
+        val sw = p.setMeFirst(2, false).swapped("gatebu")
+        assertFalse(sw.meFirst(0))
+        assertTrue(sw.meFirst(2))
+        assertEquals("gatebu", sw.partnerShown)
+        assertEquals(150.0, sw.chunk(0), 0.001)
+        // 이름 정리
+        assertEquals("ab", DoublesPlan.cleanName("  a\nb "))
+        assertNull(DoublesPlan.cleanName("   "))
+        assertEquals(20, DoublesPlan.cleanName("x".repeat(30))!!.length)
+    }
+
+    @Test fun doublesOldFileAndJson() {
+        // 예전(빌드 23) 저장 파일 {"shares": [...]} → 기본값
+        val old = SplitsJson.decodeFromString(DoublesPlan.serializer(), """{"shares":[60,50,50,50,50,50,50,50]}""")
+        assertTrue(old.isDefault)
+        // 아이폰 모양 그대로 읽고 씀
+        val p = DoublesPlan().setChunk(7, 10.0).copy(partnerName = "kim")
+        val j = SplitsJson.encodeToString(DoublesPlan.serializer(), p)
+        assertTrue(j.contains("\"chunks\":[250.0,12.5,12.5,20.0,250.0,50.0,25.0,10.0]"))
+        assertEquals(p.chunk(7), SplitsJson.decodeFromString(DoublesPlan.serializer(), j).chunk(7), 0.001)
+        // 이상한 값은 기본값으로
+        val bad = SplitsJson.decodeFromString(DoublesPlan.serializer(), """{"chunks":[999,1],"firsts":[false]}""")
+        assertEquals(250.0, bad.chunk(0), 0.001)
+        assertFalse(bad.meFirst(0))
+    }
+
+    @Test fun doublesLink() {
+        val p = DoublesPlan().setChunk(0, 150.0).setMeFirst(1, false)
+        val tok = DoublesLink.token(p, "ji/ho")
+        assertTrue(tok.startsWith("d1."))
+        val json = String(java.util.Base64.getDecoder().decode(
+            tok.drop(3).replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) }))
+        // 아이폰 JSONEncoder(sortedKeys) 와 같은 글자
+        assertEquals("""{"c":[150,12.5,12.5,20,250,50,25,20],"f":[1,0,1,1,1,1,1,1],"n":"ji\/ho"}""", json)
+        val (got, sender) = DoublesLink.read(tok)!!
+        assertEquals("ji/ho", sender)
+        assertEquals(150.0, got.chunk(0), 0.001)
+        assertFalse(got.meFirst(1))
+        // 주소에서 글자 꺼내기
+        assertEquals(tok, DoublesLink.token("splits8://d?d=$tok"))
+        assertEquals(tok, DoublesLink.token("https://splits8.com/splits8/t.html#$tok"))
+        assertNull(DoublesLink.token("splits8://t?d=$tok"))
+        assertTrue(DoublesLink.isDoubles("splits8://d?d=x"))
+        assertFalse(DoublesLink.isDoubles("splits8://t?d=1.abc"))
+        // 이상한 글자는 못 읽음
+        assertNull(DoublesLink.read("d1.@@@"))
+        assertNull(DoublesLink.read("1.abc"))
+    }
+
+    @Test fun units() {
+        assertEquals("50M · 335LB", Units.detail("50M · 152KG", true))
+        assertEquals("2×53LB", Units.detail("2×24KG", true))
+        assertEquals("0.62MI", Units.detail("1KM", true))
+        assertEquals("1000M", Units.detail("1000M", true))
+        assertEquals("50M · 152KG", Units.detail("50M · 152KG", false))
+        assertEquals(483, Units.pace(300, true))
+        assertEquals("3.11", Units.dist(5000.0, true))
+        assertEquals("/MI", Units.paceUnit(true))
+    }
+
+    @Test fun repTuneFit() {
+        // 2초마다 한 번 크게 흔듦 (20번) → 기준을 찾으면 20번을 셈
+        val mags = ArrayList<Double>()
+        val times = ArrayList<Double>()
+        for (i in 0 until 50 * 42) {
+            val t = i / 50.0
+            val ph = t % 2.0
+            mags.add(if (ph < 0.25 && t < 40) 0.9 else 0.05)
+            times.add(t)
+        }
+        val fit = RepTune.fit("wallBalls", mags, times, 20)!!
+        assertEquals(20, RepTune.count(mags, times, fit))
+        assertNotNull(fit.date)
+        assertNull(RepTune.fit("burpee", mags, times, 20))
+        assertNull(RepTune.fit("row", mags.take(10), times.take(10), 20))
+    }
+
+    @Test fun hyroxRank() {
+        val r = HyroxRank.of("openM", 90 * 60)!!
+        assertEquals("Intermediate", r.level)
+        assertEquals(33, r.pct)
+        assertEquals("Advanced" to 85 * 60, r.next)
+        assertEquals(1, HyroxRank.of("Open Women", 60 * 60)!!.pct)
+        assertNull(HyroxRank.of("openM", 60 * 60)!!.next)
+        assertEquals("Elite", HyroxRank.of("openM", 60 * 60)!!.level)
+        assertNull(HyroxRank.of("dblM", 90 * 60))
+        assertNull(HyroxRank.of("relay", 90 * 60))
+        assertEquals("World level", HyroxRank.of("proW", 60 * 60)!!.level)
     }
 
     @Test fun livePace() {
-        assertEquals("–:––", LivePace.text(30, 5.0))
+        assertEquals("Measuring", LivePace.text(30, 5.0))
+        assertEquals("–:––", LivePace.text(30, null))
         assertEquals("5:00", LivePace.text(150, 500.0))
+        // 지금 속도가 있으면 그걸로 (4 m/s = 4:10 /km)
+        assertEquals("4:10", LivePace.text(150, 500.0, speed = 4.0))
+        assertEquals("6:42", LivePace.text(150, 500.0, imperial = true, speed = 4.0))
     }
 
     @Test fun cheerSeedStable() {

@@ -71,6 +71,8 @@ fun watchFrame(st: LiveState, nowMs: Long, receivedMs: Long): LiveFrame {
         segEl = st.segEl(nowMs, receivedMs), total = st.total(nowMs, receivedMs), running = st.running, open = st.open,
         segDist = st.segDist, totalDist = st.dist, runKind = st.cur?.icon == "run" && st.mode == com.nkssi.splits8.shared.Mode.Training,
         next = next,
+        speed = if (st.running) st.spd else null,
+        imperial = com.nkssi.splits8.Store.settings.imperial,
     )
 }
 

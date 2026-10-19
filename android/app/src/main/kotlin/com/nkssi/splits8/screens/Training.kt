@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -187,7 +188,7 @@ private fun TrainingHistory() {
             val rec = recs[i]
             HistoryRow(
                 if (rec.kind != null) rec.title.l10n else "${rec.title.l10n} × ${rec.sets}", Fm.wdm(rec.date), Fm.t(rec.total),
-                last = last, pb = Store.book.isPB(rec), flag = rec.flag, partner = rec.partner,
+                last = last, pb = Store.book.isPB(rec), flag = rec.flag, partner = rec.partner, pbLabel = Store.book.runPBLabel(rec),
                 onDelete = { Store.delete(rec) },
             ) { Router.open(rec, Scr.Training) }
         }
@@ -530,7 +531,9 @@ private fun SequenceSection() {
             Box {
                 Column {
                     order.forEachIndexed { slot, i ->
-                        if (i in seq.indices) {
+                        // 74-3(안드로이드): 원래 번호로 key — 끄는 동안 줄 자리가 바뀌어도 같은 줄이 손가락을 계속 잡고 있게
+                        //  (예전엔 자리 순서대로 그려서, 한 칸 넘어가는 순간 잡고 있던 줄이 바뀌며 끌기가 끊겼음)
+                        if (i in seq.indices) key(i) {
                             val dragging = dragFrom == i
                             Box(Modifier.zIndex(if (dragging) 1f else 0f)) {
                                 SeqRow(
@@ -538,7 +541,7 @@ private fun SequenceSection() {
                                     offsetPx = if (dragging) dragY - (slot - i) * rowH else 0f,
                                     onSize = { if (it > 20) rowH = it },
                                     onRemove = { if (i in Router.draftSeq.indices) Router.draftSeq = Router.draftSeq.toMutableList().also { l -> l.removeAt(i) } },
-                                    handle = Modifier.pointerInput(i, seq.size) {
+                                    handle = Modifier.pointerInput(i) {
                                         detectDragGestures(
                                             onDragStart = {
                                                 dragFrom = i; dragTo = i; dragY = 0f
@@ -594,7 +597,7 @@ private fun SeqRow(
         Icon8(it.icon, 24.dp, C.accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             T(it.name(), F.t(17), maxLines = 1)
-            T(it.detail(Store.settings.div), F.t(11, W600, C.text2, tracking = 0.66f), maxLines = 1, translate = false)
+            T(com.nkssi.splits8.shared.Units.detail(it.detail(Store.settings.div), Store.settings.imperial), F.t(11, W600, C.text2, tracking = 0.66f), maxLines = 1, translate = false)
         }
         // 빼기 원 (#2A2A2A + 빨간 −)
         Box(Modifier.size(20.dp).tap(onClick = onRemove).testTag("builder.remove.$slot"), contentAlignment = Alignment.Center) {

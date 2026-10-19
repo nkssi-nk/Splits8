@@ -33,6 +33,8 @@ data class LiveState(
     /** 지금 구간에서 달린 거리(m) · 운동 전체 거리(m) */
     val segDist: Double? = null,
     val dist: Double? = null,
+    /** 빌드 27: 지금 속도(m/s, 실시간 페이스용). 0 · null = 아직 모름 */
+    val spd: Double? = null,
     /** 안드로이드: 워치에서 버림 (아이폰은 미러링 세션이 끝나는 것으로 알지만, 안드로이드는 메시지로 알림) */
     val discarded: Boolean = false,
 ) {
@@ -66,12 +68,42 @@ data class LivePacket(val state: LiveState? = null, val command: LiveCommand? = 
     }
 }
 
-/** "5:12" 처럼 1 km 페이스 글자 (거리가 10 m 미만이면 "–:––") */
+/**
+ * "5:12" 처럼 1 km(또는 1 mi) 페이스 글자 — 빌드 27: 실시간 페이스 (애플 운동 앱 · 나이키처럼 지금 속도로 계산)
+ *  1) 지금 속도가 0.5 m/s 넘으면 → 그 속도로 페이스
+ *  2) 아니면 구간 거리가 50 m 미만 → "Measuring" (측정 중)
+ *  3) 아니면 → 이 구간 평균 페이스 (예전 방식)
+ *  거리를 아예 못 재면(null) "–:––"
+ */
 object LivePace {
-    fun text(el: Int, dist: Double?): String {
-        if (dist == null || dist < 10 || el <= 0) return "–:––"
-        val p = (el / (dist / 1000)).r()
-        if (p >= 3600) return "–:––"
-        return "${p / 60}:" + "%02d".format(p % 60)
+    sealed class Reading {
+        data class Pace(val sec: Int) : Reading()
+        data object Measuring : Reading()
+        data object Unknown : Reading()
     }
+
+    fun reading(el: Int, dist: Double?, imperial: Boolean = false, speed: Double? = null): Reading {
+        val unitM = if (imperial) Units.mPerMile else 1000.0
+        if (speed != null && speed > 0.5) {
+            val p = unitM / speed
+            if (p < 3600) return Reading.Pace(p.r())
+        }
+        val d = dist ?: return Reading.Unknown
+        if (d < 50) return Reading.Measuring
+        if (el <= 0) return Reading.Unknown
+        val p = (el / (d / unitM)).r()
+        if (p >= 3600) return Reading.Unknown
+        return Reading.Pace(p)
+    }
+
+    /** 초 → "5:12" */
+    fun fmt(p: Int): String = "${p / 60}:" + "%02d".format(p % 60)
+
+    /** imperial = true 면 1 mi 당 페이스 · speed = 지금 속도(m/s) */
+    fun text(el: Int, dist: Double?, imperial: Boolean = false, speed: Double? = null): String =
+        when (val r = reading(el, dist, imperial, speed)) {
+            is Reading.Pace -> fmt(r.sec)
+            Reading.Measuring -> L10n.t("Measuring")
+            Reading.Unknown -> "–:––"
+        }
 }

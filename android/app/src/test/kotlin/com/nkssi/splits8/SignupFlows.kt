@@ -79,22 +79,19 @@ class SignupFlows {
     private fun tap(tag: String) { rule.onNodeWithTag(tag).performClick(); rule.waitForIdle() }
     private fun type(tag: String, t: String) { rule.onNodeWithTag(tag).performTextInput(t); rule.waitForIdle() }
 
-    @Test fun onboardingThreeSteps() {
+    @Test fun onboardingTwoSteps() {
         show(Scr.Splash)
         tap("splash.start")
         assertEquals(Scr.Ob1, Router.scr)
         tap("div.openW")
         assertEquals("openW", Store.settings.division)
         tap("ob.next")
-        assertEquals(Scr.Ob2, Router.scr)
-        val age = Store.settings.age
-        tap("hr.up")
-        assertEquals(age + 1, Store.settings.age)
-        tap("ob.next")
+        // 빌드 27: 나이 · 심박 단계는 빠짐 → 디비전 다음이 바로 워치 연결 (2 / 2)
         assertEquals(Scr.Ob3, Router.scr)
+        rule.onNodeWithTag("dots").assertTextEquals("2 / 2")
         // 위치를 이미 허락했다고 치면 "Start training" → 홈
         org.robolectric.Shadows.shadowOf(rule.activity.application).grantPermissions(android.Manifest.permission.ACCESS_FINE_LOCATION)
-        Router.go(Scr.Ob2); rule.waitForIdle(); Router.go(Scr.Ob3); rule.waitForIdle()
+        Router.go(Scr.Ob1); rule.waitForIdle(); Router.go(Scr.Ob3); rule.waitForIdle()
         tap("ob.next")
         assertEquals(Scr.Home, Router.scr)
         assertTrue(Store.settings.hasOnboarded)

@@ -15,6 +15,14 @@ object WatchWire {
     fun isRecordPath(path: String?) = path != null && path.startsWith(SyncKey.record + "/")
     fun recordId(path: String): String = path.removePrefix(SyncKey.record + "/")
 
+    /** 98번: 워치 → 폰 보정 결과 DataItem "/calib-done/<id>" (폰이 받은 뒤 지움) */
+    fun calibPath(id: String) = SyncKey.calibDone + "/" + id
+    fun isCalibPath(path: String?) = path != null && path.startsWith(SyncKey.calibDone + "/")
+    fun calibJson(r: CalibResult): String = SplitsJson.encodeToString(CalibResult.serializer(), r)
+    fun calib(json: String?): CalibResult? =
+        json?.let { runCatching { SplitsJson.decodeFromString(CalibResult.serializer(), it) }.getOrNull() }
+            ?.takeIf { it.icon in RepTune.icons }
+
     fun ctxJson(c: WatchContext): String = SplitsJson.encodeToString(WatchContext.serializer(), c)
     fun ctx(json: String?): WatchContext? =
         json?.let { runCatching { SplitsJson.decodeFromString(WatchContext.serializer(), it) }.getOrNull() }
@@ -37,6 +45,7 @@ object WatchWire {
             segBests = book.segBests,
             pftBest = pft?.pftSplits, pftBestTotal = pft?.total,
             simLast = book.simLast?.splits16,
+            doublesPlan = settings.doublesPlan,
         )
     }
 }

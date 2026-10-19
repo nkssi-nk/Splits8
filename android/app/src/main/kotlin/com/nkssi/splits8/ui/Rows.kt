@@ -45,15 +45,15 @@ import kotlinx.coroutines.launch
 
 // 아이폰 TrainingViews.swift 의 HistoryRow · PBPill · FlagPill, Components.swift 의 BorderLight · GradeBorder
 
-/** ★ PB 알약 (높이 20, 모서리 6, 노랑 0.14 바탕, 노란 글자 11/600) */
+/** ★ PB 알약 (높이 20, 모서리 6, 노랑 0.14 바탕, 노란 글자 11/600). 빌드 27: 러닝 기록은 거리까지 ("5K PB") */
 @Composable
-fun PBPill() {
+fun PBPill(label: String? = null) {
     Row(
         Modifier.height(20.dp).clip(RoundedCornerShape(6.dp)).background(Color(0x24FFE600)).padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         T("★", F.t(9, W600, C.accent), translate = false)
-        T("PB", F.t(11, W600, C.accent, tracking = 0.22f), translate = false)
+        T(label ?: "PB", F.t(11, W600, C.accent, tracking = 0.22f), translate = false)
     }
 }
 
@@ -75,22 +75,24 @@ fun HistoryRow(
     title: String, sub: String, time: String, modifier: Modifier = Modifier,
     subColor: Color = C.text2, delta: String? = null, deltaColor: Color = C.good, last: Boolean = false,
     pb: Boolean = false, flag: RecordFlag? = null, grade: PFTGrade? = null, partner: String? = null,
+    /** 빌드 27: PB 알약 글자 (러닝 기록 "5K PB"). null = "PB" */
+    pbLabel: String? = null,
     onDelete: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
     if (onDelete != null) {
         // 왼쪽으로 밀면 삭제 (아이폰 HistoryRow 의 onDelete)
         SwipeDelete("Delete this record?", modifier.fillMaxWidth().rowLine(!last), onTap = onClick, onDelete = onDelete) {
-            HistoryRowBody(title, sub, time, Modifier, subColor, delta, deltaColor, pb, flag, grade, partner, null)
+            HistoryRowBody(title, sub, time, Modifier, subColor, delta, deltaColor, pb, flag, grade, partner, null, pbLabel)
         }
     } else {
-        HistoryRowBody(title, sub, time, modifier.rowLine(!last), subColor, delta, deltaColor, pb, flag, grade, partner, onClick)
+        HistoryRowBody(title, sub, time, modifier.rowLine(!last), subColor, delta, deltaColor, pb, flag, grade, partner, onClick, pbLabel)
     }
 }
 
 @Composable
 private fun HistoryRowBody(
     title: String, sub: String, time: String, modifier: Modifier, subColor: Color, delta: String?, deltaColor: Color,
-    pb: Boolean, flag: RecordFlag?, grade: PFTGrade?, partner: String?, onClick: (() -> Unit)?,
+    pb: Boolean, flag: RecordFlag?, grade: PFTGrade?, partner: String?, onClick: (() -> Unit)?, pbLabel: String? = null,
 ) {
     val nick = partner?.trim().orEmpty()
     val subText = if (nick.isEmpty()) sub else sub + " · " + L10n.t("with @%@", nick)
@@ -103,7 +105,7 @@ private fun HistoryRowBody(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 T(title, F.t(17, W500), Modifier.weight(1f, fill = false), maxLines = 1, translate = false)
                 if (grade != null) PFTBadge(grade)
-                if (pb) PBPill()
+                if (pb) PBPill(pbLabel)
                 if (flag != null) FlagPill(flag)
             }
             T(subText, F.num(13, W400, subColor), maxLines = 1, translate = false)

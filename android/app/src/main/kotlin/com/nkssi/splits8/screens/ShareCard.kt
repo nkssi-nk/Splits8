@@ -73,6 +73,8 @@ import com.nkssi.splits8.shared.Fm
 import com.nkssi.splits8.shared.GlowTheme
 import com.nkssi.splits8.shared.Record
 import com.nkssi.splits8.shared.SegKind
+import com.nkssi.splits8.shared.Units
+import com.nkssi.splits8.shared.runDistance
 import com.nkssi.splits8.shared.mainSegs
 import com.nkssi.splits8.ui.Ambient
 import com.nkssi.splits8.ui.AmbientLayer
@@ -105,6 +107,10 @@ data class ShareData(
     val kcal: String = "", val vsWord: String = "", val vsValue: String = "", val pb: Boolean = false,
     val pairs: List<SharePair> = emptyList(), val seq: List<SharePart> = emptyList(),
     val runTotal: String = "", val stationTotal: String = "", val partner: String = "",
+    /** 빌드 27: 러닝 기록은 "5K PB" 처럼 거리까지 */
+    val pbText: String = "PB",
+    /** 85번(빌드 28): 러닝 카드 기록 — 총거리 · 총시간 · 평균 페이스 3개만 크게 (구간 표 없음) */
+    val isRun: Boolean = false, val distance: String = "", val avgPace: String = "",
 ) {
     /** "with @jiho" · 파트너 없으면 "" */
     val partnerText: String get() = if (partner.isEmpty()) "" else "with @$partner"
@@ -130,6 +136,8 @@ data class ShareData(
             val (word, v) = Store.book.vs(r)
             val runs = r.runs
             val sts = r.segs.filter { it.kind == SegKind.St }
+            val imp = Store.settings.imperial      // 빌드 27: 무게를 lb 로 (설정 > Units)
+            val run = r.isRunKind
             return ShareData(
                 badge = "${r.mode.title} · ${div.name}", place = r.title, divName = div.name,
                 date = r.date.atZone(Fm.zone).format(cardDate), total = Fm.t(r.total),
@@ -142,12 +150,16 @@ data class ShareData(
                         if (i < sts.size) short(sts[i].name) else "",
                         if (i < runs.size) Fm.t(runs[i].time) else "",
                         if (i < sts.size) Fm.t(sts[i].time) else "",
-                        if (i < sts.size) spec(sts[i].detail) else "",
+                        if (i < sts.size) spec(Units.detail(sts[i].detail, imp)) else "",
                     )
-                },
-                seq = r.mainSegs.map { SharePart(it.time, it.kind == SegKind.Run, it.icon) },
+                }.takeIf { !run } ?: emptyList(),
+                seq = if (run) emptyList() else r.mainSegs.map { SharePart(it.time, it.kind == SegKind.Run, it.icon) },
                 runTotal = Fm.t(r.runTotal), stationTotal = Fm.t(r.stationTotal),
                 partner = (r.partner ?: "").trim(),
+                pbText = Store.book.runPBLabel(r) ?: "PB",
+                isRun = run,
+                distance = if (run) Units.dist(r.runDistance, imp) + " " + Units.distUnit(imp) else "",
+                avgPace = if (run) (r.runPace?.let { Fm.t(Units.pace(it, imp)) } ?: "--:--") + " " + Units.paceUnit(imp) else "",
             )
         }
     }
@@ -384,7 +396,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Sym(R.drawable.sym_star, 10.dp, fg)
-            T("PB", F.t(11, W600, fg), maxLines = 1, translate = false)
+            T(d.pbText, F.t(11, W600, fg), maxLines = 1, translate = false)
         }
     }
 
@@ -538,20 +550,25 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
         Column(Modifier.fillMaxWidth(), horizontalAlignment = ha) {
             T("${d.place} · ${d.date}", textShadow(F.t(13, W500, tc)), maxLines = 1, translate = false)
             if (d.partner.isNotEmpty()) T(d.partnerText, textShadow(F.t(12, W500, tc.copy(alpha = 0.75f))), Modifier.padding(top = 2.dp), maxLines = 1, translate = false)
-            Big(d.total, if (post) 64f else 76f, -0.045f, tc, Modifier.padding(top = 6.dp))
+            Big(if (d.isRun) d.distance else d.total, if (post) 64f else 76f, -0.045f, tc, Modifier.padding(top = 6.dp))
             Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PosterStat("AVG HR", d.avgHR, ha)
-                if (d.hasRox) PosterStat("ROXZONE", d.rox, ha)
-                PosterStat("KCAL", d.kcal, ha)
+                if (d.isRun) {
+                    PosterStat("TIME", d.total, ha, 26)
+                    PosterStat("AVG PACE", d.avgPace, ha, 26)
+                } else {
+                    PosterStat("AVG HR", d.avgHR, ha)
+                    if (d.hasRox) PosterStat("ROXZONE", d.rox, ha)
+                    PosterStat("KCAL", d.kcal, ha)
+                }
             }
         }
     }
 
     @Composable
-    fun androidx.compose.foundation.layout.RowScope.PosterStat(label: String, value: String, ha: Alignment.Horizontal) {
+    fun androidx.compose.foundation.layout.RowScope.PosterStat(label: String, value: String, ha: Alignment.Horizontal, size: Int = 18) {
         Column(Modifier.weight(1f), horizontalAlignment = ha) {
             Tiny(label, tc)
-            FitText(value, textShadow(F.num(18, W600, tc, tracking = -0.18f)), minScale = 0.7f)
+            FitText(value, textShadow(F.num(size, W600, tc, tracking = -0.01f * size)), minScale = 0.7f)
         }
     }
 
@@ -705,11 +722,11 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
                     if (d.partner.isNotEmpty()) T(d.partnerText, small, maxLines = 1, translate = false)
                 }
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Big(d.total, if (post) 48f else 56f, -0.04f, modifier = Modifier.weight(1f))
+                    Big(if (d.isRun) d.distance else d.total, if (post) 48f else 56f, -0.04f, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(8.dp))
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        T(d.vsValue, F.num(14, W600, C.accent), maxLines = 1, translate = false)
-                        T("${d.avgHR} BPM", F.num(14, W600, C.text2), maxLines = 1, translate = false)
+                        T(if (d.isRun) d.avgPace else d.vsValue, F.num(14, W600, C.accent), maxLines = 1, translate = false)
+                        T(if (d.isRun) d.total else "${d.avgHR} BPM", F.num(14, W600, if (d.isRun) Color.White else C.text2), maxLines = 1, translate = false)
                     }
                 }
                 if (o.showSplits && d.seq.isNotEmpty()) {
@@ -760,11 +777,16 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             Column(Modifier.fillMaxSize().padding(24.dp)) {
                 BlockHeader()
                 Spacer(Modifier.weight(1f))
-                Big(d.total, if (post) 56f else 76f, -0.045f)
+                Big(if (d.isRun) d.distance else d.total, if (post) 56f else 76f, -0.045f)
                 Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    BlockTile(d.vsWord, d.vsValue, C.accent)
-                    BlockTile("AVG HR", d.avgHR, Color.White)
-                    if (d.hasRox) BlockTile("ROXZONE", d.rox, Color.White)
+                    if (d.isRun) {
+                        BlockTile("TIME", d.total, Color.White)
+                        BlockTile("AVG PACE", d.avgPace, C.accent)
+                    } else {
+                        BlockTile(d.vsWord, d.vsValue, C.accent)
+                        BlockTile("AVG HR", d.avgHR, Color.White)
+                        if (d.hasRox) BlockTile("ROXZONE", d.rox, Color.White)
+                    }
                 }
                 if (o.showSplits && d.pairs.isNotEmpty()) BlockTable(Modifier.padding(top = if (post) 10.dp else 20.dp))
             }

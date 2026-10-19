@@ -120,11 +120,19 @@ object WatchMirror {
         main.postDelayed({ if (g == gen && Router.scr == Scr.WatchLive && Router.finish == null) Router.go(Scr.Home) }, 1500)
     }
 
-    /** 기록이 도착함 → 같이 보기 끝 */
+    /** 기록이 도착함 → 같이 보기 끝. 빌드 27: 방금 끝난 운동 알림은 5초 타이머가 지움, 그 밖에 남은 알림은 바로 지움 */
     fun recordArrived(r: Record) {
-        if (!on && !ended) return
+        if (!on && !ended) { cleanLeftover(); return }
+        val finishedNow = state?.finished == true
         on = false; ended = true
         main.removeCallbacks(watchdog)
+        if (!finishedNow) cancelNote()
+    }
+
+    /** 빌드 27: 앱을 켤 때 — 지난번에 끝내지 못하고 남은 진행 중 알림 정리 (앱이 꺼졌거나 끝 소식을 못 받은 경우) */
+    fun cleanLeftover() {
+        if (on && !ended) return
+        if (Store.demo) return
         cancelNote()
     }
 
@@ -169,7 +177,13 @@ object WatchMirror {
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(NotificationChannel(CHANNEL, L10n.t("Watch workout"), NotificationManager.IMPORTANCE_LOW))
         }
-        if (st.finished) { cancelNote(); return }
+        if (st.finished) {
+            // 빌드 27: 운동이 끝나면 "끝" 알림으로 바꾸고 5초 뒤 사라짐 (아이폰 잠금 화면 카드와 같음)
+            nm.notify(NOTE_ID, buildFinished(ctx, st))
+            val g = gen
+            main.postDelayed({ if (g == gen || !on) cancelNote() }, 5_000)
+            return
+        }
         nm.notify(NOTE_ID, build(ctx, st, now))
     }
 
@@ -200,6 +214,27 @@ object WatchMirror {
         if (st.running) b.setUsesChronometer(true).setWhen(now - seg * 1000L).setShowWhen(true)
         else b.setShowWhen(false).setSubText(L10n.t("Paused"))
         return b.build()
+    }
+
+    /** 끝난 운동: 총 시간 고정 · 스와이프로 지울 수 있음 · 5초 뒤 저절로 사라짐 */
+    private fun buildFinished(ctx: Context, st: LiveState): Notification {
+        val open = PendingIntent.getActivity(ctx, 0,
+            Intent(ctx, MainActivity::class.java).putExtra("open", "watchLive").addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val title = (if (st.mode == Mode.Training) st.title else st.mode.title.l10n)
+        return NotificationCompat.Builder(ctx, CHANNEL)
+            .setSmallIcon(R.drawable.sym_stopwatch)
+            .setContentTitle(title + " · " + Fm.t(st.splits.sum()))
+            .setContentText(L10n.t("Done"))
+            .setOngoing(false)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setShowWhen(false)
+            .setTimeoutAfter(5_000)
+            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(open)
+            .build()
     }
 
     private fun cancelNote() {

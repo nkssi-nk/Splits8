@@ -8,6 +8,7 @@ import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.PFT
 import com.nkssi.splits8.shared.Program
 import com.nkssi.splits8.shared.Record
+import com.nkssi.splits8.shared.RepTune
 import com.nkssi.splits8.shared.SegKind
 import com.nkssi.splits8.shared.SeqBuilder
 import com.nkssi.splits8.shared.Settings
@@ -304,5 +305,94 @@ class EngineTest {
         assertEquals(SegKind.Run, e.cur.kind)
         sec(10); e.advance()
         assertEquals(SegKind.Rox, e.cur.kind)
+    }
+
+    // MARK: 빌드 27 · 28
+
+    @Test fun indoorRunRecordFlag() {
+        // 94번: 실내로 뛴 러닝 카드 기록은 indoor = true, 실외는 null
+        val p = Program.run(1, indoor = false)
+        e.start(Mode.Training, p.name, seq = SeqBuilder.training(p, div, emptyMap()), program = p.copy(indoor = true))
+        assertFalse(e.outdoorRun)
+        assertEquals(false, cfg!!.gps)
+        e.gotDistance(1000.0)
+        assertEquals(true, sent.single().indoor)
+        sent.clear()
+        e.reset()
+        e.start(Mode.Training, p.name, seq = SeqBuilder.training(p, div, emptyMap()), program = p)
+        assertTrue(e.outdoorRun)
+        e.gotDistance(1000.0)
+        assertNull(sent.single().indoor)
+    }
+
+    @Test fun liveSpeedPaceAndSpd() {
+        // 74-11: 지금 속도(부드럽게) → PACE, 폰에도 spd 로
+        val p = Program.run(3, indoor = false)
+        e.start(Mode.Training, p.name, seq = SeqBuilder.training(p, div, emptyMap()), program = p)
+        assertNull(e.paceText(5, 20.0))                     // 속도 모르고 50 m 미만 → 측정 중
+        assertEquals("–:––", e.paceText(0, 100.0))
+        e.gotSpeed(3.2)
+        assertEquals(3.2, e.curSpeed, 1e-9)                 // 처음 값은 그대로
+        e.gotSpeed(4.2)
+        assertEquals(3.5, e.curSpeed, 1e-9)                 // 0.3 × 새 값 + 0.7 × 예전
+        assertEquals("4:46", e.paceText(10, 20.0))          // 1000 / 3.5 = 285.7초
+        assertEquals("7:40", e.paceText(10, 20.0, imperial = true))
+        repeat(5) { sec(1); e.tick() }
+        assertEquals(3.5, lives.last().spd!!, 1e-9)
+        // 10초 넘게 새 값이 없으면 모름 → spd 안 보냄, 구간 평균으로
+        repeat(10) { sec(1); e.tick() }
+        assertEquals(0.0, e.curSpeed, 0.0)
+        assertNull(lives.last().spd)
+        assertEquals("5:00", e.paceText(300, 1000.0))
+        // 일시정지하면 속도 모름, 그동안 받은 값은 버림
+        e.gotSpeed(3.0); e.togglePause()
+        assertEquals(0.0, e.curSpeed, 0.0)
+        e.gotSpeed(3.0)
+        assertEquals(0.0, e.curSpeed, 0.0)
+    }
+
+    @Test fun repTuneFromSettings() {
+        // 97번: 기본값, 98번: 폰에서 받은 보정값이 있으면 그것
+        val s = Settings()
+        assertEquals(RepTune.defaults["wallBalls"], RepCounter.tuning("wallBalls", s))
+        assertEquals(0.45, RepCounter.tuning("wallBalls", s)!!.threshold, 0.0)
+        val mine = RepTune(0.33, 0.15, 1.0, 0.7)
+        val s2 = s.copy(repCal = mapOf("wallBalls" to mine))
+        assertEquals(mine, RepCounter.tuning("wallBalls", s2))
+        assertEquals(RepTune.defaults["row"], RepCounter.tuning("row", s2))
+        assertNull(RepCounter.tuning("sledPush", s2))
+        assertTrue(RepCounter.counts("skiErg"))
+        assertFalse(RepCounter.counts("sledPush"))
+    }
+
+    @Test fun watchGoalSplit() {
+        // 68-①: 워치에서 고른 목표 → 16구간 (폰과 같은 balanced), 합 = 목표 − Roxzone 8번
+        val s = Settings()
+        for (min in listOf(45, 60, 75, 90, 105, 120, 180)) {
+            val t = WatchGoal.split(min * 60, s, null)
+            assertEquals(16, t.size)
+            assertEquals(min * 60 - 8 * s.roxTarget, t.sum())
+            assertTrue(t.all { it >= 30 && it % 5 == 0 })
+        }
+        assertEquals(WatchGoal.split(5400, s, null), com.nkssi.splits8.shared.GoalSplit.split(5400, "balanced", s.goals, null, s.division, s.roxTarget))
+        // 고르기 화면 처음 자리 · 확인 화면 숫자 (86번)
+        assertEquals(90, WatchGoal.initialMinutes(5400, emptyList(), 30))
+        assertEquals(45, WatchGoal.initialMinutes(null, listOf(100), 30))
+        assertEquals("1:30:00", WatchGoal.shown(5400, simSeq(), 30))
+        val noRox = SeqBuilder.full(div, false, Defaults.goals)
+        assertEquals(com.nkssi.splits8.shared.Fm.t(Defaults.goals.sum() + 240), WatchGoal.shown(null, noRox, 30))
+    }
+
+    @Test fun doublesLineRules() {
+        // 75번: 더블 디비전 · 스테이션 · 계획 있을 때만
+        com.nkssi.splits8.shared.L10n.lang = "en"
+        val plan = com.nkssi.splits8.shared.DoublesPlan(partnerName = "Jihoonie")
+        val dbl = Division.of("dblM")
+        val ski = SeqBuilder.full(dbl, true, Defaults.goals).first { it.icon == "skiErg" }
+        assertEquals("Me 250 → Jihoon 250 · 4 turns", doublesLine(ski, plan, "dblM"))
+        assertNull(doublesLine(ski, plan, "openM"))
+        assertNull(doublesLine(ski, null, "dblM"))
+        val run = SeqBuilder.full(dbl, true, Defaults.goals).first { it.kind == SegKind.Run }
+        assertNull(doublesLine(run, plan, "dblM"))
     }
 }

@@ -290,7 +290,7 @@ private fun RecordRow(rec: Record, last: Boolean) {
         else -> rec.title.l10n
     }
     HistoryRow(title, Fm.wdm(rec.date) + " · " + Fm.time12(rec.date), Fm.t(rec.total), last = last,
-        pb = Store.book.isPB(rec), flag = rec.flag, grade = rec.pftGrade, partner = rec.partner) { Router.open(rec, Scr.Home) }
+        pb = Store.book.isPB(rec), flag = rec.flag, grade = rec.pftGrade, partner = rec.partner, pbLabel = Store.book.runPBLabel(rec)) { Router.open(rec, Scr.Home) }
 }
 
 private fun planSub(p: PlannedWorkout): String {

@@ -177,13 +177,16 @@ private fun BusyButton(title: String, busy: Boolean, enabled: Boolean, tag: Stri
     YellowButton(if (busy) "…" else title, enabled = enabled && !busy, tag = tag, onClick = onClick)
 }
 
-// MARK: - 시작 3단계 (Division → 심박 존 → 워치 연결)
+// MARK: - 시작 2단계 (Division → 워치 연결)
+// 빌드 27: 나이 · 심박 화면(Onboarding2)은 빠짐 — 나이는 가입 프로필의 태어난 해로 맞춤 (설정 › 최대 심박에서 그대로 고칠 수 있음)
+
+private const val OB_TOTAL = 2
 
 @Composable
 private fun ObFrame(step: Int, title: String, sub: String, button: String, onButton: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    BackAction { Router.go(when (step) { 1 -> Scr.Splash; 2 -> Scr.Ob1; else -> Scr.Ob2 }) }
+    BackAction { Router.go(if (step == 1) Scr.Splash else Scr.Ob1) }
     Page8 {
-        StepDots(step, 3)
+        StepDots(step, OB_TOTAL)
         LargeTitle(title)
         PageSub(sub, Modifier.padding(bottom = 10.dp))
         content()
@@ -194,7 +197,7 @@ private fun ObFrame(step: Int, title: String, sub: String, button: String, onBut
 
 @Composable
 fun Onboarding1() {
-    ObFrame(1, "Your division", "This sets your default weights and reps. You can change it anytime in Settings.", "Continue", { Router.go(Scr.Ob2) }) {
+    ObFrame(1, "Your division", "This sets your default weights and reps. You can change it anytime in Settings.", "Continue", { Router.go(Scr.Ob3) }) {
         DivisionList(20.dp)
     }
 }
@@ -269,7 +272,7 @@ fun Onboarding3() {
         Router.go(Scr.Home)
     }
     val done = asked || (loc && (health || hcStatus != Health.READY))
-    ObFrame(3, "Connect your watch", "Workouts and heart rate are measured on your watch. Please allow access to Health Connect.",
+    ObFrame(2, "Connect your watch", "Workouts and heart rate are measured on your watch. Please allow access to Health Connect.",
         if (done) "Start training" else "Allow & connect",
         {
             when {
@@ -514,7 +517,7 @@ fun NickView() {
     val ring = when { nd.isEmpty() -> C.cardBorder; ok -> C.good.copy(alpha = 0.6f); else -> C.bad.copy(alpha = 0.6f) }
 
     Page8(12.dp) {
-        if (Router.signupFlow) StepDots(1, 5) else if (editing) BackLink("Profile") { Router.go(Scr.Account) } else Spacer(Modifier.height(44.dp))
+        if (Router.signupFlow) StepDots(1, profileStepCount(Store.settings) + 1) else if (editing) BackLink("Profile") { Router.go(Scr.Account) } else Spacer(Modifier.height(44.dp))
         LargeTitle("Pick a nickname")
         PageSub("Friends find you by this name, and it appears on leaderboards.", Modifier.padding(bottom = 8.dp))
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.card).border(1.dp, ring, RoundedCornerShape(14.dp)).padding(horizontal = 16.dp),
@@ -544,6 +547,12 @@ private val doubles = listOf("dblM", "dblW", "dblX", "dblMP", "dblWP")
 private val recommended = setOf("dblM", "dblW", "dblX")
 
 /** 디비전 → 성별 (Doubles Mixed 는 따로 고름) */
+/** 빌드 27: 가입 흐름에서 디비전 단계를 건너뛰는지 (온보딩에서 이미 골랐으면. Mixed 는 성별을 물어야 해서 보여 줌) */
+fun profileSkipsDivision(s: com.nkssi.splits8.shared.Settings): Boolean = s.divPicked == true && s.division != "dblX"
+
+/** 가입 흐름 단계 수 (닉네임 제외) */
+fun profileStepCount(s: com.nkssi.splits8.shared.Settings): Int = if (profileSkipsDivision(s)) 3 else 4
+
 private fun sexOf(div: String): String? = when {
     div == "dblX" -> null
     div.contains("W") -> "W"
@@ -565,7 +574,13 @@ fun ProfileSetupView() {
     val editing = Router.profileEdit
     val withNick = Router.signupFlow
     val thisYear = remember { Year.now().value }
-    var step by remember { mutableIntStateOf(Router.profileStep.coerceIn(1, 4)) }
+    // 빌드 27: 온보딩에서 디비전을 이미 골랐으면 가입 흐름에서 디비전 단계를 건너뜀 (프로필 화면에서 고칠 때는 항상 보임)
+    val skipDiv = remember { !editing && profileSkipsDivision(s0) }
+    /** 이번 흐름에서 보여 줄 단계 (1 대회 경험 · 2 디비전 · 3 태어난 해 · 4 키/몸무게) */
+    val flow = if (skipDiv) listOf(1, 3, 4) else listOf(1, 2, 3, 4)
+    var step by remember { mutableIntStateOf(Router.profileStep.coerceIn(1, 4).let { if (skipDiv && it == 2) 3 else it }) }
+    /** 지금 단계가 흐름에서 몇 번째인지 (1부터) */
+    val stepIndex = flow.indexOf(step) + 1
     var raced by remember { mutableStateOf(s0.raced) }
     var bh by remember { mutableIntStateOf((s0.bestFinish ?: 4800) / 3600) }
     var bm by remember { mutableIntStateOf(((s0.bestFinish ?: 4800) % 3600) / 60) }
@@ -587,7 +602,7 @@ fun ProfileSetupView() {
         if (any) fromHealth = true
     }
 
-    BackAction(if (editing) ({ Router.go(Scr.Account) }) else if (step > 1) ({ step -= 1 }) else null)
+    BackAction(if (editing) ({ Router.go(Scr.Account) }) else if (stepIndex > 1) ({ step = flow[stepIndex - 2] }) else null)
 
     /** 이 단계 값을 저장 (withTime = 최고 완주 시간도) */
     fun saveStep(withTime: Boolean = true) {
@@ -614,16 +629,24 @@ fun ProfileSetupView() {
         }
     }
     fun finish() {
-        Store.update { it.copy(profileDone = true) }
+        Store.update { st ->
+            var n = st.copy(profileDone = true)
+            // 빌드 27: 온보딩에서 고른 디비전으로 성별을 정함 (Mixed 가 아니면 묻지 않음)
+            if (!editing && skipDiv) {
+                sexOf(n.division)?.let { n = n.copy(sex = it) }
+                if (n.raceDivision == null) n = n.copy(raceDivision = n.division)
+            }
+            n
+        }
         if (editing) Router.go(Scr.Account) else Router.finishProfile()
     }
     fun next(withTime: Boolean = true) {
         saveStep(withTime)
-        if (editing || step == 4) finish() else step += 1
+        if (editing || stepIndex >= flow.size) finish() else step = flow[stepIndex]
     }
     fun skip() {
         Router.toast = "No problem! You can fill this in anytime from Settings › Profile."
-        if (editing) Router.go(Scr.Account) else if (step == 4) finish() else step += 1
+        if (editing) Router.go(Scr.Account) else if (stepIndex >= flow.size) finish() else step = flow[stepIndex]
     }
 
     val title = when (step) { 1 -> "Race experience"; 2 -> "My division"; 3 -> "Birth year"; else -> "Height and weight" }
@@ -637,7 +660,7 @@ fun ProfileSetupView() {
 
     Page8 {
         if (editing) BackLink("Profile") { Router.go(Scr.Account) }
-        else if (withNick) StepDots(step + 1, 5) else StepDots(step, 4)
+        else if (withNick) StepDots(stepIndex + 1, flow.size + 1) else StepDots(stepIndex, flow.size)
         LargeTitle(title)
         PageSub(sub, Modifier.padding(bottom = 10.dp))
         when (step) {

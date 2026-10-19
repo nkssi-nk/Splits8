@@ -64,6 +64,15 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     var segDist by mutableStateOf(0.0); private set
     private var segDists = ArrayList<Double?>()
     private var last: RoutePt? = null
+    /** 빌드 27: GPS 로 잰 지금 속도(m/s, 부드럽게). 0 = 모름 (일시정지 · GPS 안 씀) */
+    private var curSpeed = 0.0
+    private var lastSpeedAt = Long.MIN_VALUE / 2
+
+    /** 화면용 지금 속도: 10초 넘게 새 값이 없으면 0 (멈춰 섰는데 예전 페이스가 남지 않게) */
+    fun speedNow(now: Long): Double {
+        if (!useGPS || !running || curSpeed <= 0 || now - lastSpeedAt > 10_000) return 0.0
+        return curSpeed
+    }
 
     private var settings = Settings()
     /** 진행 상태가 바뀔 때 (파일에 저장) */
@@ -177,6 +186,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         idx = 0; splits = emptyList(); running = true; finished = false
         segDists = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
         segDist = 0.0; last = null
+        curSpeed = 0.0; lastSpeedAt = Long.MIN_VALUE / 2
         segPaused = 0; pauseAt = null
         undoPoint = null; canUndo = false
         val now = clock()
@@ -274,6 +284,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         if (!active || finished) return
         if (running) {
             pauseAt = clock(); running = false
+            curSpeed = 0.0                                  // 빌드 27: 멈추면 속도 모름
             pauseStepAt = rawSteps
         } else {
             pauseAt?.let { segPaused += clock() - it }
@@ -329,6 +340,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
             vsWord = deltaWord, vsTarget = if (kind == null && (mode != Mode.Pft || hasPFTBest)) tg else null,
             complete = complete, endDate = start.plusSeconds(total.toLong()), place = place, kind = kind,
             route = if (isRunKind && useGPS && route.size >= 2) route.toList() else null,
+            indoor = if (isRunKind && !useGPS) true else null,         // 94번
         )
         // 러닝 카드 — 케이던스 · 보폭(GPS 거리 ÷ 걸음) · 오르막 (경로 높이로)
         if (isRunKind) r = RunMetrics.fill(r, segSteps, null)
@@ -348,11 +360,17 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
      * 위치 한 번. acc = 수평 정확도(m), vAcc = 높이 정확도(m, 없으면 null).
      * 30 m 보다 부정확하면 버림, 한 번에 100 m 넘게 튀면 거리에 넣지 않음
      */
-    fun gotLocation(lat: Double, lon: Double, acc: Float, alt: Double?, vAcc: Float?, atMs: Long = clock()) {
+    fun gotLocation(lat: Double, lon: Double, acc: Float, alt: Double?, vAcc: Float?, atMs: Long = clock(), speed: Float? = null) {
         if (!active || finished) return
         if (acc <= 0f || acc > 30f) return
         val p = RoutePt(lat, lon, if (vAcc != null && vAcc > 0f) alt else null, total(atMs))
         if (!running || cur.kind != SegKind.Run) { last = null; return }
+        // 빌드 27: 실시간 속도 — 위치의 속도값 (정확도 20 m 미만만), 지수 이동 평균 alpha 0.3
+        if (speed != null && speed >= 0f && acc < 20f) {
+            val fresh = curSpeed <= 0 || atMs - lastSpeedAt > 10_000
+            curSpeed = if (fresh) speed.toDouble() else 0.3 * speed + 0.7 * curSpeed
+            lastSpeedAt = atMs
+        }
         last?.let { prev ->
             val d = RunMetrics.meters(prev, p)
             if (d < 100) segDist += d

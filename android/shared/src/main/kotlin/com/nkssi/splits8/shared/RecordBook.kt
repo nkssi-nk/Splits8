@@ -49,7 +49,29 @@ object RunPB {
     )
     /** 이보다 빠른 페이스(1 km 2:30 미만)는 잘못 잰 기록으로 보고 뺌 */
     const val minPace = 150.0
+
+    /** 빌드 27: PB 알약 글자 ("5K PB" 등). 기록 목록 · 기록 화면 · 끝 카드 · 공유 카드 */
+    fun pbName(m: Double): String = when {
+        m >= 42000 -> "FULL PB"
+        m >= 21000 -> "HALF PB"
+        m >= 10000 -> "10K PB"
+        m >= 5000 -> "5K PB"
+        else -> "1KM PB"
+    }
 }
+
+/** 95번(빌드 28): 러닝 카드의 마지막 덜 뛴 구간 (계획 거리의 90% 미만에서 끝냄, 예: KM 7 · 0:08) */
+fun Record.isPartialRun(s: SegResult): Boolean {
+    if (!isRunKind || s.kind != SegKind.Run) return false
+    val last = segs.lastOrNull { it.kind == SegKind.Run } ?: return false
+    if (last !== s && last != s) return false
+    val plan = runMeters(s.detail)
+    if (plan <= 0) return false
+    return (s.dist ?: plan) < plan * 0.9
+}
+
+/** 95번: 100 m 또는 30초도 안 되는 마지막 조각 → 구간 줄 · 페이스 막대에서 숨김 (총시간 · 총거리에는 들어감) */
+fun Record.isTinyRun(s: SegResult): Boolean = isPartialRun(s) && ((s.dist ?: 0.0) < 100 || s.time < 30)
 
 /** 러닝 구간들 (거리 m, 시간 초) 순서대로 */
 val Record.runLegs: List<Pair<Double, Int>>
@@ -230,6 +252,83 @@ object Fatigue {
 
 }
 
+// MARK: 91번 홈 카드 · 80번 상위 몇 %
+
+object HomeShow {
+    val keys = listOf("auto", "sim", "race", "pft", "run", "goal")
+    fun name(k: String): String = mapOf(
+        "auto" to "Latest best", "sim" to "Full Sim PB", "race" to "Race PB", "pft" to "PFT best",
+        "run" to "Running PB", "goal" to "Race goal",
+    )[k] ?: "Latest best"
+}
+
+/** time / tag("PB" · "5K PB" · "Race goal") / sub("Full Sim" · "Race" · "") / star */
+data class HomeBest(val time: Int, val tag: String, val sub: String, val star: Boolean)
+
+/**
+ * 80번(빌드 28): 상위 몇 % (홈페이지 splits8/hyrox.html 과 같은 숫자 · 같은 계산).
+ * Open: HyroxDataLab(2026.3, 전 세계 Open 기록 70만 건+) 상위 10 / 25 / 50 / 75% 경계, 사이는 곧게 이음.
+ * Pro: Rox Lyfe 단계(Elite 15 · 세계 수준 · 경쟁 수준 · Pro 평균). 더블 · 릴레이는 자료가 없어 안 보임
+ */
+data class HyroxRank(
+    val level: String,
+    val pct: Int?,
+    val group: String,
+    val next: Pair<String, Int>?,
+    val total: Int,
+) {
+    companion object {
+        val open = mapOf("M" to listOf(75 * 60, 85 * 60, 100 * 60, 114 * 60), "W" to listOf(86 * 60, 98 * 60, 114 * 60, 130 * 60))
+        val pro = mapOf("M" to listOf(54 * 60, 58 * 60, 65 * 60, 81 * 60 + 1), "W" to listOf(57 * 60, 62 * 60, 70 * 60, 86 * 60 + 36))
+
+        fun of(division: String, total: Int): HyroxRank? {
+            // 이름이나 키가 정확히 맞는 디비전만 (릴레이 등 모르는 값이 Open Men 으로 잡히지 않게)
+            val d = Division.all.firstOrNull { it.key == division || it.name.equals(division, ignoreCase = true) } ?: return null
+            if (total < 40 * 60 || total > 4 * 3600) return null
+            val g = if (d.key.endsWith("W")) "W" else "M"
+            if (d.key == "openM" || d.key == "openW") {
+                val b = open.getValue(g)
+                val names = listOf("Elite", "Advanced", "Intermediate", "Beginner")
+                val i = b.indexOfFirst { total < it }.takeIf { it >= 0 }
+                val level = i?.let { names[it] } ?: "First finish"
+                return HyroxRank(level, maxOf(1, openPct(total, b).r()), d.name, nextStep(i, names, b), total)
+            }
+            if (d.key == "proM" || d.key == "proW") {
+                val b = pro.getValue(g)
+                val names = listOf("Elite 15 level", "World level", "Competitive level", "Faster than Pro average")
+                val i = b.indexOfFirst { total < it }.takeIf { it >= 0 }
+                val level = i?.let { names[it] } ?: "Slower than Pro average"
+                return HyroxRank(level, null, d.name, nextStep(i, names, b), total)
+            }
+            return null
+        }
+
+        /** 다음 단계 (i = 지금 단계 번호, null = 마지막 경계보다 느림 → 맨 끝 단계가 다음) */
+        fun nextStep(i: Int?, names: List<String>, b: List<Int>): Pair<String, Int>? {
+            if (i == null) return names[3] to b[3]
+            if (i == 0) return null
+            return names[i - 1] to b[i - 1]
+        }
+
+        /** 홈페이지 openPct 와 같음: (경계×0.85 → 1%), 10, 25, 50, 75, (경계×1.25 → 97%) */
+        fun openPct(t: Int, b: List<Int>): Double {
+            val pts = listOf(b[0] * 0.85 to 1.0, b[0].toDouble() to 10.0, b[1].toDouble() to 25.0,
+                b[2].toDouble() to 50.0, b[3].toDouble() to 75.0, b[3] * 1.25 to 97.0)
+            val x = t.toDouble()
+            if (x <= pts[0].first) return 1.0
+            if (x >= pts[5].first) return 97.0
+            for (i in 1 until pts.size) {
+                if (x <= pts[i].first) {
+                    val a = pts[i - 1]
+                    val c = pts[i]
+                    return a.second + (c.second - a.second) * (x - a.first) / (c.first - a.first)
+                }
+            }
+            return 97.0
+        }
+    }
+}
+
 // MARK: 기록 묶음 (아이폰 Store 의 계산 부분)
 
 /**
@@ -265,11 +364,11 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
         Mode.Pft -> records(Mode.Pft).filter { it.counts && it.pftSplits != null }
     }
 
-    /** 트레이닝 구간별 최고 */
+    /** 트레이닝 구간별 최고. 93번: 러닝 카드 · HIIT 기록은 빼고 (스테이션 섞인 트레이닝끼리만 — 워치의 BEST 도 같은 기준) */
     val segBests: Map<String, Int> by lazy {
         val b = HashMap<String, Int>()
         for (r in records) {
-            if (r.mode != Mode.Training || !r.counts) continue
+            if (r.mode != Mode.Training || !r.counts || r.isRunKind || r.isHIIT) continue
             for (s in r.segs) {
                 if (s.kind == SegKind.Rox || !SegKey.plausible(s.icon, s.detail, s.time)) continue
                 val k = SegKey.of(s.icon, s.detail)
@@ -277,6 +376,23 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
             }
         }
         b
+    }
+
+    /**
+     * 빌드 27: 이 기록 '전'까지의 트레이닝 구간별 최고 (이 기록은 뺌). 기록 화면의 구간 차이(±)에 씀.
+     * 93번(빌드 28): 자유러닝 · 러닝 카드 기록의 1 km 는 빼고, 스테이션이 섞인 트레이닝끼리만 비교
+     */
+    fun segBestsBefore(rec: Record): Map<String, Int> {
+        val b = HashMap<String, Int>()
+        for (r in records) {
+            if (r.mode != Mode.Training || !r.counts || r.isRunKind || r.isHIIT || r.id == rec.id || !r.date.isBefore(rec.date)) continue
+            for (s in r.segs) {
+                if (s.kind == SegKind.Rox || !SegKey.plausible(s.icon, s.detail, s.time)) continue
+                val k = SegKey.of(s.icon, s.detail)
+                b[k] = minOf(b[k] ?: Int.MAX_VALUE, s.time)
+            }
+        }
+        return b
     }
 
     /** 같은 프로그램 이전 최고 (VS BEST) */
@@ -304,6 +420,7 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
             friend = friend?.takeIf { it.hasSplits },
             simBest = best?.splits16, simBestTotal = best?.total, segBests = segBests,
             pftBest = pft?.pftSplits, pftBestTotal = pft?.total, simLast = simLast?.splits16,
+            doublesPlan = settings.doublesPlan,
         )
     }
 
@@ -311,7 +428,8 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
 
     /** 거리별 (가장 빠른 시간, 그 거리를 뛴 기록 수) */
     private val runBestTable: Map<Double, Pair<Int, Int>> by lazy {
-        val runs = records.filter { it.mode == Mode.Training && it.isRunKind && it.counts }
+        // 94번: 실내 러닝은 거리가 짐작값이라 PB 에서 뺌
+        val runs = records.filter { it.mode == Mode.Training && it.isRunKind && it.counts && it.indoor != true }
         RunPB.distances.mapNotNull { (m, _) ->
             val all = runs.mapNotNull { it.bestEffort(m) }
             all.minOrNull()?.let { m to (it to all.size) }
@@ -320,12 +438,61 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
 
     /** 이 러닝 기록이 최고 기록인 거리들 (같은 거리를 뛴 기록이 2개 이상일 때만) */
     fun runPBs(r: Record): List<Double> {
-        if (!r.isRunKind || !r.counts) return emptyList()
+        if (!r.isRunKind || !r.counts || r.indoor == true) return emptyList()
         return RunPB.distances.mapNotNull { (m, _) ->
             val mine = r.bestEffort(m) ?: return@mapNotNull null
             val b = runBestTable[m] ?: return@mapNotNull null
             if (b.second >= 2 && mine <= b.first) m else null
         }
+    }
+
+    /** 빌드 27: 러닝 기록의 PB 이름 — PB 인 거리 중 가장 긴 것 ("5K PB"). 러닝 PB 가 아니면 null */
+    fun runPBLabel(r: Record): String? = runPBs(r).maxOrNull()?.let { RunPB.pbName(it) }
+
+    /** 빌드 27: 홈 프로필 카드용 — 러닝 PB 중 가장 긴 거리 (거리 m, 시간 초). 같은 거리를 2번 이상 뛰었을 때만 */
+    fun longestRunPB(): Pair<Double, Int>? {
+        for ((m, _) in RunPB.distances.reversed()) {
+            val b = runBestTable[m] ?: continue
+            if (b.second >= 2) return m to b.first
+        }
+        return null
+    }
+
+    /**
+     * 91번(빌드 28): 홈 프로필 카드 오른쪽 (설정 › 프로필의 "홈 카드에 보일 기록").
+     * 기본(자동) = 가장 최근에 세운 최고 기록, 없으면 목표 시간
+     */
+    fun homeBest(): HomeBest {
+        val goal = HomeBest(settings.goalTime, "Race goal", "", false)
+        val c = HashMap<String, Pair<HomeBest, Instant>>()
+        simBest?.let { c["sim"] = HomeBest(it.total, "PB", "Full Sim", true) to it.date }
+        raceBest?.let { c["race"] = HomeBest(it.total, "PB", "Race", true) to it.date }
+        pftBest?.let { c["pft"] = HomeBest(it.total, "PB", "PFT", true) to it.date }
+        longestRunPB()?.let { (m, t) ->
+            // 그 거리 최고를 세운 기록의 날짜 (실내 러닝은 뺌)
+            val whenAt = records.filter { it.mode == Mode.Training && it.isRunKind && it.counts && it.indoor != true }
+                .filter { it.bestEffort(m) == t }.maxOfOrNull { it.date } ?: Instant.EPOCH
+            c["run"] = HomeBest(t, RunPB.pbName(m), "", true) to whenAt
+        }
+        val k = settings.homeShow ?: "auto"
+        if (k == "goal") return goal
+        if (k != "auto") c[k]?.let { return it.first }
+        // 자동: 가장 최근에 세운 최고 기록
+        return c.values.maxByOrNull { it.second }?.first ?: goal
+    }
+
+    /** 빌드 27: 이 기록의 끝 카드를 닫은 지금이 앱 평가를 물어볼 좋은 순간인지 (기록 3개 이상 · PB · PFT 등급 상승 · 새 배지) */
+    fun reviewMoment(rec: Record): Boolean {
+        if (!rec.counts || !rec.isComplete) return false
+        if (records.count { it.counts && it.isComplete } >= 3) return true
+        if (isPB(rec)) return true
+        if (Badges.new(rec, records).isNotEmpty()) return true
+        if (rec.mode == Mode.Pft && rec.pftSplits != null) {
+            val best = records.filter { it.id != rec.id && it.mode == Mode.Pft && it.counts && it.pftSplits != null }
+                .maxOfOrNull { PFT.grade(it.total).rank }
+            if (best != null && PFT.grade(rec.total).rank > best) return true
+        }
+        return false
     }
 
     // MARK: 예상 완주 시간

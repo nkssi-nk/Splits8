@@ -78,6 +78,10 @@ dependencies {
     implementation(libs.health.connect)
     // 러닝 경로 지도 (구글 지도)
     implementation(libs.maps.compose)
+    implementation(libs.haze)                     // 위 고정 바 뒤 흐림 (아이폰 material 처럼)
+    implementation(libs.haze.materials)
+    implementation(libs.play.review)              // 빌드 27: 앱 평가 요청 (Play In-App Review)
+    implementation(libs.wear.remote.interactions) // 98번: 워치에서 보정 화면 열기
     // 갤럭시 워치와 주고받기 (Wearable Data Layer)
     implementation(libs.play.wearable)
     implementation(libs.kotlinx.coroutines.play)

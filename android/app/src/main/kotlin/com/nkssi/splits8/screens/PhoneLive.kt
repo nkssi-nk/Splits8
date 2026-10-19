@@ -238,6 +238,8 @@ private fun phoneFrame(eng: PhoneRunEngine, now: Long) = LiveFrame(
     running = eng.running, open = eng.growsOpen,
     segDist = if (eng.useGPS) eng.segDist else null, totalDist = if (eng.useGPS) eng.totalDist else null,
     runKind = eng.isRunKind, next = eng.nextSeg,
+    speed = if (eng.useGPS) eng.speedNow(now) else null,
+    imperial = com.nkssi.splits8.Store.settings.imperial,
 )
 
 /** ■ End · ↩ Undo · ❚❚ Pause (둥근 알약) */
@@ -292,7 +294,8 @@ private fun Sensors(eng: PhoneRunEngine, ctx: Context) {
                     lookupPlace(loc)
                     eng.gotLocation(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 0f,
                         if (loc.hasAltitude()) loc.altitude else null,
-                        if (Build.VERSION.SDK_INT >= 26 && loc.hasVerticalAccuracy()) loc.verticalAccuracyMeters else null)
+                        if (Build.VERSION.SDK_INT >= 26 && loc.hasVerticalAccuracy()) loc.verticalAccuracyMeters else null,
+                        speed = if (loc.hasSpeed()) loc.speed else null)
                 }
                 listener = l
                 runCatching { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 5f, l, Looper.getMainLooper()) }
@@ -368,7 +371,7 @@ fun FinishSheet(rec: Record) {
             }
         }
         Column(Modifier.fillMaxSize().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 12.dp)) {
-            c.tag?.let { FinishTag(it, c.tone) }
+            c.tag?.let { FinishTag(it, c.tone, rec) }
             T(c.line, F.t(F.title2, W600), Modifier.testTag("finish.line"), translate = false)
             val name = if (rec.mode == Mode.Training) rec.title else rec.mode.title.l10n
             T(name + " · " + Fm.wdm(rec.date), F.t(F.foot, color = C.text2), Modifier.padding(top = 4.dp), maxLines = 1, translate = false)
@@ -402,7 +405,8 @@ private fun finishTiles(rec: Record): List<Triple<String, String, String>> {
     if (rec.kcal > 0) o.add(Triple("CALORIES", grouped(rec.kcal), "KCAL"))
     if (rec.avgHR > 0) o.add(Triple("AVG HR", "${rec.avgHR}", "BPM"))
     val p = rec.runPace
-    if (p != null && rec.mode != Mode.Pft) o.add(Triple("RUN PACE", Fm.t(p), "/KM"))
+    val imp = com.nkssi.splits8.Store.settings.imperial
+    if (p != null && rec.mode != Mode.Pft) o.add(Triple("RUN PACE", Fm.t(com.nkssi.splits8.shared.Units.pace(p, imp)), com.nkssi.splits8.shared.Units.paceUnit(imp)))
     else if (rec.maxHR > 0) o.add(Triple("MAX HR", "${rec.maxHR}", "BPM"))
     if (o.size < 3) o.add(Triple("SPLITS", "${rec.mainSegs.size}", ""))
     return o.take(3)
@@ -420,10 +424,12 @@ private fun RowScope.FinishTile(label: String, value: String, unit: String) {
 }
 
 @Composable
-private fun FinishTag(tag: String, tone: Cheer.Tone) {
+private fun FinishTag(tag: String, tone: Cheer.Tone, rec: Record? = null) {
     val fill = when (tone) { Cheer.Tone.Check -> C.bad.copy(alpha = 0.18f); Cheer.Tone.Celebrate -> gold; else -> Color.White.copy(alpha = 0.12f) }
     val ink = when (tone) { Cheer.Tone.Check -> C.bad; Cheer.Tone.Celebrate -> Color.Black; else -> Color.White }
-    val text = if (tag == "CHECK") "Check".l10n else tag.l10n
+    var text = if (tag == "CHECK") "Check".l10n else tag.l10n
+    // 빌드 27: 러닝 기록의 PB 는 거리까지 ("★ 5K PB")
+    if (tag == "★ PB" && rec != null && rec.isRunKind) com.nkssi.splits8.Store.book.runPBLabel(rec)?.let { text = "★ $it" }
     Box(Modifier.padding(bottom = 12.dp).height(24.dp).clip(RoundedCornerShape(50)).background(fill).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center) {
         T(text, F.t(F.cap1, W700, ink, tracking = 0.72f), maxLines = 1, translate = false)

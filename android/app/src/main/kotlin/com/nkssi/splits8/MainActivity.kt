@@ -32,6 +32,10 @@ class MainActivity : ComponentActivity() {
 
     /** 위젯을 눌러서 열었을 때 (다음 대회 → Race 탭, 이번 주 → 홈). 폰으로 기록 중이면 그 화면 그대로 */
     private fun openFrom(i: android.content.Intent?) {
+        // 트레이닝 · 더블 계획 링크 (splits8://t?d=… · splits8://d?d=…)
+        i?.data?.toString()?.let { u ->
+            if (u.lowercase().startsWith("splits8://") || u.contains("#")) { Router.handleUrl(u); return }
+        }
         val to = when (i?.getStringExtra("open")) {
             "race" -> Scr.Race; "home" -> Scr.Home
             // 진행 중 알림(워치 운동)을 눌렀을 때
@@ -55,6 +59,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) Router.start()
         // 워치: 상태 확인 · 묶음 보내기 · 앱이 꺼져 있던 동안 도착한 기록 받기
         WatchSync.start()
+        WatchMirror.cleanLeftover()               // 빌드 27: 남은 진행 중 알림 정리
         openFrom(intent)
         setContent { App(showLogo = savedInstanceState == null) }
     }
@@ -76,6 +81,7 @@ fun App(showLogo: Boolean = true) {
             if (!Cloud.live) return@repeatOnLifecycle
             Cloud.checkDevice()
             Cloud.refreshSocial()
+            Router.showNoticeIfAny()          // 빌드 27: 받은 응원 · 친구 요청 알림 띠
             while (true) {
                 delay(180_000)
                 Cloud.checkDevice()
@@ -89,6 +95,7 @@ fun App(showLogo: Boolean = true) {
                 "Your records stay on this phone. Sign in again to use friends and leaderboards here.", cancel = null)
         }
     }
+    ReviewAfterFinish()                       // 빌드 27: 운동 끝 카드를 닫은 뒤 앱 평가 요청 (좋은 순간에만)
     BackHandler(enabled = overlay || (Router.scr != Scr.Home && Router.scr != Scr.Splash)) { Router.back() }
     Box(Modifier.fillMaxSize()) {
         PhoneRoot { s -> ScreenFor(s) }

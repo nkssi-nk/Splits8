@@ -21,6 +21,9 @@ wearOngoing = "1.1.0"
 complications = "1.3.0"
 mapsCompose = "8.6.0"
 fragment = "1.8.9"
+haze = "1.7.3"
+playReview = "2.0.2"
+wearRemote = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -46,6 +49,10 @@ wear-complications = { module = "androidx.wear.watchface:watchface-complications
 wear-ongoing = { module = "androidx.wear:wear-ongoing", version.ref = "wearOngoing" }
 androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "mapsCompose" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version.ref = "haze" }
+play-review = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
+wear-remote-interactions = { module = "androidx.wear:wear-remote-interactions", version.ref = "wearRemote" }
 health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 junit = { module = "junit:junit", version.ref = "junit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }

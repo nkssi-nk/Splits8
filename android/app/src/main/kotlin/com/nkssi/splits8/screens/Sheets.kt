@@ -96,10 +96,19 @@ private fun BonusSheet(req: BonusRequest) {
     var indoor by remember(req.key) { mutableStateOf(req.existing?.indoor ?: false) }
     val fresh = remember(req.key) { newId().take(6) }
     val hiit = req.kind == "hiit"
+    // 82번(빌드 28): 카드 이름 (비우면 기본 이름 "HIIT" · "Run 5K" · "Free run"). 기본 이름 그대로면 칸은 비워 둠
+    var name by remember(req.key) {
+        val n = req.existing?.name ?: ""
+        val isDefault = n == "HIIT" || n == "Free run" || (n.startsWith("Run ") && n.endsWith("K"))
+        mutableStateOf(if (isDefault) "" else n)
+    }
+    val defaultName = if (hiit) "HIIT" else Program.runName(km)
+    val cleanName = name.trim().take(24)
 
     // 지금 고른 값으로 만든 프로그램 (편집이면 같은 id)
-    val program: Program = if (hiit) req.existing ?: Program.hiit().copy(id = "hiit.$fresh")
+    val base: Program = if (hiit) req.existing ?: Program.hiit().copy(id = "hiit.$fresh")
     else Program.run(km, indoor, req.existing?.id ?: "run.$fresh")
+    val program = base.copy(name = cleanName.ifEmpty { defaultName })
 
     fun save() {
         Store.saveProgram(program)
@@ -117,6 +126,17 @@ private fun BonusSheet(req: BonusRequest) {
             T(if (hiit) "HIIT" else "Running", F.t(F.title3, W600), Modifier.weight(1f), maxLines = 1)
             Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f)).tap { Router.bonus = null }.testTag("bonus.close"),
                 contentAlignment = Alignment.Center) { Glyph("i_x", 14.dp, C.text2) }
+        }
+        // 이름 (82번)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Label8("NAME")
+            Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.08f))
+                .padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
+                if (name.isEmpty()) T(defaultName, F.t(17, color = C.text3), maxLines = 1)
+                androidx.compose.foundation.text.BasicTextField(name, { name = it.take(40) }, Modifier.fillMaxWidth().testTag("bonus.name"),
+                    textStyle = F.t(17), singleLine = true, cursorBrush = androidx.compose.ui.graphics.SolidColor(C.accent),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words, autoCorrectEnabled = false))
+            }
         }
         if (hiit) {
             Column(Modifier.fillMaxWidth().card8(16.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -146,8 +166,8 @@ private fun BonusSheet(req: BonusRequest) {
             }
         }
         // 빌드 25 (66번): 같은 설정이 이미 목록(= 워치 목록)에 있으면 저장 단추 대신 "워치 목록에 있음"
-        val onWatch = req.existing?.let { e -> hiit || (e.runKm == km && (e.indoor ?: false) == indoor) }
-            ?: Store.programs.any { p -> if (hiit) p.isHIIT else (p.isRun && p.runKm == km && (p.indoor ?: false) == indoor) }
+        val onWatch = req.existing?.let { e -> e.name == program.name && (hiit || (e.runKm == km && (e.indoor ?: false) == indoor)) }
+            ?: Store.programs.any { p -> p.name == program.name && (if (hiit) p.isHIIT else (p.isRun && p.runKm == km && (p.indoor ?: false) == indoor)) }
         if (onWatch) {
             Row(
                 Modifier.fillMaxWidth().height(54.dp).card8(16.dp).testTag("bonus.onWatch"),

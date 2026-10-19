@@ -112,7 +112,12 @@ object Store {
         if (Supabase.session == null && settings.nickname != null) settings = settings.copy(nickname = null)
         applyLang()
         rebuild()
+        // 88번: Test 탭은 처음엔 Full Sim (예전에 PFT 를 골라 둔 사람은 그대로)
+        Router.testTab = if (pref("test.tab", "") == "pft") "pft" else "sim"
     }
+
+    /** Test 탭에서 고른 쪽 기억 */
+    fun saveTestTab(t: String) = setPref("test.tab", t)
 
     /** 시험용: 예시 모드를 끄고 빈 저장소로 다시 시작 (시험 기기의 임시 폴더) */
     fun resetForTest(context: Context) {

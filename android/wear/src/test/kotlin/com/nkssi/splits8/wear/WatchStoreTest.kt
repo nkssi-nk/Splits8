@@ -7,12 +7,18 @@ import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.ProgItem
 import com.nkssi.splits8.shared.Program
 import com.nkssi.splits8.shared.Record
+import com.nkssi.splits8.shared.RepTune
+import com.nkssi.splits8.shared.CalibResult
+import com.nkssi.splits8.shared.SplitsJson
+import com.nkssi.splits8.shared.SyncKey
 import com.nkssi.splits8.shared.Settings
 import com.nkssi.splits8.shared.WatchContext
 import com.nkssi.splits8.shared.WatchWire
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,5 +84,83 @@ class WatchStoreTest {
         assertTrue(WatchStore.programs.none { it.id == p.id })
         WatchStore.reloadForTest(app)
         assertTrue(WatchStore.quickSaved.isEmpty())
+    }
+
+    // MARK: 빌드 27 · 28
+
+    @Test fun watchGoalSavedOnWatchAndSplits() {
+        // 68-① · 86번: 워치에서 고른 목표는 워치에만 저장, 다시 켜도 그대로, 16구간을 그 목표로 나눔
+        assertNull(WatchStore.watchGoal)
+        WatchStore.pickWatchGoal(5400)
+        WatchStore.reloadForTest(app)
+        assertEquals(5400, WatchStore.watchGoal)
+        val (t, w) = WatchStore.simPick
+        assertEquals("GOAL", w)
+        assertEquals(16, t.size)
+        assertEquals(5400 - 8 * WatchStore.settings.roxTarget, t.sum())
+        assertEquals(t.sum() + 15 * WatchStore.settings.roxTarget, WatchStore.seq(Mode.Sim, null).sumOf { it.target })
+        WatchStore.pickWatchGoal(null)
+        WatchStore.reloadForTest(app)
+        assertNull(WatchStore.watchGoal)
+        assertEquals("VS GOAL", WatchStore.simPick.second)
+    }
+
+    @Test fun calibrationResultSentAndKept() {
+        // 98번: 결과는 /calib-done/<id> 에 CalibResult JSON, 워치에도 바로 씀
+        val got = ArrayList<Pair<String, String>>()
+        WatchStore.testCalibSink = { p, j -> got.add(p to j) }
+        try {
+            val tune = RepTune(0.38, 0.17, 1.0, 0.7, Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
+            WatchStore.applyCalibration("wallBalls", tune)
+            val (path, json) = got.single()
+            assertTrue(path.startsWith(SyncKey.calibDone + "/"))
+            assertTrue(path.length > SyncKey.calibDone.length + 1)
+            assertEquals(CalibResult("wallBalls", tune), SplitsJson.decodeFromString(CalibResult.serializer(), json))
+            assertEquals(tune, WatchStore.settings.repCal!!["wallBalls"])
+            assertEquals(tune, WatchStore.engine.settings.repCal!!["wallBalls"])
+            assertEquals(tune, RepCounter.tuning("wallBalls"))
+            // 폰 설정이 아직 이 값을 모른 채 내려와도 (10분 안) 지우지 않음
+            WatchStore.apply(WatchWire.ctxJson(WatchContext(Settings(), emptyList())))
+            assertEquals(tune, WatchStore.settings.repCal!!["wallBalls"])
+            // 10분이 지나면 폰 설정을 따름
+            WatchStore.apply(WatchWire.ctxJson(WatchContext(Settings(), emptyList())), Instant.now().plusSeconds(700))
+            assertNull(WatchStore.settings.repCal)
+        } finally { WatchStore.testCalibSink = null }
+    }
+
+    @Test fun calibrationFlow() {
+        // 98번: 시작 → 세기 → 끝 → 실제 개수 → 저장 (화면 없이)
+        val got = ArrayList<String>()
+        WatchStore.testCalibSink = { _, j -> got.add(j) }
+        try {
+            assertEquals("wallBalls", Calib.iconFrom(Calib.uri("wallBalls")))
+            assertNull(Calib.iconFrom(android.net.Uri.parse("splits8://calib?icon=sledPush")))
+            assertNull(Calib.iconFrom(android.net.Uri.parse("splits8://other?icon=row")))
+            assertFalse(Calib.request("sledPush"))
+            assertTrue(Calib.request("row"))
+            assertEquals(Calib.Phase.Ready, Calib.phase)
+            Calib.begin()
+            assertEquals(Calib.Phase.Counting, Calib.phase)
+            var s = 0.0
+            repeat(18) {
+                repeat(10) { s += 0.02; Calib.feed(0.9, s) }
+                repeat(70) { s += 0.02; Calib.feed(0.05, s) }
+            }
+            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            assertEquals(18, Calib.live)
+            Calib.stop()
+            assertEquals(Calib.Phase.Confirm, Calib.phase)
+            assertEquals(20, Calib.actual)
+            Calib.actual = 18
+            Calib.save()
+            assertEquals(Calib.Phase.Saved, Calib.phase)
+            val tune = Calib.saved!!
+            assertEquals(CalibResult("row", tune), SplitsJson.decodeFromString(CalibResult.serializer(), got.single()))
+            Calib.close()
+            assertNull(Calib.icon)
+            // 운동 중에는 보정 화면을 띄우지 않음
+            WatchStore.engine.start(Mode.Sim, "Full Simulation", seq = WatchStore.seq(Mode.Sim, null))
+            assertFalse(Calib.request("row"))
+        } finally { WatchStore.testCalibSink = null; Calib.close() }
     }
 }

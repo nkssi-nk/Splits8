@@ -5,37 +5,32 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import com.nkssi.splits8.shared.RepTune
+import com.nkssi.splits8.shared.Settings
 import kotlin.math.sqrt
 
 /**
  * 스키 · 로잉 · 월볼 횟수 세기 (참고용 짐작값, 아이폰 RepCounter.swift 와 같은 규칙).
  * 팔이 한 번 크게 움직일 때마다 하나로 셈. 운동 중 화면에는 안 보이고, 끝난 뒤 폰 기록 화면에 "≈ 98" 처럼 참고 숫자로만.
  * 시간 · 순위 · 최고 기록 · 등급에는 쓰지 않음.
- * 기준값은 애플워치에서 정한 것 → 갤럭시 워치로 해 보고 숫자가 많거나 적게 나오면 tuning 만 고치면 됨.
+ * 기준값 = RepTune (shared). 98번(빌드 28): 폰 설정 › 운동 · 측정에서 워치로 20회 보정하면 그 사람 값(settings.repCal),
+ * 없으면 기본값(RepTune.defaults)
  */
 class RepCounter(context: Context?) : RepSource {
-    /**
-     * threshold: 움직임 세기(g)가 이 값을 넘으면 한 번 → 적게 세면 낮추고, 많이 세면 높임
-     * release: 이 값 아래로 내려와야 다음 것을 셀 준비가 됨
-     * minGap: 두 번 사이 최소 간격(초) → 한 동작을 두 번 세면 늘림
-     * smooth: 떨림을 고르게 (0~1, 클수록 느리게 따라감)
-     */
-    data class Tuning(val threshold: Double, val release: Double, val minGap: Double, val smooth: Double)
-
     companion object {
-        val tuning: Map<String, Tuning> = mapOf(
-            "skiErg" to Tuning(0.45, 0.20, 0.80, 0.80),
-            "row" to Tuning(0.45, 0.18, 1.50, 0.85),
-            "wallBalls" to Tuning(0.60, 0.25, 1.30, 0.80),
-        )
-        fun counts(icon: String) = icon in tuning
-        private const val G = 9.80665
+        /** 이 종목 기준값 (보정값 → 기본값). settings 를 안 넘기면 워치 저장소의 설정 */
+        fun tuning(icon: String, settings: Settings = WatchStore.settings): RepTune? =
+            settings.repCal?.get(icon) ?: RepTune.defaults[icon]
+
+        /** 이 종목은 횟수를 세는지 */
+        fun counts(icon: String) = RepTune.defaults.containsKey(icon)
+        const val G = 9.80665
     }
 
     private val sm = context?.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val sensor: Sensor? = sm?.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
-    private var tune: Tuning? = null
+    private var tune: RepTune? = null
     private var count = 0
     private var level = 0.0
     private var armed = true
@@ -55,7 +50,7 @@ class RepCounter(context: Context?) : RepSource {
     @Synchronized
     override fun start(icon: String, base: Int) {
         sm?.unregisterListener(listener)
-        val t = tuning[icon]
+        val t = tuning(icon)
         tune = t; count = maxOf(0, base); level = 0.0; armed = true; lastHit = 0.0; paused = false
         if (t != null && sensor != null) sm?.registerListener(listener, sensor, 20_000)   // 50번/초
     }

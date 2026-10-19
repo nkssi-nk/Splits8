@@ -107,6 +107,10 @@ val W800 = FontWeight.ExtraBold
 /** 워치에서만 뜻이 다른 낱말 (폰 표와 열쇠가 같아도 워치 화면엔 이 말) */
 private val watchKo = mapOf(
     "SEGMENTS" to "구간",
+    // 아이폰 문장의 "iPhone" 을 갤럭시 워치에서는 "폰" 으로 (빌드 27 · 28)
+    "Use phone setting" to "폰 설정 따르기",
+    "Counting now fits your movement. You can redo it anytime from your phone." to "이제 내 동작에 맞춰 세요. 폰에서 언제든 다시 할 수 있어요.",
+    "Try again from your phone and keep the watch on the hand that moves." to "폰에서 다시 시작해 주세요. 워치는 움직이는 손목에 차 주세요.",
 )
 
 /** 번역 (워치용 덮어쓰기 먼저) */

@@ -285,7 +285,7 @@ object ShareDemo {
 
 /** 카드를 화면에 보이지 않게 3배 (360 → 1080) 로 그려 layer 에 담아 둠 */
 @Composable
-private fun CaptureCard(layer: GraphicsLayer, content: @Composable () -> Unit) {
+internal fun CaptureCard(layer: GraphicsLayer, content: @Composable () -> Unit) {
     Box(Modifier.layout { m, _ ->
         val p = m.measure(Constraints())
         layout(0, 0) { p.place(0, 0) }
@@ -431,7 +431,7 @@ fun saveImage(ctx: Context, bmp: Bitmap): Boolean = runCatching {
 }.getOrDefault(false)
 
 /** 안드로이드 공유 창 (인스타그램 · 카카오톡 등) */
-fun shareImage(ctx: Context, bmp: Bitmap) {
+fun shareImage(ctx: Context, bmp: Bitmap, text: String? = null) {
     runCatching {
         val dir = File(ctx.cacheDir, "share").apply { mkdirs() }
         val f = File(dir, "SPLITS8.png")
@@ -440,6 +440,7 @@ fun shareImage(ctx: Context, bmp: Bitmap) {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "image/png"
             putExtra(Intent.EXTRA_STREAM, uri)
+            if (text != null) putExtra(Intent.EXTRA_TEXT, text)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         ctx.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

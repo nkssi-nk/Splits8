@@ -136,19 +136,19 @@ private fun ProfileCard() {
             }
             T(s.div.name, F.t(13, color = C.text2), maxLines = 1, translate = false)
         }
-        // 오른쪽: 기록이 있으면 시간 / ★ PB · Full Sim (또는 Race), 없으면 목표 시간 / Race goal
-        val sim = Store.book.simBest
-        val best = sim ?: Store.book.raceBest
+        // 오른쪽 두 줄: 시간 / "★ PB · Full Sim" 등.
+        // 91번(빌드 28): 무엇을 보일지 설정 › 프로필에서 고름 (HomeShow). 기본(자동) = 가장 최근에 세운 최고 기록, 없으면 목표 시간
+        val hb = Store.book.homeBest()
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            T(Fm.t(best?.total ?: s.goalTime), F.num(22, tracking = -0.44f), maxLines = 1, translate = false)
-            if (best != null) {
+            T(Fm.t(hb.time), F.num(22, tracking = -0.44f), maxLines = 1, translate = false)
+            if (hb.star) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     T("★", F.t(9, W600, C.accent), translate = false)
-                    T("PB", F.t(F.foot, W600, C.accent), translate = false)
-                    T("· " + (if (sim != null) "Full Sim" else "Race").l10n, F.t(F.foot, color = C.text2), maxLines = 1, translate = false)
+                    T(hb.tag, F.t(F.foot, W600, C.accent), maxLines = 1)
+                    if (hb.sub.isNotEmpty()) T("· " + hb.sub.l10n, F.t(F.foot, color = C.text2), maxLines = 1, translate = false)
                 }
             } else {
-                T("Race goal", F.t(F.foot, color = C.text2), maxLines = 1)
+                T(hb.tag, F.t(F.foot, color = C.text2), maxLines = 1)
             }
         }
     }
@@ -256,7 +256,8 @@ private fun Bests() {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         BestTile("FULL SIM", sim?.let { Fm.t(it.total) } ?: "--", sim?.let { Fm.dm(it.date) } ?: "No record".l10n)
         BestTile("RACE", race?.let { Fm.t(it.total) } ?: "--", race?.title?.l10n ?: "No record".l10n)
-        BestTile("RUN AVG", pace?.let { Fm.t(it) } ?: "--", "per km".l10n)
+        val imp = Store.settings.imperial
+        BestTile("RUN AVG", pace?.let { Fm.t(com.nkssi.splits8.shared.Units.pace(it, imp)) } ?: "--", (if (imp) "per mi" else "per km").l10n)
     }
 }
 

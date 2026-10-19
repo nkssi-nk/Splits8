@@ -96,7 +96,7 @@ import com.nkssi.splits8.ui.tap
 fun TestView() {
     Scroll8 {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TestSeg(Router.testTab, Modifier.padding(horizontal = PageSide)) { Router.testTab = it }
+            TestSeg(Router.testTab, Modifier.padding(horizontal = PageSide)) { Router.setTest(it) }
             Column(Modifier.padding(horizontal = PageSide), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (Router.testTab == "sim") SimView() else PFTView()
             }
@@ -104,11 +104,11 @@ fun TestView() {
     }
 }
 
-/** PFT | Full Sim (40 높이, 고른 쪽은 노랑 바탕 + 검정 글자) */
+/** Full Sim | PFT — 88번(빌드 28): Full Sim 이 메인 → 왼쪽 (40 높이, 고른 쪽은 노랑 바탕 + 검정 글자) */
 @Composable
 private fun TestSeg(selected: String, modifier: Modifier = Modifier, onSelect: (String) -> Unit) {
     Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.segTrack).padding(3.dp)) {
-        for ((k, l) in listOf("pft" to "PFT", "sim" to "Full Sim")) {
+        for ((k, l) in listOf("sim" to "Full Sim", "pft" to "PFT")) {
             val on = selected == k
             Box(
                 Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(9.dp)).background(if (on) C.accent else Color.Transparent)
@@ -433,7 +433,8 @@ private fun SimView() {
 
     PredictCard()
     SimSettingsCard()
-    Note8("Compare with also sets your split targets during a Full Simulation: Goal uses your Race split targets, Last uses your latest Full Sim.")
+    // 87번: 목표 시간 · 구간 목표는 Race 와 같은 값 (한쪽에서 바꾸면 둘 다)
+    Note8("Goal time and split targets are shared with Race. Compare with sets what you race against during a Full Simulation: Goal, your latest Full Sim, or a friend.")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { StartOnPhoneButton(Mode.Sim, null) }
 
     Fatigue.analyze(sims.filter { it.counts })?.let { f ->
@@ -474,6 +475,19 @@ private fun SimSettingsCard() {
             T(s.div.name, F.t(15, color = C.text2), maxLines = 1, translate = false)
             Chevron8()
         }
+        // 87번(빌드 28): Race 와 같은 줄 — 더블 계획(더블일 때) · 목표 시간 · 구간 목표. 목표는 Race 와 같은 값을 씀
+        if (s.division.startsWith("dbl")) {
+            SimRow("Doubles plan", doublesValue()) { Router.raceSheet = "doubles" }
+        }
+        SimRow("Goal time", Fm.t(s.goalTime) + " ›", numeric = true) { Router.raceSheet = "goal" }
+        Column(Modifier.fillMaxWidth().rowLine(true).tap { Router.sub(Scr.SetGoals, Scr.Sim) }.testTag("sim.splitTargets")
+            .padding(top = 14.dp, start = 18.dp, end = 18.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row {
+                T("Split targets", F.t(17), Modifier.weight(1f), maxLines = 1)
+                T("Edit".l10n + " ›", F.t(17, color = C.text2), maxLines = 1, translate = false)
+            }
+            SplitBars(s.goals, 40) { minOf(1f, maxOf(0f, it / 335f)) }
+        }
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).rowLine(true).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             T("Compare with", F.t(17), Modifier.weight(1f), maxLines = 1)
             Seg8(items, s.simCmp, Modifier.testTag("sim.cmp"), height = 28.dp, radius = 9.dp, minWidth = 56.dp) { k ->
@@ -484,6 +498,16 @@ private fun SimSettingsCard() {
             T("Add Roxzone", F.t(17), Modifier.weight(1f), maxLines = 1)
             Toggle8(s.roxAuto, Modifier.testTag("sim.rox")) { on -> Store.update { it.copy(roxAuto = on) } }
         }
+    }
+}
+
+/** Full Sim 설정 줄 (52 높이): 제목 17 · 값 17 회색 */
+@Composable
+private fun SimRow(t: String, value: String, numeric: Boolean = false, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).rowLine(true).tap(onClick = onClick).testTag("sim.$t").padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        T(t, F.t(17), Modifier.weight(1f), maxLines = 1)
+        T(value, if (numeric) F.num(17, W400, C.text2) else F.t(17, color = C.text2), maxLines = 1, translate = false)
     }
 }
 
@@ -634,7 +658,7 @@ fun TestInfoSheet(kind: String) {
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon8(s.key, 24.dp, C.accent)
                         T("${i + 1}. " + s.name.l10n, F.t(F.body), Modifier.weight(1f), maxLines = 1, translate = false)
-                        T(s.detail(div), F.num(F.foot, color = C.text2), maxLines = 1, translate = false)
+                        T(com.nkssi.splits8.shared.Units.detail(s.detail(div), Store.settings.imperial), F.num(F.foot, color = C.text2), maxLines = 1, translate = false)
                     }
                 }
             }

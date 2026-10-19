@@ -48,6 +48,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -67,6 +70,8 @@ import com.nkssi.splits8.Scr
 import com.nkssi.splits8.Store
 import com.nkssi.splits8.TabBarScroll
 import kotlinx.coroutines.launch
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 
 // 아이폰 PhoneApp.swift 의 화면 틀: 루트 · 위 고정 바 · 떠 있는 탭 바 · 세로 스크롤
 
@@ -78,16 +83,23 @@ fun statusTop(): Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadd
 fun navBottom(): Dp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
 /** 화면 틀: 배경 빛 + 화면 + 상태 줄 그늘 + 고정 바 + 탭 바 */
+/** 위 고정 바 뒤 흐림 (안드로이드 74-2): 화면 내용을 담아 두는 곳 */
+val LocalHaze = androidx.compose.runtime.staticCompositionLocalOf<dev.chrisbanes.haze.HazeState?> { null }
+
 @Composable
 fun PhoneRoot(screen: @Composable (Scr) -> Unit) {
     val scr = Router.scr
     val theme = Store.settings.glow
+    val haze = remember { dev.chrisbanes.haze.HazeState() }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Crossfade(scr to theme, animationSpec = tween(500), label = "ambient") { (s, t) ->
-            AmbientLayer(s.ambient(t))
+        // 배경 빛 + 화면 = 위 고정 바가 뒤로 비춰 흐리게 보여 줄 내용
+        Box(Modifier.fillMaxSize().hazeSource(haze)) {
+            Crossfade(scr to theme, animationSpec = tween(500), label = "ambient") { (s, t) ->
+                AmbientLayer(s.ambient(t))
+            }
+            // 들어오는 화면만 부드럽게 (아이폰과 같음)
+            Crossfade(scr, animationSpec = tween(250), label = "screen") { s -> Box(Modifier.fillMaxSize()) { screen(s) } }
         }
-        // 들어오는 화면만 부드럽게 (아이폰과 같음)
-        Crossfade(scr, animationSpec = tween(250), label = "screen") { s -> Box(Modifier.fillMaxSize()) { screen(s) } }
 
         // 상태 줄 뒤 검은 그라데이션
         if (scr != Scr.Splash) {
@@ -96,11 +108,13 @@ fun PhoneRoot(screen: @Composable (Scr) -> Unit) {
                 Box(Modifier.fillMaxWidth().height(top).background(Brush.verticalGradient(0.6f to Color.Black, 1f to Color.Transparent)))
             }
         }
-        if (scr.showsBar) TopBar8()
+        if (scr.showsBar) androidx.compose.runtime.CompositionLocalProvider(LocalHaze provides haze) { TopBar8() }
         if (scr.showsTabs) {
             TabFade(Modifier.align(Alignment.BottomCenter))
             TabBar8(Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp).padding(bottom = maxOf(26.dp, navBottom() + 10.dp)))
         }
+        // 빌드 27: 받은 응원 · 친구 요청 알림 띠 (누르면 친구 화면)
+        com.nkssi.splits8.NoticeBanner()
         // 시트 · 확인 창 (탭 바보다 위)
         com.nkssi.splits8.screens.Overlays()
     }
@@ -137,14 +151,21 @@ object MapTouch { var down by mutableStateOf(false) }
 
 // MARK: 위 고정 바
 
-/** 44 높이, 반투명 검정, 아래 1px 흰 0.06. 왼쪽 SPLITS8 또는 노랑 ‹ 뒤로, 오른쪽 제목 17/600 */
+/**
+ * 44 높이, 아래 1px 흰 0.06. 왼쪽 SPLITS8 또는 노랑 ‹ 뒤로, 오른쪽 제목 17/600.
+ * 74-2(안드로이드): 아이폰처럼 뒤 내용을 흐리게 (얇은 유리 + 검정 0.55). 흐림이 안 되는 폰(안드로이드 11 이하)은 더 진한 검정
+ */
+@OptIn(dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi::class)
 @Composable
 fun TopBar8() {
     val top = statusTop()
+    val haze = LocalHaze.current
+    val blur = haze != null && android.os.Build.VERSION.SDK_INT >= 31
     Column(Modifier.fillMaxWidth()) {
         Box(
             Modifier.fillMaxWidth().height(top + 44.dp)
-                .background(Color.Black.copy(alpha = 0.82f))   // 아이폰 흐림(material) 대신 조금 더 진한 검정
+                .let { if (blur) it.hazeEffect(haze, dev.chrisbanes.haze.materials.HazeMaterials.ultraThin(Color.Black)) else it }
+                .background(Color.Black.copy(alpha = if (blur) 0.55f else 0.82f))
                 .drawBehind {
                     val y = size.height - 0.5.dp.toPx()
                     drawLine(Color.White.copy(alpha = 0.06f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
@@ -193,7 +214,10 @@ fun TabBar8(modifier: Modifier = Modifier) {
     val compact = TabBarScroll.compact
     val selScr = Router.scr.tab(Router.friendsFrom)
     val selected = tabs.indexOfFirst { it.scr == selScr }.takeIf { it >= 0 }
-    val barH by animateDpAsState(if (compact) 50.dp else 64.dp, spring(dampingRatio = 0.85f, stiffness = 320f), label = "barH")
+    // 74-1(안드로이드): 접기/펴기를 숫자 하나(p: 0 접힘 → 1 펼침)로 — 바 높이 · 글자 높이 · 투명도가 같은 움직임으로 함께 바뀜.
+    //  예전엔 바 높이(스프링)와 글자(나타나기 효과)가 따로 움직이고, 글자가 생길 때 아이콘이 한 번에 튀어 올라 뚝뚝 끊겨 보였음
+    val p by animateFloatAsState(if (compact) 0f else 1f, spring(dampingRatio = 1f, stiffness = 380f), label = "barP")
+    val barH = 50.dp + 14.dp * p
     val edgeL = remember { Animatable((selected ?: 0).toFloat()) }
     val edgeR = remember { Animatable((selected ?: 0).toFloat()) }
     var prev by remember { mutableStateOf(selected) }
@@ -232,15 +256,24 @@ fun TabBar8(modifier: Modifier = Modifier) {
                 val s by animateFloatAsState(if (pop == i) 1.14f else 1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium), label = "pop")
                 Column(
                     Modifier.weight(1f).fillMaxSize().tap { Router.go(t.scr) }.testTag("tab." + t.label)
-                        .padding(bottom = if (compact) 7.dp else 9.dp),
+                        .padding(bottom = 7.dp + 2.dp * p),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Box(Modifier.size(25.dp, 24.dp).scale(s).offset(y = if (pop == i) (-2).dp else 0.dp), contentAlignment = Alignment.Center) {
                         if (t.icon == "modeTraining") Icon8(t.icon, 25.dp, c) else Glyph(t.icon, 24.dp, c)
+                        // 빌드 27: 받은 응원 · 친구 요청이 있으면 설정 탭에 빨간 점 (친구 화면이 설정 안에 있음)
+                        if (t.scr == Scr.Settings && Store.signedIn && (Store.unseenCheers > 0 || Store.incoming.isNotEmpty())) {
+                            Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-1).dp).size(8.dp).clip(CircleShape).background(C.bad))
+                        }
                     }
-                    AnimatedVisibility(!compact, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }) {
-                        T(t.label, F.t(11, W600, c), Modifier.height(13.dp), maxLines = 1)
+                    // 글자: 높이 · 간격 · 투명도가 p 를 따라 조금씩 (아래로 내려가며 사라짐)
+                    if (p > 0.01f) {
+                        Box(Modifier.padding(top = 3.dp * p).height(13.dp * p).graphicsLayer {
+                            alpha = p; translationY = (1f - p) * 6.dp.toPx()
+                        }.clipToBounds(), contentAlignment = Alignment.TopCenter) {
+                            T(t.label, F.t(11, W600, c), Modifier.requiredHeight(13.dp), maxLines = 1)
+                        }
                     }
                 }
             }
@@ -249,7 +282,7 @@ fun TabBar8(modifier: Modifier = Modifier) {
         if (selected != null) {
             val lineW = 18.dp
             val lineH = 3.dp
-            val bottomGap = if (compact) 6.dp else 7.dp
+            val bottomGap = 6.dp + 1.dp * p
             Box(
                 Modifier.fillMaxSize().drawBehind {
                     val c = cell.toPx()

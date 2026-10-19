@@ -36,6 +36,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 98번: 폰 "워치에서 시작" → 횟수 보정 화면 (splits8://calib?icon=wallBalls) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="splits8" android:host="calib" />
+            </intent-filter>
         </activity>
 
         <!-- 운동 중: 측정 · 1초 시계 · "운동 중" 표시 -->
@@ -44,7 +51,7 @@
             android:exported="false"
             android:foregroundServiceType="health|location" />
 
-        <!-- 폰에서 오는 것: 설정 묶음(/ctx) · 기록 받음 확인(/record 지워짐) · 운동 중 단추(/live) -->
+        <!-- 폰에서 오는 것: 설정 묶음(/ctx) · 기록 받음 확인(/record 지워짐) · 운동 중 단추(/live) · 보정 시작(/calib) -->
         <service android:name=".WearSyncService" android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
@@ -57,6 +64,11 @@
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
                 <data android:scheme="wear" android:host="*" android:path="/live" />
+            </intent-filter>
+            <!-- 98번: 폰 → 워치 횟수 보정 시작 (내용 = 종목 아이콘) -->
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/calib" />
             </intent-filter>
         </service>
 

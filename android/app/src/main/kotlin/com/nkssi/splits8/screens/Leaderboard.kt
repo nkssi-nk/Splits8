@@ -88,12 +88,17 @@ fun RaceLeaderboard() {
         val rows = Store.leaderboard
         val me = Store.myId
         val meT = rows.firstOrNull { it.user_id == me }?.t
+        // 빌드 27: 기록이 아직 없는 친구 (순위표는 기록 있는 사람만 옴) — 이름 · 사진만, 시간 대신 "아직 없음"
+        val ranked = rows.map { it.user_id }.toSet()
+        val extra = Store.friends.filter { f -> f.id !in ranked && (s.lbAllDivisions || f.div == s.div.name) }
+        val noText = when (s.lbTab) { "sim" -> "No Full Sim yet"; "race" -> "No race yet"; else -> "No record yet" }
         Column(Modifier.fillMaxWidth().card8()) {
-            if (rows.isEmpty()) {
+            if (rows.isEmpty() && extra.isEmpty()) {
                 T("No records yet. Finish a Full Simulation once and it will show up here.", F.t(13, color = C.text2),
                     Modifier.fillMaxWidth().padding(vertical = 22.dp, horizontal = 18.dp), align = TextAlign.Center)
             }
-            rows.forEachIndexed { i, row -> LbRow(i, row, row.user_id == me, meT, i == rows.size - 1) }
+            rows.forEachIndexed { i, row -> LbRow(i, row, row.user_id == me, meT, i == rows.size - 1 && extra.isEmpty()) }
+            extra.forEachIndexed { i, f -> NoRecordRow(f, noText, i == extra.size - 1) }
         }
         T("+ Add friends", F.t(15, W600, C.accent),
             Modifier.fillMaxWidth().tap { Router.friendsFrom = Scr.Home; Router.go(Scr.Friends) }.padding(6.dp).testTag("race.addFriends"),
@@ -123,6 +128,21 @@ private fun LbRow(i: Int, row: LBRow, me: Boolean, meT: Int?, last: Boolean) {
                 T(Fm.d(row.t - meT), F.num(13, color = if (row.t < meT) C.bad else C.good), maxLines = 1, translate = false)
             }
         }
+    }
+}
+
+/** 기록 없는 친구 한 줄 (순위 번호 자리는 "–") */
+@Composable
+private fun NoRecordRow(f: com.nkssi.splits8.shared.Friend, text: String, last: Boolean) {
+    Row(Modifier.fillMaxWidth().rowLine(!last).padding(vertical = 12.dp, horizontal = 18.dp).testTag("lb.friend." + f.id),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        T("–", F.num(17, color = C.text3), Modifier.width(22.dp), translate = false)
+        Avatar8(34.dp, f.name.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(f.avatarUrl), bg = C.control, fg = Color.White)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            T("@${f.name}", F.t(15, W500), maxLines = 1, translate = false)
+            T(f.div, F.t(13, color = C.text2), maxLines = 1, translate = false)
+        }
+        T(text, F.t(13, color = C.text3), maxLines = 1)
     }
 }
 

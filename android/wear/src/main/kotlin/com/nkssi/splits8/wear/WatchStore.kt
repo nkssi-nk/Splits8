@@ -13,6 +13,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import com.nkssi.splits8.shared.CalibResult
 import com.nkssi.splits8.shared.Defaults
 import com.nkssi.splits8.shared.Fm
 import com.nkssi.splits8.shared.L10n
@@ -23,6 +24,7 @@ import com.nkssi.splits8.shared.PFT
 import com.nkssi.splits8.shared.ProgItem
 import com.nkssi.splits8.shared.Program
 import com.nkssi.splits8.shared.Record
+import com.nkssi.splits8.shared.RepTune
 import com.nkssi.splits8.shared.Seg
 import com.nkssi.splits8.shared.SeqBuilder
 import com.nkssi.splits8.shared.Settings
@@ -68,11 +70,14 @@ object WatchStore {
     var testRecordSink: ((Record) -> Unit)? = null
     var testLiveSink: ((LiveState) -> Unit)? = null
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // 처음 쓸 때 만듦 (안드로이드 없는 시험에서도 저장소의 설정을 읽을 수 있게)
+    private val scope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
 
     const val CTX_FILE = "w_ctx.json"
     const val QUICK_FILE = "w_quick.json"
     const val PENDING_FILE = "w_pending.json"
+    private const val PREFS = "w"
+    const val GOAL_KEY = "watchSimGoal"
 
     val settings: Settings get() = ctx.settings
 
@@ -85,6 +90,8 @@ object WatchStore {
         // 빌드 25 (66번): Quick 은 한 번 쓰는 운동 → 워치 목록에 남기지 않음 (예전에 남은 파일도 지움)
         quickSaved = emptyList()
         java.io.File(context.filesDir, QUICK_FILE).delete()
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        watchGoal = if (prefs.contains(GOAL_KEY)) prefs.getInt(GOAL_KEY, 0).takeIf { it > 0 } else null
         applyLang()
         wire(engine)
     }
@@ -99,7 +106,7 @@ object WatchStore {
     /** 시험 · 화면 사진: 파일 없이 이 묶음으로 */
     fun useDemo(c: WatchContext, quick: List<Program> = emptyList()) {
         demo = true
-        ctx = c; quickSaved = quick; pending = emptyList()
+        ctx = c; quickSaved = quick; pending = emptyList(); watchGoal = null
         applyLang()
         engine.settings = c.settings
     }
@@ -107,6 +114,7 @@ object WatchStore {
     /** 시험용: 빈 저장소로 다시 시작 */
     fun resetForTest(context: Context) {
         context.filesDir.listFiles()?.forEach { it.delete() }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().commit()
         dir = null; demo = false
         engine = WorkoutEngine()
         init(context)
@@ -136,7 +144,24 @@ object WatchStore {
 
     /** Full Simulation 목표 16개와 비교 이름 (폰 Full Sim 화면의 "Compare with" 를 따름) */
     val simPick: Pair<List<Int>, String>
-        get() = SimTarget.pick(settings.simCmp, settings.goals, ctx.simLast, ctx.friend?.splits, ctx.friend?.first, ctx.simBest)
+        get() {
+            // 빌드 27 (68-①): 워치에서 목표 완주 시간을 고르면 그 시간으로 16구간을 나눔 (폰과 같은 계산)
+            watchGoal?.let { g -> return WatchGoal.split(g, settings, ctx.simBest) to "GOAL" }
+            return SimTarget.pick(settings.simCmp, settings.goals, ctx.simLast, ctx.friend?.splits, ctx.friend?.first, ctx.simBest)
+        }
+
+    val simTargets: List<Int> get() = simPick.first
+
+    /** 워치에서 고른 Full Sim 목표 완주 시간(초). null = 폰 설정을 따름. 워치에만 저장 (watchSimGoal) */
+    var watchGoal by mutableStateOf<Int?>(null)
+        private set
+
+    fun pickWatchGoal(g: Int?) {
+        watchGoal = g
+        if (demo) return
+        val p = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE) ?: return
+        if (g != null) p.edit().putInt(GOAL_KEY, g).apply() else p.edit().remove(GOAL_KEY).apply()
+    }
 
     fun seq(mode: Mode, program: Program?): List<Seg> {
         val s = settings
@@ -151,8 +176,16 @@ object WatchStore {
     // MARK: 폰에서 받기
 
     /** 폰이 보낸 묶음 (설정 · 트레이닝 · 비교 기준) */
-    fun apply(json: String?) {
-        val v = WatchWire.ctx(json) ?: return
+    fun apply(json: String?, now: Instant = Instant.now()) {
+        var v = WatchWire.ctx(json) ?: return
+        // 98번: 방금(10분 안) 워치에서 보정한 값이 아직 폰을 다녀오지 않았으면 지우지 않고 둠
+        val mine = ctx.settings.repCal.orEmpty()
+        val incoming = v.settings.repCal.orEmpty().toMutableMap()
+        for ((k, t) in mine) if (k !in incoming) {
+            val d = t.date
+            if (d != null && java.time.Duration.between(d, now).seconds < 600) incoming[k] = t
+        }
+        v = v.copy(settings = v.settings.copy(repCal = incoming.ifEmpty { null }))
         ctx = v
         applyLang()                    // 앱을 다시 켜지 않아도 번역이 바로 바뀜
         save(CTX_FILE, WatchContext.serializer(), v)
@@ -225,6 +258,33 @@ object WatchStore {
         }
     }
 
+    // MARK: 98번(빌드 28) 횟수 보정
+
+    /** 시험용: 실제 폰 대신 보정 결과(경로, JSON)를 여기로 */
+    var testCalibSink: ((String, String) -> Unit)? = null
+
+    fun calibPath(id: String): String = SyncKey.calibDone + "/" + id
+    fun calibJson(icon: String, tune: RepTune): String = SplitsJson.encodeToString(CalibResult.serializer(), CalibResult(icon, tune))
+
+    /** 보정 결과를 워치에 바로 쓰고 폰으로 보냄 (폰이 저장한 설정이 다시 내려오면 같은 값). 폰은 읽은 뒤 DataItem 을 지움 */
+    fun applyCalibration(icon: String, tune: RepTune) {
+        val c = ctx.copy(settings = ctx.settings.copy(repCal = ctx.settings.repCal.orEmpty() + (icon to tune)))
+        ctx = c
+        save(CTX_FILE, WatchContext.serializer(), c)
+        if (!engine.active) engine.settings = c.settings
+        val path = calibPath(newId().take(12))
+        val json = calibJson(icon, tune)
+        testCalibSink?.let { it(path, json); return }
+        val a = appContext ?: return
+        if (demo) return
+        scope.launch {
+            runCatching {
+                val req = PutDataMapRequest.create(path).apply { dataMap.putString(WatchWire.KEY, json) }.asPutDataRequest().setUrgent()
+                Wearable.getDataClient(a).putDataItem(req).await()
+            }
+        }
+    }
+
     // MARK: 파일
 
     private fun <T> load(name: String, ser: KSerializer<T>): T? {
@@ -258,8 +318,21 @@ class WearSyncService : WearableListenerService() {
         }
     }
 
-    /** 폰에서 누른 Next · Undo · Pause · Resume · End */
+    /** 폰에서 누른 Next · Undo · Pause · Resume · End · 98번 보정 시작 */
     override fun onMessageReceived(e: MessageEvent) {
+        if (e.path == SyncKey.calib) {
+            val icon = String(e.data, Charsets.UTF_8).trim()
+            WatchStore.init(applicationContext)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                if (!Calib.request(icon)) return@post
+                // 앱 화면을 띄움 (안 되면 다음에 앱을 켤 때 보정 화면)
+                runCatching {
+                    startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Calib.uri(icon), applicationContext, WearActivity::class.java)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                }
+            }
+            return
+        }
         if (e.path != SyncKey.live) return
         val c = LivePacket.read(e.data)?.command ?: return
         WatchStore.init(applicationContext)

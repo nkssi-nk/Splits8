@@ -24,9 +24,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -100,8 +102,8 @@ fun SettingsView() {
         Column(Modifier.padding(horizontal = PageSide), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             ProfileCard()
             Column(Modifier.fillMaxWidth().card8()) {
-                // 구간 목표는 Race 탭의 "Split targets" 한 곳에서만 고침
-                SettingRow("Running", RunModes.name(s.runMode).l10n, Modifier.testTag("settings.running"), last = true) { Router.go(Scr.SetRun) }
+                // 98번(빌드 28): 러닝 · 횟수 보정 · 심박 · 진동을 "운동 · 측정" 한 줄로 묶음 (다른 줄과 같은 모양, 값 글자 없음)
+                SettingRow("Workout & tracking", "", Modifier.testTag("settings.workout"), last = true) { Router.go(Scr.SetWorkout) }
             }
 
             SectionLabel("FRIENDS")
@@ -111,18 +113,19 @@ fun SettingsView() {
                 }
             }
 
-            SectionLabel("VIBRATION")
-            Column(Modifier.fillMaxWidth().card8()) {
-                ToggleRow("Heart rate zone change", null, s.hapticZone, false, "settings.hapticZone") { v -> Store.update { it.withHapticZone(v) } }
-                ToggleRow("Behind target pace", "Race · Full Sim", s.hapticPace, true, "settings.hapticPace") { v -> Store.update { it.withHapticPace(v) } }
-            }
-            Note8("Your watch alerts you with a vibration during workouts.")
-
             // 언어: 기본은 폰 언어. 안드로이드는 앱을 다시 켜지 않아도 바로 바뀜
             SectionLabel("LANGUAGE")
             Seg8(listOf("system" to "System", "ko" to "한국어", "en" to "English"), s.lang ?: "system", Modifier.fillMaxWidth().testTag("settings.language"),
                 height = 34.dp, radius = 11.dp, fontSize = 14) { k -> Store.update { it.copy(lang = if (k == "system") null else k) } }
             Note8("Follows your phone language unless you pick one here.")
+
+            // 단위 (빌드 27) — kg · km / lb · mi. 화면에 보일 때만 바꿈, 저장 값은 그대로. 워치도 같은 단위
+            SectionLabel("UNITS")
+            Seg8(listOf("metric" to "kg · km", "imperial" to "lb · mi"), if (s.imperial) "imperial" else "metric",
+                Modifier.fillMaxWidth().testTag("settings.units"), height = 34.dp, radius = 11.dp, fontSize = 14) { k ->
+                Store.update { it.copy(units = if (k == "imperial") "imperial" else null) }
+            }
+            Note8("Weights and run distance and pace. Station distances stay in meters.")
 
             ThemeSection()
 
@@ -176,6 +179,34 @@ fun SettingsView() {
                     verticalAlignment = Alignment.CenterVertically) {
                     T("Sign out", F.t(17), Modifier.weight(1f), maxLines = 1)
                     T("@" + (s.nickname ?: ""), F.t(15, color = C.text2), maxLines = 1, translate = false)
+                }
+            }
+        }
+    }
+}
+
+/** 91번(빌드 28): 홈 프로필 카드 오른쪽에 보일 기록 고르기 (아이폰 Menu → 줄 오른쪽 아래로 작은 목록) */
+@Composable
+private fun HomeShowRow() {
+    val cur = Store.settings.homeShow ?: "auto"
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    Box {
+        SettingRow("On home card", com.nkssi.splits8.shared.HomeShow.name(cur).l10n, Modifier.testTag("profile.homeShow"), last = true) { open = true }
+        if (open) {
+            androidx.compose.ui.window.Popup(alignment = Alignment.TopEnd, offset = androidx.compose.ui.unit.IntOffset(0, 0),
+                onDismissRequest = { open = false }, properties = androidx.compose.ui.window.PopupProperties(focusable = true)) {
+                Column(Modifier.padding(end = 12.dp).width(240.dp).shadow(18.dp, RoundedCornerShape(14.dp), ambientColor = Color.Black, spotColor = Color.Black).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2C2C2E))) {
+                    val keys = com.nkssi.splits8.shared.HomeShow.keys
+                    keys.forEachIndexed { i, k ->
+                        Row(Modifier.fillMaxWidth().rowLine(i < keys.size - 1).tap {
+                            open = false
+                            Store.update { it.copy(homeShow = if (k == "auto") null else k) }
+                        }.testTag("homeShow.$k").padding(vertical = 12.dp, horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.width(16.dp)) { if (k == cur) Check8(size = 16.dp) }
+                            T(com.nkssi.splits8.shared.HomeShow.name(k), F.t(17), Modifier.weight(1f), maxLines = 1)
+                        }
+                    }
                 }
             }
         }
@@ -451,7 +482,8 @@ fun AccountView() {
             SectionLabel("ATHLETE")
             Column(Modifier.fillMaxWidth().card8()) {
                 val hr = (if (s.hrMode == "age" && s.birthYear == null) L10n.t("Age %lld", s.age) + " · " else "") + "${s.maxHR} BPM"
-                SettingRow(if (s.birthYear == null) "Age · Max heart rate" else "Max heart rate", hr, Modifier.testTag("profile.hr"), numeric = true, last = true) { Router.sub(Scr.SetHr, Scr.Account) }
+                SettingRow(if (s.birthYear == null) "Age · Max heart rate" else "Max heart rate", hr, Modifier.testTag("profile.hr"), numeric = true) { Router.sub(Scr.SetHr, Scr.Account) }
+                HomeShowRow()
             }
 
             // 가입 프로필과 같은 구성 (빌드 24): 대회 경험 · 태어난 해 · 키 · 몸무게. 성별은 디비전에서 정해짐

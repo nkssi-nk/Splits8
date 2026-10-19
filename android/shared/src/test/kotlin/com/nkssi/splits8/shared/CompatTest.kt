@@ -69,7 +69,7 @@ class CompatTest {
     }
 
     @Test fun settingsRoundTrip() {
-        val s = Settings(nickname = "kim", doublesPlan = DoublesPlan().set(2, 70)).withGlow(GlowTheme.Purple)
+        val s = Settings(nickname = "kim", doublesPlan = DoublesPlan().setChunk(0, 150.0).setMeFirst(3, false).copy(partnerName = "jiho"), units = "imperial", homeShow = "run").withGlow(GlowTheme.Purple)
         val j = SplitsJson.encodeToString(Settings.serializer(), s)
         assertFalse(j.contains("null"))
         assertEquals(s, SplitsJson.decodeFromString(Settings.serializer(), j))
@@ -120,8 +120,7 @@ class CompatTest {
         // 이 모듈 코드가 쓰는 번역 열쇠가 아이폰 한국어 표에 다 있는지
         val keys = listOf(
             "1 set · %lld segments", "%lld sets · %lld segments",
-            "You %lld · Partner %lld reps", "You %lld m · Partner %lld m",
-            "me %lld / you %lld reps", "me %lld m / you %lld m", "SPLITS8 Doubles plan", "Runs: together",
+            "%@ reps", "Partner", "Measuring", "SPLITS8 Doubles plan",
             "Saved. A few splits look off.", "Ended early. All the way next time.",
             "Your first record. Welcome to SPLITS8.", "Day one. Every split counts from here.",
             "Goal beaten by %@. Great race.", "Race done. You did it.", "That's a race in the books.",

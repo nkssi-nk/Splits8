@@ -61,12 +61,23 @@ class WearActivity : ComponentActivity() {
         WearDevice.attach(applicationContext)
         lifecycle.addObserver(AmbientLifecycleObserver(this, ambientCallback))
         WatchStore.start()
+        handle(intent)
         askPermissionsOnce()
         setContent {
             CompositionLocalProvider(LocalAod provides ambient) {
                 WearApp(buzz = { Buzz.play(this, it) }, exit = { finish() })
             }
         }
+    }
+
+    /** 98번: 폰이 splits8://calib?icon=… 로 워치 앱을 켜면 보정 화면 */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handle(intent)
+    }
+
+    private fun handle(i: android.content.Intent?) {
+        Calib.iconFrom(i?.data)?.let { Calib.request(it) }
     }
 
     /** 처음 켤 때 한 번: 심박 · 활동 · 위치 · 알림 (아이폰은 앱을 켤 때 건강 권한을 물어봄) */
@@ -88,6 +99,8 @@ object WearDevice {
         e.reps = RepCounter(c)
         e.buzz = { Buzz.play(c, it) }
         e.onActive = { on -> if (on) WorkoutService.start(c) else WorkoutService.stop(c) }
+        Calib.sensor = AccelCalibSensor(c)
+        Calib.buzz = { Buzz.play(c, it) }
     }
 
     fun permissions(): List<String> = buildList {
@@ -105,6 +118,13 @@ fun WearApp(buzz: (BuzzKind) -> Unit, exit: () -> Unit) {
     val e = WatchStore.engine
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when {
+            // 98번: 보정 화면 (운동 중 · 3 · 2 · 1 중이 아닐 때만)
+            Calib.icon != null && !e.active && e.countdown == null -> {
+                BackHandler { Calib.close() }
+                // 세는 동안 화면이 꺼지지 않게
+                KeepScreenOn(Calib.phase == Calib.Phase.Counting)
+                WCalibView()
+            }
             e.active && e.finished -> WSummary()
             e.active -> {
                 // 운동 중 뒤로 단추 = 아무것도 안 함 (실수로 나가지 않게 — 끝내기는 조작 화면에서)
@@ -132,8 +152,8 @@ private fun NavStack(buzz: (BuzzKind) -> Unit, exit: () -> Unit) {
     val scope = rememberCoroutineScope()
     BackHandler(enabled = top != null) { WNav.pop() }
 
-    fun start() {
-        val run = { startWorkout() }
+    fun start(indoor: Boolean?) {
+        val run = { startWorkout(indoor) }
         if (WatchStore.demo) { run(); return }
         scope.launch {
             // 삼성 헬스 등 다른 앱이 운동을 기록 중이면 먼저 알림 (시작하면 그쪽이 끝남)
@@ -149,7 +169,7 @@ private fun NavStack(buzz: (BuzzKind) -> Unit, exit: () -> Unit) {
     ) { isBackground ->
         val s = if (isBackground) below else top
         if (isBackground && top == null) Box(Modifier.fillMaxSize().background(Color.Black))
-        else Screen(s, buzz, ::start)
+        else Screen(s, buzz) { start(it) }
     }
     askOther?.let { go ->
         OtherAppAsk(onStart = { askOther = null; go() }, onCancel = { askOther = null })
@@ -160,21 +180,23 @@ private fun NavStack(buzz: (BuzzKind) -> Unit, exit: () -> Unit) {
 private var askOther by mutableStateOf<(() -> Unit)?>(null)
 
 @Composable
-private fun Screen(s: WScreen?, buzz: (BuzzKind) -> Unit, start: () -> Unit) {
+private fun Screen(s: WScreen?, buzz: (BuzzKind) -> Unit, start: (Boolean?) -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (s) {
             null -> WHome()
             WScreen.Programs -> WPrograms()
             WScreen.Quick -> WQuick(buzz)
             WScreen.Confirm -> WConfirm(onStart = start)
+            WScreen.Goal -> WGoalPicker()
         }
     }
 }
 
-/** 확인 화면의 Start: 3 · 2 · 1 을 센 뒤 시작 */
-fun startWorkout() {
+/** 확인 화면의 Start: 3 · 2 · 1 을 센 뒤 시작. 83번: 러닝은 고른 실내/실외로 이번 운동만 바꿔서 (카드 자체는 그대로) */
+fun startWorkout(indoor: Boolean? = null) {
     val mode = WNav.mode
-    val program = WNav.program ?: Program.presets()[0]
+    var program = WNav.program ?: Program.presets()[0]
+    if (indoor != null) program = program.copy(indoor = indoor)
     val e = WatchStore.engine
     val title = when (mode) {
         Mode.Training -> program.name
@@ -187,6 +209,16 @@ fun startWorkout() {
     e.startAfterCountdown(mode, title, if (mode == Mode.Training) program.sets else 1,
         WatchStore.seq(mode, if (mode == Mode.Training) program else null),
         if (mode == Mode.Training) program else null, WatchStore.simPick.second)
+}
+
+/** 켜져 있는 동안 화면 꺼짐 막기 */
+@Composable
+fun KeepScreenOn(on: Boolean) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(on) {
+        view.keepScreenOn = on
+        onDispose { view.keepScreenOn = false }
+    }
 }
 
 @Composable

@@ -34,6 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.animation.core.spring
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,7 +57,7 @@ import kotlinx.coroutines.delay
 // 운동 전 화면 (아이폰 SplitsWatchApp.swift): 홈(모드 4개) · 트레이닝 목록 · 빠른 트레이닝 · 확인 · 3 · 2 · 1
 // 갤럭시 워치는 동그란 화면 → 목록은 위아래 끝에서 작아지며 지나가는 둥근 목록(ScalingLazyColumn), 크라운 · 베젤로 넘김.
 
-enum class WScreen { Programs, Quick, Confirm }
+enum class WScreen { Programs, Quick, Confirm, Goal }
 
 /** 워치 화면 이동 (아이폰 WNav) */
 object WNav {
@@ -70,6 +74,7 @@ object WNav {
             WScreen.Programs -> listOf(WScreen.Programs)
             WScreen.Quick -> listOf(WScreen.Programs, WScreen.Quick)
             WScreen.Confirm -> if (mode == Mode.Training) listOf(WScreen.Programs, WScreen.Confirm) else listOf(WScreen.Confirm)
+            WScreen.Goal -> listOf(WScreen.Confirm, WScreen.Goal)
         }
     }
 
@@ -102,24 +107,53 @@ fun RoundList(tag: String, modifier: Modifier = Modifier, center: Int = 1, offse
 
 // MARK: - 홈
 
-/** 첫 화면: 모드 카드 4개 (설명 줄 없음 — 아이콘 · 이름 · 단추만). 처음엔 카드 4개가 가운데. 맨 위는 시계 자리라 로고는 뺌 */
+/**
+ * 첫 화면: 모드 카드 4개 (설명 줄 없음 — 아이콘 · 이름 · 단추만). 맨 위는 시계 자리라 로고는 뺌.
+ * 96번(빌드 28): 늘 화면 가운데 고정 — 끌면 따라오고 놓으면 제자리(스프링). 높이가 모자라면 카드 여백 · 간격만 줄임
+ */
 @Composable
 fun WHome() {
     val k = wk()
-    Box(Modifier.fillMaxSize()) {
+    val h = LocalConfiguration.current.screenHeightDp
+    // 동그란 화면: 위아래 가장자리는 좁아서 카드가 잘림 → 위아래 33(× 크기) 씩 뺀 높이에 맞춤
+    val fit = homeFit(h - 2 * 33f * k)
+    val drag = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var raw by remember { mutableStateOf(0f) }
+    Box(Modifier.fillMaxSize().testTag("w.home")
+        .pointerInput(Unit) {
+            detectVerticalDragGestures(
+                onDragStart = { raw = 0f },
+                onDragEnd = { scope.launch { drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 320f)) } },
+                onDragCancel = { scope.launch { drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 320f)) } },
+            ) { _, d ->
+                raw += d / density
+                // 멀리 끌수록 덜 따라옴
+                scope.launch { drag.snapTo(raw / (1 + kotlin.math.abs(raw) / 60) * 0.6f) }
+            }
+        }) {
         AmbientLayer(Ambient.y(0.22f, 0.9f, 0.4f, 0.5f, -0.06f, WatchStore.settings.glow))
-        // 가운데 = PFT 와 Full Simulation 사이 (카드 반 칸만큼 내림)
-        val half = with(androidx.compose.ui.platform.LocalDensity.current) { (22 * k).dp.roundToPx() }
-        RoundList("w.home", center = 1, offset = half, side = 14f) {
-            for (m in listOf(Mode.Training, Mode.Pft, Mode.Sim, Mode.Race)) item { ModeCard(m, k) }
+        Column(Modifier.fillMaxWidth().align(Alignment.Center).offset(y = drag.value.dp).padding(horizontal = (14 * k).dp),
+            verticalArrangement = Arrangement.spacedBy(fit.second.dp)) {
+            for (m in listOf(Mode.Training, Mode.Pft, Mode.Sim, Mode.Race)) ModeCard(m, fit.first)
         }
     }
 }
 
+/** 카드 하나 = 위아래 여백 × 2 + 22(아이콘 · 단추). 기본 여백 9 · 간격 6, 모자라면 여백 4 · 간격 3 까지 줄임 (아이폰 WHome.fit) */
+fun homeFit(h: Float): Pair<Float, Float> {
+    val need = 186f                                   // 4 × (22 + 9 × 2) + 3 × 6 + 8
+    if (h >= need) return 9f to 6f
+    val room = maxOf(0f, h - 96f)                      // 아이콘 4개(88) + 위아래 4 를 뺀 높이
+    val gap = (room / 10).coerceIn(3f, 6f)
+    val pad = ((room - gap * 3) / 8).coerceIn(4f, 9f)
+    return pad to gap
+}
+
 @Composable
-private fun ModeCard(m: Mode, k: Float) {
+private fun ModeCard(m: Mode, pad: Float) {
     Row(
-        Modifier.fillMaxWidth().wCard(18.dp).press { WNav.openMode(m) }.padding(vertical = (7 * k).dp, horizontal = 12.dp)
+        Modifier.fillMaxWidth().wCard(18.dp).press { WNav.openMode(m) }.padding(vertical = pad.dp, horizontal = 12.dp)
             .testTag("w.mode." + m.raw),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -297,7 +331,7 @@ private fun chipLabel(q: ProgItem, full: Boolean = false): String {
 // MARK: - 확인 (Start)
 
 @Composable
-fun WConfirm(onStart: () -> Unit) {
+fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
     val mode = WNav.mode
     val program = WNav.program ?: Program.presets()[0]
     val seq = WatchStore.seq(mode, if (mode == Mode.Training) program else null)
@@ -341,23 +375,92 @@ fun WConfirm(onStart: () -> Unit) {
                 else -> item {
                     val small = if (mode == Mode.Race) Fm.wdm(ev.date) + " · " + WatchStore.settings.div.name
                         else WatchStore.settings.div.name + " · " + "8 runs · 8 stations".l10n
-                    val goal = if (mode == Mode.Race) Fm.t(WatchStore.settings.goalTime) else Fm.t(seq.sumOf { it.target })
+                    // 86번: 워치에서 고른 목표는 그 숫자 그대로
+                    val goal = if (mode == Mode.Race) Fm.t(WatchStore.settings.goalTime)
+                        else WatchGoal.shown(WatchStore.watchGoal, seq, WatchStore.settings.roxTarget)
                     val w = WatchStore.simPick.second
                     val goalWord = if (mode == Mode.Race) "GOAL" else if (w == "VS GOAL") "GOAL" else w
+                    // 빌드 27 (71-1): Full Sim 은 맨 위 제목과 겹치던 큰 제목을 빼고 목표 시간을 크게. 목표를 누르면 워치에서 바로 바꿈(68-①)
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        T(if (mode == Mode.Race) ev.name else "Full Simulation", F.t(17, W600, tracking = -0.34f), Modifier.fillMaxWidth(), maxLines = 2,
-                            align = TextAlign.Center, translate = mode != Mode.Race)
+                        if (mode == Mode.Race) T(ev.name, F.t(17, W600, tracking = -0.34f), Modifier.fillMaxWidth(), maxLines = 2,
+                            align = TextAlign.Center, translate = false)
                         T(small, F.t(12, color = C.text2), Modifier.fillMaxWidth(), translate = false)
-                        T(goal, F.num(30 * k, tracking = -0.6f), Modifier.padding(top = 6.dp).testTag("w.goal"), translate = false)
-                        T(goalWord, F.t(11, W600, C.text2, tracking = 0.9f))
+                        if (mode == Mode.Sim) {
+                            Column(Modifier.padding(top = 4.dp).clip(RoundedCornerShape(12.dp)).press { WNav.open(WScreen.Goal) }
+                                .padding(horizontal = 8.dp, vertical = 2.dp).testTag("w.simGoal"),
+                                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    T(goal, F.num(34 * k, tracking = -0.6f), Modifier.testTag("w.goal"), minScale = 0.85f, translate = false)
+                                    Icon8("i_pencil", 13.dp, C.accent)
+                                }
+                                T(goalWord, F.t(11, W600, C.text2, tracking = 0.9f))
+                            }
+                        } else {
+                            T(goal, F.num(30 * k, tracking = -0.6f), Modifier.padding(top = 6.dp).testTag("w.goal"), translate = false)
+                            T(goalWord, F.t(11, W600, C.text2, tracking = 0.9f))
+                        }
                     }
                 }
             }
-            if (!noEvent) item {
-                Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(40.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).press(onClick = onStart).testTag("w.start"),
-                    contentAlignment = Alignment.Center) {
-                    T("Start", F.t(15, W600, Color.Black))
+            when {
+                noEvent -> {}
+                // 83번(빌드 28): 러닝은 시작할 때 실외(GPS) / 실내를 고름 — 카드에 저장된 쪽이 노란 단추, 다른 쪽은 회색
+                mode == Mode.Training && program.isRun -> item {
+                    val cardIndoor = program.indoor ?: false
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        RunStart(false, !cardIndoor, Modifier.weight(1f)) { onStart(false) }
+                        RunStart(true, cardIndoor, Modifier.weight(1f)) { onStart(true) }
+                    }
                 }
+                else -> item {
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(40.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).press { onStart(null) }.testTag("w.start"),
+                        contentAlignment = Alignment.Center) {
+                        T("Start", F.t(15, W600, Color.Black))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RunStart(indoor: Boolean, main: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val fg = if (main) Color.Black else Color.White
+    Column(modifier.height(44.dp).clip(RoundedCornerShape(14.dp)).background(if (main) C.accent else hex(0x262626)).press(onClick = onClick)
+        .testTag(if (indoor) "w.startIndoor" else "w.startOutdoor"),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically)) {
+        T(if (indoor) "Indoor" else "Outdoor", F.t(14, W600, fg), Modifier.padding(horizontal = 4.dp))
+        T(if (indoor) "No GPS" else "GPS", F.t(10, W500, fg.copy(alpha = 0.7f)), Modifier.padding(horizontal = 4.dp))
+    }
+}
+
+// MARK: - Full Sim 목표 고르기
+
+/** 빌드 27 (68-①): 워치에서 Full Sim 목표 완주 시간 고르기 (크라운 · 위아래로 1분 단위). 고르면 16구간을 다시 나눔 */
+@Composable
+fun WGoalPicker() {
+    val k = wk()
+    val range = WatchGoal.minutes
+    val start = WatchGoal.initialMinutes(WatchStore.watchGoal, WatchStore.simTargets, WatchStore.settings.roxTarget)
+    val state = androidx.wear.compose.material3.rememberPickerState(range.size, range.indexOf(start).coerceAtLeast(0), false)
+    Box(Modifier.fillMaxSize().testTag("w.goalPicker")) {
+        AmbientLayer(Ambient.y(0.18f, 1.0f, 0.5f, 0.5f, -0.1f, WatchStore.settings.glow))
+        Column(Modifier.fillMaxSize().padding(start = (26 * k).dp, end = (26 * k).dp, top = (26 * k).dp, bottom = (14 * k).dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            T("Goal time", F.t(13, W600, C.text2))
+            androidx.wear.compose.material3.Picker(state, { Fm.t(range[state.selectedOptionIndex] * 60) },
+                Modifier.weight(1f).fillMaxWidth().testTag("w.goalWheel"), verticalSpacing = 0.dp) { i ->
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    T(Fm.t(range[i] * 60), F.num(22, color = if (i == state.selectedOptionIndex) Color.White else C.text3), translate = false)
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(12.dp)).background(C.accent)
+                .press { WatchStore.pickWatchGoal(range[state.selectedOptionIndex] * 60); WNav.pop() }.testTag("w.goalSet"),
+                contentAlignment = Alignment.Center) {
+                T("Set", F.t(14, W600, Color.Black))
+            }
+            if (WatchStore.watchGoal != null) {
+                T("Use phone setting", F.t(12, color = C.text2), Modifier.press { WatchStore.pickWatchGoal(null); WNav.pop() }.testTag("w.goalReset"))
             }
         }
     }

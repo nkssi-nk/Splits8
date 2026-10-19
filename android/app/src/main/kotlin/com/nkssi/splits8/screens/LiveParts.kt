@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.nkssi.splits8.shared.Fm
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.LivePace
+import com.nkssi.splits8.shared.Units
 import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.Seg
 import com.nkssi.splits8.shared.SegKind
@@ -68,6 +69,10 @@ data class LiveFrame(
     val runKind: Boolean,
     /** 다음 구간 (null = 마지막 → Finish) */
     val next: Seg?,
+    /** 빌드 27: 지금 속도(m/s) — 실시간 페이스. null · 0 = 모름 */
+    val speed: Double? = null,
+    /** 빌드 27: lb · mi 로 보여 주는지 (설정 > Units) */
+    val imperial: Boolean = false,
 ) {
     val cur: Seg get() = seq.getOrNull(idx) ?: seq.lastOrNull() ?: Seg("run", "Run", "1KM", SegKind.Run, 0)
 
@@ -97,14 +102,17 @@ data class LiveFrame(
             val c = cur
             if (c.kind == SegKind.Rox) return ""
             if (c.kind == SegKind.Run) {
-                val sd = segDist ?: return c.detail
-                val km = runMeters(c.detail) / 1000
-                var s = String.format(Locale.US, "%.2f / %.2f KM", min(km, sd / 1000), km)
+                val sd = segDist ?: return Units.detail(c.detail, imperial)
+                val segM = runMeters(c.detail)
+                var s = Units.dist(min(segM, sd), imperial) + " / " + Units.dist(segM, imperial) + " " + Units.distUnit(imperial)
                 val td = totalDist
-                if ((open || runKind) && td != null && td >= 10) s += " · " + L10n.t("Total %@ km", String.format(Locale.US, "%.2f", td / 1000))
+                if ((open || runKind) && td != null && td >= 10) {
+                    s += " · " + if (imperial) L10n.t("Total %@ mi", Units.dist(td, true))
+                    else L10n.t("Total %@ km", String.format(Locale.US, "%.2f", td / 1000))
+                }
                 return s
             }
-            return if (c.target > 0) c.detail else ""
+            return if (c.target > 0) Units.detail(c.detail, imperial) else ""
         }
 }
 
@@ -167,9 +175,10 @@ fun LiveBody(f: LiveFrame, totalFont: Float, segFont: Float, icon: Float, nameFo
             // 가운데 세로선: 숫자 높이에 맞춤
             Box(Modifier.padding(top = 22.dp).width(1.dp).height((segFont * 0.85f).dp).background(Color.White.copy(alpha = 0.14f)))
             when {
-                cur.kind == SegKind.Run -> LiveCol("PACE /KM", LivePace.text(f.segEl, f.segDist), timeColor, segFont * 0.85f)
+                cur.kind == SegKind.Run -> LiveCol(if (f.imperial) "PACE /MI" else "PACE /KM",
+                    LivePace.text(f.segEl, f.segDist, f.imperial, f.speed), timeColor, segFont * 0.85f)
                 cur.target > 0 -> LiveCol(f.goalWord, Fm.t(cur.target), timeColor, segFont * 0.85f, Modifier.testTag("$tagPrefix.goal"))
-                else -> LiveCol("", cur.detail, C.text2, nameFont)
+                else -> LiveCol("", Units.detail(cur.detail, f.imperial), C.text2, nameFont)
             }
         }
         FitText(f.detailLine, F.num(detailFont, androidx.compose.ui.text.font.FontWeight.Normal, C.aeb),

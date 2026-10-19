@@ -50,6 +50,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="splits8" android:host="t" />
             </intent-filter>
+            <!-- 빌드 27: 더블 계획 링크 splits8://d?d=<토큰> -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="splits8" android:host="d" />
+            </intent-filter>
         </activity>
 
         <!-- Health Connect 허락 창의 "개인정보 처리방침" (안드로이드 13 이하 / 14 이상) -->
@@ -99,6 +106,11 @@
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/record" />
+            </intent-filter>
+            <!-- 98번: 워치에서 끝낸 횟수 보정 결과 -->
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/calib-done" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />

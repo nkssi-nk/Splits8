@@ -106,6 +106,41 @@ object WatchSync {
         return true
     }
 
+    /**
+     * 98번(빌드 28): 워치에서 끝낸 횟수 보정 결과 → 설정에 저장 (설정이 바뀌면 워치로 다시 내려감).
+     * 글자가 깨졌어도 true (DataItem 을 지워야 다시 안 옴)
+     */
+    fun receiveCalib(json: String?): Boolean {
+        val c = WatchWire.calib(json) ?: return true
+        Store.update { s -> s.copy(repCal = (s.repCal ?: emptyMap()) + (c.icon to c.tune)) }
+        return true
+    }
+
+    /**
+     * 98번: 워치 앱을 켜서 그 종목 보정 화면으로 (아이폰 startWatchApp + sendMessage 와 같은 역할).
+     * 워치 앱 열기(RemoteActivityHelper) + 이미 켜져 있으면 메시지로도 알림
+     */
+    fun startCalibration(icon: String) {
+        val ctx = context ?: return
+        if (Store.demo) return
+        scope.launch {
+            runCatching {
+                val nodes = Wearable.getNodeClient(ctx).connectedNodes.await()
+                val helper = androidx.wear.remote.interactions.RemoteActivityHelper(ctx)
+                for (n in nodes) {
+                    runCatching {
+                        val i = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                            .addCategory(android.content.Intent.CATEGORY_BROWSABLE)
+                            .setData(Uri.parse("splits8://calib?icon=$icon"))
+                        val f = helper.startRemoteActivity(i, n.id)
+                        kotlinx.coroutines.withContext(Dispatchers.IO) { f.get(10, java.util.concurrent.TimeUnit.SECONDS) }
+                    }
+                    runCatching { Wearable.getMessageClient(ctx).sendMessage(n.id, SyncKey.calib, icon.toByteArray(Charsets.UTF_8)).await() }
+                }
+            }
+        }
+    }
+
     /** 받은 기록의 DataItem 지우기 = 워치에 "받았어요" */
     fun ack(uri: Uri) {
         val ctx = context ?: return
@@ -124,6 +159,11 @@ object WatchSync {
                 val items = buf.map { DataMapItem.fromDataItem(it).dataMap.getString(WatchWire.KEY) to it.uri }
                 buf.release()
                 for ((json, uri) in items) if (receiveRecord(json)) ack(uri)
+                // 98번: 앱이 꺼져 있던 동안 온 보정 결과
+                val cb = Wearable.getDataClient(ctx).getDataItems(Uri.parse("wear://*" + SyncKey.calibDone), com.google.android.gms.wearable.DataClient.FILTER_PREFIX).await()
+                val cs = cb.map { DataMapItem.fromDataItem(it).dataMap.getString(WatchWire.KEY) to it.uri }
+                cb.release()
+                for ((json, uri) in cs) if (receiveCalib(json)) ack(uri)
             }
         }
     }
@@ -135,10 +175,13 @@ class PhoneWearService : WearableListenerService() {
         Store.init(applicationContext)
         val got = events.filter { it.type == DataEvent.TYPE_CHANGED && WatchWire.isRecordPath(it.dataItem.uri.path) }
             .map { DataMapItem.fromDataItem(it.dataItem).dataMap.getString(WatchWire.KEY) to it.dataItem.uri }
+        val cal = events.filter { it.type == DataEvent.TYPE_CHANGED && WatchWire.isCalibPath(it.dataItem.uri.path) }
+            .map { DataMapItem.fromDataItem(it.dataItem).dataMap.getString(WatchWire.KEY) to it.dataItem.uri }
         events.release()
         // 저장 · 화면은 메인 스레드에서
         Handler(Looper.getMainLooper()).post {
             for ((json, uri) in got) if (WatchSync.receiveRecord(json)) WatchSync.ack(uri)
+            for ((json, uri) in cal) if (WatchSync.receiveCalib(json)) WatchSync.ack(uri)
         }
     }
 

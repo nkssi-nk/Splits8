@@ -47,6 +47,8 @@ fun ScreenFor(s: Scr) {
         Scr.Settings -> SettingsView()
         Scr.SetDiv -> SetDivView()
         Scr.SetRun -> SetRunView()
+        Scr.SetWorkout -> SetWorkoutView()
+        Scr.SetCalib -> SetCalibView()
         Scr.SetHr -> SetHrView()
         Scr.Account -> AccountView()
         Scr.Friends -> FriendsView()

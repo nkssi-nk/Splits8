@@ -88,7 +88,7 @@ import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 
 // 아이폰 SimRaceViews.swift 의 RaceView · GoalTimeSheet, EventViews.swift (대회 · 대회 찾기),
-// SettingsViews.swift 의 SetGoalsView (구간 목표), DoublesPlanViews.swift (더블 구간 나누기)
+// SettingsViews.swift 의 SetGoalsView (구간 목표). 더블 계획은 Doubles.kt
 
 // MARK: - I4 레이스 탭
 
@@ -139,6 +139,8 @@ private fun GoalCard() {
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // 89번(빌드 28): 막대 뜻이 안 보였음 → 한 줄 설명 (막대 길이 = 시간, 짧을수록 빠름)
+            T("Goal vs your best race · shorter bar = faster", F.t(12, color = C.text3), maxLines = 1)
             GoalBar("Goal", best?.let { minOf(1f, goal.toFloat() / maxOf(1, it)) } ?: 1f, C.accent, Fm.t(goal), Color.White)
             GoalBar("Best", if (best == null) 0f else 1f, Color.White.copy(alpha = 0.35f), best?.let { Fm.t(it) } ?: "--:--", C.text2)
         }
@@ -177,11 +179,11 @@ private fun RaceRowsCard() {
         }
         RaceRow("Division", "${s.div.name} ›") { Router.sub(Scr.SetDiv, Scr.Race) }
         if (s.division.startsWith("dbl")) {
-            RaceRow("Doubles plan", if (s.doublesPlan?.isDefault != false) "50:50 ›" else "Custom".l10n + " ›") { Router.raceSheet = "doubles" }
+            RaceRow("Doubles plan", doublesValue()) { Router.raceSheet = "doubles" }
         }
         RaceRow("Goal time", Fm.t(s.goalTime) + " ›", numeric = true) { Router.raceSheet = "goal" }
         // 누르면 구간별 목표 고치는 화면
-        Column(Modifier.fillMaxWidth().tap { Router.go(Scr.SetGoals) }.testTag("race.splitTargets")
+        Column(Modifier.fillMaxWidth().tap { Router.sub(Scr.SetGoals, Scr.Race) }.testTag("race.splitTargets")
             .padding(top = 14.dp, start = 18.dp, end = 18.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row {
                 T("Split targets", F.t(17), Modifier.weight(1f), maxLines = 1)
@@ -193,7 +195,7 @@ private fun RaceRowsCard() {
 }
 
 @Composable
-private fun RaceRow(t: String, value: String, numeric: Boolean = false, onClick: () -> Unit) {
+internal fun RaceRow(t: String, value: String, numeric: Boolean = false, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().rowLine(true).tap(onClick = onClick).testTag("race.$t").padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         T(t, F.t(17), maxLines = 1)
@@ -204,7 +206,7 @@ private fun RaceRow(t: String, value: String, numeric: Boolean = false, onClick:
 
 /** 16 막대 (gap 3): 러닝 #2C2C2E · 스테이션 노랑. frac = 칸 높이 비율 */
 @Composable
-private fun SplitBars(g: List<Int>, h: Int, frac: (Float) -> Float) {
+internal fun SplitBars(g: List<Int>, h: Int, frac: (Float) -> Float) {
     Row(Modifier.fillMaxWidth().height(h.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom) {
         g.forEachIndexed { i, t ->
             Box(Modifier.weight(1f).fillMaxHeight(frac(t.toFloat())).background(if (i % 2 == 0) C.control else C.accent))
@@ -254,55 +256,6 @@ fun GoalTimeSheet() {
 
 /** 단위 글자: 한국어 표에 있으면 그것(시간 · 분 · 초), 없으면 영어 기본값 (아이폰 defaultValue) */
 fun unit(key: String, def: String): String = L10n.t(key).let { if (it == key) def else it }
-
-// MARK: - 더블 구간 나누기 시트 (디비전이 더블일 때만)
-
-@Composable
-fun DoublesPlanSheet() {
-    var plan by remember { mutableStateOf(Store.settings.doublesPlan ?: DoublesPlan()) }
-    val ctx = LocalContext.current
-    Column(Modifier.padding(horizontal = 16.dp)) {
-        NavBar3("Cancel", "Doubles plan", right = "Save", edgeBack = false, onLeft = { Router.raceSheet = null }, onRight = {
-            // 반반이면 비워 둠 (아이폰 저장 파일과 같은 모양)
-            val p = plan
-            Store.update { it.copy(doublesPlan = if (p.isDefault) null else p) }
-            Router.raceSheet = null
-        })
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Note8("Set how much of each station you take — your partner does the rest. 10% steps.")
-            Column(Modifier.fillMaxWidth().card8()) {
-                for (i in 0 until 8) {
-                    val st = Station.all[i]
-                    Row(Modifier.fillMaxWidth().rowLine(i < 7).padding(vertical = 12.dp, horizontal = 16.dp).testTag("dbl." + st.key),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon8(st.key, 20.dp, C.accent)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            T(st.name, F.t(15, W600), maxLines = 1)
-                            T(plan.splitText(i), F.t(13, color = C.text2), maxLines = 1, translate = false)
-                        }
-                        Stepper8("${plan.share(i)}%", minWidth = 48.dp, fontSize = 15, button = 28.dp, radius = 8.dp, gap = 6.dp,
-                            down = { plan = plan.set(i, plan.share(i) - 10) }, up = { plan = plan.set(i, plan.share(i) + 10) })
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.08f))
-                    .press(tag = "dbl.reset") { plan = DoublesPlan() }, contentAlignment = Alignment.Center) {
-                    T("Reset 50:50", F.t(15, W600), maxLines = 1)
-                }
-                // 계획을 글로 만들어 파트너에게 보내기 (안드로이드 공유 창)
-                Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).background(C.accent)
-                    .press(tag = "dbl.share") {
-                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, plan.shareText)
-                        runCatching { ctx.startActivity(Intent.createChooser(send, null)) }
-                    }, contentAlignment = Alignment.Center) {
-                    T("Share as text", F.t(15, W600, Color.Black), maxLines = 1)
-                }
-            }
-            Note8("In Doubles, you run all 8 runs together. Only stations are split.")
-        }
-    }
-}
 
 // MARK: - I4b 대회 (자체 머리줄 Cancel · Race event · Save, 달력 · 시간은 카드 안에서 바로 고르기)
 
@@ -571,7 +524,7 @@ fun SetGoalsView() {
                         Icon8(if (run) "run" else st.key, 20.dp, if (run) Color.White else C.accent)
                         Column(Modifier.weight(1f)) {
                             T(if (run) L10n.t("Run %lld", i / 2 + 1) else st.name, F.t(15, W500), maxLines = 1, translate = false)
-                            T(if (run) "1KM" else st.detail(s.div), F.num(11, W400, C.text2), maxLines = 1, translate = false)
+                            T(com.nkssi.splits8.shared.Units.detail(if (run) "1KM" else st.detail(s.div), s.imperial), F.num(11, W400, C.text2), maxLines = 1, translate = false)
                         }
                         Stepper8(Fm.t(t), Modifier.testTag("goals.row.$i"), minWidth = 46.dp, fontSize = 17, button = 30.dp, radius = 9.dp, gap = 12.dp,
                             down = { changeGoal(i, -5) }, up = { changeGoal(i, 5) })

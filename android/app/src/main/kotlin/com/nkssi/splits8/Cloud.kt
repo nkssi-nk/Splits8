@@ -247,6 +247,8 @@ object Cloud {
             it.copy(sex = p.sex ?: it.sex, heightCm = p.heightCm ?: it.heightCm, weightKg = p.weightKg ?: it.weightKg,
                 birthYear = p.birthYear ?: it.birthYear, raced = p.raced ?: it.raced, raceDivision = p.raceDivision ?: it.raceDivision,
                 profileDone = true)          // 다른 기기에서 이미 답함 → 다시 묻지 않음
+                // 빌드 27: 태어난 해로 심박 계산용 나이도 맞춤 (나이로 계산할 때만)
+                .let { s -> Store.fixSettings(s) }
         }
     }
 

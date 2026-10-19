@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.nkssi.splits8.shared.HRPoint
 import com.nkssi.splits8.shared.LiveCommand
+import com.nkssi.splits8.shared.LivePace
 import com.nkssi.splits8.shared.LiveState
 import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.PFT
@@ -50,6 +51,8 @@ interface SensorSink {
     fun gotSteps(total: Double)
     fun gotLocation(lat: Double, lon: Double, acc: Float, alt: Double?, vAcc: Float?, atMs: Long)
     fun gotPlace(name: String)
+    /** 빌드 27: 지금 러닝 속도(m/s) — 실시간 페이스 */
+    fun gotSpeed(mps: Double) {}
 }
 
 /** 운동 측정 (실제: Health Services ExerciseClient) */
@@ -138,6 +141,11 @@ class WorkoutEngine(
     private var steps = 0.0
     private var segStepStart = 0.0
     private var segSteps = ArrayList<Double?>()
+    // 빌드 27: 실시간 속도 (애플 운동 앱처럼 "지금" 페이스)
+    /** 지금 속도(m/s). 0 = 모름 (일시정지 · 10초 넘게 새 값 없음) */
+    var curSpeed by mutableDoubleStateOf(0.0); private set
+    /** 마지막으로 속도를 받은 때 (오래되면 0 으로) */
+    private var lastSpeedAt = Long.MIN_VALUE / 2
 
     // 시간 (일시정지 제외)
     var startMs = 0L; private set
@@ -191,6 +199,25 @@ class WorkoutEngine(
 
     /** 현재 러닝 구간 거리(m) */
     val segDist: Double get() = max(0.0, distance - segDistStart)
+
+    /**
+     * 빌드 27: 워치 화면의 PACE 글자 (1 km 당, imperial 이면 1 mi 당).
+     * "5:12" = 지금 속도로 계산 (모르면 이 구간 평균) · null = 측정 중 ("Measuring") · "–:––" = 계산할 수 없음
+     */
+    fun paceText(el: Int, dist: Double, imperial: Boolean = false): String? =
+        when (val r = LivePace.reading(el, dist, imperial, curSpeed)) {
+            is LivePace.Reading.Pace -> LivePace.fmt(r.sec)
+            LivePace.Reading.Measuring -> null
+            LivePace.Reading.Unknown -> "–:––"
+        }
+
+    /** 속도 하나 받음: 부드럽게 (지수 이동 평균 0.3). 처음 값 · 10초 넘게 끊긴 뒤 값은 그대로 */
+    private fun blendSpeed(v: Double, now: Long) {
+        if (v < 0 || !v.isFinite()) return
+        val fresh = curSpeed <= 0 || now - lastSpeedAt > 10_000
+        curSpeed = if (fresh) v else 0.3 * v + 0.7 * curSpeed
+        lastSpeedAt = now
+    }
 
     /** 다음 구간 (HIIT · 자유 러닝은 아직 순서에 없는 다음 라운드/km) */
     val nextSeg: Seg
@@ -266,6 +293,7 @@ class WorkoutEngine(
         segReps = ArrayList<Int?>().apply { repeat(seq.size) { add(null) } }
         segSteps = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
         steps = 0.0; segStepStart = 0.0
+        curSpeed = 0.0; lastSpeedAt = Long.MIN_VALUE / 2
         segDistStart = 0.0; segPaused = 0; pauseAt = null
         undoPoint = null; canUndo = false
         val now = clock()
@@ -384,6 +412,7 @@ class WorkoutEngine(
         if (!active || finished) return
         if (running) {
             pauseAt = clock(); running = false
+            curSpeed = 0.0                              // 빌드 27: 멈추면 속도 모름
             sensors.pause()
             reps.setPaused(true)
         } else {
@@ -429,6 +458,8 @@ class WorkoutEngine(
     fun tick() {
         // 폰에 5초마다 심박 · 칼로리 · 시간 맞추기
         liveTicks++
+        // 빌드 27: 10초 넘게 새 속도가 없으면 모름(0) — 멈춰 섰는데 예전 페이스가 남지 않게
+        if (curSpeed > 0 && clock() - lastSpeedAt > 10_000) curSpeed = 0.0
         if (liveTicks % 5 == 0) pushLive()
         if (!active || finished || !running) return
         if (!settings.hapticPace || !(mode == Mode.Race || mode == Mode.Sim)) return
@@ -481,6 +512,7 @@ class WorkoutEngine(
             vsWord = deltaWord, vsTarget = if (kind == null && (mode != Mode.Pft || hasPFTBest)) tg else null,
             complete = complete, endDate = start.plusSeconds(total.toLong()), place = place, kind = kind,
             route = if (outdoorRun && routePts.size >= 2) routePts.toList() else null,
+            indoor = if (isRunKind && !outdoorRun) true else null,     // 94번
         )
         // 러닝 카드 — 케이던스 · 보폭 · 오르막 (경로 높이로)
         if (isRunKind) r = RunMetrics.fill(r, segSteps, null)
@@ -507,7 +539,7 @@ class WorkoutEngine(
         return LiveState(mode, title, seq, idx, splits, segEl(now), running, hr.roundToInt(), kcal.roundToInt(),
             if (hr > 0) zone else 0, canUndo, finished, deltaWord,
             delta = if (hasTarget) delta(now) else null, open = growsOpen, autoSplit = autoSplit,
-            segDist = segDist, dist = distance)
+            segDist = segDist, dist = distance, spd = if (curSpeed > 0) curSpeed else null)
     }
 
     private fun pushLive() {
@@ -566,11 +598,17 @@ class WorkoutEngine(
 
     override fun gotPlace(name: String) { if (place == null) place = name }
 
+    /** 빌드 27: 워치가 잰 지금 러닝 속도(m/s) */
+    override fun gotSpeed(mps: Double) {
+        if (!active || finished || !running) return
+        blendSpeed(mps, clock())
+    }
+
     // MARK: 화면 사진용 (측정 · 타이머 없이 운동 중 / 요약 상태)
 
     fun demoRun(mode: Mode, title: String, seq: List<Seg>, idx: Int, elapsed: Int, hr: Double, done: Boolean, vsBest: Boolean = false,
-                kind: String? = null, dist: Double = 380.0, segDist: Double = 0.0) {
-        this.kind = kind; hasPFTBest = vsBest; runKm = if (kind == "run") 5 else 0; outdoorRun = kind == "run"
+                kind: String? = null, dist: Double = 380.0, segDist: Double = 0.0, speed: Double = 0.0, indoor: Boolean = false) {
+        this.kind = kind; hasPFTBest = vsBest; runKm = if (kind == "run") 5 else 0; outdoorRun = kind == "run" && !indoor
         this.mode = mode; this.title = title; sets = 1; this.seq = seq
         running = true; finished = false; lastRecord = null
         this.hr = hr; kcal = 214.0; distance = dist
@@ -579,6 +617,7 @@ class WorkoutEngine(
         segReps = ArrayList<Int?>().apply { repeat(seq.size) { add(null) } }
         segSteps = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
         steps = 0.0; segStepStart = 0.0
+        curSpeed = speed; lastSpeedAt = clock()
         segDistStart = dist - segDist; segPaused = 0; pauseAt = null
         undoPoint = null; canUndo = !done && idx > 0
         val now = clock()

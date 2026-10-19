@@ -4,8 +4,8 @@ val centralMirror = "https://maven-central.storage-download.googleapis.com/maven
 pluginManagement {
     repositories {
         google()
-        mavenCentral()
         maven("https://maven-central.storage-download.googleapis.com/maven2/")
+        mavenCentral()
         gradlePluginPortal()
     }
 }
@@ -14,8 +14,8 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        maven(centralMirror)                  // 빌드 28 맞춤: 미러를 먼저 (Maven Central 429 로 실패하던 것 막기)
         mavenCentral()
-        maven(centralMirror)
     }
 }
 

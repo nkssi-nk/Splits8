@@ -239,11 +239,17 @@ struct WHome: View {
 
     /// 카드 하나 = 위아래 여백 × 2 + 22(아이콘 · 버튼). 기본 여백 9 · 간격 6, 모자라면 여백 4 · 간격 3 까지 줄임
     static func fit(_ h: CGFloat) -> (pad: CGFloat, gap: CGFloat) {
-        let need: CGFloat = 4 * (22 + 18) + 3 * 6 + 8
+        // 4 × (22 + 9 × 2) + 3 × 6 + 8 = 186 (컴파일러가 오래 걸리지 않게 숫자로)
+        let need: CGFloat = 186
         if h >= need { return (9, 6) }
-        let room: CGFloat = max(0, h - 4 * 22 - 8)              // 여백 8개 + 간격 3개에 쓸 수 있는 높이
-        let gap: CGFloat = max(3, min(6, room * 0.1))
-        let pad: CGFloat = max(4, min(9, (room - 3 * gap) / 8))
+        let free: CGFloat = h - 96                               // 아이콘 4개(88) + 위아래 4 를 뺀 높이
+        let room: CGFloat = free > 0 ? free : 0                  // 여백 8개 + 간격 3개에 쓸 수 있는 높이
+        var gap: CGFloat = room / 10
+        if gap > 6 { gap = 6 }
+        if gap < 3 { gap = 3 }
+        var pad: CGFloat = (room - gap * 3) / 8
+        if pad > 9 { pad = 9 }
+        if pad < 4 { pad = 4 }
         return (pad, gap)
     }
 

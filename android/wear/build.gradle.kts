@@ -15,7 +15,7 @@ android {
         targetSdk = 36
         // 구글 플레이는 올릴 때마다 번호가 커져야 함 → GitHub 빌드 번호 × 10 + 2 (폰 끝자리 1, 워치 끝자리 2). 컴퓨터 빌드는 102
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { it * 10 + 2 } ?: 102
-        versionName = "1.0.0"
+        versionName = "1.1.2"
     }
     // 폰과 같은 디버그 서명 키 (폰 ↔ 워치는 서명이 같아야 서로 주고받음)
     signingConfigs {

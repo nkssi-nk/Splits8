@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -133,9 +134,19 @@ fun WHome() {
             }
         }) {
         AmbientLayer(Ambient.y(0.22f, 0.9f, 0.4f, 0.5f, -0.06f, WatchStore.settings.glow))
-        Column(Modifier.fillMaxWidth().align(Alignment.Center).offset(y = drag.value.dp).padding(horizontal = (14 * k).dp),
+        // 2026-10-21: 동그란 화면이라 위 · 아래 카드는 원 안에 들어오게 폭을 줄임 (가운데 두 장은 넓게 — 워치 기본 목록과 같은 모양)
+        val cardH = 22f + 2 * fit.first
+        val total = 4 * cardH + 3 * fit.second
+        val top0 = (h - total) / 2f
+        val maxW = (LocalConfiguration.current.screenWidthDp - 2 * 14f * k).dp
+        Column(Modifier.fillMaxWidth().align(Alignment.Center).offset(y = drag.value.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(fit.second.dp)) {
-            for (m in listOf(Mode.Training, Mode.Pft, Mode.Sim, Mode.Race)) ModeCard(m, fit.first)
+            listOf(Mode.Training, Mode.Pft, Mode.Sim, Mode.Race).forEachIndexed { i, m ->
+                val top = top0 + i * (cardH + fit.second)
+                val fromEdge = minOf(top, h - (top + cardH))
+                ModeCard(m, fit.first, minOf(roundWidth(fromEdge, 3f), maxW))
+            }
         }
     }
 }
@@ -151,9 +162,9 @@ fun homeFit(h: Float): Pair<Float, Float> {
 }
 
 @Composable
-private fun ModeCard(m: Mode, pad: Float) {
+private fun ModeCard(m: Mode, pad: Float, width: androidx.compose.ui.unit.Dp) {
     Row(
-        Modifier.fillMaxWidth().wCard(18.dp).press { WNav.openMode(m) }.padding(vertical = pad.dp, horizontal = 12.dp)
+        Modifier.width(width).wCard(18.dp).press { WNav.openMode(m) }.padding(vertical = pad.dp, horizontal = 12.dp)
             .testTag("w.mode." + m.raw),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -289,7 +300,8 @@ fun WQuick(buzz: (BuzzKind) -> Unit) {
                     }
                 }
                 item {
-                    Box(Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(50)).background(C.accent)
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(screenFrac(0.72f)).height(36.dp).clip(RoundedCornerShape(50)).background(C.accent)
                         .press {
                             val p = WatchStore.saveQuick(WNav.quick)
                             WNav.program = p; WNav.quick = emptyList(); WNav.open(WScreen.Confirm)
@@ -297,11 +309,13 @@ fun WQuick(buzz: (BuzzKind) -> Unit) {
                         contentAlignment = Alignment.Center) {
                         T(wt("Start · %lld segments", WNav.quick.size), F.t(15, W600, Color.Black), Modifier.padding(horizontal = 10.dp), translate = false)
                     }
+                    }
                 }
             }
         }
         // 알림 (아래에서 잠깐)
-        AnimatedVisibility(toast != null, Modifier.align(Alignment.BottomCenter).padding(bottom = (18 * k).dp),
+        // 2026-10-21: 아래 끝은 좁아서 글자가 잘림 → 조금 위로, 폭은 원 안으로
+        AnimatedVisibility(toast != null, Modifier.align(Alignment.BottomCenter).padding(bottom = (30 * k).dp).widthIn(max = roundWidth(30 * k)),
             enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
             Box(Modifier.height(26.dp).clip(RoundedCornerShape(50)).background(C.accent).padding(horizontal = 10.dp).testTag("w.quickToast"),
                 contentAlignment = Alignment.Center) {
@@ -407,15 +421,21 @@ fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
                 // 83번(빌드 28): 러닝은 시작할 때 실외(GPS) / 실내를 고름 — 카드에 저장된 쪽이 노란 단추, 다른 쪽은 회색
                 mode == Mode.Training && program.isRun -> item {
                     val cardIndoor = program.indoor ?: false
-                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // 2026-10-21: 동그란 화면 아래쪽이라 줄 폭을 줄임 (양 끝이 잘렸음)
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
+                      Row(Modifier.width(screenFrac(0.70f)), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         RunStart(false, !cardIndoor, Modifier.weight(1f)) { onStart(false) }
                         RunStart(true, cardIndoor, Modifier.weight(1f)) { onStart(true) }
+                      }
                     }
                 }
                 else -> item {
-                    Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(40.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).press { onStart(null) }.testTag("w.start"),
-                        contentAlignment = Alignment.Center) {
-                        T("Start", F.t(15, W600, Color.Black))
+                    // 2026-10-21: 알약 모양 + 폭 줄임 (화면 아래 끝에서 양 끝이 잘렸음)
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.width(screenFrac(0.62f)).height(40.dp).clip(Pill).background(C.accent).press { onStart(null) }.testTag("w.start"),
+                            contentAlignment = Alignment.Center) {
+                            T("Start", F.t(15, W600, Color.Black))
+                        }
                     }
                 }
             }
@@ -426,7 +446,7 @@ fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
 @Composable
 private fun RunStart(indoor: Boolean, main: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val fg = if (main) Color.Black else Color.White
-    Column(modifier.height(44.dp).clip(RoundedCornerShape(14.dp)).background(if (main) C.accent else hex(0x262626)).press(onClick = onClick)
+    Column(modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(if (main) C.accent else hex(0x262626)).press(onClick = onClick)
         .testTag(if (indoor) "w.startIndoor" else "w.startOutdoor"),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically)) {
         T(if (indoor) "Indoor" else "Outdoor", F.t(14, W600, fg), Modifier.padding(horizontal = 4.dp))
@@ -445,7 +465,7 @@ fun WGoalPicker() {
     val state = androidx.wear.compose.material3.rememberPickerState(range.size, range.indexOf(start).coerceAtLeast(0), false)
     Box(Modifier.fillMaxSize().testTag("w.goalPicker")) {
         AmbientLayer(Ambient.y(0.18f, 1.0f, 0.5f, 0.5f, -0.1f, WatchStore.settings.glow))
-        Column(Modifier.fillMaxSize().padding(start = (26 * k).dp, end = (26 * k).dp, top = (26 * k).dp, bottom = (14 * k).dp),
+        Column(Modifier.fillMaxSize().padding(start = (26 * k).dp, end = (26 * k).dp, top = (26 * k).dp, bottom = (20 * k).dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             T("Goal time", F.t(13, W600, C.text2))
             androidx.wear.compose.material3.Picker(state, { Fm.t(range[state.selectedOptionIndex] * 60) },
@@ -454,7 +474,9 @@ fun WGoalPicker() {
                     T(Fm.t(range[i] * 60), F.num(22, color = if (i == state.selectedOptionIndex) Color.White else C.text3), translate = false)
                 }
             }
-            Box(Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(12.dp)).background(C.accent)
+            // 2026-10-21: 아래 끝 단추가 원 밖으로 나가지 않게 (아래에 "폰 설정 따르기" 줄이 있으면 그만큼 위)
+            val below = (20 * k) + (if (WatchStore.watchGoal != null) 20f else 0f)
+            Box(Modifier.width(roundWidth(below)).height(36.dp).clip(Pill).background(C.accent)
                 .press { WatchStore.pickWatchGoal(range[state.selectedOptionIndex] * 60); WNav.pop() }.testTag("w.goalSet"),
                 contentAlignment = Alignment.Center) {
                 T("Set", F.t(14, W600, Color.Black))

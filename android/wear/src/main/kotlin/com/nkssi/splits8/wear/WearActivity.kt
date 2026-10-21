@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -227,10 +228,10 @@ private fun OtherAppAsk(onStart: () -> Unit, onCancel: () -> Unit) {
     Column(Modifier.fillMaxSize().background(Color.Black).padding(horizontal = (24 * k).dp, vertical = (30 * k).dp).testTag("w.otherApp"),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically)) {
         T("Another app is recording a workout. Starting here will end it.", F.t(13, color = C.text2), Modifier.fillMaxWidth(), maxLines = 4, align = TextAlign.Center)
-        Box(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(12.dp)).background(C.accent).press(onClick = onStart), contentAlignment = Alignment.Center) {
+        Box(Modifier.width(screenFrac(0.7f)).height(34.dp).clip(Pill).background(C.accent).press(onClick = onStart), contentAlignment = Alignment.Center) {
             T("Start anyway", F.t(14, W600, Color.Black))
         }
-        Box(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(12.dp)).background(hex(0x1F1F1F)).press(onClick = onCancel), contentAlignment = Alignment.Center) {
+        Box(Modifier.width(screenFrac(0.62f)).height(34.dp).clip(Pill).background(hex(0x1F1F1F)).press(onClick = onCancel), contentAlignment = Alignment.Center) {
             T("Cancel", F.t(14, W600))
         }
     }

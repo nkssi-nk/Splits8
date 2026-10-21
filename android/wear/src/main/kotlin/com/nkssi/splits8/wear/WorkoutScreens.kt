@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -371,7 +372,8 @@ fun WControls(onBack: () -> Unit, onEnd: () -> Unit, onNext: () -> Unit) {
         detectHorizontalDragGestures(onDragStart = { dx = 0f }, onDragEnd = { if (dx <= -swipePx) onBack() }) { _, d -> dx += d }
     }) {
         AmbientLayer(Ambient(0xFFFFFF, 0.07f, 0.8f, 0.5f, 0.5f, 0.5f))
-        Column(Modifier.fillMaxSize().padding(top = (24 * k).dp, bottom = (16 * k).dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // 2026-10-21: 위 제목 줄 · 아래 안내 글이 동그란 테두리에 잘려서 안쪽으로
+        Column(Modifier.fillMaxSize().padding(top = (28 * k).dp, bottom = (30 * k).dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 T(if (e.mode == Mode.Training) e.title else e.mode.title, F.t(12, W600, C.accent), Modifier.width((90 * k).dp), translate = e.mode != Mode.Training)
                 T(Fm.t(e.total(now)), F.num(14), translate = false)
@@ -389,7 +391,7 @@ fun WControls(onBack: () -> Unit, onEnd: () -> Unit, onNext: () -> Unit) {
                     RoundButton("Next", "i_dblChev", Color.Black, C.accent, Color.Black, "w.controlsNext", labelColor = C.accent, onClick = onNext)
                 }
             }
-            T("‹ Swipe left to go back", F.t(11, color = C.text3))
+            T("‹ Swipe left to go back", F.t(11, color = C.text3), Modifier.widthIn(max = roundWidth(30 * k)))
         }
     }
 }
@@ -458,7 +460,10 @@ fun WEndSheet(onEnd: () -> Unit, onDiscard: () -> Unit, onResume: () -> Unit, bu
     var ask by remember { mutableStateOf(false) }
     val k = wk()
     Box(Modifier.fillMaxSize().background(Color.Black).press { }.testTag("w.endSheet")) {
-        Column(Modifier.fillMaxSize().padding(start = (30 * k).dp, end = (30 * k).dp, top = (30 * k).dp, bottom = (26 * k).dp),
+        // 2026-10-21: 아래 단추 줄이 동그란 테두리에 잘려서 → 조금 올리고, 맨 아래 줄은 원 안에 들어오는 폭으로
+        val bottomPad = 30 * k
+        val lastW = roundWidth(bottomPad)
+        Column(Modifier.fillMaxSize().padding(start = (26 * k).dp, end = (26 * k).dp, top = (30 * k).dp, bottom = bottomPad.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
             if (!ask) {
                 T("End workout?", F.t(15, W600))
@@ -468,8 +473,8 @@ fun WEndSheet(onEnd: () -> Unit, onDiscard: () -> Unit, onResume: () -> Unit, bu
                 T(if (e.growsOpen) wt("Everything so far will be saved.") else wt("%lld/%lld segments done. The rest won't be recorded.", done, all),
                     F.t(12, color = C.text2), Modifier.fillMaxWidth(), maxLines = 3, align = TextAlign.Center, translate = false)
                 Spacer(Modifier.weight(1f))
-                SheetButton("Save & end", Color.Black, C.accent, Modifier.fillMaxWidth().testTag("w.endConfirm"), onEnd)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SheetButton("Save & end", Color.Black, C.accent, Modifier.width(roundWidth(bottomPad + 39f)).testTag("w.endConfirm"), onEnd)
+                Row(Modifier.width(lastW), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SheetButton("Discard", C.bad, hex(0x2A1412), Modifier.weight(1f).testTag("w.discard")) { buzz(BuzzKind.Click); ask = true }
                     SheetButton("Resume", Color.White, hex(0x1F1F1F), Modifier.weight(1f).testTag("w.resume"), onResume)
                 }
@@ -477,8 +482,8 @@ fun WEndSheet(onEnd: () -> Unit, onDiscard: () -> Unit, onResume: () -> Unit, bu
                 T("Discard this workout?", F.t(15, W600))
                 T("It won't be saved here, on your phone or in Health Connect.", F.t(12, color = C.text2), Modifier.fillMaxWidth(), maxLines = 3, align = TextAlign.Center)
                 Spacer(Modifier.weight(1f))
-                SheetButton("Discard", Color.White, C.bad, Modifier.fillMaxWidth().testTag("w.discardConfirm"), onDiscard)
-                SheetButton("Cancel", Color.White, hex(0x1F1F1F), Modifier.fillMaxWidth()) { ask = false }
+                SheetButton("Discard", Color.White, C.bad, Modifier.width(roundWidth(bottomPad + 39f)).testTag("w.discardConfirm"), onDiscard)
+                SheetButton("Cancel", Color.White, hex(0x1F1F1F), Modifier.width(lastW)) { ask = false }
             }
         }
     }
@@ -486,7 +491,7 @@ fun WEndSheet(onEnd: () -> Unit, onDiscard: () -> Unit, onResume: () -> Unit, bu
 
 @Composable
 private fun SheetButton(t: String, fg: Color, bg: Color, modifier: Modifier, onClick: () -> Unit) {
-    Box(modifier.height(34.dp).clip(RoundedCornerShape(12.dp)).background(bg).press(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(modifier.height(34.dp).clip(Pill).background(bg).press(onClick = onClick), contentAlignment = Alignment.Center) {
         T(t, F.t(14, W600, fg), Modifier.padding(horizontal = 6.dp))
     }
 }
@@ -500,10 +505,13 @@ fun WSummary() {
     val k = wk()
     Box(Modifier.fillMaxSize().testTag("w.summary")) {
         AmbientLayer(Ambient(0x30D158, 0.18f, 1.2f, 0.6f, 0.5f, -0.1f))
-        val state = rememberScalingLazyListState(initialCenterItemIndex = 0)
+        // 2026-10-21: 첫 줄이 화면 가운데에서 시작해 아래 AVG · MAX · KCAL 이 잘렸음 → 첫 줄을 맨 위에 붙여 시작 (가운데 맞춤 끔)
+        val state = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
         ScalingLazyColumn(Modifier.fillMaxSize(), state = state,
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = (22 * k).dp, vertical = (26 * k).dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = (22 * k).dp, end = (22 * k).dp, top = (30 * k).dp, bottom = (40 * k).dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            anchorType = androidx.wear.compose.foundation.lazy.ScalingLazyListAnchorType.ItemStart,
+            autoCentering = null) {
             item { T(if (r.mode == Mode.Training) r.title else r.mode.title, F.t(12, W600, C.text2), translate = r.mode != Mode.Training) }
             item { Head(r) }
             item { Stats(r) }
@@ -520,9 +528,11 @@ fun WSummary() {
                 }
             }
             item {
-                Box(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(12.dp)).background(C.accent)
-                    .press { e.reset(); WNav.open(null) }.testTag("w.done"), contentAlignment = Alignment.Center) {
-                    T("Done", F.t(14, W600, Color.Black))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(screenFrac(0.6f)).height(36.dp).clip(Pill).background(C.accent)
+                        .press { e.reset(); WNav.open(null) }.testTag("w.done"), contentAlignment = Alignment.Center) {
+                        T("Done", F.t(14, W600, Color.Black))
+                    }
                 }
             }
         }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -207,12 +208,13 @@ fun WCalibView() {
     val k = wk()
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("w.calib")) {
         AmbientLayer(Ambient.y(0.18f, 1.0f, 0.5f, 0.5f, -0.1f, WatchStore.settings.glow))
-        Column(Modifier.fillMaxSize().padding(start = (24 * k).dp, end = (24 * k).dp, top = (22 * k).dp, bottom = (16 * k).dp),
+        Column(Modifier.fillMaxSize().padding(start = (24 * k).dp, end = (24 * k).dp, top = (22 * k).dp, bottom = (24 * k).dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
             // 제목 + 닫기 (언제든 — 세는 중이어도 센서 정리, 저장 안 함)
-            Row(Modifier.fillMaxWidth().padding(horizontal = (6 * k).dp), verticalAlignment = Alignment.CenterVertically,
+            // 2026-10-21: 맨 위 줄은 동그란 화면에서 좁음 → 원 안 폭으로 (제목 앞 글자가 잘렸음)
+            Row(Modifier.width(roundWidth(22 * k, 4f)), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
-                T(wt("Calibrate") + " · " + Calib.name(icon), F.t(13, W600, C.accent), Modifier.weight(1f, fill = false), minScale = 0.7f, translate = false)
+                T(wt("Calibrate") + " · " + Calib.name(icon), F.t(13, W600, C.accent), Modifier.weight(1f, fill = false), minScale = 0.6f, translate = false)
                 Box(Modifier.size(24.dp).clip(CircleShape).background(hex(0x262626)).press { c.close() }.testTag("w.calib.close"),
                     contentAlignment = Alignment.Center) {
                     Icon8("i_x", 10.dp, C.text2)
@@ -273,7 +275,8 @@ private fun CountPicker(modifier: Modifier) {
 
 @Composable
 private fun BigButton(t: String, bg: Color, fg: Color, tag: String, onClick: () -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(40.dp).clip(RoundedCornerShape(20.dp)).background(bg).press(onClick = onClick).testTag(tag),
+    // 2026-10-21: 화면 아래 끝 단추 — 동그란 화면 안에 들어오는 폭으로 (양 끝이 잘렸음)
+    Box(Modifier.width(roundWidth(24 * wk())).height(40.dp).clip(RoundedCornerShape(20.dp)).background(bg).press(onClick = onClick).testTag(tag),
         contentAlignment = Alignment.Center) {
         T(t, F.t(15, W600, fg))
     }

@@ -238,3 +238,27 @@ fun PFTBadge(grade: PFTGrade, width: Dp, height: Dp, fontSize: Float) {
 
 /** 눌림 효과 없이 살짝 줄어듦 (필요한 곳만) */
 fun Modifier.pressScale(down: Boolean): Modifier = this.scale(if (down) 0.97f else 1f)
+
+// MARK: 동그란 화면 폭 (2026-10-21 갤럭시 워치 가장자리 잘림)
+
+/**
+ * 동그란 화면에서, 화면 아래(또는 위) 끝에서 [fromEdge]dp 떨어진 가로줄이 원 안에 들어오는 폭 (양쪽 [margin] 만큼 더 뺌).
+ * 네모난 화면이면 화면 폭 그대로. 단추 · 카드의 바깥 끝(가장 가장자리 쪽 줄)을 넣어서 씀.
+ */
+@Composable
+fun roundWidth(fromEdge: Float, margin: Float = 6f): Dp {
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    val w = cfg.screenWidthDp.toFloat()
+    if (!cfg.isScreenRound) return (w - 2 * margin).dp
+    val r = minOf(cfg.screenWidthDp, cfg.screenHeightDp) / 2f
+    val d = (r - fromEdge).coerceIn(0f, r)
+    val chord = 2f * kotlin.math.sqrt(r * r - d * d)
+    return (chord - 2 * margin).coerceIn(0f, w).dp
+}
+
+/** 화면 폭 × [f] (동그란 화면의 위아래 끝 쪽 단추 — 목록 안이라 자리가 움직이는 것) */
+@Composable
+fun screenFrac(f: Float): Dp = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * f).dp
+
+/** 알약 모양 (양 끝이 반원 — 동그란 화면 가장자리와 잘 맞음) */
+val Pill = RoundedCornerShape(50)

@@ -360,7 +360,8 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
         if (p != null) {
             Image(p, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, colorFilter = filter)
         } else {
-            Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0B)), contentAlignment = Alignment.Center) {
+            // 1.1.2: "탭해서 사진 고르기" 를 가운데보다 위로 (가운데면 Poster 의 날짜 · 큰 시간과 겹쳤음). 미리보기에만 보이고 저장 그림에는 없음
+            Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0B)), contentAlignment = androidx.compose.ui.BiasAlignment(0f, -0.5f)) {
                 if (o.placeholder) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Glyph("i_camera", 26.dp, C.text2)

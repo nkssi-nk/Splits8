@@ -222,8 +222,10 @@ fun PhoneLiveView() {
             // Next 버튼 (GPS 러닝은 1 km 마다 저절로)
             val gpsRun = eng.isRunKind && eng.useGPS
             val enabled = eng.running && !gpsRun
+            // 1.1.2: Finish 를 누른 뒤 기록 화면으로 넘어가는 0.25초 동안 버튼이 회색으로 바뀌어 "사라진 것처럼" 보이던 것 → 끝난 뒤에도 노란색 유지 (누를 수는 없음)
+            val looksOn = enabled || eng.finished
             Row(
-                Modifier.fillMaxWidth().height(m.buttonH.dp).yellowFill(RoundedCornerShape(50), on = enabled)
+                Modifier.fillMaxWidth().height(m.buttonH.dp).yellowFill(RoundedCornerShape(50), on = looksOn)
                     .press(enabled = enabled, tag = "phone.next") {
                         buzz(true); flashNow()
                         eng.advance()?.let { success(); done(it) }
@@ -231,7 +233,7 @@ fun PhoneLiveView() {
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
             ) {
                 val label = if (gpsRun) "Auto split every 1 km" else if (eng.hasNext || eng.growsOpen) "Next" else "Finish"
-                T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (enabled) Color.Black else C.text3), maxLines = 1, translate = false)
+                T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (looksOn) Color.Black else C.text3), maxLines = 1, translate = false)
             }
             Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Pill(R.drawable.sym_stop, "End", C.bad, hex(0xFF453A, 0.22f), m.pillH, "phone.end") { askEnd() }

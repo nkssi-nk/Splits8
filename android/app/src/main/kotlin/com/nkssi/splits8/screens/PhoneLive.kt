@@ -17,7 +17,14 @@ import android.os.Looper
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.key
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -232,7 +239,14 @@ fun PhoneLiveView() {
             Box(Modifier.fillMaxSize().background(Color.Black).tap { count = null; Router.go(req.from) }.testTag("phone.countdown"),
                 contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    T("$n", F.num(160, W700, C.accent), Modifier.testTag("phone.count"), maxLines = 1, translate = false)
+                    // 1.1.2: 숫자가 바뀔 때마다 새 글자로 그림 (아이폰 .numericText 처럼 위로 밀려 바뀜).
+                    // 예전엔 같은 글자 칸의 내용만 바꿔서 에뮬레이터 등에서 "3" 다음 "2 · 1" 이 안 그려지고 빈 화면이었음
+                    AnimatedContent(n, transitionSpec = {
+                        (slideInVertically(tween(250)) { it / 3 } + fadeIn(tween(250))) togetherWith
+                            (slideOutVertically(tween(250)) { -it / 3 } + fadeOut(tween(200)))
+                    }, label = "count") { k ->
+                        key(k) { T("$k", F.num(160, W700, C.accent), Modifier.testTag("phone.count"), maxLines = 1, translate = false) }
+                    }
                     T("Tap to cancel", F.t(15, color = C.text2), maxLines = 1)
                 }
             }

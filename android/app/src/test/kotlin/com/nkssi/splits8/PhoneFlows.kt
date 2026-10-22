@@ -82,6 +82,15 @@ class PhoneFlows {
         assertEquals(Scr.Share, Router.scr)
     }
 
+    /** 1.1.2: 트레이닝 편집 화면에서 시작해도 끝난 뒤 기록 화면의 뒤로 가기는 Training 탭 */
+    @Test fun finishFromBuilderGoesBackToTraining() {
+        Router.scr = Scr.Builder
+        start(Mode.Training, Store.programs.first())
+        repeat(eng.seq.size) { wait(60); tap("phone.next") }
+        assertEquals(Scr.Detail, Router.scr)
+        assertEquals(Scr.Training, Router.detailFrom)
+    }
+
     @Test fun undoJoinsTheTime() {
         start(Mode.Sim)
         wait(100); tap("phone.next")

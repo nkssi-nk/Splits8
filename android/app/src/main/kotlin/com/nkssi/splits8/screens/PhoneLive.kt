@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -186,15 +188,20 @@ fun PhoneLiveView() {
 
     Sensors(eng, ctx)
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {
+    // 1.1.2: 아이폰처럼 상태 줄 · 아래 내비게이션 줄을 뺀 안전 영역 안에만 그림 (크기 계산도 안전 영역 높이로)
+    BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
         val m = LiveMetrics(maxHeight.value)
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             // 빌드 24: 제목 / ● Phone · No HR / n / 16 / 막대 (워치 같이 보기 화면과 같은 머리)
             val frame = phoneFrame(eng, now)
             LiveHeader(frame, "Phone · No HR", live = false, tagPrefix = "phone")
-            LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
-            LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
-            Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
+            // 1.1.2: 가운데는 남는 자리만 씀 → 글자가 커도 아래 버튼(Next/완료 · End · Undo · Pause)은 항상 보임 (아이폰 Spacer(minLength: 16) 와 같음)
+            Column(Modifier.weight(1f).clipToBounds()) {
+                LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
+                LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
+            }
+            Spacer(Modifier.height(16.dp))
             // Next 버튼 (GPS 러닝은 1 km 마다 저절로)
             val gpsRun = eng.isRunKind && eng.useGPS
             val enabled = eng.running && !gpsRun
@@ -217,6 +224,7 @@ fun PhoneLiveView() {
                     if (eng.running) Color.White else C.accent, Color.White.copy(alpha = 0.12f), m.pillH, "phone.pause") { eng.togglePause() }
             }
         }
+    }
         // 넘길 때 노랗게 반짝
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(C.accent.copy(alpha = flash.value * 0.22f)))
         // 시작 전 3 · 2 · 1 (누르면 취소하고 돌아감)
@@ -362,7 +370,9 @@ fun FinishSheet(rec: Record) {
     }
     // 빌드 24: 이 기록으로 새로 받은 배지 (있으면 카드가 그만큼 길어짐)
     val nb = remember(rec.id, Store.records) { com.nkssi.splits8.shared.Badges.new(rec, Store.records) }
-    Box(Modifier.fillMaxWidth().height(if (nb.isEmpty()) 400.dp else 470.dp)) {
+    // 1.1.2: 높이를 고정하지 않음 (예전 400/470 고정 → 멘트가 두 줄 · 배지 · 큰 글자면 아래 Share/완료 버튼이 밀려 안 보였음).
+    // 아이폰처럼 최소 400, 내용이 길면 그만큼 늘어나고 버튼은 항상 맨 아래
+    Box(Modifier.fillMaxWidth().heightIn(min = 400.dp)) {
         if (isGold) {
             // 카드 위쪽 금색 빛 (축하)
             androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(300.dp)) {
@@ -370,7 +380,7 @@ fun FinishSheet(rec: Record) {
                     center = androidx.compose.ui.geometry.Offset(size.width / 2, 0f), radius = 320.dp.toPx()))
             }
         }
-        Column(Modifier.fillMaxSize().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 12.dp + 52.dp + 16.dp)) {
             c.tag?.let { FinishTag(it, c.tone, rec) }
             T(c.line, F.t(F.title2, W600), Modifier.testTag("finish.line"), translate = false)
             val name = if (rec.mode == Mode.Training) rec.title else rec.mode.title.l10n
@@ -380,8 +390,8 @@ fun FinishSheet(rec: Record) {
                 for ((l, v, u) in finishTiles(rec)) FinishTile(l, v, u)
             }
             if (nb.isNotEmpty()) NewBadgesRow(nb, Modifier.padding(top = 12.dp))
-            Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        }
+        Row(Modifier.align(Alignment.BottomCenter).padding(start = 22.dp, end = 22.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
                     Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).press(tag = "finish.primary") {
                         Router.finish = null
@@ -394,7 +404,6 @@ fun FinishSheet(rec: Record) {
                         .press(tag = "finish.done") { Router.finish = null },
                     contentAlignment = Alignment.Center,
                 ) { T("Done", F.t(17, W600), maxLines = 1) }
-            }
         }
     }
 }

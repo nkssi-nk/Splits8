@@ -8,6 +8,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -92,7 +97,8 @@ fun WatchLiveView() {
     val z = st?.zone ?: 0
     val glow by animateColorAsState(if (z in 1..5) C.zone(z) else hex(Store.settings.glow.hex), tween(800), label = "zone")
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val m = LiveMetrics(maxHeight.value)
+        val bars = WindowInsets.systemBars.asPaddingValues()
+        val m = LiveMetrics(maxHeight.value - bars.calculateTopPadding().value - bars.calculateBottomPadding().value)
         Canvas(Modifier.fillMaxWidth().height(maxHeight * 0.5f)) {
             drawRect(Brush.radialGradient(listOf(glow.copy(alpha = 0.30f), glow.copy(alpha = 0f)), Offset(size.width / 2, 0f), 420.dp.toPx()))
         }
@@ -102,7 +108,8 @@ fun WatchLiveView() {
             }
             return@BoxWithConstraints
         }
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        // 1.1.2: 아이폰처럼 상태 줄 · 내비게이션 줄을 뺀 안전 영역 안에만 그림
+        Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 20.dp)) {
             val f = watchFrame(st, now, WatchMirror.received)
             LiveHeader(f, if (WatchMirror.reconnecting) "Watch · Reconnecting…" else "Watch · Live", !WatchMirror.reconnecting, "watchLive")
             when {
@@ -110,11 +117,14 @@ fun WatchLiveView() {
                 WatchMirror.discarded -> Spacer(Modifier.weight(1f))
                 st.finished || WatchMirror.ended -> Saving(Modifier.weight(1f))
                 else -> {
-                    LiveBody(f, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "watchLive",
-                        Modifier.padding(top = (m.top * 0.6f).dp))
-                    Chips(st, Modifier.padding(top = (14 * m.k).dp))
-                    LiveNextRow(f.next, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop * 0.7f, m.k, "watchLive")
-                    Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
+                    // 1.1.2: 가운데는 남는 자리만 → 아래 버튼은 항상 보임
+                    Column(Modifier.weight(1f).clipToBounds()) {
+                        LiveBody(f, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "watchLive",
+                            Modifier.padding(top = (m.top * 0.6f).dp))
+                        Chips(st, Modifier.padding(top = (14 * m.k).dp))
+                        LiveNextRow(f.next, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop * 0.7f, m.k, "watchLive")
+                    }
+                    Spacer(Modifier.height(16.dp))
                     Buttons(st, m) { strong -> view.performHapticFeedback(if (strong) HapticFeedbackConstants.LONG_PRESS else HapticFeedbackConstants.VIRTUAL_KEY) }
                 }
             }

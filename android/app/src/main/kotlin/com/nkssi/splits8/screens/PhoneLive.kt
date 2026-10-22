@@ -151,7 +151,17 @@ fun PhoneLiveView() {
     fun done(rec: Record) {
         Store.addPhoneRecord(rec)
         // 기록 상세 위로 "수고했어요" 카드
-        Router.showFinish(Store.records.firstOrNull { it.id == rec.id } ?: rec.copy(source = "phone"), req.from)
+        // 1.1.2: 트레이닝 편집 화면 등 탭이 아닌 곳에서 시작했으면, 기록 화면의 뒤로 가기는 그 모드의 탭으로
+        // (예전엔 편집 화면에서 시작하면 "‹ Race" 라고 나오고 누르면 편집 화면으로 감)
+        val back = when (req.from) {
+            Scr.Home, Scr.Training, Scr.Sim, Scr.Race -> req.from
+            else -> when (rec.mode) {
+                Mode.Training -> Scr.Training
+                Mode.Race -> Scr.Race
+                else -> { Router.testTab = if (rec.mode == Mode.Pft) "pft" else "sim"; Scr.Sim }
+            }
+        }
+        Router.showFinish(Store.records.firstOrNull { it.id == rec.id } ?: rec.copy(source = "phone"), back)
     }
     fun askEnd() {
         Router.ask = Ask("End workout?", "Save the segments you've done so far?", ok = "Save", cancel = "Cancel",

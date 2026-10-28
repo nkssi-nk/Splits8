@@ -11,6 +11,10 @@ struct FriendsView: View {
     @State private var searchState = ""
     /// 차단 확인창에 띄울 사람
     @State private var blockAsk: BlockedUser?
+    /// 16번: 친구 삭제 확인창에 띄울 사람
+    @State private var removeAsk: BlockedUser?
+    /// 17번: 꾹 눌러 순서 바꾸기
+    @State private var reorder = Reorder()
     /// 메일 앱을 열 수 없을 때 주소 안내
     @State private var mailFail = false
     /// 빌드 24: 친구 10명이 다 참
@@ -54,16 +58,24 @@ struct FriendsView: View {
             }
             Note8(text: "The selected friend's records are used as the Full Simulation comparison and as Training split targets.", color: C.text2)
                 .padding(.bottom, 4)
-            if !store.friends.isEmpty {
+            let shown: [Friend] = store.shownFriends
+            if !shown.isEmpty {
+                // 17번: 0.35초 꾹 누르면 "툭" → 끌어서 순서 바꾸기 (이 폰에만 저장)
+                let ids: [String] = shown.map(\.id)
+                let ordered: [Indexed<Friend>] = reorder.order(shown.count).map { Indexed(i: $0, item: shown[$0]) }
                 VStack(spacing: 0) {
-                    ForEach(Array(store.friends.enumerated()), id: \.element.id) { i, f in
-                        friendRow(f, last: i == store.friends.count - 1)
+                    ForEach(Array(ordered.enumerated()), id: \.element.id) { slot, x in
+                        friendRow(x.item, last: slot == ordered.count - 1 || reorder.from == x.i)
+                            .reorderRow(index: x.i, ids: ids, state: $reorder) { f, t in
+                                store.setFriendOrder(ids.moved(f, to: t))
+                            }
                     }
                 }
                 .card8()
             }
             Note8(text: "Tap to compare · Tap again to clear · VS is against your best")
             sentSection
+            hiddenSection
             blockedSection
         }
         .padding(.horizontal, 16)
@@ -94,6 +106,18 @@ struct FriendsView: View {
         } message: {
             Text("They are removed from your friends and hidden from your search and rankings. You can unblock them here later.")
         }
+        .alert(String(localized: "Remove @\(removeAsk?.name ?? "") from friends?"),
+               isPresented: Binding(get: { removeAsk != nil }, set: { if !$0 { removeAsk = nil } })) {
+            Button("Remove", role: .destructive) {
+                if let b = removeAsk {
+                    withAnimation(.easeOut(duration: 0.25)) { store.removeFriend(id: b.id) }
+                }
+                removeAsk = nil
+            }
+            Button("Cancel", role: .cancel) { removeAsk = nil }
+        } message: {
+            Text("They won't be notified. You can add them again later.")
+        }
         .alert("Report by email", isPresented: $mailFail) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -103,9 +127,18 @@ struct FriendsView: View {
 
     // MARK: 신고 · 차단 (다른 사용자의 닉네임 · 사진이 보이는 곳)
 
-    /// ··· 메뉴: Report (운영자에게 메일) · Block
-    private func moreMenu(id: String, name: String) -> some View {
+    /// ··· 메뉴: (친구면) Hide · Remove friend · Report (운영자에게 메일) · Block
+    private func moreMenu(id: String, name: String, isFriend: Bool = false) -> some View {
         Menu {
+            if isFriend {
+                Button {
+                    let u: HideUndo = withAnimation(.easeOut(duration: 0.25)) { store.hide(id: id, name: name) }
+                    r.showHideUndo(u)
+                } label: { Label("Hide", systemImage: "eye.slash") }
+                Button(role: .destructive) { removeAsk = BlockedUser(id: id, name: name) } label: {
+                    Label("Remove friend", systemImage: "person.badge.minus")
+                }
+            }
             Button { report(id: id, name: name) } label: { Label("Report", systemImage: "flag") }
             Button(role: .destructive) { blockAsk = BlockedUser(id: id, name: name) } label: {
                 Label("Block user", systemImage: "hand.raised")
@@ -250,6 +283,34 @@ struct FriendsView: View {
         .buttonStyle(Press(scale: 0.96))
     }
 
+    /// 16번: 숨긴 친구 목록 (Unhide 로 다시 보이기). 이 폰에만
+    @ViewBuilder private var hiddenSection: some View {
+        let list: [BlockedUser] = store.settings.hidden
+        if !list.isEmpty {
+            SectionLabel(text: "HIDDEN FRIENDS", top: 14)
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.element.id) { i, b in
+                    HStack(spacing: 12) {
+                        Text("@" + b.name).font(F.t(17)).foregroundStyle(C.text2).lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button { withAnimation(.easeOut(duration: 0.2)) { store.unhide(b.id) } } label: {
+                            Text("Unhide").font(F.t(13, .semibold)).foregroundStyle(.white)
+                                .padding(.horizontal, 14).frame(height: 32)
+                                .background(Color.white.opacity(0.12), in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(Press(scale: 0.96))
+                        .accessibilityIdentifier("friends.unhide")
+                    }
+                    .padding(.vertical, 11).padding(.horizontal, 18)
+                    .rowLine(i < list.count - 1)
+                }
+            }
+            .card8()
+            Note8(text: "Hidden friends stay friends. They're only hidden on this iPhone.")
+        }
+    }
+
     /// 차단한 사람 목록 (Unblock 으로 풂)
     @ViewBuilder private var blockedSection: some View {
         let list: [BlockedUser] = store.settings.blocked
@@ -332,7 +393,10 @@ struct FriendsView: View {
         let myBest = store.simBest?.total
         let d: Int? = (myBest != nil && f.hasSplits) ? f.total - (myBest ?? 0) : nil
         return HStack(spacing: 0) {
-          Button { if f.hasSplits { store.toggleFriend(f) } } label: {
+          Button {
+              if ReorderKit.blocksTap { return }
+              if f.hasSplits { store.toggleFriend(f) }
+          } label: {
             HStack(spacing: 14) {
                 FriendAvatar(url: f.avatarUrl, ini: f.ini, size: 40)
                     .photoTap(f.avatarUrl.map { PhotoItem(url: $0, title: "@" + f.name, sub: f.div) })
@@ -364,7 +428,7 @@ struct FriendsView: View {
           }
           .buttonStyle(Press(scale: 0.9))
           .accessibilityIdentifier("friends.cheer")
-          moreMenu(id: f.id, name: f.name)
+          moreMenu(id: f.id, name: f.name, isFriend: true)
               .padding(.trailing, 6)
         }
         .rowLine(!last)
@@ -510,18 +574,7 @@ private struct FriendAvatar: View {
     let ini: String
     let size: CGFloat
     var body: some View {
-        ZStack {
-            Avatar8(size: size, initial: ini, fontSize: 15)
-            if let url, let u = URL(string: url) {
-                AsyncImage(url: u) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Color.clear
-                }
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-            }
-        }
-        .frame(width: size, height: size)
+        // 14번: AsyncImage 대신 RemoteImages (저장 + 취소 안 됨)
+        Avatar8(size: size, photo: RemoteImages.shared.image(url), initial: ini, fontSize: 15)
     }
 }

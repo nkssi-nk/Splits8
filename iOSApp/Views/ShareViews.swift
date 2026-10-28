@@ -208,6 +208,9 @@ struct ShareCard: View {
                         Text("Tap to choose a photo").font(F.t(13, .medium))
                     }
                     .foregroundStyle(C.text2)
+                    // 10번: 가운데면 날짜 · 큰 시간과 겹침 → 위쪽 빈 사진 자리로 (안드로이드 세로 비율 −0.5 와 같음)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .modifier(QuarterUp())
                 }
             }
         }
@@ -1504,5 +1507,14 @@ enum ShareSheet {
         let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
         vc.popoverPresentationController?.sourceView = top.view
         top.present(vc, animated: true)
+    }
+}
+
+/// 10번: 자리 표시를 높이의 25% 지점(가운데에서 위로 1/4)으로
+private struct QuarterUp: ViewModifier {
+    func body(content: Content) -> some View {
+        GeometryReader { g in
+            content.offset(y: -g.size.height * 0.25)
+        }
     }
 }

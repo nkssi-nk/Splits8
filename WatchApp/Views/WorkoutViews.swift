@@ -402,7 +402,6 @@ struct WLive: View {
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .modifier(DoubleTapNext())
             .accessibilityLabel(Text(isLast ? "Finish" : "Next"))
             .accessibilityIdentifier("w.next")
         }
@@ -420,17 +419,6 @@ struct WLive: View {
         .buttonStyle(.plain)
         .disabled(!on)
         .accessibilityIdentifier(id)
-    }
-}
-
-/// 더블탭(손가락 두 번 톡톡) = 다음 구간 (watchOS 11 이상)
-struct DoubleTapNext: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(watchOS 11.0, *) {
-            content.handGestureShortcut(.primaryAction)
-        } else {
-            content
-        }
     }
 }
 

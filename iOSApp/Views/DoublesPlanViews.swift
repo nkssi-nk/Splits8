@@ -79,11 +79,11 @@ struct DoublesPlanSheet: View {
                 .padding(.vertical, 12).padding(.horizontal, 14)
                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityIdentifier("dbl.partner")
-            if !store.friends.isEmpty {
+            if !store.shownFriends.isEmpty {
                 Text("Or pick a friend").font(F.t(13)).foregroundStyle(C.text2)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(store.friends) { f in
+                        ForEach(store.shownFriends) { f in
                             friendChip(f)
                         }
                     }

@@ -778,6 +778,18 @@ struct Settings: Codable, Hashable {
         get { blockedOpt ?? [] }
         set { blockedOpt = newValue.isEmpty ? nil : newValue }
     }
+    /// 16번: 숨긴 친구 (이 폰에만, 다른 기기와 안 맞춤). 차단 목록과 같은 모양 — 예전 저장 파일과 호환되도록 옵셔널
+    var hiddenOpt: [BlockedUser]? = nil
+    var hidden: [BlockedUser] {
+        get { hiddenOpt ?? [] }
+        set { hiddenOpt = newValue.isEmpty ? nil : newValue }
+    }
+    /// 17번: 친구 목록 순서 (id). 이 폰에만, 서버에 안 올림. 없는 친구는 맨 아래(서버 순서)
+    var friendOrderOpt: [String]? = nil
+    var friendOrder: [String] {
+        get { friendOrderOpt ?? [] }
+        set { friendOrderOpt = newValue.isEmpty ? nil : newValue }
+    }
 
     // 배경 빛 색 (설정 > Theme). 노랑이 기본 — 예전 저장 파일과 호환되도록 옵셔널, 노랑이면 비워 둠
     var themeOpt: String? = nil

@@ -117,3 +117,165 @@ struct NoticeBanner: View {
         .accessibilityIdentifier("notice.banner")
     }
 }
+
+// MARK: - 4번 · 앱 안 업데이트 안내 (홈 화면 위 띠)
+// 앱을 켤 때 하루 한 번 App Store 최신 버전 조회 → 내 버전보다 높으면 홈 위에 띠 [Update] [×].
+// × = 그 버전은 다시 안 띄움. TestFlight · 데모 · 처음 설치 안내 · 운동 중에는 안 띄움. 실패하면 조용히 넘어감.
+
+enum AppUpdate {
+    static let lookupURL = URL(string: "https://itunes.apple.com/lookup?bundleId=com.nkssi.splits8&country=kr")!
+    static let storeURL = URL(string: "itms-apps://apps.apple.com/app/id6817286611")!
+    private static let checkedKey = "update.checkedAt"
+    private static let latestKey = "update.latest"
+    private static let dismissedKey = "update.dismissed"
+
+    /// TestFlight 로 설치한 빌드 (베타는 TestFlight 가 알림 · 업데이트 담당)
+    static var isTestFlight: Bool {
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
+
+    /// 숫자 단위 비교: a 가 b 보다 높으면 true (1.1.10 > 1.1.9)
+    static func isNewer(_ a: String, than b: String) -> Bool {
+        let x: [Int] = a.split(separator: ".").map { Int($0) ?? 0 }
+        let y: [Int] = b.split(separator: ".").map { Int($0) ?? 0 }
+        let n: Int = max(x.count, y.count)
+        for i in 0..<n {
+            let p: Int = i < x.count ? x[i] : 0
+            let q: Int = i < y.count ? y[i] : 0
+            if p != q { return p > q }
+        }
+        return false
+    }
+
+    /// 띄울 새 버전 (없으면 nil). 조회는 하루 한 번, 그 사이에는 저장해 둔 값을 씀
+    static func available() async -> String? {
+        let d = UserDefaults.standard
+        var latest: String? = d.string(forKey: latestKey)
+        let last: Date = (d.object(forKey: checkedKey) as? Date) ?? .distantPast
+        if Date().timeIntervalSince(last) > 24 * 3600 {
+            if let v = await fetchLatest() {
+                latest = v
+                d.set(v, forKey: latestKey)
+            }
+            d.set(Date(), forKey: checkedKey)
+        }
+        guard let v = latest, isNewer(v, than: ReviewAsk.appVersion) else { return nil }
+        if d.string(forKey: dismissedKey) == v { return nil }
+        return v
+    }
+
+    static func dismiss(_ version: String) {
+        UserDefaults.standard.set(version, forKey: dismissedKey)
+    }
+
+    private struct Lookup: Decodable {
+        struct Item: Decodable { let version: String? }
+        let results: [Item]
+    }
+
+    private static func fetchLatest() async -> String? {
+        var req = URLRequest(url: lookupURL)
+        req.timeoutInterval = 10
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        guard let got = try? await URLSession.shared.data(for: req),
+              (got.1 as? HTTPURLResponse)?.statusCode == 200,
+              let info = try? JSONDecoder().decode(Lookup.self, from: got.0) else { return nil }
+        return info.results.first?.version
+    }
+}
+
+extension Router {
+    /// 앱이 앞으로 올 때: 새 버전이 있으면 홈 위 띠에 보일 버전을 정함
+    @MainActor
+    func checkUpdate() async {
+        guard !Demo.enabled, !AppUpdate.isTestFlight, Store.shared.settings.hasOnboarded else { return }
+        guard let v = await AppUpdate.available() else { return }
+        // 운동 중이면 띄우지 않음 (다음에 앱을 열 때 다시)
+        guard phoneRun == nil, !liveMirror else { return }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { updateVersion = v }
+    }
+
+    func dismissUpdate() {
+        if let v = updateVersion { AppUpdate.dismiss(v) }
+        withAnimation(.easeOut(duration: 0.2)) { updateVersion = nil }
+    }
+}
+
+/// 홈 화면 위 "새 버전" 띠: 글 · [Update] · [×]
+struct UpdateBanner: View {
+    let version: String
+    let r = Router.shared
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("A new version is available (\(version))")
+                .font(F.t(14, .semibold)).foregroundStyle(.black)
+                .lineLimit(2).minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                UIApplication.shared.open(AppUpdate.storeURL)
+            } label: {
+                Text("Update").font(F.t(14, .bold)).foregroundStyle(C.accent)
+                    .padding(.horizontal, 14).frame(height: 32)
+                    .background(Color.black, in: Capsule())
+            }
+            .buttonStyle(Press(scale: 0.95))
+            .accessibilityIdentifier("update.open")
+            Button {
+                r.dismissUpdate()
+            } label: {
+                Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.black)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Close"))
+            .accessibilityIdentifier("update.close")
+        }
+        .padding(.leading, 16).padding(.trailing, 6).padding(.vertical, 8)
+        .background(C.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityIdentifier("update.banner")
+    }
+}
+
+// MARK: - 16번 · 친구 숨긴 뒤 "Hidden · Undo" 띠 (4초 뒤 사라짐)
+
+extension Router {
+    func showHideUndo(_ u: HideUndo) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { hideUndo = u }
+        let token: UUID = u.token
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+            guard let self, self.hideUndo?.token == token else { return }
+            withAnimation(.easeOut(duration: 0.3)) { self.hideUndo = nil }
+        }
+    }
+
+    func undoHide(_ u: HideUndo) {
+        withAnimation(.easeOut(duration: 0.25)) {
+            Store.shared.undoHide(u)
+            hideUndo = nil
+        }
+    }
+}
+
+struct HideUndoBanner: View {
+    let onUndo: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("Hidden").font(F.t(15, .semibold)).foregroundStyle(.white).lineLimit(1)
+            Spacer(minLength: 4)
+            Button(action: onUndo) {
+                Text("Undo").font(F.t(15, .semibold)).foregroundStyle(C.accent)
+                    .padding(.horizontal, 10).frame(height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(Press(scale: 0.95))
+            .accessibilityIdentifier("friends.undoHide")
+        }
+        .padding(.leading, 18).padding(.trailing, 8).frame(height: 48)
+        .background(C.control, in: Capsule())
+        .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+    }
+}

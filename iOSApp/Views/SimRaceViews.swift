@@ -671,7 +671,7 @@ struct RaceLeaderboard: View {
     private var noRecordFriends: [Friend] {
         let ranked: Set<String> = Set(store.leaderboard.map(\.user_id))
         let divName: String = store.div.name
-        return store.friends.filter { f in
+        return store.shownFriends.filter { f in
             !ranked.contains(f.id) && (store.settings.lbAllDivisions || f.div == divName)
         }
     }
@@ -773,21 +773,8 @@ private struct RaceLbAvatar: View {
     let initial: String
 
     var body: some View {
-        if let s = url, let u = URL(string: s) {
-            AsyncImage(url: u) { img in
-                img.resizable().scaledToFill()
-            } placeholder: {
-                fallback
-            }
-            .frame(width: 34, height: 34)
-            .clipShape(Circle())
-        } else {
-            fallback
-        }
-    }
-
-    private var fallback: some View {
-        Avatar8(size: 34, photo: photo, initial: initial,
+        // 14번: AsyncImage 대신 RemoteImages (저장 + 취소 안 됨)
+        Avatar8(size: 34, photo: RemoteImages.shared.image(url) ?? photo, initial: initial,
                 bg: me ? C.accent : C.control, fg: me ? Color.black : Color.white, fontSize: 15)
     }
 }

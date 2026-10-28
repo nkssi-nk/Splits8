@@ -13,6 +13,10 @@ struct HomeView: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            // 4번: 새 버전 안내 띠
+            if let v = r.updateVersion {
+                UpdateBanner(version: v)
+            }
             // 대표님 요청 순서: 프로필 → 대회 일정 → 기록 달력(예약·기록 확인) → 주/월 요약 (예정된 운동 목록은 달력으로 대체)
             Group {
                 profileCard

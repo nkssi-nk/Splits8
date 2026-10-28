@@ -474,6 +474,28 @@ data class Friend(
     val hasSplits: Boolean get() = splits.size == 16
 }
 
+/** 17번: 꾹 눌러 끌어서 정한 순서 (친구 목록). 서버가 주는 순서 위에 덮어 씀 */
+object ListOrder {
+    /** order(id 목록) 순서대로. order 에 없는 것(새 친구)은 원래 순서 그대로 맨 아래 */
+    fun <T> ordered(items: List<T>, order: List<String>, id: (T) -> String): List<T> {
+        if (order.isEmpty()) return items
+        val pos = HashMap<String, Int>()
+        order.forEachIndexed { i, s -> if (s !in pos) pos[s] = i }
+        return items.withIndex()
+            .sortedWith(compareBy<IndexedValue<T>>({ pos[id(it.value)] ?: Int.MAX_VALUE }, { it.index }))
+            .map { it.value }
+    }
+
+    /** 보이는 줄(visible, all 의 일부를 같은 순서로) 안에서 from → to 로 옮긴 뒤의 전체 순서. 안 보이는 것(숨긴 친구)은 제자리 */
+    fun moved(all: List<String>, visible: List<String>, from: Int, to: Int): List<String> {
+        if (from !in visible.indices || to !in visible.indices || from == to) return all
+        val v = visible.toMutableList().also { it.add(to, it.removeAt(from)) }
+        val set = visible.toHashSet()
+        var k = 0
+        return all.map { if (it in set && k < v.size) v[k++] else it }
+    }
+}
+
 // MARK: 대회 목록 (서버 목록이 없을 때 쓰는 기본값)
 
 @Serializable
@@ -838,12 +860,18 @@ data class Settings(
     val repCal: Map<String, RepTune>? = null,
     /** 91번(빌드 28): 홈 프로필 카드 오른쪽에 보일 것. null / "auto" = 가장 최근에 세운 최고 기록, sim · race · pft · run · goal */
     val homeShow: String? = null,
+    /** 16번: 이 폰에서만 숨긴 친구 (차단 목록과 같은 모양 — id · 숨길 때의 닉네임). 다른 기기와 안 맞춤. 없으면 비워 둠 */
+    val hiddenOpt: List<BlockedUser>? = null,
+    /** 17번: 친구 목록 순서 (친구 id). 이 폰에만. 없으면 서버 순서, 목록에 없는 새 친구는 맨 아래 */
+    val friendOrderOpt: List<String>? = null,
 ) {
     /** lb · mi 로 보여 주는지 */
     val imperial: Boolean get() = units == "imperial"
     val hapticZone: Boolean get() = hapticZoneOpt ?: true
     val hapticPace: Boolean get() = hapticPaceOpt ?: true
     val blocked: List<BlockedUser> get() = blockedOpt ?: emptyList()
+    val hidden: List<BlockedUser> get() = hiddenOpt ?: emptyList()
+    val friendOrder: List<String> get() = friendOrderOpt ?: emptyList()
     val glow: GlowTheme get() = GlowTheme.of(themeOpt)
     /** 워치 운동을 폰에 같이 보여 주기 (기본 켬) */
     val mirror: Boolean get() = mirrorOpt ?: true
@@ -856,6 +884,8 @@ data class Settings(
     fun withHapticZone(v: Boolean) = copy(hapticZoneOpt = v)
     fun withHapticPace(v: Boolean) = copy(hapticPaceOpt = v)
     fun withBlocked(v: List<BlockedUser>) = copy(blockedOpt = v.ifEmpty { null })
+    fun withHidden(v: List<BlockedUser>) = copy(hiddenOpt = v.ifEmpty { null })
+    fun withFriendOrder(v: List<String>) = copy(friendOrderOpt = v.ifEmpty { null })
     fun withGlow(v: GlowTheme) = copy(themeOpt = if (v == GlowTheme.Yellow) null else v.raw)
     fun withMirror(v: Boolean) = copy(mirrorOpt = if (v) null else false)
 

@@ -267,4 +267,33 @@ class ModelsTest {
         assertFalse(CheerPicker.pick(base.copy(goalDelta = -65)).line.startsWith("Goal"))
         L10n.lang = "en"
     }
+
+    /** 17번: 친구 순서 — 정한 순서대로, 새 친구는 맨 아래, 숨긴 친구는 제자리 */
+    @Test fun listOrderApplyAndMove() {
+        val ids = listOf("a", "b", "c", "d")
+        assertEquals(ids, ListOrder.ordered(ids, emptyList()) { it })
+        // 저장된 순서 c, a + 목록에 없는 b · d 는 원래 순서로 아래 (지워진 x 는 무시)
+        assertEquals(listOf("c", "a", "b", "d"), ListOrder.ordered(ids, listOf("c", "x", "a")) { it })
+        // 맨 위 ↔ 맨 아래
+        assertEquals(listOf("b", "c", "d", "a"), ListOrder.moved(ids, ids, 0, 3))
+        assertEquals(listOf("d", "a", "b", "c"), ListOrder.moved(ids, ids, 3, 0))
+        // b 를 숨김: 보이는 a c d 에서 d 를 맨 위로 → b 는 둘째 자리 그대로
+        assertEquals(listOf("d", "b", "a", "c"), ListOrder.moved(ids, listOf("a", "c", "d"), 2, 0))
+        assertEquals(ids, ListOrder.moved(ids, ids, 1, 9))
+    }
+
+    /** 16 · 17번: 숨긴 친구 · 친구 순서 — 예전 설정 파일도 읽히고, 비어 있으면 파일에 안 씀 */
+    @Test fun hiddenAndOrderSettingsCompatible() {
+        val old = SplitsJson.decodeFromString(Settings.serializer(), """{"division":"openW","blockedOpt":[{"id":"x","name":"xx"}]}""")
+        assertTrue(old.hidden.isEmpty())
+        assertTrue(old.friendOrder.isEmpty())
+        assertEquals("x", old.blocked.single().id)
+        val plain = SplitsJson.encodeToString(Settings.serializer(), Settings().withHidden(emptyList()).withFriendOrder(emptyList()))
+        assertFalse(plain.contains("hiddenOpt"))
+        assertFalse(plain.contains("friendOrderOpt"))
+        val s = Settings().withHidden(listOf(BlockedUser("u1", "jiho"))).withFriendOrder(listOf("u2", "u1"))
+        val back = SplitsJson.decodeFromString(Settings.serializer(), SplitsJson.encodeToString(Settings.serializer(), s))
+        assertEquals("jiho", back.hidden.single().name)
+        assertEquals(listOf("u2", "u1"), back.friendOrder)
+    }
 }

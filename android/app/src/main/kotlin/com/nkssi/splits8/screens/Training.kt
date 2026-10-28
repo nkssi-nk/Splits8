@@ -99,7 +99,11 @@ import com.nkssi.splits8.ui.W600
 import com.nkssi.splits8.ui.W700
 import com.nkssi.splits8.ui.card8
 import com.nkssi.splits8.ui.doubleChevron
+import com.nkssi.splits8.ui.dragLift
 import com.nkssi.splits8.ui.press
+import com.nkssi.splits8.ui.rememberReorder
+import com.nkssi.splits8.ui.reorderItem
+import com.nkssi.splits8.ui.reorderLongPress
 import com.nkssi.splits8.ui.rowLine
 import com.nkssi.splits8.ui.statusTop
 import com.nkssi.splits8.ui.strokeBorder
@@ -121,14 +125,25 @@ fun TrainingView() {
             Store.friend?.let { FriendTargets(it) }
             val progs = Store.programs
             if (progs.isNotEmpty()) ListHeader(progs.size)
-            for (p in progs) {
-                SwipeDelete(
-                    "Delete this training?", Modifier.fillMaxWidth().testTag("training.card"), corner = 20.dp,
-                    alertMessage = "Records you've done with it stay in History.",
-                    onTap = { if (p.isOpen) Router.bonus = BonusRequest(p.kind ?: "run", p) else Router.edit(p) },
-                    onDelete = { Store.deleteProgram(p.id) },
-                ) {
-                    ProgramCard(p, p.id in expanded) { expanded = if (p.id in expanded) expanded - p.id else expanded + p.id }
+            // 17번: 꾹 눌러 끌어서 순서 바꾸기 (programs 순서 그대로 저장 → 워치에도 같은 순서). 지우기는 왼쪽으로 밀기
+            val re = rememberReorder(10.dp)
+            if (progs.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                re.order(progs.size).forEach { i ->
+                    if (i in progs.indices) key(progs[i].id) {
+                        val p = progs[i]
+                        Box(Modifier.reorderItem(re, i, corner = 20.dp)) {
+                            SwipeDelete(
+                                "Delete this training?", Modifier.fillMaxWidth().testTag("training.card"), corner = 20.dp,
+                                alertMessage = "Records you've done with it stay in History.",
+                                onTap = { if (p.isOpen) Router.bonus = BonusRequest(p.kind ?: "run", p) else Router.edit(p) },
+                                onDelete = { Store.deleteProgram(p.id) },
+                                longPressDelete = false,
+                                inner = Modifier.reorderLongPress(re, i, progs.size) { from, to -> Store.movePrograms(from, to) },
+                            ) {
+                                ProgramCard(p, p.id in expanded) { expanded = if (p.id in expanded) expanded - p.id else expanded + p.id }
+                            }
+                        }
+                    }
                 }
             }
             TrainingHistory()
@@ -579,15 +594,10 @@ private fun SeqRow(
     slot: Int, it: ProgItem, dragging: Boolean, last: Boolean, offsetPx: Float, onSize: (Int) -> Unit,
     onRemove: () -> Unit, handle: Modifier,
 ) {
-    val sc by animateFloatAsState(if (dragging) 1.03f else 1f, tween(150), label = "drag")
-    val shape = RoundedCornerShape(if (dragging) 14.dp else 0.dp)
     Row(
         Modifier.fillMaxWidth()
-            .offset { IntOffset(0, offsetPx.roundToInt()) }
-            .scale(sc)
-            .then(if (dragging) Modifier.shadow(12.dp, shape) else Modifier)
-            .clip(shape)
-            .background(if (dragging) C.segOn else Color.Transparent)
+            // 17번: 끄는 줄 모양은 트레이닝 목록 · 친구 목록과 공용 (ui/Reorder.kt)
+            .dragLift(dragging) { offsetPx }
             .onSizeChanged { s -> onSize(s.height) }
             .rowLine(!dragging && !last)
             .padding(vertical = 11.dp).padding(start = 16.dp),

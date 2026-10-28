@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,6 +58,9 @@ import com.nkssi.splits8.ui.W600
 import com.nkssi.splits8.ui.YellowPill
 import com.nkssi.splits8.ui.card8
 import com.nkssi.splits8.ui.press
+import com.nkssi.splits8.ui.rememberReorder
+import com.nkssi.splits8.ui.reorderItem
+import com.nkssi.splits8.ui.reorderLongPress
 import com.nkssi.splits8.ui.rowLine
 import com.nkssi.splits8.ui.tap
 import kotlinx.coroutines.delay
@@ -138,13 +142,26 @@ fun FriendsView() {
                 }
             }
             Note8("The selected friend's records are used as the Full Simulation comparison and as Training split targets.", Modifier.padding(bottom = 4.dp), C.text2)
-            if (Store.friends.isNotEmpty()) {
-                Column(Modifier.fillMaxWidth().card8()) {
-                    Store.friends.forEachIndexed { i, f -> FriendRow(f, i == Store.friends.size - 1) }
+            // 16번: 숨긴 친구는 빼고 · 17번: 내가 정한 순서대로, 꾹 눌러 끌어서 순서 바꾸기 (이 폰에만 저장)
+            val shown = Store.shownFriends
+            val re = rememberReorder()
+            if (shown.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().card8().testTag("friends.list")) {
+                    val order = re.order(shown.size)
+                    order.forEachIndexed { slot, i ->
+                        // 원래 번호 · id 로 key — 끄는 동안 자리가 바뀌어도 같은 줄이 손가락을 계속 잡고 있게
+                        if (i in shown.indices) key(shown[i].id) {
+                            Box(Modifier.reorderItem(re, i)) {
+                                FriendRow(shown[i], last = re.dragging(i) || slot == shown.size - 1,
+                                    drag = Modifier.reorderLongPress(re, i, shown.size) { from, to -> Store.moveFriend(from, to) })
+                            }
+                        }
+                    }
                 }
             }
             Note8("Tap to compare · Tap again to clear · VS is against your best")
             Sent()
+            Hidden()
             Blocked()
         }
     }
@@ -289,6 +306,24 @@ private fun Sent() {
     Note8("They'll see your request in Friends. Records are shared once they accept.")
 }
 
+/** 16번: 숨긴 친구 (Unhide 로 다시 보이게). 이 폰에서만 숨김 — 친구 관계는 그대로 */
+@Composable
+private fun Hidden() {
+    val list = Store.settings.hidden
+    if (list.isEmpty()) return
+    SectionLabel("HIDDEN FRIENDS")
+    Column(Modifier.fillMaxWidth().card8().testTag("friends.hidden")) {
+        list.forEachIndexed { i, b ->
+            Row(Modifier.fillMaxWidth().rowLine(i < list.size - 1).padding(vertical = 11.dp, horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                T("@" + b.name, F.t(17, color = C.text2), Modifier.weight(1f), maxLines = 1, translate = false)
+                Pill("Unhide", false, "friends.unhide") { Store.unhide(b.id) }
+            }
+        }
+    }
+    Note8("Only hidden on this phone. They're still your friend and can see your records.")
+}
+
 /** 차단한 사람 (Unblock 으로 풂) */
 @Composable
 private fun Blocked() {
@@ -340,12 +375,13 @@ private fun HitCard(h: RemoteProfile, n: String) {
 
 /** 친구 줄: 40 원 · 이름 17 (고르면 600) + 디비전 · 날짜 · 최고 Full Sim 시간 + 내 최고와의 차이 · 체크 · ··· */
 @Composable
-private fun FriendRow(f: Friend, last: Boolean) {
+private fun FriendRow(f: Friend, last: Boolean, drag: Modifier = Modifier) {
     val on = Store.settings.friendId == f.id
     val myBest = Store.book.simBest?.total
     val d = if (myBest != null && f.hasSplits) f.total - myBest else null
     Row(Modifier.fillMaxWidth().rowLine(!last), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f).tap { if (f.hasSplits) Store.toggleFriend(f) }.testTag("friend." + f.name)
+        // 17번: 꾹 누르기(drag)는 탭보다 안쪽에 — 꾹 눌렀다 그냥 떼도 친구 고르기가 같이 안 눌리게
+        Row(Modifier.weight(1f).tap { if (f.hasSplits) Store.toggleFriend(f) }.then(drag).testTag("friend." + f.name)
             .padding(vertical = 14.dp).padding(start = 18.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Avatar8(40.dp, f.ini, photo = com.nkssi.splits8.RemoteImages.get(f.avatarUrl))
@@ -376,13 +412,32 @@ private fun MoreButton(id: String, name: String) {
     }
 }
 
-/** ··· 을 누르면 아래에서 올라오는 메뉴: Report (운영자에게 메일) · Block user */
+/** ··· 을 누르면 아래에서 올라오는 메뉴: (친구면) Hide · Remove friend · Report (운영자에게 메일) · Block user */
 @Composable
 fun UserMenuSheet(u: BlockedUser) {
     val ctx = LocalContext.current
+    val isFriend = Store.friends.any { it.id == u.id }
     Column(Modifier.padding(horizontal = 16.dp).padding(top = 4.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         T("@" + u.name, F.t(15, W600, C.text2), Modifier.fillMaxWidth(), align = TextAlign.Center, maxLines = 1, translate = false)
         Column(Modifier.fillMaxWidth().card8(14.dp)) {
+            if (isFriend) {
+                // 16번 숨기기: 확인 창 없이 바로 + 아래 "숨겼어요 · 되돌리기" 띠
+                Box(Modifier.fillMaxWidth().heightIn(min = 52.dp).rowLine(true).tap {
+                    Router.userMenu = null
+                    Store.hide(u.id, u.name)
+                    Router.undo = com.nkssi.splits8.UndoNote("Hidden".l10n) { Store.unhide(u.id) }
+                }.testTag("menu.hide").padding(horizontal = 18.dp), contentAlignment = Alignment.CenterStart) {
+                    T("Hide", F.t(17), maxLines = 1)
+                }
+                // 16번 친구 삭제: 확인 창 → 서버에서 양쪽 친구 줄 지움 (차단 목록에는 안 넣음)
+                Box(Modifier.fillMaxWidth().heightIn(min = 52.dp).rowLine(true).tap {
+                    Router.userMenu = null
+                    Router.ask = Ask(L10n.t("Remove @%@ from friends?", u.name), "They won't be notified. You can add them again later.".l10n,
+                        ok = "Remove", destructive = true) { Store.removeFriend(u.id) }
+                }.testTag("menu.remove").padding(horizontal = 18.dp), contentAlignment = Alignment.CenterStart) {
+                    T("Remove friend", F.t(17), maxLines = 1)
+                }
+            }
             Box(Modifier.fillMaxWidth().heightIn(min = 52.dp).rowLine(true).tap {
                 Router.userMenu = null
                 // 신고: 메일 앱을 열어 운영자에게 (누구를 신고하는지 미리 적어 둠). 메일 앱이 없으면 주소를 알려 줌

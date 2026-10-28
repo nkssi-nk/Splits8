@@ -213,10 +213,12 @@ private fun PartnerCard(plan: DoublesPlan, onChange: (DoublesPlan) -> Unit) {
                 onChange(p)
             }, Modifier.fillMaxWidth().testTag("dbl.partner"), textStyle = F.t(17), singleLine = true, cursorBrush = SolidColor(C.accent))
         }
-        if (friends.isNotEmpty()) {
+        // 16번: 고르기 칩에는 숨긴 친구를 빼고 (내가 정한 순서대로)
+        val shown = Store.shownFriends
+        if (shown.isNotEmpty()) {
             T("Or pick a friend", F.t(13, color = C.text2), maxLines = 1)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (f in friends) {
+                for (f in shown) {
                     val on = plan.partnerId == f.id
                     Box(Modifier.height(34.dp).clip(CircleShape).background(if (on) C.accent else Color.White.copy(alpha = 0.10f))
                         .press(0.96f, tag = "dbl.friend." + f.id) {

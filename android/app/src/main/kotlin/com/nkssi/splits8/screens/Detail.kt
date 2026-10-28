@@ -419,7 +419,7 @@ fun PartnerSheet(recordId: String) {
             onLeft = { Router.partnerFor = null }, onRight = { saveTyped() })
         SectionLabel("CHOOSE PARTNER", top = 10.dp)
         Column(Modifier.fillMaxWidth().card8()) {
-            for (f in Store.friends) {
+            for (f in Store.shownFriends) {      // 16번: 숨긴 친구는 빼고
                 Row(
                     Modifier.fillMaxWidth().rowLine(true).tap { save(f.name) }.padding(vertical = 12.dp, horizontal = 18.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),

@@ -80,3 +80,22 @@
 "Another app is recording a workout. Starting here will end it." = "다른 앱이 운동을 기록하고 있어요. 여기서 시작하면 그 운동은 끝나요.";
 "Start anyway" = "그래도 시작";
 "Recording a workout" = "운동 기록 중";
+
+/* 5번: 워치 두 번 톡톡 안내 뺌 (갤럭시 워치는 노란 버튼 · 왼쪽 밀기만) */
+"When a round ends, tap the yellow button or swipe left on the watch → next interval." = "라운드가 끝나면 워치의 노란 버튼을 누르거나 왼쪽으로 밀기 → 다음 인터벌";
+
+/* 4번: 앱 안 업데이트 안내 (Play In-App Updates) */
+"A new version is available" = "새 버전이 나왔어요";
+"Update" = "업데이트";
+"Restart to update" = "다시 시작해서 적용";
+"Restart" = "다시 시작";
+
+/* 16번: 친구 삭제 · 숨기기 */
+"Hide" = "숨기기";
+"Remove friend" = "친구 삭제";
+"Remove @%@ from friends?" = "@%@ 님을 친구에서 삭제할까요?";
+"They won't be notified. You can add them again later." = "상대에게 알림은 가지 않아요. 나중에 다시 친구 추가할 수 있어요.";
+"Hidden" = "숨겼어요";
+"HIDDEN FRIENDS" = "숨긴 친구";
+"Unhide" = "다시 보이기";
+"Only hidden on this phone. They're still your friend and can see your records." = "이 폰에서만 숨겨요. 친구 관계는 그대로라서 상대는 내 기록을 계속 볼 수 있어요.";

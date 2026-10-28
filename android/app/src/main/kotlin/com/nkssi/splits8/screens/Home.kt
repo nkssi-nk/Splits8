@@ -80,6 +80,7 @@ fun HomeView() {
     var period by remember { mutableStateOf(Store.pref("home.summaryPeriod", "week")) }
     Scroll8 {
         Column(Modifier.padding(top = 6.dp).padding(horizontal = PageSide), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            com.nkssi.splits8.UpdateBand()       // 4번: 새 버전 안내 띠 (있을 때만)
             ProfileCard()
             SectionLabel("NEXT RACE")
             NextRace()

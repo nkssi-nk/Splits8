@@ -23,6 +23,7 @@ mapsCompose = "8.6.0"
 fragment = "1.8.9"
 haze = "1.7.3"
 playReview = "2.0.2"
+playAppUpdate = "2.1.0"
 wearRemote = "1.2.0"
 
 [libraries]
@@ -52,6 +53,7 @@ maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = 
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version.ref = "haze" }
 play-review = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
+play-app-update = { module = "com.google.android.play:app-update-ktx", version.ref = "playAppUpdate" }
 wear-remote-interactions = { module = "androidx.wear:wear-remote-interactions", version.ref = "wearRemote" }
 health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 junit = { module = "junit:junit", version.ref = "junit" }

@@ -140,7 +140,7 @@ private fun BonusSheet(req: BonusRequest) {
         }
         if (hiit) {
             Column(Modifier.fillMaxWidth().card8(16.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                T("When a round ends, swipe left or double-tap on the watch → next interval.", F.t(F.sub))
+                T("When a round ends, tap the yellow button or swipe left on the watch → next interval.", F.t(F.sub))  // 5번: 두 번 톡톡 안내 뺌
                 T("Saved: time per round · average heart rate · calories", F.t(F.foot, color = C.text2))
             }
         } else {

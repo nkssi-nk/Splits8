@@ -22,6 +22,7 @@ import com.nkssi.splits8.screens.LaunchLogo
 import com.nkssi.splits8.screens.ScreenFor
 import com.nkssi.splits8.ui.PhoneRoot
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.repeatOnLifecycle
 
 class MainActivity : ComponentActivity() {
@@ -75,11 +76,14 @@ fun App(showLogo: Boolean = true) {
     val overlay = Router.ask != null || Router.bonus != null || Router.planRequest != null || Router.testInfo != null || Router.raceSheet != null || Router.userMenu != null || Router.partnerFor != null || Router.finish != null
     // 앱이 앞에 있는 동안: 다른 기기 로그인 확인 (3분마다) · 친구 목록 새로 받기
     val life = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(life) {
         life.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
             WatchSync.refreshState()
+            launch { AppUpdate.check(ctx) }   // 4번: 하루 한 번 새 버전 확인 (서버 로그인과 상관없이, 실패하면 조용히)
             if (!Cloud.live) return@repeatOnLifecycle
             Cloud.checkDevice()
+            Cloud.retryAvatarIfNeeded()       // 15번
             Cloud.refreshSocial()
             Router.showNoticeIfAny()          // 빌드 27: 받은 응원 · 친구 요청 알림 띠
             while (true) {
@@ -93,6 +97,17 @@ fun App(showLogo: Boolean = true) {
             Cloud.signedOutElsewhere = false
             Router.ask = Ask("Signed out because this account signed in on another device.",
                 "Your records stay on this phone. Sign in again to use friends and leaderboards here.", cancel = null)
+        }
+    }
+    // 15번: 사진 올리기 실패 안내
+    LaunchedEffect(Cloud.avatarUploadFailed) {
+        if (Cloud.avatarUploadFailed) {
+            Cloud.avatarUploadFailed = false
+            Router.ask = Ask("Couldn't upload your photo",
+                "Friends still see your old photo. We'll try again next time you open the app.",
+                ok = "Try again", cancel = "Later") {
+                Store.photoJpeg()?.let { j -> Cloud.launch { Cloud.syncAvatar(j) } }
+            }
         }
     }
     ReviewAfterFinish()                       // 빌드 27: 운동 끝 카드를 닫은 뒤 앱 평가 요청 (좋은 순간에만)

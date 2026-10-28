@@ -16,7 +16,7 @@ android {
         // 워치와 겹치지 않게: 폰은 끝자리 1, 워치는 끝자리 2
         // 구글 플레이는 올릴 때마다 번호가 커져야 함 → GitHub 빌드 번호 × 10 + 1 (폰 끝자리 1, 워치 끝자리 2). 컴퓨터 빌드는 101
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { it * 10 + 1 } ?: 101
-        versionName = "1.1.2"
+        versionName = "1.2.0"
         // 구글 지도 키: gradle.properties 의 splits8.mapsKey (또는 환경 변수 MAPS_API_KEY)
         val mapsKey = (providers.gradleProperty("splits8.mapsKey").orNull ?: "").ifBlank { System.getenv("MAPS_API_KEY") ?: "" }
         manifestPlaceholders["mapsKey"] = mapsKey
@@ -81,6 +81,7 @@ dependencies {
     implementation(libs.haze)                     // 위 고정 바 뒤 흐림 (아이폰 material 처럼)
     implementation(libs.haze.materials)
     implementation(libs.play.review)              // 빌드 27: 앱 평가 요청 (Play In-App Review)
+    implementation(libs.play.app.update)          // 4번: 앱 안 업데이트 안내 (Play In-App Updates, 유연한 업데이트)
     implementation(libs.wear.remote.interactions) // 98번: 워치에서 보정 화면 열기
     // 갤럭시 워치와 주고받기 (Wearable Data Layer)
     implementation(libs.play.wearable)

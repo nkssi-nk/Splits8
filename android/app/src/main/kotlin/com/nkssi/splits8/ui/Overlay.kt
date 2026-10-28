@@ -202,7 +202,12 @@ fun <T : Any> Sheet8(item: T?, onClose: () -> Unit, large: Boolean = false, bg: 
 @Composable
 fun SwipeDelete(
     alertTitle: String, modifier: Modifier = Modifier, corner: Dp = 0.dp, alertMessage: String = "This can't be undone.",
-    onTap: () -> Unit, onDelete: () -> Unit, content: @Composable BoxScope.() -> Unit,
+    onTap: () -> Unit, onDelete: () -> Unit,
+    /** 꾹 누르면 지우기 확인 (17번: 트레이닝 목록은 꾹 누르기가 순서 바꾸기라 끔) */
+    longPressDelete: Boolean = true,
+    /** 17번: 꾹 눌러 끌기 (탭보다 안쪽에 붙임) */
+    inner: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
     val reveal = with(density) { 84.dp.toPx() }
@@ -240,9 +245,11 @@ fun SwipeDelete(
                         scope.launch { off.snapTo((off.value + dx).coerceAtMost(0f)) }
                     }
                 }
-                .pointerInput(Unit) {
-                    detectTapGestures(onLongPress = { ask() }) { if (off.value != 0f) close() else onTap() }
-                },
+                .pointerInput(longPressDelete) {
+                    val del: (androidx.compose.ui.geometry.Offset) -> Unit = { ask() }
+                    detectTapGestures(onLongPress = if (longPressDelete) del else null) { if (off.value != 0f) close() else onTap() }
+                }
+                .then(inner),
             content = content,
         )
     }

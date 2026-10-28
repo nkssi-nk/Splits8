@@ -97,12 +97,34 @@ object Cloud {
         Supabase.upsertProfile(null, Store.settings.div.name, Store.settings.visibility, Store.avatarUrl, clearAvatar)
     }
 
+    /** 15번: 사진 올리기 실패를 조용히 넘기지 않음 — 한 번 더 해 보고, 그래도 안 되면 안내 + 다음에 앱을 켤 때 다시 올림 */
     suspend fun syncAvatar(jpeg: ByteArray) {
         if (Supabase.session == null) return
-        val u = runCatching { Supabase.uploadAvatar(jpeg) }.getOrNull() ?: return
-        Store.avatarUrl = u
-        runCatching { syncProfile() }
+        var ok = false
+        for (attempt in 0 until 2) {
+            if (attempt > 0) kotlinx.coroutines.delay(1000)
+            val u = runCatching { Supabase.uploadAvatar(jpeg) }.getOrNull() ?: continue
+            Store.avatarUrl = u
+            ok = runCatching { syncProfile() }.isSuccess
+            if (ok) break
+        }
+        avatarPending = !ok
+        avatarUploadFailed = !ok
     }
+
+    /** 앱이 앞으로 올 때: 지난번에 못 올린 사진이 있으면 다시 올림 (실패하면 그때 안내) */
+    suspend fun retryAvatarIfNeeded() {
+        if (!on || !avatarPending) return
+        Store.photoJpeg()?.let { syncAvatar(it) } ?: run { avatarPending = false }
+    }
+
+    /** 아직 서버에 못 올린 사진이 있음 (앱을 껐다 켜도 기억) */
+    var avatarPending: Boolean
+        get() = Store.pref("avatar.pending", "") == "1"
+        set(v) = Store.setPref("avatar.pending", if (v) "1" else "")
+
+    /** 프로필 사진을 서버에 못 올림 → "다시 시도" 안내 */
+    var avatarUploadFailed by mutableStateOf(false)
 
     // MARK: 친구 · 순위표 · 대회
 

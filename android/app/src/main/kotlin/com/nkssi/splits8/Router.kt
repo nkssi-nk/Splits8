@@ -97,6 +97,9 @@ data class PlanRequest(val date: java.time.Instant, val mode: Mode, val existing
 /** HIIT · 러닝 설정 시트 (새로 만들기 / 저장된 것 편집). kind = "hiit" / "run" */
 data class BonusRequest(val kind: String, val existing: Program? = null, val key: String = java.util.UUID.randomUUID().toString())
 
+/** 16번: 아래 "숨겼어요 · 되돌리기" 띠 (4초 뒤 사라짐). key 는 같은 글자를 다시 띄워도 4초를 새로 세게 */
+data class UndoNote(val text: String, val key: String = java.util.UUID.randomUUID().toString(), val undo: () -> Unit)
+
 /** 확인 창 (아이폰 .alert). destructive = 빨간 확인 단추 */
 data class Ask(
     val title: String, val message: String? = null, val ok: String = "OK", val cancel: String? = "Cancel",
@@ -324,6 +327,9 @@ object Router {
 
     /** 잠깐 떴다 사라지는 안내 (2.5초) */
     var toast by mutableStateOf<String?>(null)
+
+    /** 16번: 되돌리기 띠 (null = 안 보임) */
+    var undo by mutableStateOf<UndoNote?>(null)
 
     // MARK: 링크로 받은 트레이닝 · 더블 계획 (아이폰 Router.handle(url:))
 

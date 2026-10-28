@@ -85,12 +85,13 @@ fun RaceLeaderboard() {
                 Modifier.tap { Store.update { it.copy(lbAllDivisions = !it.lbAllDivisions) } }.testTag("lb.division"), translate = false)
         }
         // 순위
-        val rows = Store.leaderboard
         val me = Store.myId
+        // 16번: 숨긴 친구는 순위표에서도 안 보임 (이 폰에서만)
+        val rows = Store.leaderboard.filterNot { it.user_id != me && Store.isHidden(it.user_id) }
         val meT = rows.firstOrNull { it.user_id == me }?.t
         // 빌드 27: 기록이 아직 없는 친구 (순위표는 기록 있는 사람만 옴) — 이름 · 사진만, 시간 대신 "아직 없음"
         val ranked = rows.map { it.user_id }.toSet()
-        val extra = Store.friends.filter { f -> f.id !in ranked && (s.lbAllDivisions || f.div == s.div.name) }
+        val extra = Store.shownFriends.filter { f -> f.id !in ranked && (s.lbAllDivisions || f.div == s.div.name) }
         val noText = when (s.lbTab) { "sim" -> "No Full Sim yet"; "race" -> "No race yet"; else -> "No record yet" }
         Column(Modifier.fillMaxWidth().card8()) {
             if (rows.isEmpty() && extra.isEmpty()) {

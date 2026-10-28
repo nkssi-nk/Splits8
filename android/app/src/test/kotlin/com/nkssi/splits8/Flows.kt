@@ -7,6 +7,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.geometry.Offset
 import com.nkssi.splits8.screens.ScreenFor
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.Mode
@@ -72,6 +74,28 @@ class Flows {
         val p = Store.programs.first()                     // 새것은 맨 위
         assertEquals("Training 3", p.name)
         assertEquals("400M", p.seq[0].run)
+    }
+
+    /** 17번: 트레이닝 목록 순서 바꾸기 — 꾹 눌러 아래로 끌면 programs 순서가 바뀌고, 그냥 탭은 그대로 열림 */
+    @Test fun trainingsReorderByLongPressDrag() {
+        show(Scr.Training)
+        assertEquals(listOf("p1", "p2"), Store.programs.map { it.id })
+        rule.onAllNodesWithTag("training.card")[0].performTouchInput {
+            down(center)
+            advanceEventTime(800)                              // 꾹 누름 (0.4초 넘게)
+            repeat(6) { moveBy(Offset(0f, 120f)) }             // 아래로 끌기
+            up()
+        }
+        rule.waitForIdle()
+        assertEquals(listOf("p2", "p1"), Store.programs.map { it.id })
+        assertNull(Router.ask)                                 // 꾹 누르기가 더 이상 지우기 확인을 안 띄움
+        Store.movePrograms(1, 0)
+        assertEquals(listOf("p1", "p2"), Store.programs.map { it.id })
+        Store.movePrograms(0, 5)                               // 범위 밖은 무시
+        assertEquals(listOf("p1", "p2"), Store.programs.map { it.id })
+        rule.onAllNodesWithTag("training.card")[0].performClick(); rule.waitForIdle()
+        assertEquals(Scr.Builder, Router.scr)                  // 탭은 그대로 열기
+        assertEquals("p1", Router.editId)
     }
 
     @Test fun cancelKeepsList() {

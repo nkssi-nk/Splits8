@@ -61,6 +61,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
@@ -115,10 +117,20 @@ fun PhoneRoot(screen: @Composable (Scr) -> Unit) {
         }
         // 빌드 27: 받은 응원 · 친구 요청 알림 띠 (누르면 친구 화면)
         com.nkssi.splits8.NoticeBanner()
+        // 16번: "숨겼어요 · 되돌리기" 띠 (탭 바 바로 위)
+        com.nkssi.splits8.UndoBand(Modifier.align(Alignment.BottomCenter))
         // 시트 · 확인 창 (탭 바보다 위)
         com.nkssi.splits8.screens.Overlays()
     }
 }
+
+/** 17번: 끌어서 순서 바꿀 때 화면 끝 자동 스크롤에 씀 — Scroll8 의 스크롤 + 내용이 보이는 영역(창 기준 y, 위 바 · 탭 바 자리 뺌) */
+class ScrollArea(val state: androidx.compose.foundation.ScrollState) {
+    var top = 0f
+    var bottom = 0f
+}
+
+val LocalScrollArea = androidx.compose.runtime.staticCompositionLocalOf<ScrollArea?> { null }
 
 /** 세로 스크롤. 위: 고정 바가 있으면 52 (상태 줄 아래) / 없으면 4, 아래 120 (탭 바 자리) */
 @Composable
@@ -139,11 +151,21 @@ fun Scroll8(bottom: Dp = 120.dp, content: @Composable ColumnScope.() -> Unit) {
     LaunchedEffect(state.isScrollInProgress) { if (!state.isScrollInProgress) TabBarScroll.dragging(false) }
     val s = Router.scr
     val top = statusTop() + if (s.showsBar || s.pinsNav) 52.dp else 4.dp
-    Column(
-        Modifier.fillMaxSize().nestedScroll(conn).verticalScroll(state, enabled = !MapTouch.down)
-            .padding(top = top, bottom = bottom + navBottom()),
-        content = content,
-    )
+    val area = remember(state) { ScrollArea(state) }
+    val topPx = with(density) { top.toPx() }
+    val bottomPx = with(density) { (bottom + navBottom()).toPx() }
+    androidx.compose.runtime.CompositionLocalProvider(LocalScrollArea provides area) {
+        Column(
+            Modifier.fillMaxSize()
+                .onGloballyPositioned { c ->
+                    val b = c.boundsInWindow()
+                    area.top = b.top + topPx; area.bottom = b.bottom - bottomPx
+                }
+                .nestedScroll(conn).verticalScroll(state, enabled = !MapTouch.down)
+                .padding(top = top, bottom = bottom + navBottom()),
+            content = content,
+        )
+    }
 }
 
 /** 지도를 손가락으로 누르고 있는 동안은 화면 스크롤을 멈춤 (지도를 위아래로 끌어도 화면이 안 따라가게) */

@@ -202,6 +202,7 @@ object Store {
         if (src == null) {
             photo = null
             if (!demo) f?.delete()
+            Cloud.avatarPending = false
             if (upload && Cloud.on) { avatarUrl = null; Cloud.launch { Cloud.syncProfile(clearAvatar = true) } }
             return
         }
@@ -293,22 +294,73 @@ object Store {
 
     fun isBlocked(id: String): Boolean = settings.blocked.any { it.id == id }
 
-    /** 차단: 이 폰의 차단 목록에 넣고, 친구 목록 · 순위표 · 요청에서 바로 빼고, 서버의 친구 관계도 끊음 */
-    fun block(id: String, name: String) {
-        update {
-            var n = if (it.blocked.any { b -> b.id == id }) it else it.withBlocked(it.blocked + BlockedUser(id, name))
-            if (n.friendId == id) n = n.copy(friendId = null, simCmp = if (n.simCmp == "friend") "goal" else n.simCmp, tgtSrc = "mine")
-            n
-        }
+    /** 16번: 이 폰에서 숨긴 친구인지 (친구 목록 · 순위표 · 비교 고르기에서 안 보임) */
+    fun isHidden(id: String): Boolean = settings.hidden.any { it.id == id }
+
+    /** 화면에 보일 친구: 내가 정한 순서대로 (17번, 새 친구는 맨 아래) + 숨긴 친구는 뺌 (16번) */
+    val shownFriends: List<Friend>
+        get() = orderedFriends().filterNot { isHidden(it.id) }
+
+    /** 숨긴 친구까지 모두, 내가 정한 순서대로 */
+    private fun orderedFriends(): List<Friend> = com.nkssi.splits8.shared.ListOrder.ordered(friends, settings.friendOrder) { it.id }
+
+    /** 그 사람이 비교 대상이었으면 풂 (Full Sim 비교 · 트레이닝 목표) */
+    private fun clearPick(n: Settings, id: String): Settings =
+        if (n.friendId != id) n else n.copy(friendId = null, simCmp = if (n.simCmp == "friend") "goal" else n.simCmp, tgtSrc = "mine")
+
+    /** 친구 목록 · 순위표 · 요청에서 바로 뺌 (차단 · 친구 삭제) */
+    private fun dropSocial(id: String) {
         friends = friends.filterNot { it.id == id }
         leaderboard = leaderboard.filterNot { it.user_id == id }
         requested = requested - id
         requests = requests.filterNot { it.id == id }
         save("friends.json", ListSerializer(Friend.serializer()), friends)
+    }
+
+    /** 차단: 이 폰의 차단 목록에 넣고, 친구 목록 · 순위표 · 요청에서 바로 빼고, 서버의 친구 관계도 끊음 */
+    fun block(id: String, name: String) {
+        update {
+            val n = if (it.blocked.any { b -> b.id == id }) it else it.withBlocked(it.blocked + BlockedUser(id, name))
+            clearPick(n, id).withHidden(n.hidden.filterNot { h -> h.id == id }).withFriendOrder(n.friendOrder - id)
+        }
+        dropSocial(id)
         if (signedIn && !demo) socialCall { Accounts.api.removeFriend(id) }
     }
 
     fun unblock(id: String) = update { it.withBlocked(it.blocked.filterNot { b -> b.id == id }) }
+
+    /**
+     * 16번 친구 삭제: 서버의 친구 줄을 양쪽 다 지움 (상대 목록에서도 내가 사라짐, 상대에게 알림 없음).
+     * 차단 목록에는 안 넣음 → 나중에 다시 친구 추가할 수 있음
+     */
+    fun removeFriend(id: String) {
+        update { clearPick(it, id).withHidden(it.hidden.filterNot { h -> h.id == id }).withFriendOrder(it.friendOrder - id) }
+        dropSocial(id)
+        if (signedIn && !demo) socialCall { Accounts.api.removeFriend(id) }
+    }
+
+    /** 16번 숨기기: 이 폰에서만 안 보이게 (친구 관계는 그대로, 상대에게 알림 없음). 비교 대상이었으면 풂 */
+    fun hide(id: String, name: String) = update {
+        clearPick(if (it.hidden.any { h -> h.id == id }) it else it.withHidden(it.hidden + BlockedUser(id, name)), id)
+    }
+
+    fun unhide(id: String) = update { it.withHidden(it.hidden.filterNot { h -> h.id == id }) }
+
+    /** 17번: 친구 목록에서 꾹 눌러 끌어 옮김 (보이는 줄 번호). 이 폰에만 저장, 서버에는 안 올림 */
+    fun moveFriend(from: Int, to: Int) {
+        val all = orderedFriends().map { it.id }
+        val shown = all.filterNot { isHidden(it) }
+        if (from !in shown.indices || to !in shown.indices || from == to) return
+        update { it.withFriendOrder(com.nkssi.splits8.shared.ListOrder.moved(all, shown, from, to)) }
+    }
+
+    /** 17번: 트레이닝 목록 순서 바꾸기 (programs 배열 순서 그대로 저장 → 워치에도 같은 순서로) */
+    fun movePrograms(from: Int, to: Int) {
+        if (from !in programs.indices || to !in programs.indices || from == to) return
+        programs = programs.toMutableList().also { it.add(to, it.removeAt(from)) }
+        save("programs.json", ListSerializer(Program.serializer()), programs)
+        WatchSync.dirty()
+    }
 
     /** 받은 요청 수락 / 거절. 수락은 친구 10명 한도 안에서만 (넘으면 false) */
     fun respond(q: FriendReq, accept: Boolean): Boolean {

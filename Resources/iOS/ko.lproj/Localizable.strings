@@ -396,7 +396,7 @@
 "High-intensity intervals" = "고강도 인터벌";
 "Distance · 1 km splits" = "총거리 · 1km 스플릿";
 "Save (add to watch list)" = "저장 (워치 목록에 추가)";
-"When a round ends, swipe left or double-tap on the watch → next interval." = "라운드가 끝나면 워치를 왼쪽으로 밀거나 두 번 톡톡 → 다음 인터벌";
+"When a round ends, swipe left or tap Next on the watch → next interval." = "라운드가 끝나면 워치를 왼쪽으로 밀거나 다음 버튼 → 다음 인터벌";
 "Saved: time per round · average heart rate · calories" = "저장: 라운드별 시간 · 평균 심박 · 칼로리";
 "DISTANCE" = "총거리";
 "PLACE" = "장소";
@@ -951,3 +951,23 @@
 "%@ to %@ (%@) — about %lld sec per split" = "%2$@(%3$@)까지 %1$@ — 16구간으로 나누면 구간마다 약 %4$lld초";
 "Rough position from published worldwide race results (2025/26) — not an official ranking." = "공개된 전 세계 대회 결과(2025/26)로 계산한 대략의 위치예요. 공식 순위가 아니에요.";
 "Top %lld%%" = "상위 %lld%%";
+
+/* 1.2.0 · 15번: 프로필 사진 올리기 실패 */
+"Couldn't upload your photo" = "사진을 올리지 못했어요";
+"Friends still see your old photo. We'll try again next time you open the app." = "친구에게는 아직 예전 사진이 보여요. 다음에 앱을 열 때 다시 올릴게요.";
+"Try again" = "다시 시도";
+"Later" = "나중에";
+
+/* 4번 · 앱 안 업데이트 안내 */
+"A new version is available (%@)" = "새 버전이 나왔어요 (%@)";
+"Update" = "업데이트";
+
+/* 16번 · 친구 삭제 · 숨기기 */
+"Hide" = "숨기기";
+"Remove friend" = "친구 삭제";
+"Remove @%@ from friends?" = "@%@ 님을 친구에서 삭제할까요?";
+"They won't be notified. You can add them again later." = "상대에게 알림은 가지 않아요. 나중에 다시 친구 추가할 수 있어요.";
+"Hidden" = "숨겼어요";
+"HIDDEN FRIENDS" = "숨긴 친구";
+"Unhide" = "다시 보이기";
+"Hidden friends stay friends. They're only hidden on this iPhone." = "숨긴 친구도 친구 관계는 그대로예요. 이 아이폰에서만 안 보여요.";

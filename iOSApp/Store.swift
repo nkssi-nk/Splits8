@@ -45,6 +45,8 @@ final class Store: NSObject, WCSessionDelegate {
     var lastError: String?
     /// 빌드 23: 같은 계정이 다른 기기에서 로그인해서 이 기기가 로그아웃됨 → 안내창
     var signedOutElsewhere = false
+    /// 15번: 프로필 사진을 서버에 못 올림 → "다시 시도" 안내
+    var avatarUploadFailed = false
     /// 이 기기를 서버에 적는 중 (그동안은 기기 확인을 하지 않음)
     @ObservationIgnored private var claiming = false
     /// 워치로 보내기가 실패함 → 워치 상태가 바뀔 때 다시 보냄
@@ -378,21 +380,103 @@ final class Store: NSObject, WCSessionDelegate {
 
     func isBlocked(_ id: String) -> Bool { settings.blocked.contains { $0.id == id } }
 
+    /// 비교 대상(friendId · simCmp "friend" · tgtSrc "friend")이 이 사람이면 풀어 줌
+    private static func clearCompare(_ s: inout Settings, _ id: String) {
+        guard s.friendId == id else { return }
+        s.friendId = nil
+        if s.simCmp == "friend" { s.simCmp = "goal" }
+        s.tgtSrc = "mine"
+    }
+
     /// 차단: 이 기기의 차단 목록에 넣고, 친구 목록 · 순위표에서 바로 빼고, 서버의 친구 관계도 끊음
     func block(id: String, name: String) {
         var s = settings
         if !s.blocked.contains(where: { $0.id == id }) { s.blocked = s.blocked + [BlockedUser(id: id, name: name)] }
-        if s.friendId == id {
-            s.friendId = nil
-            if s.simCmp == "friend" { s.simCmp = "goal" }
-            s.tgtSrc = "mine"
-        }
+        s.hidden = s.hidden.filter { $0.id != id }
+        Self.clearCompare(&s, id)
         settings = s
         friends.removeAll { $0.id == id }
         leaderboard.removeAll { $0.user_id == id }
         requested.remove(id)
         requests.removeAll { $0.id == id }
         if signedIn { Task { try? await sb.removeFriend(id) } }
+    }
+
+    // MARK: 16번 · 친구 삭제 · 숨기기
+
+    /// 친구 삭제: 서버의 친구 줄을 양쪽 방향 모두 지움 (상대 목록에서도 내가 빠짐). 차단 목록에는 안 넣음 → 다시 추가할 수 있음
+    func removeFriend(id: String) {
+        var s = settings
+        s.hidden = s.hidden.filter { $0.id != id }
+        Self.clearCompare(&s, id)
+        settings = s
+        friends.removeAll { $0.id == id }
+        leaderboard.removeAll { $0.user_id == id }
+        requested.remove(id)
+        requests.removeAll { $0.id == id }
+        guard signedIn, !Demo.enabled else { return }
+        Task {
+            try? await sb.removeFriend(id)
+            await refreshSocial()
+        }
+    }
+
+    func isHidden(_ id: String) -> Bool { settings.hidden.contains { $0.id == id } }
+
+    /// 숨기지 않은 친구 (친구 목록 · 순위표 · 비교 친구 고르기에 씀). 17번: 내가 정한 순서, 새 친구는 맨 아래
+    var shownFriends: [Friend] {
+        let h: Set<String> = Set(settings.hidden.map(\.id))
+        let list: [Friend] = friends.filter { !h.contains($0.id) }
+        let order: [String] = settings.friendOrder
+        guard !order.isEmpty else { return list }
+        let rank: [String: Int] = Dictionary(order.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { a, _ in a })
+        return list.enumerated().sorted { a, b in
+            let ra: Int = rank[a.element.id] ?? Int.max
+            let rb: Int = rank[b.element.id] ?? Int.max
+            if ra != rb { return ra < rb }
+            return a.offset < b.offset
+        }.map(\.element)
+    }
+
+    /// 17번: 친구 목록을 끌어서 바꾼 순서 저장 (보이는 친구 id 순서 + 숨긴 친구는 뒤에 그대로)
+    func setFriendOrder(_ shownIds: [String]) {
+        var s = settings
+        let rest: [String] = s.friendOrder.filter { !shownIds.contains($0) }
+        s.friendOrder = shownIds + rest
+        settings = s
+    }
+
+    /// 숨기기 (이 폰에만): 친구 관계는 그대로, 상대에게 알림 없음. 되돌리기용으로 숨기기 전 비교 설정을 돌려줌
+    @discardableResult
+    func hide(id: String, name: String) -> HideUndo {
+        let undo = HideUndo(id: id, name: name, friendId: settings.friendId, simCmp: settings.simCmp, tgtSrc: settings.tgtSrc)
+        var s = settings
+        if !s.hidden.contains(where: { $0.id == id }) { s.hidden = s.hidden + [BlockedUser(id: id, name: name)] }
+        Self.clearCompare(&s, id)
+        settings = s
+        leaderboard.removeAll { $0.user_id == id }
+        return undo
+    }
+
+    /// 숨기기 되돌리기: 다시 보이게 하고, 그 친구가 비교 대상이었으면 그대로 돌려 놓음
+    func undoHide(_ u: HideUndo) {
+        var s = settings
+        s.hidden = s.hidden.filter { $0.id != u.id }
+        if u.friendId == u.id && s.friendId == nil && friends.contains(where: { $0.id == u.id }) {
+            s.friendId = u.friendId
+            s.simCmp = u.simCmp
+            s.tgtSrc = u.tgtSrc
+        }
+        settings = s
+        Task { await refreshLeaderboard() }
+    }
+
+    /// 설정 › 친구 › 숨긴 친구 › 다시 보이기
+    func unhide(_ id: String) {
+        var s = settings
+        s.hidden = s.hidden.filter { $0.id != id }
+        settings = s
+        Task { await refreshLeaderboard() }
     }
 
     // MARK: 친구 요청 (빌드 22)
@@ -438,6 +522,7 @@ final class Store: NSObject, WCSessionDelegate {
         } else {
             try? FileManager.default.removeItem(at: url)
             avatarUrl = nil
+            avatarPending = false
             if signedIn { Task { await syncProfile(clearAvatar: true) } }
         }
     }
@@ -525,15 +610,48 @@ final class Store: NSObject, WCSessionDelegate {
         await refreshSocial()
     }
 
-    func syncProfile(clearAvatar: Bool = false) async {
-        guard signedIn else { return }
-        try? await sb.upsertProfile(nickname: nil, division: div.name, visibility: settings.visibility, avatarUrl: avatarUrl,
-                                    clearAvatar: clearAvatar)
+    @discardableResult
+    func syncProfile(clearAvatar: Bool = false) async -> Bool {
+        guard signedIn else { return false }
+        do {
+            try await sb.upsertProfile(nickname: nil, division: div.name, visibility: settings.visibility, avatarUrl: avatarUrl,
+                                       clearAvatar: clearAvatar)
+            return true
+        } catch { return false }
     }
 
     @MainActor
+    /// 15번: 사진 올리기 실패를 조용히 넘기지 않음 — 실패하면 안내 + 다음에 앱을 켤 때 다시 올림
     private func syncAvatar(_ d: Data) async {
-        if let u = try? await sb.uploadAvatar(d) { avatarUrl = u; await syncProfile() }
+        var ok = false
+        for attempt in 0..<2 {
+            if attempt > 0 { try? await Task.sleep(nanoseconds: 1_000_000_000) }
+            if let u = try? await sb.uploadAvatar(d) {
+                avatarUrl = u
+                ok = await syncProfile()
+                if ok { break }
+            }
+        }
+        avatarPending = !ok
+        await MainActor.run { self.avatarUploadFailed = !ok }
+    }
+
+    /// 앱이 앞으로 올 때: 지난번에 못 올린 사진이 있으면 조용히 다시 올림 (실패하면 그때 안내)
+    func retryAvatarIfNeeded() async {
+        guard signedIn, avatarPending, let d = try? Data(contentsOf: JSONStore.url("avatar.jpg")) else { return }
+        await syncAvatar(d)
+    }
+
+    /// 안내에서 "Try again"
+    func retryAvatarNow() {
+        guard let d = try? Data(contentsOf: JSONStore.url("avatar.jpg")) else { avatarPending = false; return }
+        Task { await syncAvatar(d) }
+    }
+
+    /// 아직 서버에 못 올린 사진이 있음 (앱을 껐다 켜도 기억)
+    var avatarPending: Bool {
+        get { UserDefaults.standard.bool(forKey: "avatar.pending") }
+        set { UserDefaults.standard.set(newValue, forKey: "avatar.pending") }
     }
 
     /// 친구 목록 · 순위표 · 대회 목록 새로 받기
@@ -578,6 +696,10 @@ final class Store: NSObject, WCSessionDelegate {
             }
             friends = fs
             requests = rq
+            // 17번: 삭제 · 차단된 친구는 순서 목록에서 뺌
+            let ids: Set<String> = Set(fs.map(\.id))
+            let kept: [String] = settings.friendOrder.filter { ids.contains($0) }
+            if kept != settings.friendOrder { settings.friendOrder = kept }
             requested = requested.filter { r in !fs.contains { $0.id == r } }
             if let sel, !friends.contains(where: { $0.id == sel }) { settings.friendId = nil }
         }
@@ -614,7 +736,7 @@ final class Store: NSObject, WCSessionDelegate {
         let kind = settings.lbTab == "stations" ? "station" : settings.lbTab
         let st = Station.all.firstIndex { $0.key == settings.lbStation } ?? 0
         if let rows = try? await sb.leaderboard(kind: kind, station: st, division: settings.lbAllDivisions ? nil : div.name) {
-            leaderboard = rows.filter { !isBlocked($0.user_id) }
+            leaderboard = rows.filter { !isBlocked($0.user_id) && !isHidden($0.user_id) }
         }
     }
 
@@ -835,4 +957,15 @@ final class Store: NSObject, WCSessionDelegate {
         watchInstalled = s.isWatchAppInstalled
         watchReachable = s.isReachable
     }
+}
+
+/// 16번: 숨기기 되돌리기에 쓰는 값 (숨긴 친구 + 숨기기 전 비교 설정)
+struct HideUndo: Equatable, Identifiable {
+    let id: String
+    let name: String
+    let friendId: String?
+    let simCmp: String
+    let tgtSrc: String
+    /// 띠를 띄울 때마다 새 값 (같은 친구를 다시 숨겨도 앞 띠의 타이머가 새 띠를 닫지 않게)
+    let token: UUID = UUID()
 }

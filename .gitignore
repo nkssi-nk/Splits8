@@ -7,3 +7,11 @@ cert_key*
 # 서명 키 (PC 에만, 절대 올리지 않음)
 _upload-key/
 *.jks
+
+# android 가지에서 넘어왔을 때 남는 빌드 찌꺼기 (main 쪽에서 안 보이게)
+android/.gradle/
+android/.idea/
+android/.kotlin/
+android/local.properties
+android/**/build/
+*.iml

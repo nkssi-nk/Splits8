@@ -10,22 +10,36 @@ struct TrainingView: View {
     @State private var expanded: Set<String> = []
     /// 5개가 꽉 찼을 때 안내
     @State private var limitAlert = false
+    /// 17번: 꾹 눌러 순서 바꾸기
+    @State private var reorder = Reorder()
 
     var body: some View {
         VStack(spacing: 10) {
             newButton
             if let f = store.friend { friendCard(f) }
             if !store.programs.isEmpty { listHeader }
-            ForEach(store.programs) { p in
+            // 17번: 0.35초 꾹 누르면 "툭" → 끌어서 순서 바꾸기 (programs 순서 그대로 저장 · 워치에도 같은 순서)
+            let progs: [Program] = store.programs
+            let ids: [String] = progs.map(\.id)
+            let rows: [Indexed<Program>] = reorder.order(progs.count).map { Indexed(i: $0, item: progs[$0]) }
+            ForEach(rows) { x in
+                let p: Program = x.item
                 SwipeDelete(corner: 20, press: true, menu: false, alertTitle: "Delete this training?",
                             alertMessage: "Records you've done with it stay in History.",
-                            onTap: { if p.isOpen { r.bonus = BonusRequest(kind: p.kind ?? "run", existing: p) } else { r.edit(p) } },
+                            onTap: {
+                                if ReorderKit.blocksTap { return }
+                                if p.isOpen { r.bonus = BonusRequest(kind: p.kind ?? "run", existing: p) } else { r.edit(p) }
+                            },
                             onDelete: { store.deleteProgram(p.id) }) {
                     ProgramCard(p: p, expanded: expanded.contains(p.id)) {
+                        if ReorderKit.blocksTap { return }
                         withAnimation(.snappy(duration: 0.25)) {
                             if expanded.contains(p.id) { expanded.remove(p.id) } else { expanded.insert(p.id) }
                         }
                     }
+                }
+                .reorderRow(index: x.i, ids: ids, state: $reorder, corner: 20, spacing: 10) { f, t in
+                    store.programs = store.programs.moved(f, to: t)
                 }
                 .accessibilityIdentifier("training.card")
             }
@@ -71,7 +85,7 @@ struct TrainingView: View {
 
     private func friendCard(_ f: Friend) -> some View {
         HStack(spacing: 14) {
-            Avatar8(size: 36, initial: f.ini, fontSize: 13)
+            Avatar8(size: 36, photo: RemoteImages.shared.image(f.avatarUrl), initial: f.ini, fontSize: 13)
             VStack(alignment: .leading, spacing: 2) {
                 Label8("SPLIT TARGETS")
                 Text("\(f.first)'s splits").font(F.t(15))
@@ -548,14 +562,9 @@ struct BuilderView: View {
         .background(GeometryReader { g in
             Color.clear.onAppear { if g.size.height > 20 { rowH = g.size.height } }
         })
-        .background(dragging ? Color(hex: 0x2C2C2E) : Color.black.opacity(0.001))
         .rowLine(!dragging && slot < r.draftSeq.count - 1)
-        .clipShape(RoundedRectangle(cornerRadius: dragging ? 14 : 0, style: .continuous))
-        .scaleEffect(dragging ? 1.03 : 1)
-        .shadow(color: .black.opacity(dragging ? 0.5 : 0), radius: 12, y: 6)
-        .offset(y: dragging ? dragY - CGFloat(slot - i) * rowH : 0)
-        .zIndex(dragging ? 1 : 0)
-        .animation(.easeOut(duration: 0.15), value: dragging)
+        // 17번: 끄는 줄 모양은 목록(트레이닝 · 친구)과 공용 (Reorder.swift)
+        .reorderLift(dragging, offset: dragY - CGFloat(slot - i) * rowH)
     }
 
     private func reorderGesture(_ i: Int) -> some Gesture {

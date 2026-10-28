@@ -814,8 +814,21 @@ struct PhoneLiveView: View {
         if let rec = eng.endNow() { done(rec) }
     }
 
-    private func done(_ rec: Record) {
+    /// 9번: 편집 화면(.builder) 등 탭이 아닌 곳에서 시작했으면 기록 종류의 탭으로 돌아가기
+    /// (안 그러면 기록 화면 뒤로 가기가 "‹ Race" 로 나오고 편집 화면으로 감)
+    private func backTab(_ mode: Mode) -> Scr {
         let from: Scr = eng.from
+        if [.home, .training, .sim, .race].contains(from) { return from }
+        switch mode {
+        case .training: return .training
+        case .race: return .race
+        case .pft: r.testTab = "pft"; return .sim
+        case .sim: r.testTab = "sim"; return .sim
+        }
+    }
+
+    private func done(_ rec: Record) {
+        let from: Scr = backTab(rec.mode)
         UIApplication.shared.isIdleTimerDisabled = false
         Store.shared.addPhoneRecord(rec)
         // addPhoneRecord 가 source = "phone" 을 붙여 저장 → 저장된 것으로 상세 열기
@@ -826,7 +839,7 @@ struct PhoneLiveView: View {
     }
 
     private func discard() {
-        let from: Scr = eng.from
+        let from: Scr = eng.from   // 버리기는 시작한 화면(편집 화면 포함)으로 그대로
         eng.discard()
         UIApplication.shared.isIdleTimerDisabled = false
         r.go(from)

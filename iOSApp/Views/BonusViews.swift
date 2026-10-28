@@ -123,7 +123,7 @@ struct BonusSheet: View {
 
     private var hiitBody: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("When a round ends, swipe left or double-tap on the watch → next interval.")
+            Text("When a round ends, swipe left or tap Next on the watch → next interval.")
                 .font(F.t(F.sub)).fixedSize(horizontal: false, vertical: true)
             Text("Saved: time per round · average heart rate · calories")
                 .font(F.t(F.foot)).foregroundStyle(C.text2).fixedSize(horizontal: false, vertical: true)

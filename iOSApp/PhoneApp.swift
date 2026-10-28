@@ -225,6 +225,12 @@ final class Router {
     @ObservationIgnored var finishShown: Record? = nil
     /// 빌드 27: 앱을 열 때 받은 응원 · 친구 요청 알림 띠 (nil = 안 보임)
     var notice: AppNotice? = nil
+    /// 4번: 홈 위에 띄울 새 버전 (nil = 안 보임)
+    var updateVersion: String? = nil
+    /// 16번: 친구를 숨긴 뒤 "Hidden · Undo" 띠 (nil = 안 보임)
+    var hideUndo: HideUndo? = nil
+    /// 17번: 목록 줄을 꾹 눌러 끄는 중 (그동안 스크롤 멈춤)
+    var reordering = false
     /// 워치 운동을 아이폰에 같이 보여 주는 중 (52번)
     var liveMirror = false
 
@@ -587,6 +593,17 @@ struct PhoneRoot: View {
                     .zIndex(8)
             }
 
+            // 16번: 친구 숨긴 뒤 되돌리기 띠 (탭 바 위)
+            if let u = r.hideUndo {
+                HideUndoBanner { r.undoHide(u) }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 104)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(8)
+            }
+
             if let p = r.photoView {
                 PhotoViewer(item: p)
                     .transition(.opacity)
@@ -627,8 +644,10 @@ struct PhoneRoot: View {
         .task(id: scenePhase == .active) {
             guard scenePhase == .active, !Demo.enabled else { return }
             await Store.shared.checkDevice()
+            await Store.shared.retryAvatarIfNeeded()   // 15번
             await r.askProfileIfNeeded()
             await r.checkNotice()
+            await r.checkUpdate()   // 4번
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 180_000_000_000)
                 if Task.isCancelled { break }
@@ -640,6 +659,14 @@ struct PhoneRoot: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Your records stay on this iPhone. Sign in again to use friends and leaderboards here.")
+        }
+        // 15번: 사진 올리기 실패 안내
+        .alert("Couldn't upload your photo",
+               isPresented: Binding(get: { Store.shared.avatarUploadFailed }, set: { Store.shared.avatarUploadFailed = $0 })) {
+            Button("Try again") { Store.shared.retryAvatarNow() }
+            Button("Later", role: .cancel) {}
+        } message: {
+            Text("Friends still see your old photo. We'll try again next time you open the app.")
         }
     }
 
@@ -719,6 +746,8 @@ struct Scroll8<Content: View>: View {
         }
         .modifier(ScrollTrack())
         .scrollDismissesKeyboard(.interactively)
+        // 17번: 줄을 꾹 눌러 끄는 동안은 스크롤하지 않음
+        .scrollDisabled(Router.shared.reordering)
     }
 }
 

@@ -968,7 +968,7 @@ struct PartnerSheet: View {
             dismiss()
         } label: {
             HStack(spacing: 12) {
-                Avatar8(size: 30, initial: f.ini, bg: Self.color(for: f.name), fg: .black, fontSize: 13)
+                Avatar8(size: 30, photo: RemoteImages.shared.image(f.avatarUrl), initial: f.ini, bg: Self.color(for: f.name), fg: .black, fontSize: 13)
                 Text("@\(f.name)").font(F.t(15)).lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if on { Check8(size: 18) }

@@ -11,7 +11,15 @@ struct WWorkoutPager: View {
     var body: some View {
         ZStack {
             TabView(selection: $page) {
-                WLive(onControls: { withAnimation { page = 1 } }).tag(0)
+                Group {
+                    // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성은 큰 타이머 화면
+                    if engine.isNewKind {
+                        WTimerLive(onControls: { withAnimation { page = 1 } })
+                    } else {
+                        WLive(onControls: { withAnimation { page = 1 } })
+                    }
+                }
+                .tag(0)
                 WControls(onBack: { withAnimation { page = 0 } },
                           onEnd: { endSheet = true },
                           onNext: {
@@ -702,7 +710,7 @@ struct WSummary: View {
             // 위 34 는 시계 줄: 내용은 그 아래에서만 움직임 (위로 밀어도 시계와 겹치지 않게)
             VStack(spacing: 0) {
                 // 시계 줄 왼쪽에 모드 이름 (51번: 멘트는 그 아래 노랑)
-                Text(engine.lastRecord.map { $0.mode == .training ? $0.title : $0.mode.name.l10n } ?? "")
+                Text(engine.lastRecord.map { $0.mode == .training ? $0.title.l10n : $0.mode.name.l10n } ?? "")
                     .font(F.t(13, .semibold)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16).padding(.trailing, WClock.reserve)
@@ -739,6 +747,12 @@ struct WSummary: View {
             if let g = r.pftGrade {
                 PFTBadge(grade: g, width: 84, height: 24, fontSize: 13)
                     .padding(.top, 5)
+            }
+            // 18번: "8 rounds" · "12 sets · 4,200 kg" 등
+            if let k = r.kindSummary {
+                Text(verbatim: k).font(F.t(13, .semibold)).foregroundStyle(C.accent)
+                    .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+                    .padding(.top, 3)
             }
             if showVs {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -791,7 +805,7 @@ struct WSummary: View {
 
     private func rows(_ r: Record) -> some View {
         VStack(spacing: 0) {
-            ForEach(Array(r.segs.filter { $0.kind != .rox }.enumerated()), id: \.offset) { _, s in
+            ForEach(Array(r.segs.filter { $0.kind != .rox && $0.tag != "rest" }.enumerated()), id: \.offset) { _, s in
                 HStack(spacing: 7) {
                     Icon8(s.icon, 12, tint: .yellow)
                     Text(s.name).font(F.t(13)).lineLimit(1).minimumScaleFactor(0.85)

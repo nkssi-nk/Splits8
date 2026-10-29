@@ -293,6 +293,20 @@ struct Seg: Codable, Hashable {
     var detail: String
     var kind: SegKind
     var target: Int
+    // 18번 · 새 트레이닝 종류 (타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동). 예전 구간엔 없음
+    /// 이 초가 지나면 저절로 다음 구간 (타바타 운동/휴식 · EMOM 간격 · 시간 단계 · 세트 사이 휴식)
+    var auto: Int? = nil
+    /// 이 거리(m)를 뛰면 저절로 다음 구간 (인터벌 러닝 거리 단계 · GPS/워치 거리)
+    var autoM: Int? = nil
+    /// work · rest (타바타 · 기능성 휴식) / round (EMOM · AMRAP) / set (기능성) / fast · easy · walk · rest (인터벌 단계)
+    var tag: String? = nil
+    /// 인터벌 러닝 목표 페이스 (초/km)
+    var tp: Int? = nil
+    /// 몇 번째 (타바타·EMOM 라운드, 인터벌 반복, 기능성 세트). 워밍업·쿨다운은 nil
+    var no: Int? = nil
+    /// 기능성 운동: 목표 횟수 · 무게(kg)
+    var reps: Int? = nil
+    var kg: Double? = nil
 }
 
 /// 러닝 거리 (m)
@@ -329,11 +343,26 @@ struct Program: Codable, Hashable, Identifiable {
     /// nil = 하이록스 트레이닝 / "hiit" = 고강도 인터벌 / "run" = 러닝 (예전 파일엔 없음)
     var kind: String? = nil
     var runKm: Int? = nil          // 러닝 총거리 km (0 = 자유)
-    var indoor: Bool? = nil        // 러닝: 실내(러닝머신)
+    var indoor: Bool? = nil        // 러닝 · 인터벌 러닝: 실내(러닝머신)
+    // 18번 · 새 종류 설정 (예전 파일엔 없음 → nil)
+    var work: Int? = nil           // 타바타: 운동 초
+    var rest: Int? = nil           // 타바타: 휴식 초 / 기능성: 세트 사이 휴식 초
+    var rounds: Int? = nil         // 타바타 · EMOM 라운드 수
+    var every: Int? = nil          // EMOM 간격 초
+    var cap: Int? = nil            // AMRAP 총 시간 초
+    var task: String? = nil        // EMOM · AMRAP 할 일 (줄마다 하나, 화면에 표시만)
+    var steps: [IntervalStep]? = nil   // 인터벌 러닝 반복 묶음
+    var repeats: Int? = nil        // 인터벌 러닝 반복 횟수
+    var warm: IntervalStep? = nil  // 인터벌 러닝 워밍업 (선택)
+    var cool: IntervalStep? = nil  // 인터벌 러닝 쿨다운 (선택)
+    var moves: [StrengthMove]? = nil   // 기능성 운동 종목
 
     var isHIIT: Bool { kind == "hiit" }
     var isRun: Bool { kind == "run" }
-    var isOpen: Bool { isHIIT || isRun }
+    /// 하이록스 트레이닝이 아닌 카드 (HIIT · 러닝 · 18번 새 종류) — 구간 칩 대신 설정 시트로 엶
+    var isOpen: Bool { kind != nil }
+    /// 인터벌 러닝 (GPS · 실내/실외 고르기는 러닝과 같음)
+    var isInterval: Bool { kind == WKind.interval }
 
     /// 만들어 둘 수 있는 트레이닝 개수 (기본 카드 · HIIT · 러닝 카드 포함 전체). 이미 더 많이 가진 경우 있던 것은 그대로 두고 새로 만드는 것만 막음
     static let freeLimit: Int = 5
@@ -366,9 +395,9 @@ struct Program: Codable, Hashable, Identifiable {
     }
 
     /// 아이폰 카드 설명
-    var cardMeta: String { meta.map { $0.l10n } ?? watchMeta }
+    var cardMeta: String { kindLine ?? meta.map { $0.l10n } ?? watchMeta }
     /// 워치 목록 설명
-    var watchMeta: String { isOpen ? (meta ?? "").l10n : Self.setsText(sets, seq.count) }
+    var watchMeta: String { kindLine ?? (isOpen ? (meta ?? "").l10n : Self.setsText(sets, seq.count)) }
     /// 1 set · 8 segments (번역됨)
     static func setsText(_ sets: Int, _ segs: Int) -> String {
         if sets == 1 { return String(localized: "1 set · \(segs) segments") }
@@ -590,6 +619,12 @@ struct SegResult: Codable, Hashable {
     var dist: Double?          // 러닝 거리(m)
     /// 워치가 팔 움직임으로 센 횟수 (스키 당긴 횟수 · 로잉 저은 횟수 · 월볼 던진 횟수). 참고용 짐작값 — 시간·순위·등급에는 쓰지 않음. 예전 기록엔 없음
     var reps: Int? = nil
+    // 18번 · 새 종류 (예전 기록엔 없음). 기능성 운동은 reps = 실제 횟수(팔 움직임 짐작값 아님)
+    var tag: String? = nil        // Seg.tag 그대로 + AMRAP 마지막 덜 한 라운드 = "part"
+    var no: Int? = nil            // 몇 번째 라운드 · 반복 · 세트
+    var work: Int? = nil          // EMOM: 할 일을 끝낸 시간(초, "끝" 누른 때)
+    var kg: Double? = nil         // 기능성: 실제 무게
+    var tp: Int? = nil            // 인터벌: 목표 페이스(초/km)
     /// 62번 · 러닝 구간 평균 케이던스 (분당 걸음). 예전 기록 · 걸음을 못 잰 기록엔 없음
     var cad: Int? = nil
     /// 62번 · 러닝 구간에서 오른 높이(m, 3 m 미만 흔들림은 뺌). 높이 있는 실외 경로가 있을 때만
@@ -645,7 +680,9 @@ struct Record: Codable, Hashable, Identifiable {
     var endDate: Date? = nil   // 끝난 시각 (예전 기록엔 없음 → date + total)
     var place: String? = nil   // 동네 이름 "성수동, 서울" (폰에만 저장, 서버로 안 보냄)
     var route: [RoutePt]? = nil // 실외 러닝 경로 (폰에만)
-    var kind: String? = nil    // "hiit" / "run" (트레이닝 중 HIIT·러닝 카드로 한 것)
+    var kind: String? = nil    // "hiit" / "run" / 18번: "interval" · "tabata" · "emom" · "amrap" · "strength"
+    /// 18번 · AMRAP: 마지막 반 라운드에서 더 한 동작 수 (끝난 뒤 입력). 예전 기록엔 없음
+    var extra: Int? = nil
     // 62번 · 러닝 카드 기록 분석 (예전 기록 · 못 잰 기록엔 없음)
     var cadence: Int? = nil    // 평균 케이던스 (분당 걸음)
     /// 평균 보폭(m). 주의: Record 안에서 전역 stride(from:to:by:) 를 부르면 이 이름에 가려지니 Swift.stride 로 부를 것
@@ -658,6 +695,8 @@ struct Record: Codable, Hashable, Identifiable {
     var end: Date { endDate ?? date.addingTimeInterval(Double(total)) }
     var isHIIT: Bool { kind == "hiit" }
     var isRunKind: Bool { kind == "run" }
+    /// 18번 새 종류 (인터벌 러닝 · 타바타 · EMOM · AMRAP · 기능성) — 하이록스 PB · 순위 · 시뮬 통계에 안 들어감
+    var isNewKind: Bool { WKind.isNew(kind) }
 
     /// 러닝·스테이션 16개 (Roxzone 제외)
     var splits16: [Int]? {
@@ -825,6 +864,45 @@ struct Settings: Codable, Hashable {
     var repCal: [String: RepTune]? = nil
     /// 91번(빌드 28): 홈 프로필 카드 오른쪽에 보일 것. nil / "auto" = 가장 최근에 세운 최고 기록, sim · race · pft · run · goal
     var homeShow: String? = nil
+    /// 19번(빌드 29): 음성 안내 — 예전 저장 파일과 호환되도록 옵셔널 (nil = 기본값). 워치로도 같이 감 (WatchContext.settings)
+    var voiceOpt: Bool? = nil              // 켜기 (기본 끄기)
+    var voiceEveryOpt: Int? = nil          // 러닝 알림 간격(m): 500 · 1000(기본) · 0 = 끄기
+    var voiceDistOpt: Bool? = nil          // 러닝에서 말할 것: 거리 · 총 시간 · 평균 페이스 · 평균 심박 (기본 모두 켬)
+    var voiceTimeOpt: Bool? = nil
+    var voicePaceOpt: Bool? = nil
+    var voiceHrOpt: Bool? = nil
+
+    var voiceOn: Bool {
+        get { voiceOpt ?? false }
+        set { voiceOpt = newValue ? true : nil }
+    }
+    var voiceEvery: Int {
+        get { voiceEveryOpt ?? 1000 }
+        set { voiceEveryOpt = newValue == 1000 ? nil : newValue }
+    }
+    var voiceDist: Bool {
+        get { voiceDistOpt ?? true }
+        set { voiceDistOpt = newValue ? nil : false }
+    }
+    var voiceTime: Bool {
+        get { voiceTimeOpt ?? true }
+        set { voiceTimeOpt = newValue ? nil : false }
+    }
+    var voicePace: Bool {
+        get { voicePaceOpt ?? true }
+        set { voicePaceOpt = newValue ? nil : false }
+    }
+    var voiceHr: Bool {
+        get { voiceHrOpt ?? true }
+        set { voiceHrOpt = newValue ? nil : false }
+    }
+    /// 음성 안내 소리가 있는 언어인지 (지금은 한국어만). 앱 안에서 고른 언어 → 없으면 기기 언어
+    var voiceLangOK: Bool {
+        if let l = lang { return l == "ko" }
+        return Fm.isKorean
+    }
+    /// 운동 중에 실제로 말할지
+    var voiceActive: Bool { voiceOn && voiceLangOK }
 
     var glow: GlowTheme {
         get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }
@@ -976,6 +1054,7 @@ enum SeqBuilder {
 
     /// 트레이닝: 순서 × 세트, Roxzone 없음
     static func training(_ p: Program, div: Division, bests: [String: Int]) -> [Seg] {
+        if WKind.isNew(p.kind) { return newKind(p) }
         if p.isHIIT { return [hiitRound(1)] }
         if p.isRun {
             let n: Int = max(1, p.runKm ?? 0)
@@ -1002,7 +1081,7 @@ enum SegKey {
     /// 최고 기록으로 써도 되는 시간인지 (너무 빠른 시험용 탭은 빼기)
     /// 러닝: 1KM 2:30 기준으로 거리 비례 · 스테이션: 30초 · 인터벌: 제외
     static func plausible(icon: String, detail: String, time: Int) -> Bool {
-        if icon == "hiit" { return false }
+        if icon == "hiit" || icon == WKind.strengthIcon || icon == "roxzone" { return false }
         if icon == "run" {
             let m = runMeters(detail)
             return Double(time) >= Double(Record.minRun) * m / 1000

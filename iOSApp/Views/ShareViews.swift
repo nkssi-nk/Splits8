@@ -66,7 +66,18 @@ struct ShareData {
         runTotal = Fm.t(r.runTotal)
         stationTotal = Fm.t(r.stationTotal)
         partner = (r.partner ?? "").trimmingCharacters(in: .whitespaces)
-        if r.isRunKind {
+        // 18번: 새 종류 — 카드 위 이름표에 종류 (Training · EMOM), 쉬는 구간은 표에서 뺌
+        if r.isNewKind {
+            badge = "\(r.mode.name) · " + WKind.label(r.kind)
+            let main: [SegResult] = r.segs.filter { $0.tag != "rest" }
+            pairs = main.prefix(16).enumerated().map { i, x in
+                Pair(no: String(format: "%02d", i + 1), icon: x.icon, sn: ShareData.short(x.name), rt: "", st: Fm.t(x.time),
+                     spec: x.tag == "set" ? "\(x.reps ?? 0) × " + StrengthMove.kgText(x.kg ?? 0) : "")
+            }
+            seq = main.map { Part(t: $0.time, run: $0.kind == .run, icon: $0.icon) }
+            hasRox = false
+        }
+        if r.isRunKind || r.kind == WKind.interval {
             isRun = true
             distance = Units.dist(r.runDistance, imp) + " " + Units.distUnit(imp)
             avgPace = (r.runPace.map { Fm.t(Units.pace($0, imp)) } ?? "--:--") + " " + Units.paceUnit(imp)

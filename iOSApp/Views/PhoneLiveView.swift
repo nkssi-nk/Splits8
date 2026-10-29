@@ -55,8 +55,28 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     var isRunKind: Bool { kind == "run" }
     /// 64번: GPS 로 잰 전체 거리(m) — 끝난 구간 + 지금 구간
     var totalDist: Double { segDists.compactMap { $0 }.reduce(0, +) + segDist }
-    /// 끝 없이 늘어나는 운동 (HIIT · 자유 러닝)
-    var growsOpen: Bool { isHIIT || (isRunKind && runKm == 0) }
+    /// 끝 없이 늘어나는 운동 (HIIT · AMRAP · 자유 러닝)
+    var growsOpen: Bool { isHIIT || kind == WKind.amrap || (isRunKind && runKm == 0) }
+    // 18번 · 새 종류 (타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성) — 워치 WorkoutEngine 과 같은 규칙
+    /// 시작한 카드 (AMRAP 총 시간 · 할 일 글자 · 기능성 종목)
+    @ObservationIgnored private(set) var program: Program?
+    var isNewKind: Bool { WKind.isNew(kind) }
+    var isInterval: Bool { kind == WKind.interval }
+    /// 러닝처럼 GPS · 거리 · 페이스를 쓰는 종류
+    var runLike: Bool { isRunKind || isInterval }
+    var amrapCap: Int? { kind == WKind.amrap ? program?.cap : nil }
+    /// EMOM: 이번 라운드를 "끝" 낸 초 (nil = 아직)
+    private(set) var doneAt: Int? = nil
+    /// 구간이 넘어갈 때마다 +1 (시간으로 저절로 넘어갈 때도 화면이 번쩍이게)
+    private(set) var advanceCount = 0
+    @ObservationIgnored private var segWork: [Int?] = []
+    /// 기능성: 세트 끝에 고친 실제 횟수 · 무게
+    @ObservationIgnored private var segActual: [Int?] = []
+    @ObservationIgnored private var segKg: [Double?] = []
+    @ObservationIgnored private var partialLast = false
+    /// 시간 단계 넘김 (0.25초마다 — 새 종류만)
+    @ObservationIgnored private var timedTimer: Timer?
+    @ObservationIgnored private var cdKey = String()
     /// GPS 러닝이 총거리를 다 뛰어서 저절로 끝났을 때 (화면이 받아서 저장)
     private(set) var autoDone: Record? = nil
     // 동네 이름 · 경로
@@ -88,6 +108,9 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     }
     @ObservationIgnored private var undoPoint: UndoPoint?
     private(set) var canUndo = false
+
+    /// 19번: 음성 안내 1초 타이머 (아이폰만으로 운동할 때만 — 워치 운동을 같이 보여 줄 때는 워치가 말함)
+    @ObservationIgnored private var voiceTimer: Timer?
 
     // MARK: 값
 
@@ -172,15 +195,22 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         startDate = now; segStart = now
         active = true
         kind = req.mode == .training ? req.program?.kind : nil
+        program = req.mode == .training ? req.program : nil
         runKm = req.program?.runKm ?? 0
+        doneAt = nil; partialLast = false; cdKey = String()
+        segWork = Array(repeating: nil, count: seq.count)
+        segActual = Array(repeating: nil, count: seq.count)
+        segKg = Array(repeating: nil, count: seq.count)
         autoDone = nil; place = nil; routePts = []; lastRouteLoc = nil
         segSteps = Array(repeating: nil, count: seq.count)
         steps = 0; rawSteps = 0; pausedSteps = 0; pauseStepAt = 0; segStepStart = 0; stepBase = 0
         from = req.from
         if isRunKind { startSteps(now) }
 
-        if isRunKind {
+        if runLike {
             useGPS = !(req.program?.indoor ?? true)
+        } else if isNewKind {
+            useGPS = false
         } else {
             useGPS = req.mode != .race && settings.runMode == "outdoor"
         }
@@ -191,22 +221,29 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             placeLookup = p
             p.fetch { [weak self] name in self?.place = name; self?.placeLookup = nil }
         }
+        // 19번: 음성 안내 "운동을 시작합니다" (+ 첫 구간)
+        VoiceCoach.shared.begin(settings, seq: seq, runCard: runLike, open: growsOpen, kind: kind)
+        startVoice()
+        startTimed()
         persist()
     }
 
     /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
     private func growSeq() {
         let n: Int = seq.count + 1
-        seq.append(isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n))
+        seq.append(kind == WKind.amrap ? SeqBuilder.amrapRound(n) : (isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n)))
         segDists.append(nil)
         segSteps.append(nil)
+        segWork.append(nil)
+        segActual.append(nil)
+        segKg.append(nil)
     }
 
     /// 다음 구간 (HIIT·자유 러닝은 아직 순서에 없는 다음 라운드/km)
     var nextSeg: Seg? {
         if growsOpen && !hasNext {
             let n: Int = seq.count + 1
-            return isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n)
+            return kind == WKind.amrap ? SeqBuilder.amrapRound(n) : (isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n))
         }
         return next
     }
@@ -214,10 +251,20 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     // MARK: 진행
 
     /// 다음 구간. 마지막 구간이면 끝내고 기록을 돌려줌
-    func advance() -> Record? {
+    /// reps · kg: 기능성 세트 끝에 확인한 실제 횟수 · 무게
+    func advance(reps: Int? = nil, kg: Double? = nil) -> Record? {
         guard active, !finished, running else { return nil }
+        if kind == WKind.emom { markDone(); return nil }   // 18번: EMOM 은 "끝" (남은 시간 = 휴식)
         if isRunKind && useGPS { return nil }            // GPS 러닝은 1km마다 저절로 넘어감
-        let now = Date()
+        if kind == WKind.strength, cur.tag == "set", segActual.indices.contains(idx) {
+            segActual[idx] = reps
+            segKg[idx] = kg
+        }
+        return advanceCore(Date(), manual: true)
+    }
+
+    /// 다음 구간으로 (손으로 · 18번 시간/거리 자동 모두). now = 이 구간이 끝난 시각
+    private func advanceCore(_ now: Date, manual: Bool) -> Record? {
         let up = UndoPoint(idx: idx, segStart: segStart, segPaused: segPaused, segDist: segDist,
                            grew: growsOpen && splits.count + 1 >= seq.count, segStepStart: segStepStart)
         closeSeg(now)
@@ -225,12 +272,22 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         if splits.count >= seq.count {
             return finish(complete: true)
         }
-        undoPoint = up
-        canUndo = true
+        undoPoint = manual ? up : nil
+        canUndo = manual && kind != WKind.tabata
         idx = splits.count
         segStart = now; segPaused = 0
         segDist = 0
         segStepStart = steps
+        doneAt = nil
+        advanceCount += 1
+        // 19번: 음성 안내 — 다음 구간 이름 (실내 러닝 카드를 손으로 넘기면 1 km 안내)
+        if isNewKind {
+            VoiceCoach.shared.phase(seq, idx: idx)
+        } else if isRunKind {
+            VoiceCoach.shared.runMark(meters: Double(idx) * 1000, totalSec: total(now), avgHR: nil)
+        } else {
+            VoiceCoach.shared.segment(seq, idx: idx)
+        }
         persist()
         return nil
     }
@@ -243,10 +300,15 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         splits.removeLast()
         if segDists.indices.contains(u.idx) { segDists[u.idx] = nil }
         if segSteps.indices.contains(u.idx) { segSteps[u.idx] = nil }
+        if segActual.indices.contains(u.idx) { segActual[u.idx] = nil }
+        if segKg.indices.contains(u.idx) { segKg[u.idx] = nil }
         if u.grew, seq.count == newIdx + 1 {
             seq.removeLast()
             if segDists.count > seq.count { segDists.removeLast() }
             if segSteps.count > seq.count { segSteps.removeLast() }
+            if segWork.count > seq.count { segWork.removeLast() }
+            if segActual.count > seq.count { segActual.removeLast() }
+            if segKg.count > seq.count { segKg.removeLast() }
         }
         idx = u.idx
         segStart = u.segStart
@@ -264,6 +326,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             pauseAt = Date(); running = false
             curSpeed = 0                                // 빌드 27: 멈추면 속도 모름
             pauseStepAt = rawSteps
+            VoiceCoach.shared.paused()
         } else {
             if let p = pauseAt { segPaused += Date().timeIntervalSince(p) }
             pauseAt = nil; running = true
@@ -271,6 +334,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             // 62번: 일시정지 동안 걸은 걸음은 케이던스에서 뺌
             pausedSteps += max(0, rawSteps - pauseStepAt)
             steps = stepBase + max(0, rawSteps - pausedSteps)
+            VoiceCoach.shared.resumed()
         }
         persist()
     }
@@ -279,7 +343,13 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     func endNow() -> Record? {
         guard active, !finished else { return nil }
         if !running { togglePause() }
-        closeSeg(Date())
+        let now = Date()
+        closeSeg(now)
+        if let c = amrapCap {
+            // 18번: AMRAP 을 시간 전에 끝냄 → 하던 라운드는 덜 한 라운드
+            partialLast = true
+            return finish(complete: total(now) >= c - 1)
+        }
         return finish(complete: growsOpen || splits.count >= seq.count)
     }
 
@@ -287,6 +357,9 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     func discard() {
         stopGPS()
         stopSteps()
+        stopVoice()
+        stopTimed()
+        VoiceCoach.shared.stop()
         active = false; finished = true
         PhoneRunEngine.clearSnapshot()
     }
@@ -305,6 +378,9 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
     private func finish(complete: Bool) -> Record {
         stopGPS()
         stopSteps()
+        stopVoice()
+        stopTimed()
+        if isNewKind { VoiceCoach.shared.endedKind(kind, timeUp: complete) } else { VoiceCoach.shared.ended() }   // 19번: "운동 끝! 수고하셨어요."
         undoPoint = nil; canUndo = false
         finished = true
         PhoneRunEngine.clearSnapshot()
@@ -317,8 +393,18 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         for (i, t) in splits.enumerated() where seq.indices.contains(i) {
             let s: Seg = seq[i]
             let d: Double? = segDists.indices.contains(i) ? segDists[i] : nil
-            results.append(SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
-                                     hr: nil, dist: d))
+            var sr = SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
+                               hr: nil, dist: d)
+            if isNewKind {
+                sr.fillKind(s, kind: kind, work: segWork.indices.contains(i) ? segWork[i] : nil,
+                            partial: partialLast && i == splits.count - 1)
+                // 기능성: 세트 끝에 고친 값
+                if s.tag == "set", segActual.indices.contains(i) {
+                    if let a = segActual[i] { sr.reps = a }
+                    if let k = segKg[i] { sr.kg = k }
+                }
+            }
+            results.append(sr)
         }
         let total: Int = splits.reduce(0, +)
         let tg: Int = seq.prefix(splits.count).map(\.target).reduce(0, +)
@@ -329,11 +415,110 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         r.endDate = startDate.addingTimeInterval(Double(total))
         r.place = place
         r.kind = kind
-        if isRunKind && !useGPS { r.indoor = true }          // 94번
-        if isRunKind && useGPS && routePts.count >= 2 { r.route = routePts }
+        if runLike && !useGPS { r.indoor = true }          // 94번 · 18번 인터벌 러닝도
+        if runLike && useGPS && routePts.count >= 2 { r.route = routePts }
         // 62번: 러닝 카드 — 케이던스 · 보폭(GPS 거리 ÷ 걸음) · 오르막 (경로 높이로)
         if isRunKind { RunMetrics.fill(&r, segSteps: segSteps, strideHK: nil) }
         return r
+    }
+
+    // MARK: 19번 · 음성 안내 (1초마다)
+
+    private func startVoice() {
+        voiceTimer?.invalidate()
+        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.voiceTick() }
+        RunLoop.main.add(t, forMode: .common)
+        voiceTimer = t
+    }
+
+    private func stopVoice() {
+        voiceTimer?.invalidate()
+        voiceTimer = nil
+    }
+
+    /// 러닝 카드(GPS)는 알림 간격마다 거리 · 시간 · 평균 페이스, 그 외는 스테이션 중간 응원
+    private func voiceTick() {
+        guard active, !finished, running else { return }
+        let now = Date()
+        if isNewKind {
+            VoiceCoach.shared.timerTick(seq: seq, idx: idx, segEl: segEl(now), total: total(now), cap: amrapCap)
+            if isInterval && useGPS { VoiceCoach.shared.runMark(meters: totalDist, totalSec: total(now), avgHR: nil) }
+        } else if isRunKind {
+            if useGPS { VoiceCoach.shared.runMark(meters: totalDist, totalSec: total(now), avgHR: nil) }
+        } else {
+            VoiceCoach.shared.tick(seq: seq, idx: idx, segEl: segEl(now))
+        }
+    }
+
+    // MARK: 18번 · 시간 · 라운드 (0.25초마다)
+
+    private func startTimed() {
+        timedTimer?.invalidate()
+        guard isNewKind else { return }
+        let t = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in self?.timedTick() }
+        RunLoop.main.add(t, forMode: .common)
+        timedTimer = t
+    }
+
+    private func stopTimed() {
+        timedTimer?.invalidate()
+        timedTimer = nil
+    }
+
+    /// 시간 단계가 끝나면 다음 (경계 시각에 정확히 맞춤), 3 · 2 · 1초 전 진동, AMRAP 총 시간이 되면 끝
+    private func timedTick() {
+        guard active, !finished, running else { return }
+        let now = Date()
+        if let c = amrapCap, c > 0, total(now) >= c {
+            closeSeg(now)
+            let before: Int = splits.dropLast().reduce(0, +)
+            if !splits.isEmpty { splits[splits.count - 1] = max(0, c - before) }
+            partialLast = true
+            autoDone = finish(complete: true)
+            return
+        }
+        var n = 0
+        while n < 20, active, !finished, running, let a = cur.auto, segEl(now) >= a {
+            if let rec = advanceCore(segStart.addingTimeInterval(segPaused + Double(a)), manual: false) {
+                autoDone = rec
+                return
+            }
+            n += 1
+        }
+        guard let a = cur.auto else { return }
+        let left: Int = a - segEl(now)
+        if left >= 1 && left <= 3 {
+            let key: String = "\(idx).\(left)"
+            if key != cdKey {
+                cdKey = key
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            }
+        }
+    }
+
+    /// EMOM: 할 일을 끝냄 → 그 라운드 시간 저장, 남은 시간은 휴식
+    func markDone() {
+        guard active, !finished, running, kind == WKind.emom, doneAt == nil else { return }
+        let el: Int = segEl(Date())
+        doneAt = el
+        if segWork.indices.contains(idx) { segWork[idx] = el }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        persist()
+    }
+
+    /// 기능성: 이 종목 · 세트를 지난번에 한 값 (횟수 · 무게) — 세트 끝 확인 칸을 미리 채움
+    func lastSetValues() -> (reps: Int, kg: Double) {
+        let c: Seg = cur
+        let plan: (reps: Int, kg: Double) = (c.reps ?? 0, c.kg ?? 0)
+        guard c.tag == "set" else { return plan }
+        let prev: Record? = Store.shared.records
+            .filter { r in r.kind == WKind.strength && r.segs.contains { $0.tag == "set" && $0.name == c.name } }
+            .max { $0.date < $1.date }
+        guard let p = prev else { return plan }
+        let sets: [SegResult] = p.segs.filter { $0.tag == "set" && $0.name == c.name }
+        let same: SegResult? = sets.first { $0.no == c.no } ?? sets.last
+        guard let x = same else { return plan }
+        return (x.reps ?? plan.reps, x.kg ?? plan.kg)
     }
 
     // MARK: 걸음 수 (62번 · 아이폰 모션 센서)
@@ -426,7 +611,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             if d < 100 { segDist += d }       // 튀는 값은 버림
         }
         lastLoc = loc
-        if isRunKind {
+        if runLike {
             if lastRouteLoc == nil || loc.distance(from: lastRouteLoc!) >= 8 {
                 lastRouteLoc = loc
                 // 62번: 높이(못 쟀으면 nil) · 시작부터 초(일시정지 뺀 시간, 구간 시간과 같은 시계)
@@ -439,6 +624,13 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
 
     /// GPS 러닝: 1km 넘으면 저절로 다음 km (총거리 다 뛰면 끝 → autoDone)
     private func autoSplitIfNeeded() {
+        // 18번: 인터벌 러닝 거리 단계 — 그 거리를 뛰면 다음 단계
+        if isInterval {
+            guard useGPS, active, !finished, running, let m = cur.autoM, segDist >= Double(m) else { return }
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            if let rec = advanceCore(Date(), manual: false) { autoDone = rec }
+            return
+        }
         guard isRunKind, useGPS, active, !finished, running, segDist >= 1000 else { return }
         let now = Date()
         undoPoint = nil; canUndo = false
@@ -489,6 +681,12 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         var segStepStart: Double
         var segSteps: [Double?]
         var from: String
+        // 18번 (예전 파일엔 없음)
+        var program: Program? = nil
+        var work: [Int?]? = nil
+        var actual: [Int?]? = nil
+        var kgs: [Double?]? = nil
+        var doneAt: Int? = nil
     }
 
     func persist() {
@@ -497,7 +695,8 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
                             startDate: startDate, segStart: segStart, pauseAt: pauseAt, segPaused: segPaused,
                             useGPS: useGPS, segDist: segDist, segDists: segDists, settings: settings, simWord: simWord,
                             hasPFTBest: hasPFTBest, kind: kind, runKm: runKm, place: place, routePts: routePts,
-                            steps: steps, segStepStart: segStepStart, segSteps: segSteps, from: from.rawValue)
+                            steps: steps, segStepStart: segStepStart, segSteps: segSteps, from: from.rawValue,
+                            program: program, work: segWork, actual: segActual, kgs: segKg, doneAt: doneAt)
         JSONStore.save(snap, PhoneRunEngine.snapFile)
     }
 
@@ -526,6 +725,12 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         if segSteps.count < seq.count { segSteps += Array(repeating: nil, count: seq.count - segSteps.count) }
         segStepStart = s.segStepStart
         from = Scr(rawValue: s.from) ?? .home
+        program = s.program
+        let n: Int = seq.count
+        segWork = PhoneRunEngine.padded(s.work, n)
+        segActual = PhoneRunEngine.padded(s.actual, n)
+        segKg = PhoneRunEngine.padded(s.kgs, n)
+        doneAt = s.doneAt; partialLast = false; cdKey = String()
         // 걸음: 센서는 0부터 다시 셈 → 저장한 걸음에 이어서 더함
         steps = s.steps; stepBase = s.steps; rawSteps = 0; pausedSteps = 0; pauseStepAt = 0
         undoPoint = nil; canUndo = false
@@ -533,7 +738,17 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         active = true
         if isRunKind { startSteps(Date()) }
         if useGPS { startGPS() }
+        // 19번: 이어 받을 때는 말없이 상태만 (지난 거리 안내를 다시 하지 않음)
+        VoiceCoach.shared.begin(settings, seq: seq, runCard: runLike, open: growsOpen, announce: false, kind: kind)
+        startVoice()
+        startTimed()
         persist()
+    }
+
+    /// 저장해 둔 배열을 구간 수에 맞춤 (모자라면 nil 로 채움)
+    static func padded<T>(_ a: [T?]?, _ n: Int) -> [T?] {
+        let x: [T?] = a ?? []
+        return x.count >= n ? x : x + Array(repeating: nil, count: n - x.count)
     }
 }
 
@@ -580,6 +795,8 @@ struct PhoneLiveView: View {
     @State private var count: Int? = nil
     @State private var countTimer: Timer? = nil
     @State private var saveTimer: Timer? = nil
+    /// 18번 · 기능성: 세트 끝 → 실제 횟수 · 무게 확인
+    @State private var setAsk: StrengthSetAsk? = nil
 
     private var req: PhoneRunRequest { r.phoneRun ?? PhoneRunRequest(mode: .sim) }
 
@@ -603,6 +820,21 @@ struct PhoneLiveView: View {
                 done(rec)
             }
         }
+        // 18번: 시간으로 저절로 넘어갈 때도 번쩍 + 진동
+        .onChange(of: eng.advanceCount) { _, _ in
+            guard eng.isNewKind else { return }
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            flashNow()
+        }
+        .sheet(item: $setAsk) { a in
+            StrengthSetSheet(ask: a) { reps, kg in
+                setAsk = nil
+                advanceNow(reps: reps, kg: kg)
+            }
+            .presentationDetents([.height(340)])
+            .presentationBackground(Color(hex: 0x1C1C1E))
+            .preferredColorScheme(.dark)
+        }
         .alert("End workout?", isPresented: $askEnd) {
             Button("Save") { save() }
             Button("Discard", role: .destructive) { discard() }
@@ -616,11 +848,22 @@ struct PhoneLiveView: View {
         VStack(spacing: 0) {
             // 빌드 24: 제목 / ● iPhone · No HR / n / 16 / 막대 (워치 같이 보기 화면과 같은 머리)
             LiveHeader(f: frame(Date()), status: "iPhone · No HR", live: false, idPrefix: "phone")
-            TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-                LiveBody(f: frame(ctx.date), m: m, idPrefix: "phone")
+            if eng.isNewKind {
+                // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 — 큰 남은 시간 화면
+                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+                    TimerLiveBody(f: timerFace(ctx.date), total: eng.total(ctx.date), m: m,
+                                  pace: eng.runLike && eng.useGPS ? LivePace.text(el: eng.segEl(ctx.date), dist: eng.segDist,
+                                                                                  imperial: false, speed: eng.speedNow(ctx.date)) : nil,
+                                  paceColor: paceColor(ctx.date))
+                }
+                .padding(.top, m.top * 0.6)
+            } else {
+                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+                    LiveBody(f: frame(ctx.date), m: m, idPrefix: "phone")
+                }
+                .padding(.top, m.top * 0.6)
+                LiveNextRow(next: eng.nextSeg, m: m)
             }
-            .padding(.top, m.top * 0.6)
-            LiveNextRow(next: eng.nextSeg, m: m)
             Spacer(minLength: 16)
             nextButton(m)
             HStack(spacing: 10) {
@@ -639,19 +882,49 @@ struct PhoneLiveView: View {
     /// 엔진 → 화면 한 장면
     private func frame(_ now: Date) -> LiveFrame {
         LiveFrame(mode: eng.mode, title: eng.title, seq: eng.seq, idx: eng.idx, segEl: eng.segEl(now), total: eng.total(now),
-                  running: eng.running, open: eng.growsOpen,
+                  running: eng.running, open: eng.growsOpen || eng.isNewKind,
                   segDist: eng.useGPS ? eng.segDist : nil, totalDist: eng.useGPS ? eng.totalDist : nil,
                   runKind: eng.isRunKind,
                   speed: eng.useGPS ? eng.speedNow(now) : nil)
     }
 
+    /// 18번: 새 종류 화면 한 장
+    private func timerFace(_ now: Date) -> TimerFace {
+        TimerFaces.make(kind: eng.kind ?? "", seq: eng.seq, idx: eng.idx, segEl: eng.segEl(now), total: eng.total(now),
+                        cap: eng.amrapCap, segDist: eng.useGPS ? eng.segDist : nil, done: eng.doneAt, task: eng.program?.task)
+    }
+
+    /// 인터벌 러닝: 목표 페이스보다 빠르면 초록, 느리면 빨강
+    private func paceColor(_ now: Date) -> Color {
+        let sp: Double = eng.speedNow(now)
+        guard let tp = eng.cur.tp, sp > 0.5 else { return C.text2 }
+        return Int(1000 / sp) <= tp ? C.good : C.bad
+    }
+
     // MARK: 아래 버튼
 
+    /// 가운데 큰 버튼 글자 (18번 새 종류는 종류마다 다름)
+    private var nextLabel: String {
+        if eng.isRunKind && eng.useGPS { return "Auto split every 1 km" }
+        switch eng.kind ?? "" {
+        case WKind.emom: return eng.doneAt == nil ? "Done" : "Resting"
+        case WKind.amrap: return "Round done"
+        case WKind.strength: return eng.cur.tag == "rest" ? "Skip rest" : "Set done"
+        case WKind.interval: return eng.hasNext ? "Next step" : "Finish"
+        case WKind.tabata: return "Skip"
+        default: return (eng.hasNext || eng.growsOpen) ? "Next" : "Finish"
+        }
+    }
+
+    private var nextOn: Bool {
+        eng.running && !(eng.isRunKind && eng.useGPS) && !(eng.kind == WKind.emom && eng.doneAt != nil)
+    }
+
     private func nextButton(_ m: PhoneLiveMetrics) -> some View {
-        YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: eng.running && !(eng.isRunKind && eng.useGPS),
+        YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: nextOn,
                      action: { next() }) {
             HStack(spacing: 10) {
-                Text((eng.isRunKind && eng.useGPS ? "Auto split every 1 km" : ((eng.hasNext || eng.growsOpen) ? "Next" : "Finish")).l10n)
+                Text(nextLabel.l10n)
                 Text("›")
             }
             .font(F.t(m.buttonFont, .semibold))
@@ -729,8 +1002,12 @@ struct PhoneLiveView: View {
         .transition(.opacity)
     }
 
+    /// 18번: 타이머 운동은 3 · 2 · 1 을 소리로도
+    private var countVoice: Bool { req.mode == .training && WKind.isTimer(req.program?.kind) }
+
     private func startCount() {
         count = 3
+        if countVoice { VoiceCoach.shared.count(Store.shared.settings, 3) }
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         let t = Timer(timeInterval: 1, repeats: true) { _ in
             DispatchQueue.main.async { countTick() }
@@ -743,6 +1020,7 @@ struct PhoneLiveView: View {
         guard let c = count else { return }
         if c > 1 {
             count = c - 1
+            if countVoice { VoiceCoach.shared.count(Store.shared.settings, c - 1) }
             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         } else {
             stopCountTimer()
@@ -795,9 +1073,19 @@ struct PhoneLiveView: View {
     }
 
     private func next() {
+        // 18번 · 기능성: 세트 끝 → 실제 횟수 · 무게 확인 (지난번 값으로 미리 채움) → 휴식
+        if eng.kind == WKind.strength && eng.cur.tag == "set" && eng.running {
+            let v = eng.lastSetValues()
+            setAsk = StrengthSetAsk(name: eng.cur.name, no: eng.cur.no ?? 1, reps: v.reps, kg: v.kg)
+            return
+        }
+        advanceNow(reps: nil, kg: nil)
+    }
+
+    private func advanceNow(reps: Int?, kg: Double?) {
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        flashNow()
-        if let rec = eng.advance() {
+        if !eng.isNewKind { flashNow() }          // 새 종류는 advanceCount 로 번쩍
+        if let rec = eng.advance(reps: reps, kg: kg) {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             done(rec)
         }

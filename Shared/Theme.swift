@@ -283,7 +283,12 @@ enum L10n {
 extension String {
     /// Localizable.strings 에서 번역을 찾음 (키 = 영어 원문). 없으면 그대로.
     /// 변수로 들어오는 화면 문자열(부품의 title/label 등)에 씀. 사용자 입력·숫자는 키가 없어 그대로 나옴.
-    var l10n: String { L10n.bundle.localizedString(forKey: self, value: self, table: nil) }
+    var l10n: String {
+        let v: String = L10n.bundle.localizedString(forKey: self, value: self, table: nil)
+        // 18번: "EMOM 12 min" · "Interval timer 40/20" 처럼 숫자가 든 운동 이름
+        if v == self, let k = KindTitle.localize(self) { return k }
+        return v
+    }
 }
 
 // MARK: - 시간 형식

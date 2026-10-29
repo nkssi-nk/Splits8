@@ -92,7 +92,7 @@ struct PlanRequest: Equatable {
 /// HIIT · 러닝 설정 시트 (새로 만들기 / 저장된 것 편집)
 struct BonusRequest: Identifiable, Equatable {
     let id = UUID()
-    var kind: String            // "hiit" / "run"
+    var kind: String            // "hiit" / "run" / 18번: "interval" · "tabata" · "emom" · "amrap" · "strength"
     var existing: Program? = nil
 }
 
@@ -239,6 +239,8 @@ final class Router {
 
     // HIIT · 러닝 설정 시트 (nil 이면 닫힘)
     var bonus: BonusRequest? = nil
+    /// 18번: 트레이닝 만들기 — 종류 고르기 카드 시트
+    var kindPicker = false
 
     // 아이폰으로 기록
     var phoneRun: PhoneRunRequest? = Router.launchResume
@@ -611,6 +613,12 @@ struct PhoneRoot: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: r.photoView)
+        .sheet(isPresented: Binding(get: { r.kindPicker }, set: { r.kindPicker = $0 })) {
+            KindPickerSheet()
+                .presentationDetents([.large])
+                .presentationBackground(Color(hex: 0x1C1C1E))
+                .preferredColorScheme(.dark)
+        }
         .sheet(item: Binding(get: { r.bonus }, set: { r.bonus = $0 })) { req in
             BonusSheet(req: req)
                 .presentationDetents([.medium, .large])

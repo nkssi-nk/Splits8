@@ -147,24 +147,29 @@ struct DetailView: View {
                 zonesCard(rec)
             }
             Group {
-                if !rec.runs.isEmpty && rec.mode != .pft { paceCard(rec) }
+                if !rec.runs.isEmpty && rec.mode != .pft && !rec.isNewKind { paceCard(rec) }
                 if rec.mode == .sim, let f = Fatigue.analyze([rec], limit: 1) {
                     SectionLabel(text: "RUN FATIGUE", top: 20)
                     RunFatigueCard(result: f, footnote: "Based on this Full Sim")
                 }
             }
-            Group {
-                // SPLITS 라벨: margin 20px 4px 0
-                HStack(alignment: .firstTextBaseline) {
-                    SectionText("SPLITS")
-                    Spacer(minLength: 8)
-                    if rec.mode == .training {
-                        Text("VS YOUR BEST").font(F.t(11, .semibold)).tracking(0.6).foregroundStyle(C.text3).lineLimit(1)
+            if rec.isNewKind {
+                // 18번: 종류별 표 (라운드 · 단계 · 세트)
+                KindDetailSection(rec: rec)
+            } else {
+                Group {
+                    // SPLITS 라벨: margin 20px 4px 0
+                    HStack(alignment: .firstTextBaseline) {
+                        SectionText("SPLITS")
+                        Spacer(minLength: 8)
+                        if rec.mode == .training {
+                            Text("VS YOUR BEST").font(F.t(11, .semibold)).tracking(0.6).foregroundStyle(C.text3).lineLimit(1)
+                        }
                     }
+                    .padding(.top, 20).padding(.horizontal, 4)
+                    splits(rec)
+                    BenchSection(rec: rec)
                 }
-                .padding(.top, 20).padding(.horizontal, 4)
-                splits(rec)
-                BenchSection(rec: rec)
             }
 
             // 66번(빌드 25): 워치 Quick 은 한 번 쓰는 운동 → 마음에 들면 여기서 정식 트레이닝으로
@@ -325,10 +330,10 @@ struct DetailView: View {
             head = []
         } else if rec.mode == .training {
             // 64번: VS BEST 는 풀 시뮬 · 레이스에서만. 러닝은 거리, 그 외 트레이닝은 구간 수
-            let second: DetailTile = rec.isRunKind
+            let second: DetailTile = kindTile(rec) ?? (rec.isRunKind
                 ? DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: .white, unitColor: C.text2,
                              sub: rec.indoor == true ? "Indoor · est.".l10n : "")
-                : DetailTile(label: "SEGMENTS", value: "\(rec.mainSegs.count)", unit: "", color: .white, unitColor: .clear)
+                : DetailTile(label: "SEGMENTS", value: "\(rec.mainSegs.count)", unit: "", color: .white, unitColor: .clear))
             head = [DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear), second]
         } else {
             head = [
@@ -336,12 +341,43 @@ struct DetailView: View {
                 DetailTile(label: vs.word, value: vs.value.map(Fm.d) ?? "--:--", unit: "", color: deltaColor(vs.value), unitColor: .clear),
             ]
         }
-        return head + [
+        var more: [DetailTile] = [
             DetailTile(label: "AVG HR", value: rec.avgHR > 0 ? "\(rec.avgHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "MAX HR", value: rec.maxHR > 0 ? "\(rec.maxHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
             DetailTile(label: "CALORIES", value: grouped(rec.kcal), unit: "KCAL", color: .white, unitColor: C.text2),
-            DetailTile(label: "RUN PACE", value: pace, unit: Units.paceUnit(imp), color: .white, unitColor: C.text2),
-        ] + runTiles(rec) + repTiles(rec) + bestTiles(rec)
+        ]
+        // 18번: 타바타 · EMOM · AMRAP · 기능성은 러닝 페이스가 없음 (인터벌 러닝은 있음)
+        if !rec.isNewKind || rec.kind == WKind.interval {
+            more.append(DetailTile(label: "RUN PACE", value: pace, unit: Units.paceUnit(imp), color: .white, unitColor: C.text2))
+        }
+        if rec.kind == WKind.interval, let fp = rec.fastPace {
+            more.append(DetailTile(label: "FAST PACE", value: Fm.t(Units.pace(fp, imp)), unit: Units.paceUnit(imp), color: C.accent, unitColor: C.text2))
+        }
+        return head + more + runTiles(rec) + repTiles(rec) + bestTiles(rec)
+    }
+
+    /// 18번: 새 종류의 두 번째 타일 (라운드 · 거리 · 볼륨)
+    private func kindTile(_ rec: Record) -> DetailTile? {
+        let imp: Bool = store.settings.imperial
+        switch rec.kind ?? "" {
+        case WKind.interval:
+            return DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: .white,
+                              unitColor: C.text2, sub: rec.indoor == true ? "Indoor · est.".l10n : "")
+        case WKind.tabata:
+            return DetailTile(label: "ROUNDS", value: "\(rec.workRounds)", unit: "", color: .white, unitColor: .clear,
+                              sub: rec.complete == false ? "Ended early".l10n : "")
+        case WKind.emom:
+            let done: Int = rec.segs.filter { $0.work != nil }.count
+            return DetailTile(label: "ROUNDS", value: "\(rec.segs.count)", unit: "", color: .white, unitColor: .clear,
+                              sub: String(format: "%lld done".l10n, done))
+        case WKind.amrap:
+            let e: Int = rec.extra ?? 0
+            return DetailTile(label: "ROUNDS", value: "\(rec.fullRounds)" + (e > 0 ? " +\(e)" : ""), unit: "", color: C.accent, unitColor: .clear)
+        case WKind.strength:
+            return DetailTile(label: "VOLUME", value: grouped(Int(rec.volume.rounded())), unit: "KG", color: .white, unitColor: C.text2)
+        default:
+            return nil
+        }
     }
 
     /// 62번: 러닝 기록 — 평균 케이던스 · 보폭 · 오른 높이 (잰 값이 있을 때만)

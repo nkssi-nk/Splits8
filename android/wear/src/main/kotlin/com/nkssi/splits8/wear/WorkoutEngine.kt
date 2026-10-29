@@ -5,7 +5,10 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.nkssi.splits8.shared.Bonus
 import com.nkssi.splits8.shared.HRPoint
+import com.nkssi.splits8.shared.Kinds
+import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.LiveCommand
 import com.nkssi.splits8.shared.LivePace
 import com.nkssi.splits8.shared.LiveState
@@ -20,6 +23,8 @@ import com.nkssi.splits8.shared.SegKind
 import com.nkssi.splits8.shared.SegResult
 import com.nkssi.splits8.shared.SeqBuilder
 import com.nkssi.splits8.shared.Settings
+import com.nkssi.splits8.shared.VoiceCoach
+import com.nkssi.splits8.shared.VoicePrefs
 import com.nkssi.splits8.shared.newId
 import java.time.Instant
 import kotlin.math.max
@@ -98,19 +103,32 @@ class WorkoutEngine(
     var onLive: ((LiveState) -> Unit)? = null
     /** 운동이 시작 · 끝날 때 (운동 서비스 켜고 끄기) */
     var onActive: (Boolean) -> Unit = {}
+    /** 19번: 음성 안내 한 줄 재생 (WearDevice 가 이어 줌). null 이면 말 안 함 (시험 · 화면 사진) */
+    var voice: ((VoiceCoach.Line) -> Unit)? = null
+    /** 이번 운동의 음성 안내 (시작할 때 설정으로 만듦) */
+    private var coach: VoiceCoach? = null
 
     var settings = Settings()
 
-    // HIIT · 러닝 카드 (null = 하이록스 운동)
+    // HIIT · 러닝 카드 (null = 하이록스 운동) · 18번 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동
     var kind by mutableStateOf<String?>(null); private set
     private var runKm = 0
     private var hasPFTBest = false
     private var simWordAtStart: String? = null
+    /** 실외 GPS 러닝 (러닝 카드 · 인터벌 러닝) */
     var outdoorRun = false; private set
     val isHIIT: Boolean get() = kind == "hiit"
     val isRunKind: Boolean get() = kind == "run"
-    /** 끝 없이 늘어나는 운동 (HIIT · 자유 러닝) */
-    val growsOpen: Boolean get() = isHIIT || (isRunKind && runKm == 0)
+    /** 18번 AMRAP: 정한 총 시간(초) */
+    var cap: Int? = null; private set
+    /** 18번 EMOM · AMRAP: 할 일 (화면에 보이기만) */
+    var tasks: List<String> = emptyList(); private set
+    /** 18번 EMOM: 라운드마다 "끝" 을 누른 때 (라운드 시작부터 초) */
+    var segWork by mutableStateOf<List<Int?>>(emptyList()); private set
+    /** 18번: 3 · 2 · 1 진동을 한 (구간, 숫자) */
+    private var warned: Pair<Int, Int>? = null
+    /** 끝 없이 늘어나는 운동 (HIIT · 자유 러닝 · AMRAP) */
+    val growsOpen: Boolean get() = isHIIT || (isRunKind && runKm == 0) || Bonus.grows(kind)
 
     private var place: String? = null
     private var routePts = ArrayList<RoutePt>()
@@ -181,10 +199,20 @@ class WorkoutEngine(
     val cur: Seg get() = seq.getOrNull(idx) ?: seq.lastOrNull() ?: Seg("run", "Run", "1KM", SegKind.Run, 270)
     val next: Seg get() = seq.getOrNull(idx + 1) ?: cur
 
-    fun segEl(now: Long = clock()): Int {
+    fun segEl(now: Long = clock()): Int = (segMs(now) / 1000).toInt()
+
+    /** 이번 구간에서 지난 ms (일시정지 뺀) */
+    fun segMs(now: Long = clock()): Long {
         val p = pauseAt?.let { now - it } ?: 0L
-        return max(0L, (now - segStart - segPaused - p) / 1000).toInt()
+        return max(0L, now - segStart - segPaused - p)
     }
+
+    /** 18번: 시간 구간의 남은 초 (타바타 · EMOM · 휴식 · 시간 단계). 시간 구간이 아니면 null */
+    fun segLeft(now: Long = clock()): Int? =
+        Bonus.timedLen(kind, cur)?.let { len -> ((len * 1000L - segMs(now) + 999) / 1000).toInt().coerceAtLeast(0) }
+
+    /** 18번 AMRAP: 남은 초 */
+    fun capLeft(now: Long = clock()): Int? = Bonus.capLeft(cap, total(now))
     fun doneT(): Int = splits.take(idx).sum()
     fun total(now: Long = clock()): Int = doneT() + segEl(now)
 
@@ -219,15 +247,19 @@ class WorkoutEngine(
         lastSpeedAt = now
     }
 
-    /** 다음 구간 (HIIT · 자유 러닝은 아직 순서에 없는 다음 라운드/km) */
+    /** 다음 구간 (HIIT · 자유 러닝 · AMRAP 은 아직 순서에 없는 다음 라운드/km) */
     val nextSeg: Seg
         get() {
-            if (growsOpen && idx >= seq.size - 1) {
-                val n = seq.size + 1
-                return if (isHIIT) SeqBuilder.hiitRound(n) else SeqBuilder.runKm(n)
-            }
+            if (growsOpen && idx >= seq.size - 1) return openSeg(seq.size + 1)
             return next
         }
+
+    /** 끝 없이 늘어나는 운동의 n 번째 구간 */
+    private fun openSeg(n: Int): Seg = when {
+        isHIIT -> SeqBuilder.hiitRound(n)
+        Bonus.grows(kind) -> Bonus.amrapRound(n)
+        else -> SeqBuilder.runKm(n)
+    }
 
     val isLast: Boolean get() = idx >= seq.size - 1 && !growsOpen
 
@@ -249,16 +281,31 @@ class WorkoutEngine(
         if (active || countdown != null) return
         pendingStart = { start(mode, title, sets, seq, program, simWord, buzzStart = false) }
         countdown = COUNT_FROM
+        // 18번: 타이머 운동은 3 · 2 · 1 · 시작 을 소리로도 (음성 안내를 켰을 때)
+        countKind = if (mode == Mode.Training) program?.kind else null
+        countCoach = if (voice != null && Kinds.isTimer(countKind)) VoiceCoach(VoicePrefs.of(settings, L10n.isKorean)) else null
+        countVoice(COUNT_FROM)
         buzz(BuzzKind.Tick)
+    }
+
+    /** 세기 음성 (타이머 운동만) — 시작할 때 이 coach 를 그대로 씀 (시작 안내를 다시 안 하게) */
+    private var countCoach: VoiceCoach? = null
+    private var countKind: String? = null
+
+    private fun countVoice(n: Int) {
+        val v = voice ?: return
+        countCoach?.countdown(n, countKind)?.let { v(it) }
     }
 
     fun countTick() {
         val c = countdown ?: return
         if (c > 1) {
             countdown = c - 1
+            countVoice(c - 1)
             buzz(BuzzKind.Tick)
         } else {
             countdown = null
+            countVoice(0)
             val go = pendingStart
             pendingStart = null
             go?.invoke()
@@ -270,6 +317,7 @@ class WorkoutEngine(
     fun cancelCountdown() {
         countdown = null
         pendingStart = null
+        countCoach = null
     }
 
     // MARK: 시작
@@ -278,7 +326,10 @@ class WorkoutEngine(
         if (active) return
         kind = if (mode == Mode.Training) program?.kind else null
         runKm = program?.runKm ?: 0
-        outdoorRun = isRunKind && !(program?.indoor ?: true)
+        outdoorRun = Kinds.runLike(kind) && !(program?.indoor ?: true)
+        cap = if (kind == Kinds.AMRAP) (program?.cap ?: Bonus.AMRAP_CAP) else null
+        tasks = if (kind == Kinds.EMOM || kind == Kinds.AMRAP) program?.tasks.orEmpty() else emptyList()
+        warned = null
         hasPFTBest = mode == Mode.Pft && pftBestCount == PFT.items.size
         place = null; routePts = ArrayList(); lastRoute = null
         simWordAtStart = if (mode == Mode.Sim) simWord else null
@@ -292,6 +343,7 @@ class WorkoutEngine(
         segDists = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
         segReps = ArrayList<Int?>().apply { repeat(seq.size) { add(null) } }
         segSteps = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
+        segWork = List(seq.size) { null }
         steps = 0.0; segStepStart = 0.0
         curSpeed = 0.0; lastSpeedAt = Long.MIN_VALUE / 2
         segDistStart = 0.0; segPaused = 0; pauseAt = null
@@ -302,11 +354,15 @@ class WorkoutEngine(
         active = true
         reps.start(cur.icon)
         // 레이스는 늘 실내(GPS 안 씀) — 아이폰과 같음. 하이록스 운동의 야외 러닝은 설정의 러닝 방식이 outdoor 일 때만
-        val gps = if (isRunKind) outdoorRun else (mode != Mode.Race && settings.runMode == "outdoor" && !isHIIT)
-        sensors.start(ExerciseCfg(hiit = isHIIT, gps = gps, steps = isRunKind), this)
+        // 18번: 타바타 · EMOM · AMRAP · 기능성 운동은 HIIT 운동으로 (GPS 없음), 인터벌 러닝은 러닝 카드처럼
+        val gps = if (Kinds.runLike(kind)) outdoorRun else (mode != Mode.Race && settings.runMode == "outdoor" && !Kinds.hiitLike(kind))
+        sensors.start(ExerciseCfg(hiit = Kinds.hiitLike(kind), gps = gps, steps = Kinds.runLike(kind)), this)
         onActive(true)
         if (buzzStart) buzz(BuzzKind.Start)
         pushLive()
+        coach = countCoach ?: VoiceCoach(VoicePrefs.of(settings, L10n.isKorean))
+        countCoach = null
+        voiceCheck()
     }
 
     /** 시작할 때 PFT 최고 기록 구간 수 (WatchStore 가 넣어 줌) */
@@ -318,6 +374,8 @@ class WorkoutEngine(
     fun advance() {
         if (!active || finished || !running) return
         if (isRunKind && autoSplit) return            // 러닝은 1km마다 저절로 넘어감
+        // 18번 EMOM: 넘기지 않고 "끝" — 이 라운드에 걸린 시간만 적음 (남은 시간은 휴식)
+        if (Bonus.tapMarksDone(kind)) { markDone(); return }
         val now = clock()
         val prevIdx = idx
         val prevStart = segStart
@@ -334,7 +392,8 @@ class WorkoutEngine(
             finish(now, complete = true)
         } else {
             undoPoint = UndoPoint(prevIdx, prevStart, prevPaused, prevDistStart, grew, segReps.getOrNull(prevIdx), prevStepStart)
-            canUndo = !isRunKind
+            // 18번: 타바타 · EMOM 은 시계로 넘어가서 되돌리기 없음
+            canUndo = !isRunKind && kind != Kinds.TABATA && kind != Kinds.EMOM
             idx = splits.size
             segStart = now; segPaused = 0
             segDistStart = distance
@@ -343,6 +402,7 @@ class WorkoutEngine(
             reps.start(cur.icon)
             buzz(BuzzKind.Next)
             pushLive()
+            voiceCheck()
         }
     }
 
@@ -360,8 +420,9 @@ class WorkoutEngine(
         if (u.idx < segDists.size) segDists[u.idx] = null
         if (u.idx < segReps.size) segReps[u.idx] = null
         if (u.idx < segSteps.size) segSteps[u.idx] = null
-        if (u.grew && seq.size == newIdx + 1) {          // HIIT · 자유 러닝에서 붙였던 다음 라운드를 뗌
+        if (u.grew && seq.size == newIdx + 1) {          // HIIT · 자유 러닝 · AMRAP 에서 붙였던 다음 라운드를 뗌
             seq = seq.dropLast(1)
+            if (segWork.size > seq.size) segWork = segWork.dropLast(1)
             if (segHR.size > seq.size) segHR.removeAt(segHR.size - 1)
             if (segDists.size > seq.size) segDists.removeAt(segDists.size - 1)
             if (segReps.size > seq.size) segReps.removeAt(segReps.size - 1)
@@ -381,15 +442,88 @@ class WorkoutEngine(
         pushLive()
     }
 
-    /** HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임 */
+    /** HIIT 다음 라운드 / 자유 러닝 다음 km / AMRAP 다음 라운드를 순서 끝에 붙임 */
     private fun growSeq() {
-        val n = seq.size + 1
-        seq = seq + (if (isHIIT) SeqBuilder.hiitRound(n) else SeqBuilder.runKm(n))
+        seq = seq + openSeg(seq.size + 1)
         segHR.add(ArrayList()); segDists.add(null); segReps.add(null); segSteps.add(null)
+        segWork = segWork + null
+    }
+
+    // MARK: 18번 — 시간 · 거리로 저절로 넘어가기
+
+    /** EMOM "끝": 이 라운드를 끝낸 시간 (한 라운드에 한 번) */
+    fun markDone() {
+        if (!active || finished || !running || kind != Kinds.EMOM) return
+        if (segWork.getOrNull(idx) != null) return
+        val w = segEl()
+        segWork = segWork.mapIndexed { i, v -> if (i == idx) w else v }
+        buzz(BuzzKind.Click)
+        pushLive()
+    }
+
+    /**
+     * 시간 구간(타바타 · EMOM · 휴식 · 시간 단계)이 끝났으면 다음으로, AMRAP 은 총 시간이 다 되면 끝.
+     * 기록되는 시간은 정확히 구간 길이 (늦게 확인해도), 넘친 시간은 다음 구간으로. 운동 서비스가 0.25초마다 부름
+     */
+    fun timerTick() {
+        if (!active || finished || !running || !Kinds.isNew(kind)) return
+        val now = clock()
+        var moved = false
+        while (active && !finished) {
+            val ms = segMs(now)
+            Bonus.capCut(cap, doneT(), ms)?.let { c ->
+                closeSegWith(c.time)
+                finish(now, complete = true)
+                return
+            }
+            val c = Bonus.timedCut(kind, cur, ms) ?: break
+            undoPoint = null; canUndo = false
+            closeSegWith(c.time)
+            if (splits.size >= seq.size) { finish(now, complete = true); return }
+            moveTo(now - c.overMs)
+            moved = true
+        }
+        if (moved) {
+            buzz(BuzzKind.Next)
+            pushLive()
+            voiceCheck()
+        }
+        // 바뀌기 3 · 2 · 1초 전 진동
+        val w = Bonus.warnSec(kind, cur, segMs(now))
+        if (w != null && warned != (idx to w)) {
+            warned = idx to w
+            buzz(BuzzKind.Tick)
+        }
+    }
+
+    /** 다음 구간으로 (splits 는 이미 닫음). at = 새 구간 시작 시각 */
+    private fun moveTo(at: Long) {
+        idx = splits.size
+        segStart = at; segPaused = 0
+        segDistStart = distance
+        segStepStart = steps
+        advanceCount++
+        reps.start(cur.icon)
+    }
+
+    /** 인터벌 러닝: 거리 단계를 다 뛰면 저절로 다음 단계 */
+    private fun ivDistCheck() {
+        if (kind != Kinds.IVRUN || !active || finished || !running) return
+        val len = Bonus.distLen(kind, cur) ?: return
+        if (segDist < len) return
+        val now = clock()
+        undoPoint = null; canUndo = false
+        closeSeg(now)
+        if (splits.size >= seq.size) { finish(now, complete = true); return }
+        moveTo(now)
+        buzz(BuzzKind.Next)
+        pushLive()
+        voiceCheck()
     }
 
     /** 러닝: 1km 넘으면 저절로 다음 km (총거리 다 뛰면 끝) */
     private fun autoSplitIfNeeded() {
+        if (kind == Kinds.IVRUN) { ivDistCheck(); return }
         if (!isRunKind || !active || finished || !running || segDist < 1000) return
         val now = clock()
         undoPoint = null; canUndo = false
@@ -405,6 +539,7 @@ class WorkoutEngine(
             advanceCount++
             buzz(BuzzKind.Next)
             pushLive()
+            voiceCheck()
         }
     }
 
@@ -422,6 +557,7 @@ class WorkoutEngine(
             reps.setPaused(false)
         }
         pushLive()
+        voiceCheck()
     }
 
     /** End → 저장하고 끝내기: 현재 구간까지 기록 */
@@ -431,7 +567,9 @@ class WorkoutEngine(
         val now = clock()
         closeSeg(now)
         // HIIT · 자유 러닝은 끝이 없으니 End 가 정상 종료. 그 외는 마지막 구간에서 End 눌러도 다 한 것
-        finish(now, complete = growsOpen || splits.size >= seq.size)
+        // 18번 AMRAP 은 정한 시간을 다 채워야 다 한 것
+        val c = cap
+        finish(now, complete = if (c != null) splits.sum() >= c else growsOpen || splits.size >= seq.size)
     }
 
     /** 버리기: 기록 안 만듦 · 폰으로 안 보냄 · 측정도 저장 안 함 → 첫 화면 */
@@ -440,6 +578,7 @@ class WorkoutEngine(
         reps.stop()
         undoPoint = null; canUndo = false
         sensors.end(save = false)
+        coach = null                                    // 버리면 말 안 함
         onLive?.invoke(liveState(clock()).copy(discarded = true))
         buzz(BuzzKind.Click)
         active = false; finished = false; lastRecord = null
@@ -462,6 +601,9 @@ class WorkoutEngine(
         if (curSpeed > 0 && clock() - lastSpeedAt > 10_000) curSpeed = 0.0
         if (liveTicks % 5 == 0) pushLive()
         if (!active || finished || !running) return
+        timerTick()
+        if (!active || finished) return
+        voiceCheck()
         if (!settings.hapticPace || !(mode == Mode.Race || mode == Mode.Sim)) return
         val c = cur
         if (c.kind == SegKind.Rox || c.target <= 0 || idx in paceBuzzed) return
@@ -483,8 +625,10 @@ class WorkoutEngine(
         buzz(if (z > prev) BuzzKind.ZoneUp else BuzzKind.ZoneDown)
     }
 
-    private fun closeSeg(now: Long) {
-        val t = segEl(now)
+    private fun closeSeg(now: Long) = closeSegWith(segEl(now))
+
+    /** 이번 구간을 t 초로 닫음 */
+    private fun closeSegWith(t: Int) {
         splits = splits + t
         if (cur.kind == SegKind.Run && idx < segDists.size) segDists[idx] = segDist
         // 이 구간 걸음 수 (러닝 카드에서 걸음을 받았을 때만)
@@ -498,9 +642,12 @@ class WorkoutEngine(
         val results = splits.mapIndexedNotNull { i, t ->
             val s = seq.getOrNull(i) ?: return@mapIndexedNotNull null
             val h = segHR.getOrNull(i).orEmpty()
+            // 18번 기능성 운동: 워치는 세트 끝만 → 횟수 · 무게는 계획 값 (폰 기록 화면에서 고침)
+            val lift = s.icon == "lift"
             SegResult(s.icon, s.name, s.detail, s.kind, t, s.target,
                 hr = if (h.isEmpty()) null else (h.sum() / h.size).roundToInt(),
-                dist = segDists.getOrNull(i), reps = segReps.getOrNull(i))
+                dist = segDists.getOrNull(i), reps = if (lift) (s.reps ?: segReps.getOrNull(i)) else segReps.getOrNull(i),
+                kg = if (lift) s.kg else null, work = segWork.getOrNull(i), rep = s.rep)
         }
         val total = splits.sum()
         val tg = seq.take(splits.size).sumOf { it.target }
@@ -512,7 +659,9 @@ class WorkoutEngine(
             vsWord = deltaWord, vsTarget = if (kind == null && (mode != Mode.Pft || hasPFTBest)) tg else null,
             complete = complete, endDate = start.plusSeconds(total.toLong()), place = place, kind = kind,
             route = if (outdoorRun && routePts.size >= 2) routePts.toList() else null,
-            indoor = if (isRunKind && !outdoorRun) true else null,     // 94번
+            indoor = if (Kinds.runLike(kind) && !outdoorRun) true else null,     // 94번
+            rounds = if (kind == Kinds.AMRAP) (splits.size - 1).coerceAtLeast(0) else null,
+            cap = Bonus.recordCap(kind, cap, seq),
         )
         // 러닝 카드 — 케이던스 · 보폭 · 오르막 (경로 높이로)
         if (isRunKind) r = RunMetrics.fill(r, segSteps, null)
@@ -526,10 +675,27 @@ class WorkoutEngine(
         lastRecord = r
         finished = true
         pushLive()                      // 폰: "워치에서 저장 중…" → 기록이 도착하면 카드
+        voiceCheck()                    // "운동 끝! 수고하셨어요"
         onRecord(r)
         buzz(BuzzKind.Success)
         sensors.end(save = true)
         onActive(false)
+    }
+
+    // MARK: 음성 안내 (19번)
+
+    /** 지금 상태를 음성 안내에 넣어 봄 — 말할 것이 있으면 재생 (같은 말은 두 번 안 함) */
+    private fun voiceCheck() {
+        val v = voice ?: return
+        val c = coach ?: return
+        val now = clock()
+        val avg = if (hrSamples.isEmpty()) null else hrSamples.sumOf { it.b } / hrSamples.size
+        // 거리: 워치가 잰 값. 실내 러닝인데 거리값이 없으면 손으로 넘긴 km 수
+        val d = if (distance > 0) distance else if (isRunKind) splits.size * 1000.0 else null
+        // 끝났으면 기록의 총 시간 (AMRAP 이 정한 시간에 딱 끝났는지)
+        val tot = if (finished) splits.sum() else total(now)
+        val line = c.update(VoiceCoach.Obs(active, finished, running, mode, kind, seq, idx, segEl(now), tot, d, avg, cap, segMs(now)), now) ?: return
+        v(line)
     }
 
     // MARK: 폰에 같이 보여 주기
@@ -608,7 +774,8 @@ class WorkoutEngine(
 
     fun demoRun(mode: Mode, title: String, seq: List<Seg>, idx: Int, elapsed: Int, hr: Double, done: Boolean, vsBest: Boolean = false,
                 kind: String? = null, dist: Double = 380.0, segDist: Double = 0.0, speed: Double = 0.0, indoor: Boolean = false) {
-        this.kind = kind; hasPFTBest = vsBest; runKm = if (kind == "run") 5 else 0; outdoorRun = kind == "run" && !indoor
+        this.kind = kind; hasPFTBest = vsBest; runKm = if (kind == "run") 5 else 0; outdoorRun = Kinds.runLike(kind) && !indoor
+        cap = if (kind == Kinds.AMRAP) Bonus.AMRAP_CAP else null; tasks = emptyList(); segWork = List(seq.size) { null }; warned = null
         this.mode = mode; this.title = title; sets = 1; this.seq = seq
         running = true; finished = false; lastRecord = null
         this.hr = hr; kcal = 214.0; distance = dist

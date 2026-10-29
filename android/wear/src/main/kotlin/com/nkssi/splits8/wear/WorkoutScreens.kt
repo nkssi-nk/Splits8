@@ -57,7 +57,9 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.pager.VerticalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import com.nkssi.splits8.shared.CheerInput
+import com.nkssi.splits8.shared.Bonus
 import com.nkssi.splits8.shared.CheerPicker
+import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.Fm
 import com.nkssi.splits8.shared.Units
 import com.nkssi.splits8.shared.Mode
@@ -210,6 +212,8 @@ private fun Color.toHex(): Long = ((red * 255).toLong() shl 16) or ((green * 255
 @Composable
 private fun Current(now: Long, m: LiveMetrics, aod: Boolean) {
     val e = WatchStore.engine
+    // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동은 남은 시간 · 거리를 크게
+    if (Kinds.isNew(e.kind)) { BonusCurrent(now, m, aod); return }
     val cur = e.cur
     val el = e.segEl(now)
     val isRox = cur.kind == SegKind.Rox
@@ -239,6 +243,88 @@ private fun Current(now: Long, m: LiveMetrics, aod: Boolean) {
         T(detailLine(now), if (isRun) F.num(11, W500, C.text2) else F.t(11, W500, C.text2),
             Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
     }
+}
+
+/**
+ * 18번 지금 구간: 이름 줄 (라운드 3/8 · 휴식 · 스쿼트 2/3) · 큰 숫자 (남은 시간 / 남은 거리 / 세트 시간) · 아래 줄.
+ * 운동 = 노랑, 휴식 = 회색 (타바타 화면 규칙). AMRAP 은 남은 총 시간 + 다 한 라운드 수
+ */
+@Composable
+private fun BonusCurrent(now: Long, m: LiveMetrics, aod: Boolean) {
+    val e = WatchStore.engine
+    val cur = e.cur
+    val rest = cur.kind == SegKind.Rox
+    val big = if (aod) C.text3 else if (rest) C.d1 else C.accent
+    val imp = e.settings.imperial
+    val el = e.segEl(now)
+    // (이름 줄 오른쪽 작은 글자, 큰 숫자, 아래 줄)
+    val head: String
+    val value: String
+    var line = ""
+    when (e.kind) {
+        Kinds.AMRAP -> {
+            head = wt("%lld rounds", e.idx)
+            value = Fm.t(e.capLeft(now) ?: 0)
+            line = e.tasks.joinToString(" · ")
+        }
+        Kinds.EMOM -> {
+            val n = e.seq.size
+            head = "${cur.rep ?: (e.idx + 1)}/$n"
+            value = Fm.t(e.segLeft(now) ?: 0)
+            val w = e.segWork.getOrNull(e.idx)
+            line = if (w != null) wt("Done in %@", Fm.t(w)) else e.tasks.joinToString(" · ")
+        }
+        Kinds.TABATA -> {
+            val n = e.seq.count { it.icon == "hiit" }
+            head = "${cur.rep ?: 1}/$n"
+            value = Fm.t(e.segLeft(now) ?: 0)
+        }
+        Kinds.LIFT -> {
+            head = if (rest) "" else cur.detail.removePrefix("SET ")
+            value = if (rest) Fm.t(e.segLeft(now) ?: 0) else Fm.t(el)
+            line = if (rest) wt("Next: %@", wt(e.next.name)) else liftLine(cur.reps, cur.kg)
+        }
+        else -> {                                                       // 인터벌 러닝
+            val distLen = Bonus.distLen(e.kind, cur)
+            head = cur.rep?.let { r -> "$r/${e.seq.mapNotNull { it.rep }.maxOrNull() ?: r}" } ?: ""
+            value = if (distLen != null) Units.dist(maxOf(0.0, distLen - e.segDist), imp) + (if (imp) " mi" else " km")
+                else Fm.t(e.segLeft(now) ?: 0)
+            line = ivLine(el)
+        }
+    }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.height((m.name + 6).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Icon8(if (rest) "hiit" else Kinds.icon(e.kind), m.icon.dp, if (aod) Tint.Dim else if (rest) Tint.Mute else Tint.Yellow)
+            T(wt(cur.name), F.t(m.name, W600, if (rest) C.text2 else Color.White), minScale = 0.8f, translate = false)
+            if (head.isNotEmpty()) T(head, F.num(m.name * 0.85f, W500, C.text2), translate = false)
+        }
+        T(if (aod) value.dropLast(2) + "––" else value, F.num(m.seg * 1.45f, color = big, tracking = -0.02f * m.seg),
+            Modifier.fillMaxWidth().height((m.seg * 1.6f).dp).testTag("w.bonusBig"), translate = false)
+        T(line, F.t(11, W500, C.text2), Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
+    }
+}
+
+/** 기능성 운동 세트 줄: "5 × 80 kg" */
+private fun liftLine(reps: Int?, kg: Double?): String {
+    val r = reps ?: return ""
+    return if ((kg ?: 0.0) > 0) "$r × " + Bonus.kgText(kg ?: 0.0) else wt("%lld reps", r)
+}
+
+/** 인터벌 러닝 아래 줄: 지금 페이스 · 목표 페이스와 차이 (빠름 −0:05 / 느림 +0:07) */
+private fun ivLine(el: Int): String {
+    val e = WatchStore.engine
+    val imp = e.settings.imperial
+    val cur = e.cur
+    if (cur.kind == SegKind.Rox) return ""
+    val p = e.paceText(el, e.segDist, imp) ?: return wt("Measuring")
+    val goal = cur.pace ?: return wt("Pace %@", p)
+    val now = LivePaceSec.of(el, e.segDist) ?: return wt("Pace %@", p)
+    return wt("Pace %@", p) + " · " + Fm.d(now - goal)
+}
+
+/** 이 구간 평균 페이스 (초/km) — 목표와 비교용. 100 m 안 되면 null */
+private object LivePaceSec {
+    fun of(el: Int, dist: Double): Int? = if (dist < 100 || el <= 0) null else (el / dist * 1000).roundToInt()
 }
 
 /** 아래 줄: 러닝 = 거리, 스테이션 = 무게 · 거리 (더블이고 계획이 있으면 "Me 150 → 파트너 150 · 7 turns"), Roxzone = 빈 줄 */
@@ -317,9 +403,13 @@ private fun Controls(m: LiveMetrics) {
                 maxLines = 2, align = TextAlign.Center)
         } else {
             val last = e.isLast
-            Box(Modifier.size(m.main.dp).clip(CircleShape).background(if (last) C.good else C.accent).press { e.advance() }.testTag("w.next"),
+            // 18번 EMOM: 가운데 단추 = "끝" (이 라운드 할 일을 끝냄 → 남은 시간은 휴식). 이미 눌렀으면 흐리게
+            val emom = Bonus.tapMarksDone(e.kind)
+            val emomDone = emom && e.segWork.getOrNull(e.idx) != null
+            Box(Modifier.size(m.main.dp).clip(CircleShape).background(if (emomDone) C.wCard else if (last || emom) C.good else C.accent)
+                .press(!emomDone) { e.advance() }.testTag("w.next"),
                 contentAlignment = Alignment.Center) {
-                if (last) Icon8("i_check", (m.main * 0.42f).dp, Color.Black)
+                if (last || emom) Icon8("i_check", (m.main * 0.42f).dp, if (emomDone) C.text3 else Color.Black)
                 else TriArrow(Modifier.size((m.main * 0.5f).dp, (m.main * 0.42f).dp), Color.Black)
             }
         }
@@ -513,6 +603,8 @@ fun WSummary() {
             anchorType = androidx.wear.compose.foundation.lazy.ScalingLazyListAnchorType.ItemStart,
             autoCentering = null) {
             item { T(if (r.mode == Mode.Training) r.title else r.mode.title, F.t(12, W600, C.text2), translate = r.mode != Mode.Training) }
+            // 18번: 종류 줄 (EMOM · 12분 / AMRAP 7라운드 / 볼륨)
+            bonusSummary(r)?.let { line -> item { T(line, F.t(12, W600, C.accent), Modifier.fillMaxWidth(), maxLines = 2, align = TextAlign.Center, translate = false) } }
             item { Head(r) }
             item { Stats(r) }
             item {
@@ -571,6 +663,13 @@ private fun Stats(r: Record) {
             }
         }
     }
+}
+
+/** 18번 요약 한 줄 (번역됨). AMRAP 은 라운드 수 + "남은 동작은 폰에서", 기능성 운동은 총 볼륨 */
+private fun bonusSummary(r: Record): String? = when (r.kind) {
+    Kinds.AMRAP -> Bonus.amrapScore(r) + " · " + wt("Add extra reps on your phone")
+    Kinds.LIFT -> wt("Volume %@", Bonus.kgText(Bonus.volume(r)))
+    else -> Bonus.kindLine(r)
 }
 
 /** 워치가 아는 것: 내 최고 Full Sim · 최고 PFT · 레이스 목표 · 대회 날짜 · 심박 */

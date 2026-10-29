@@ -65,6 +65,7 @@ import com.nkssi.splits8.Scr
 import com.nkssi.splits8.Store
 import com.nkssi.splits8.shared.Defaults
 import com.nkssi.splits8.shared.Fm
+import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.Friend
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.Mode
@@ -241,7 +242,7 @@ fun ProgramCard(p: Program, expanded: Boolean, onMore: () -> Unit) {
         if (p.isOpen) {
             Row(Modifier.height(34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon8(if (p.isHIIT) "hiit" else "run", 18.dp, C.accent)
+                Icon8(Kinds.icon(p.kind), 18.dp, C.accent)
                 T(openLine(p), F.t(13, W600, C.d1), maxLines = 1, translate = false)
             }
         } else {
@@ -250,9 +251,10 @@ fun ProgramCard(p: Program, expanded: Boolean, onMore: () -> Unit) {
     }
 }
 
-/** HIIT: "Intervals" / 러닝: "5 KM · Outdoor" */
+/** HIIT: "Intervals" / 러닝: "5 KM · Outdoor" / 18번: 종류 이름 (타바타 · EMOM …) */
 private fun openLine(p: Program): String {
     if (p.isHIIT) return "Intervals".l10n
+    if (Kinds.isNew(p.kind)) return Kinds.title(p.kind).l10n
     val km = p.runKm ?: 0
     val d = if (km > 0) "$km KM" else "Free run".l10n
     return d + " · " + (if (p.indoor == true) "Indoor" else "Outdoor").l10n
@@ -407,11 +409,16 @@ private fun BuilderBar() {
 
 // HIIT · 러닝 카드 (새로 만들 때만, 맨 아래)
 
+// 18번: 러닝 · 인터벌 러닝 · HIIT · 타바타 · EMOM · AMRAP · 기능성 운동 (2칸씩)
 @Composable
 private fun BonusCards() {
-    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        BonusCard("hiit", "HIIT", "High-intensity intervals", Modifier.weight(1f))
-        BonusCard("run", "Running", "Distance · 1 km splits", Modifier.weight(1f))
+    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        for (row in Kinds.menu.chunked(2)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                for (k in row) BonusCard(k, Kinds.title(k), Kinds.sub(k), Modifier.weight(1f))
+                if (row.size < 2) Spacer(Modifier.weight(1f))
+            }
+        }
     }
 }
 
@@ -419,7 +426,7 @@ private fun BonusCards() {
 private fun BonusCard(kind: String, title: String, sub: String, modifier: Modifier) {
     Column(modifier.card8().press(tag = "builder.bonus.$kind") { Router.bonus = BonusRequest(kind) }.padding(16.dp)) {
         Row(verticalAlignment = Alignment.Top) {
-            Icon8(kind, 28.dp, C.accent)
+            Icon8(Kinds.icon(kind), 28.dp, C.accent)
             Spacer(Modifier.weight(1f))
             Chevron8()
         }

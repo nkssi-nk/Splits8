@@ -66,12 +66,15 @@ import androidx.core.content.ContextCompat
 import com.nkssi.splits8.Ask
 import com.nkssi.splits8.PhoneRunEngine
 import com.nkssi.splits8.PhoneRunRequest
+import com.nkssi.splits8.PhoneVoice
 import com.nkssi.splits8.R
 import com.nkssi.splits8.Router
 import com.nkssi.splits8.Scr
 import com.nkssi.splits8.Store
 import com.nkssi.splits8.shared.Cheer
+import com.nkssi.splits8.shared.Bonus
 import com.nkssi.splits8.shared.Fm
+import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.LivePace
 import com.nkssi.splits8.shared.Mode
@@ -136,6 +139,10 @@ fun PhoneLiveView() {
     var count by remember { mutableStateOf<Int?>(if (eng.active || Router.phoneNoCount) null else 3) }
     var now by remember { mutableLongStateOf(Router.phoneClock()) }
     val flash = remember { Animatable(0f) }
+    // 18번: 타이머 운동 삑 소리 · 기능성 운동 세트 확인 칸 (횟수, 무게)
+    val beep = rememberBeeper()
+    var liftAsk by remember { mutableStateOf<Pair<Int, Double>?>(null) }
+    val countKind = if (req.mode == Mode.Training) req.program?.kind else null
 
     fun buzz(strong: Boolean = false) {
         view.performHapticFeedback(if (strong) HapticFeedbackConstants.LONG_PRESS else HapticFeedbackConstants.VIRTUAL_KEY)
@@ -149,6 +156,7 @@ fun PhoneLiveView() {
         flash.animateTo(0f, tween(260))
     }
     fun done(rec: Record) {
+        PhoneVoice.observe(ctx, eng, Router.phoneClock())      // 19번: "운동 끝! 수고하셨어요"
         Store.addPhoneRecord(rec)
         // 기록 상세 위로 "수고했어요" 카드
         // 1.1.2: 트레이닝 편집 화면 등 탭이 아닌 곳에서 시작했으면, 기록 화면의 뒤로 가기는 그 모드의 탭으로
@@ -184,8 +192,11 @@ fun PhoneLiveView() {
         if (eng.active) return@LaunchedEffect
         if (count == null) { eng.start(req); return@LaunchedEffect }
         buzz()
-        while ((count ?: 0) > 1) { delay(1000); count = count?.minus(1); buzz() }
+        PhoneVoice.countdown(ctx, count ?: 3, countKind)               // 18번: 타이머 운동은 "3 · 2 · 1 · 시작" 소리
+        while ((count ?: 0) > 1) { delay(1000); count = count?.minus(1); buzz(); count?.let { PhoneVoice.countdown(ctx, it, countKind) } }
         delay(1000)
+        if (count == null) return@LaunchedEffect                        // 세는 중에 취소함
+        PhoneVoice.countdown(ctx, 0, countKind)
         count = null
         if (!eng.active) eng.start(req)
         success(); flashNow()
@@ -193,15 +204,24 @@ fun PhoneLiveView() {
     // 0.25초마다 시간 다시 그림
     LaunchedEffect(Unit) {
         var n = 0
+        var warned: Pair<Int, Int>? = null
         while (true) {
-            now = Router.phoneClock(); delay(250)
+            now = Router.phoneClock()
+            // 18번: 시간 구간이 끝나면 다음으로 (타바타 · EMOM · 휴식 · 시간 단계), AMRAP 은 시간이 다 되면 끝 → autoDone
+            eng.timerTick()
+            eng.warnSec()?.let { w -> if (warned != (eng.idx to w)) { warned = eng.idx to w; beep(false); buzz() } }
+            // 19번: 음성 안내 (시작 · 일시정지 · 구간 · 러닝 알림 · 응원). 워치 운동을 같이 보는 화면(WatchLive)에서는 안 부름
+            PhoneVoice.observe(ctx, eng, now)
+            delay(250)
             // 5초마다 진행 상태 저장 (GPS 거리 · 경로 · 걸음까지 — 앱이 꺼져도 이어서)
             if (++n % 20 == 0 && eng.active && !eng.finished) Store.savePhoneRun(eng.snapshot())
         }
     }
     // GPS 러닝이 총거리를 다 뛰어서 저절로 끝남
     LaunchedEffect(eng.autoDone) { eng.autoDone?.let { success(); done(it) } }
-    LaunchedEffect(eng.autoSplits) { if (eng.autoSplits > 0) { buzz(true); flashNow() } }
+    LaunchedEffect(eng.autoSplits) {
+        if (eng.autoSplits > 0) { buzz(true); flashNow(); if (Kinds.isNew(eng.kind)) beep(true) }
+    }
 
     Sensors(eng, ctx)
 
@@ -215,24 +235,31 @@ fun PhoneLiveView() {
             LiveHeader(frame, "Phone · No HR", live = false, tagPrefix = "phone")
             // 1.1.2: 가운데는 남는 자리만 씀 → 글자가 커도 아래 버튼(Next/완료 · End · Undo · Pause)은 항상 보임 (아이폰 Spacer(minLength: 16) 와 같음)
             Column(Modifier.weight(1f).clipToBounds()) {
-                LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
+                if (Kinds.isNew(eng.kind)) BonusLiveBody(eng, now, m, Modifier.padding(top = (m.top * 0.6f).dp))
+                else LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
                 LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
             }
             Spacer(Modifier.height(16.dp))
             // Next 버튼 (GPS 러닝은 1 km 마다 저절로)
             val gpsRun = eng.isRunKind && eng.useGPS
-            val enabled = eng.running && !gpsRun
+            // 18번 EMOM: 이 라운드 "끝" 을 이미 눌렀으면 다음 간격까지 못 누름
+            val emomDone = eng.kind == Kinds.EMOM && eng.segWork.getOrNull(eng.idx) != null
+            val enabled = eng.running && !gpsRun && !emomDone && liftAsk == null
             // 1.1.2: Finish 를 누른 뒤 기록 화면으로 넘어가는 0.25초 동안 버튼이 회색으로 바뀌어 "사라진 것처럼" 보이던 것 → 끝난 뒤에도 노란색 유지 (누를 수는 없음)
             val looksOn = enabled || eng.finished
             Row(
                 Modifier.fillMaxWidth().height(m.buttonH.dp).yellowFill(RoundedCornerShape(50), on = looksOn)
                     .press(enabled = enabled, tag = "phone.next") {
-                        buzz(true); flashNow()
+                        // 18번 기능성 운동: 세트 끝 → 횟수 · 무게 확인 칸 먼저
+                        if (eng.isLiftSet) { buzz(); liftAsk = eng.liftPrefill(); return@press }
+                        buzz(true); if (eng.kind != Kinds.EMOM) flashNow()
                         eng.advance()?.let { success(); done(it) }
                     },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
             ) {
-                val label = if (gpsRun) "Auto split every 1 km" else if (eng.hasNext || eng.growsOpen) "Next" else "Finish"
+                val label = if (gpsRun) "Auto split every 1 km"
+                    else if (Kinds.isNew(eng.kind)) (if (!eng.hasNext && !eng.growsOpen && eng.kind != Kinds.EMOM && !(eng.kind == Kinds.LIFT && !eng.isLiftSet)) "Finish" else bonusNextLabel(eng))
+                    else if (eng.hasNext || eng.growsOpen) "Next" else "Finish"
                 T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (looksOn) Color.Black else C.text3), maxLines = 1, translate = false)
             }
             Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -246,6 +273,17 @@ fun PhoneLiveView() {
     }
         // 넘길 때 노랗게 반짝
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(C.accent.copy(alpha = flash.value * 0.22f)))
+        // 18번 기능성 운동: 세트 끝 확인 (횟수 · 무게)
+        liftAsk?.let { (r, k) ->
+            LiftSetSheet(eng.cur.name, eng.cur.detail.replace("SET", "Set".l10n), r, k,
+                onReps = { liftAsk = it to k }, onKg = { liftAsk = r to it },
+                onSave = {
+                    liftAsk = null
+                    buzz(true); flashNow()
+                    eng.finishSet(r, k)?.let { success(); done(it) }
+                },
+                onCancel = { liftAsk = null })
+        }
         // 시작 전 3 · 2 · 1 (누르면 취소하고 돌아감)
         count?.let { n ->
             Box(Modifier.fillMaxSize().background(Color.Black).tap { count = null; Router.go(req.from) }.testTag("phone.countdown"),
@@ -409,7 +447,9 @@ fun FinishSheet(rec: Record) {
         Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 12.dp + 52.dp + 16.dp)) {
             c.tag?.let { FinishTag(it, c.tone, rec) }
             T(c.line, F.t(F.title2, W600), Modifier.testTag("finish.line"), translate = false)
-            val name = if (rec.mode == Mode.Training) rec.title else rec.mode.title.l10n
+            // 18번: 종류 줄 (EMOM · 12분 · 인터벌 타이머 40/20 × 10 · 기능성 운동)
+            val name = if (Kinds.isNew(rec.kind)) (Bonus.kindLine(rec) ?: rec.title.l10n)
+                else if (rec.mode == Mode.Training) rec.title else rec.mode.title.l10n
             T(name + " · " + Fm.wdm(rec.date), F.t(F.foot, color = C.text2), Modifier.padding(top = 4.dp), maxLines = 1, translate = false)
             FitText(Fm.t(rec.total), F.num(46, color = if (isGold) gold else Color.White, tracking = -0.92f), Modifier.padding(top = 14.dp), minScale = 0.6f)
             Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -437,6 +477,17 @@ fun FinishSheet(rec: Record) {
 /** 타일 3개: 칼로리 · 평균 심박 · 러닝 페이스(없으면 최대 심박). 심박이 없으면(폰 기록) 구간 수 */
 private fun finishTiles(rec: Record): List<Triple<String, String, String>> {
     val o = ArrayList<Triple<String, String, String>>()
+    // 18번: 종류마다 첫 칸 (라운드 · 볼륨 · 빠른 구간 페이스)
+    when (rec.kind) {
+        Kinds.AMRAP -> o.add(Triple("ROUNDS", "${rec.rounds ?: 0}" + ((rec.extra ?: 0).takeIf { it > 0 }?.let { " +$it" } ?: ""), ""))
+        Kinds.TABATA -> o.add(Triple("ROUNDS", "${Bonus.tabataDone(rec)}/${rec.segs.count { it.icon == "hiit" }}", ""))
+        Kinds.EMOM -> o.add(Triple("ROUNDS", "${rec.segs.size}", ""))
+        Kinds.LIFT -> o.add(Triple("VOLUME", grouped(Bonus.volume(rec).toInt()), "KG"))
+        Kinds.IVRUN -> Bonus.fastPace(rec)?.let { fp ->
+            val imp = com.nkssi.splits8.Store.settings.imperial
+            o.add(Triple("FAST PACE", Fm.t(com.nkssi.splits8.shared.Units.pace(fp, imp)), com.nkssi.splits8.shared.Units.paceUnit(imp)))
+        }
+    }
     if (rec.kcal > 0) o.add(Triple("CALORIES", grouped(rec.kcal), "KCAL"))
     if (rec.avgHR > 0) o.add(Triple("AVG HR", "${rec.avgHR}", "BPM"))
     val p = rec.runPace

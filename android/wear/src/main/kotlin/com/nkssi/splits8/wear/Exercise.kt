@@ -182,7 +182,7 @@ class WorkoutService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val e = WatchStore.engine
         val note = notification(e)
-        val gps = e.outdoorRun || (e.mode != Mode.Race && WatchStore.settings.runMode == "outdoor" && !e.isHIIT)
+        val gps = e.outdoorRun || (e.mode != Mode.Race && WatchStore.settings.runMode == "outdoor" && !com.nkssi.splits8.shared.Kinds.hiitLike(e.kind))
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
         if (gps && hasLocation()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
         runCatching { startForeground(NOTE_ID, note, type) }.onFailure {
@@ -190,11 +190,15 @@ class WorkoutService : Service() {
         }
         ticker?.cancel()
         ticker = scope.launch {
+            // 18번: 타이머 운동(타바타 · EMOM · 휴식)은 0.25초마다 시간 확인 → 바뀌는 순간 · 3 · 2 · 1 진동이 늦지 않게. tick() 은 그대로 1초마다
+            var n = 0
             while (isActive) {
-                delay(1000)
+                delay(250)
                 val en = WatchStore.engine
                 if (!en.active || en.finished) break
-                en.tick()
+                en.timerTick()
+                if (!en.active || en.finished) break
+                if (++n % 4 == 0) en.tick()
             }
             stopSelf()
         }

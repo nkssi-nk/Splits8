@@ -269,6 +269,14 @@ data class Seg(
     val detail: String,
     val kind: SegKind,
     val target: Int,
+    /** 18번: 몇 번째 라운드 · 반복 · 세트 (1부터). 없으면 null */
+    val rep: Int? = null,
+    /** 18번 인터벌 러닝: 목표 페이스 (1 km 당 초) */
+    val pace: Int? = null,
+    /** 18번 기능성 운동: 계획 횟수 */
+    val reps: Int? = null,
+    /** 18번 기능성 운동: 계획 무게(kg) */
+    val kg: Double? = null,
 )
 
 /** 러닝 거리 (m) */
@@ -306,21 +314,43 @@ data class Program(
     val seq: List<ProgItem>,
     val meta: String? = null,
     val quick: Boolean = false,
-    /** null = 하이록스 트레이닝 / "hiit" / "run" */
+    /** null = 하이록스 트레이닝 / "hiit" / "run" / 18번: "tabata" "emom" "amrap" "ivrun" "lift" (Kinds) */
     val kind: String? = null,
     /** 러닝 총거리 km (0 = 자유) */
     val runKm: Int? = null,
-    /** 러닝: 실내(러닝머신) */
+    /** 러닝 · 인터벌 러닝: 실내(러닝머신) */
     val indoor: Boolean? = null,
+    // 18번 (모두 없으면 null — 예전 파일 · 예전 앱과 그대로 주고받음)
+    /** 타바타: 운동 초 */
+    val work: Int? = null,
+    /** 타바타: 휴식 초 · 기능성 운동: 세트 사이 휴식 초 */
+    val rest: Int? = null,
+    /** 타바타 · EMOM: 라운드 수 · 인터벌 러닝: 묶음 반복 수 */
+    val rounds: Int? = null,
+    /** EMOM: 간격 초 (60 = 1분) */
+    val every: Int? = null,
+    /** AMRAP: 총 시간 초 */
+    val cap: Int? = null,
+    /** EMOM · AMRAP: 할 일 (화면에 보이기만) */
+    val tasks: List<String>? = null,
+    /** 인터벌 러닝: 반복 묶음의 단계들 */
+    val steps: List<IvStep>? = null,
+    /** 인터벌 러닝: 워밍업 (선택) */
+    val warm: IvStep? = null,
+    /** 인터벌 러닝: 쿨다운 (선택) */
+    val cool: IvStep? = null,
+    /** 기능성 운동: 종목들 */
+    val lifts: List<Lift>? = null,
 ) {
     val isHIIT: Boolean get() = kind == "hiit"
     val isRun: Boolean get() = kind == "run"
-    val isOpen: Boolean get() = isHIIT || isRun
+    /** 하이록스 트레이닝이 아닌 카드 (HIIT · 러닝 · 18번 카드들) → 설정 시트로 엶, 링크 공유 안 함 */
+    val isOpen: Boolean get() = kind != null
 
     /** 카드 설명 */
     val cardMeta: String get() = meta?.l10n ?: watchMeta
     /** 워치 목록 설명 */
-    val watchMeta: String get() = if (isOpen) (meta ?: "").l10n else setsText(sets, seq.size)
+    val watchMeta: String get() = if (Kinds.isNew(kind)) Bonus.metaLine(this) else if (isOpen) (meta ?: "").l10n else setsText(sets, seq.size)
 
     companion object {
         /** 만들어 둘 수 있는 트레이닝 개수 (기본 카드 · HIIT · 러닝 카드 포함) */
@@ -555,12 +585,18 @@ data class SegResult(
     val hr: Int? = null,
     /** 러닝 거리(m) */
     val dist: Double? = null,
-    /** 워치가 팔 움직임으로 센 횟수 (참고용) */
+    /** 워치가 팔 움직임으로 센 횟수 (참고용). 18번 기능성 운동: 이 세트에 한 횟수 */
     val reps: Int? = null,
     /** 러닝 구간 평균 케이던스 (분당 걸음) */
     val cad: Int? = null,
     /** 러닝 구간에서 오른 높이(m) */
     val up: Double? = null,
+    /** 18번 기능성 운동: 이 세트 무게(kg) */
+    val kg: Double? = null,
+    /** 18번 EMOM: 할 일을 끝낸 때 (라운드 시작부터 초). 안 눌렀으면 null */
+    val work: Int? = null,
+    /** 18번: 몇 번째 라운드 · 반복 · 세트 */
+    val rep: Int? = null,
 )
 
 /** 스키 · 로잉 · 월볼 횟수 요약 (기록 화면 카드용) */
@@ -639,10 +675,18 @@ data class Record(
     val ascent: Double? = null,
     /** 94번(빌드 28): 러닝 카드를 실내(GPS 없음)로 뛴 기록. 거리는 손목 움직임 짐작값 → "실내 · 추정 거리", 러닝 PB 에서 뺌 */
     val indoor: Boolean? = null,
+    /** 18번 AMRAP: 다 한 라운드 수 */
+    val rounds: Int? = null,
+    /** 18번 AMRAP: 남은 반 라운드에서 더 한 동작 수 (끝나고 입력) */
+    val extra: Int? = null,
+    /** 18번 AMRAP: 정한 총 시간(초) · EMOM: 간격(초) · 타바타: 운동 초 */
+    val cap: Int? = null,
 ) {
     val end: Instant get() = endDate ?: date.plusSeconds(total.toLong())
     val isHIIT: Boolean get() = kind == "hiit"
     val isRunKind: Boolean get() = kind == "run"
+    /** 하이록스가 아닌 운동 (HIIT · 러닝 · 18번 종류) — 하이록스 PB · 구간 최고 · 시뮬 통계에서 뺌 */
+    val isBonus: Boolean get() = kind != null
 
     /** 러닝·스테이션 16개 (Roxzone 제외) */
     val splits16: List<Int>?
@@ -864,6 +908,15 @@ data class Settings(
     val hiddenOpt: List<BlockedUser>? = null,
     /** 17번: 친구 목록 순서 (친구 id). 이 폰에만. 없으면 서버 순서, 목록에 없는 새 친구는 맨 아래 */
     val friendOrderOpt: List<String>? = null,
+    /** 19번: 음성 안내 켬. null = 끔 (기본 끔). 워치로도 감 — 워치 운동은 워치가 말함 */
+    val voiceOpt: Boolean? = null,
+    /** 19번: 러닝 알림 간격(m). null = 1000, 500, 0 = 끔 */
+    val voiceEveryOpt: Int? = null,
+    /** 19번: 러닝 알림에 넣을 것 (null = 켬): 거리 · 총 시간 · 평균 페이스 · 평균 심박 */
+    val voiceDistOpt: Boolean? = null,
+    val voiceTimeOpt: Boolean? = null,
+    val voicePaceOpt: Boolean? = null,
+    val voiceHrOpt: Boolean? = null,
 ) {
     /** lb · mi 로 보여 주는지 */
     val imperial: Boolean get() = units == "imperial"
@@ -872,6 +925,14 @@ data class Settings(
     val blocked: List<BlockedUser> get() = blockedOpt ?: emptyList()
     val hidden: List<BlockedUser> get() = hiddenOpt ?: emptyList()
     val friendOrder: List<String> get() = friendOrderOpt ?: emptyList()
+    /** 19번: 음성 안내 (기본 끔) */
+    val voice: Boolean get() = voiceOpt ?: false
+    /** 19번: 러닝 알림 간격(m). 0 = 끔 */
+    val voiceEvery: Int get() = voiceEveryOpt ?: 1000
+    val voiceDist: Boolean get() = voiceDistOpt ?: true
+    val voiceTime: Boolean get() = voiceTimeOpt ?: true
+    val voicePace: Boolean get() = voicePaceOpt ?: true
+    val voiceHr: Boolean get() = voiceHrOpt ?: true
     val glow: GlowTheme get() = GlowTheme.of(themeOpt)
     /** 워치 운동을 폰에 같이 보여 주기 (기본 켬) */
     val mirror: Boolean get() = mirrorOpt ?: true
@@ -886,6 +947,12 @@ data class Settings(
     fun withBlocked(v: List<BlockedUser>) = copy(blockedOpt = v.ifEmpty { null })
     fun withHidden(v: List<BlockedUser>) = copy(hiddenOpt = v.ifEmpty { null })
     fun withFriendOrder(v: List<String>) = copy(friendOrderOpt = v.ifEmpty { null })
+    fun withVoice(v: Boolean) = copy(voiceOpt = if (v) true else null)
+    fun withVoiceEvery(m: Int) = copy(voiceEveryOpt = if (m == 1000) null else m)
+    fun withVoiceDist(v: Boolean) = copy(voiceDistOpt = if (v) null else false)
+    fun withVoiceTime(v: Boolean) = copy(voiceTimeOpt = if (v) null else false)
+    fun withVoicePace(v: Boolean) = copy(voicePaceOpt = if (v) null else false)
+    fun withVoiceHr(v: Boolean) = copy(voiceHrOpt = if (v) null else false)
     fun withGlow(v: GlowTheme) = copy(themeOpt = if (v == GlowTheme.Yellow) null else v.raw)
     fun withMirror(v: Boolean) = copy(mirrorOpt = if (v) null else false)
 
@@ -1034,6 +1101,7 @@ object SeqBuilder {
     /** 트레이닝: 순서 × 세트, Roxzone 없음 */
     fun training(p: Program, div: Division, bests: Map<String, Int>): List<Seg> {
         if (p.isHIIT) return listOf(hiitRound(1))
+        if (Kinds.isNew(p.kind)) return Bonus.seq(p)
         if (p.isRun) {
             val n = maxOf(1, p.runKm ?: 0)
             return (1..n).map { runKm(it, bests[SegKey.of("run", "1KM")] ?: 0) }
@@ -1055,7 +1123,7 @@ object SegKey {
 
     /** 최고 기록으로 써도 되는 시간인지 (너무 빠른 시험용 탭은 빼기) */
     fun plausible(icon: String, detail: String, time: Int): Boolean {
-        if (icon == "hiit") return false
+        if (icon == "hiit" || icon == "rest" || icon == "lift") return false
         if (icon == "run") return time.toDouble() >= Record.MIN_RUN * runMeters(detail) / 1000
         return time >= Record.MIN_STATION
     }

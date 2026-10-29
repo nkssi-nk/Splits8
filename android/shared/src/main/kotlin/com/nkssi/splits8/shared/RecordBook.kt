@@ -84,6 +84,7 @@ val Record.runLegs: List<Pair<Double, Int>>
             val d = s.dist
             when {
                 d != null -> d to s.time
+                Bonus.isTimeDetail(s.detail) -> null          // 18번: 인터벌 러닝 시간 단계인데 거리를 모름
                 s.time < median * 0.6 -> null
                 else -> runMeters(s.detail) to s.time
             }
@@ -368,7 +369,7 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
     val segBests: Map<String, Int> by lazy {
         val b = HashMap<String, Int>()
         for (r in records) {
-            if (r.mode != Mode.Training || !r.counts || r.isRunKind || r.isHIIT) continue
+            if (r.mode != Mode.Training || !r.counts || r.isBonus) continue
             for (s in r.segs) {
                 if (s.kind == SegKind.Rox || !SegKey.plausible(s.icon, s.detail, s.time)) continue
                 val k = SegKey.of(s.icon, s.detail)
@@ -385,7 +386,7 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
     fun segBestsBefore(rec: Record): Map<String, Int> {
         val b = HashMap<String, Int>()
         for (r in records) {
-            if (r.mode != Mode.Training || !r.counts || r.isRunKind || r.isHIIT || r.id == rec.id || !r.date.isBefore(rec.date)) continue
+            if (r.mode != Mode.Training || !r.counts || r.isBonus || r.id == rec.id || !r.date.isBefore(rec.date)) continue
             for (s in r.segs) {
                 if (s.kind == SegKind.Rox || !SegKey.plausible(s.icon, s.detail, s.time)) continue
                 val k = SegKey.of(s.icon, s.detail)
@@ -537,7 +538,7 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
     private fun sameKind(a: Record, r: Record): Boolean {
         if (a.mode != r.mode || !a.counts) return false
         return when (r.mode) {
-            Mode.Training -> a.title == r.title && a.sets == r.sets && !a.isHIIT
+            Mode.Training -> a.title == r.title && a.sets == r.sets && !a.isHIIT && !Kinds.isNew(a.kind)
             Mode.Sim -> a.splits16 != null
             Mode.Race -> true
             Mode.Pft -> a.pftSplits != null
@@ -556,12 +557,12 @@ class RecordBook(val records: List<Record>, val settings: Settings, val friend: 
         }
         val goalDelta = if (r.mode == Mode.Race) (r.goal ?: r.vsTarget)?.let { r.total - it } else null
         var pbDelta: Int? = null
-        if (r.counts && !r.isHIIT) {
+        if (r.counts && !r.isHIIT && !Kinds.isNew(r.kind)) {
             val best = before.filter { sameKind(it, r) }.minOfOrNull { it.total }
             if (best != null && r.total < best) pbDelta = r.total - best
         }
         var segBest: String? = null
-        if (r.mode == Mode.Training && r.counts) {
+        if (r.mode == Mode.Training && r.counts && !Kinds.isNew(r.kind)) {
             val prev = HashMap<String, Int>()
             for (b in before) {
                 if (b.mode != Mode.Training || !b.counts) continue

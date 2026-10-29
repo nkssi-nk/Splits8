@@ -79,6 +79,8 @@ object Insights {
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun candidates(r: Record, book: RecordBook): List<Insight> {
         if (!(r.isComplete || r.mode == Mode.Training)) return emptyList()
+        // 18번 종류(타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동)는 하이록스 분석을 하지 않음
+        if (Kinds.isNew(r.kind)) return emptyList()
         val o = ArrayList<Insight>()
         val main = r.mainSegs
         val runs = r.runs
@@ -397,7 +399,7 @@ object Insights {
         }
 
         // ── 트레이닝 ──
-        if (r.mode == Mode.Training && !r.isHIIT && !r.isRunKind) {
+        if (r.mode == Mode.Training && !r.isBonus) {
             val sets = maxOf(1, r.sets)
             if (sets >= 2 && main.size % sets == 0) {
                 val per = main.size / sets

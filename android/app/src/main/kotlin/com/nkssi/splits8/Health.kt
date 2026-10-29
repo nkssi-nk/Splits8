@@ -60,8 +60,13 @@ data class HealthWorkout(
             val start = r.date
             val end = r.end.takeIf { it.isAfter(start) } ?: start.plusSeconds(1)
             fun clamp(t: Int): Instant = start.plusSeconds(t.toLong()).let { if (it.isAfter(end)) end else it }
-            val type = if (r.kind == "hiit") ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING
-                else ExerciseSessionRecord.EXERCISE_TYPE_RUNNING          // 아이폰과 같음: HIIT 말고는 모두 러닝
+            // 아이폰과 같음: HIIT 말고는 모두 러닝. 18번: 타바타 · EMOM · AMRAP = HIIT, 기능성 운동 = 근력 운동, 인터벌 러닝 = 러닝
+            val type = when (r.kind) {
+                com.nkssi.splits8.shared.Kinds.LIFT -> ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
+                "hiit", com.nkssi.splits8.shared.Kinds.TABATA, com.nkssi.splits8.shared.Kinds.EMOM, com.nkssi.splits8.shared.Kinds.AMRAP ->
+                    ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING
+                else -> ExerciseSessionRecord.EXERCISE_TYPE_RUNNING
+            }
             val m = r.segs.filter { it.kind == SegKind.Run }.mapNotNull { it.dist }.sum()
             val hr = r.hr.filter { it.b in 1..300 }.map { clamp(it.t) to it.b.toLong() }.distinctBy { it.first }.sortedBy { it.first }
             val route = r.route.orEmpty().filter { it.t != null }.map { HealthPt(clamp(it.t!!), it.a, it.o, it.h) }

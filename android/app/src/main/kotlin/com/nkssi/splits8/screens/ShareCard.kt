@@ -137,9 +137,12 @@ data class ShareData(
             val runs = r.runs
             val sts = r.segs.filter { it.kind == SegKind.St }
             val imp = Store.settings.imperial      // 빌드 27: 무게를 lb 로 (설정 > Units)
-            val run = r.isRunKind
+            // 18번: 인터벌 러닝은 러닝처럼 거리 · 페이스, 다른 새 종류는 종류 줄 (EMOM · 12분 · 인터벌 타이머 40/20 × 10)
+            val run = r.isRunKind || r.kind == com.nkssi.splits8.shared.Kinds.IVRUN
+            val bonus = com.nkssi.splits8.shared.Kinds.isNew(r.kind)
             return ShareData(
-                badge = "${r.mode.title} · ${div.name}", place = r.title, divName = div.name,
+                badge = if (bonus) (com.nkssi.splits8.shared.Bonus.kindLine(r) ?: r.mode.title) else "${r.mode.title} · ${div.name}",
+                place = r.title, divName = div.name,
                 date = r.date.atZone(Fm.zone).format(cardDate), total = Fm.t(r.total),
                 avgHR = if (r.avgHR > 0) "${r.avgHR}" else "--", rox = Fm.t(r.roxTotal), hasRox = r.roxTotal > 0,
                 kcal = kcalText(r.kcal), vsWord = word, vsValue = v?.let { Fm.d(it) } ?: "--:--", pb = Store.book.isPB(r),
@@ -152,7 +155,7 @@ data class ShareData(
                         if (i < sts.size) Fm.t(sts[i].time) else "",
                         if (i < sts.size) spec(Units.detail(sts[i].detail, imp)) else "",
                     )
-                }.takeIf { !run } ?: emptyList(),
+                }.takeIf { !run && !bonus } ?: emptyList(),
                 seq = if (run) emptyList() else r.mainSegs.map { SharePart(it.time, it.kind == SegKind.Run, it.icon) },
                 runTotal = Fm.t(r.runTotal), stationTotal = Fm.t(r.stationTotal),
                 partner = (r.partner ?: "").trim(),

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -18,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -33,6 +35,7 @@ import com.nkssi.splits8.shared.Fm
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.RepTune
 import com.nkssi.splits8.shared.RunModes
+import com.nkssi.splits8.shared.Settings
 import com.nkssi.splits8.shared.l10n
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.Chevron8
@@ -41,6 +44,7 @@ import com.nkssi.splits8.ui.Note8
 import com.nkssi.splits8.ui.PageSide
 import com.nkssi.splits8.ui.Scroll8
 import com.nkssi.splits8.ui.SectionLabel
+import com.nkssi.splits8.ui.Seg8
 import com.nkssi.splits8.ui.SettingRow
 import com.nkssi.splits8.ui.T
 import com.nkssi.splits8.ui.Toggle8
@@ -86,8 +90,38 @@ fun SetWorkoutView() {
                 WToggleRow("Behind target pace", "Race · Full Sim", s.hapticPace, true, "settings.hapticPace") { v -> Store.update { it.withHapticPace(v) } }
             }
             Note8("Your watch alerts you with a vibration during workouts.")
+
+            VoiceSection(s)
         }
     }
+}
+
+/**
+ * 19번: 음성 안내 — 켜기/끄기(기본 끔) · 러닝 알림 간격 · 러닝 알림에 넣을 것.
+ * 워치 운동은 워치가, 폰 운동은 폰이 말함 (설정은 워치로 같이 감). 지금은 한국어 조각만 있어서 다른 언어면 회색으로 못 켬
+ */
+@Composable
+private fun VoiceSection(s: Settings) {
+    val ko = L10n.isKorean
+    val on = s.voice && ko
+    SectionLabel("VOICE GUIDANCE")
+    Column(Modifier.fillMaxWidth().card8().alpha(if (ko) 1f else 0.45f)) {
+        WToggleRow("Voice guidance", null, on, !on, "settings.voice") { v -> if (ko) Store.update { it.withVoice(v) } }
+        if (on) {
+            Row(Modifier.fillMaxWidth().rowLine(true).padding(vertical = 10.dp, horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                T("Running alerts", F.t(17), Modifier.weight(1f), maxLines = 1)
+                Seg8(listOf("500" to "0.5 km", "1000" to "1 km", "0" to "Off"), "${s.voiceEvery}", Modifier.width(196.dp).testTag("settings.voiceEvery"),
+                    height = 30.dp, radius = 9.dp, fontSize = 13) { k -> Store.update { it.withVoiceEvery(k.toIntOrNull() ?: 1000) } }
+            }
+            WToggleRow("Distance", null, s.voiceDist, false, "settings.voiceDist") { v -> Store.update { it.withVoiceDist(v) } }
+            WToggleRow("Total time", null, s.voiceTime, false, "settings.voiceTime") { v -> Store.update { it.withVoiceTime(v) } }
+            WToggleRow("Average pace", null, s.voicePace, false, "settings.voicePace") { v -> Store.update { it.withVoicePace(v) } }
+            WToggleRow("Average heart rate", "Watch workouts only", s.voiceHr, true, "settings.voiceHr") { v -> Store.update { it.withVoiceHr(v) } }
+        }
+    }
+    Note8(if (ko) "Speaks on the device you work out with: the watch for watch workouts, this phone for phone workouts. Other sound gets quieter while it speaks. Running alerts are for Run cards."
+        else "Voice guidance is available in Korean for now.")
 }
 
 /** 종목 이름 · 오른쪽 상태 (기본값 / 보정됨 · 날짜) */

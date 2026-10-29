@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.nkssi.splits8.shared.Bonus
+import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.PFT
 import com.nkssi.splits8.shared.Program
@@ -37,6 +39,11 @@ data class PhoneRunSnapshot(
     val kind: String?, val runKm: Int, val place: String?, val route: List<RoutePt>,
     val steps: Double, val rawSteps: Double, val pausedSteps: Double, val pauseStepAt: Double, val segStepStart: Double,
     val segSteps: List<Double?>,
+    // 18번 (예전 파일엔 없음 → 기본값)
+    val cap: Int? = null,
+    val segWork: List<Int?>? = null,
+    val liftReps: List<Int?>? = null,
+    val liftKg: List<Double?>? = null,
 )
 
 /**
@@ -83,15 +90,26 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     private var simWord = "VS BEST"
     private var hasPFTBest = false
 
-    // HIIT · 러닝 카드
+    // HIIT · 러닝 카드 · 18번 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동
     var kind by mutableStateOf<String?>(null); private set
     private var runKm = 0
     val isHIIT: Boolean get() = kind == "hiit"
     val isRunKind: Boolean get() = kind == "run"
     /** GPS 로 잰 전체 거리(m) — 끝난 구간 + 지금 구간 */
     val totalDist: Double get() = segDists.filterNotNull().sum() + segDist
-    /** 끝 없이 늘어나는 운동 (HIIT · 자유 러닝) */
-    val growsOpen: Boolean get() = isHIIT || (isRunKind && runKm == 0)
+    /** 끝 없이 늘어나는 운동 (HIIT · 자유 러닝 · AMRAP) */
+    val growsOpen: Boolean get() = isHIIT || (isRunKind && runKm == 0) || Bonus.grows(kind)
+    /** 18번 AMRAP: 정한 총 시간(초) */
+    var cap: Int? = null; private set
+    /** 18번 EMOM · AMRAP: 할 일 */
+    var tasks: List<String> = emptyList(); private set
+    /** 18번 EMOM: 라운드마다 "끝" 을 누른 때 (라운드 시작부터 초) */
+    var segWork by mutableStateOf<List<Int?>>(emptyList()); private set
+    /** 18번 기능성 운동: 세트 끝에 확인한 횟수 · 무게 (구간 번호 → 값). 확인 안 한 세트는 계획 값 */
+    private var liftReps = ArrayList<Int?>()
+    private var liftKg = ArrayList<Double?>()
+    /** 18번 기능성 운동: 종목별 지난번 세트 (확인 칸 미리 채우기) */
+    private var lastLift: Map<String, List<Pair<Int?, Double?>>> = emptyMap()
     /** GPS 러닝이 총거리를 다 뛰어서 저절로 끝났을 때 (화면이 받아서 저장) */
     var autoDone by mutableStateOf<Record?>(null); private set
     /** 저절로 1 km 넘어간 횟수 (화면이 진동 · 반짝) */
@@ -119,10 +137,23 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     val hasNext: Boolean get() = idx + 1 < seq.size
     val next: Seg? get() = seq.getOrNull(idx + 1)
 
-    fun segEl(now: Long = clock()): Int {
+    fun segEl(now: Long = clock()): Int = (segMs(now) / 1000).toInt()
+
+    /** 이번 구간에서 지난 ms (일시정지 뺀) */
+    fun segMs(now: Long = clock()): Long {
         val p = pauseAt?.let { now - it } ?: 0L
-        return max(0L, (now - segStart - segPaused - p) / 1000).toInt()
+        return max(0L, now - segStart - segPaused - p)
     }
+
+    /** 18번: 시간 구간의 남은 초. 시간 구간이 아니면 null */
+    fun segLeft(now: Long = clock()): Int? =
+        Bonus.timedLen(kind, cur)?.let { len -> ((len * 1000L - segMs(now) + 999) / 1000).toInt().coerceAtLeast(0) }
+
+    /** 18번 AMRAP: 남은 초 */
+    fun capLeft(now: Long = clock()): Int? = Bonus.capLeft(cap, total(now))
+
+    /** 18번: 바뀌기 3 · 2 · 1초 전이면 그 숫자 (화면이 소리 · 진동) */
+    fun warnSec(now: Long = clock()): Int? = if (active && !finished && running) Bonus.warnSec(kind, cur, segMs(now)) else null
     fun doneT(): Int = splits.take(idx).sum()
     fun total(now: Long = clock()): Int = doneT() + segEl(now)
 
@@ -133,12 +164,16 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     /** 다음 구간 (HIIT · 자유 러닝은 아직 순서에 없는 다음 라운드/km) */
     val nextSeg: Seg?
         get() {
-            if (growsOpen && !hasNext) {
-                val n = seq.size + 1
-                return if (isHIIT) SeqBuilder.hiitRound(n) else SeqBuilder.runKm(n)
-            }
+            if (growsOpen && !hasNext) return openSeg(seq.size + 1)
             return next
         }
+
+    /** 끝 없이 늘어나는 운동의 n 번째 구간 */
+    private fun openSeg(n: Int): Seg = when {
+        isHIIT -> SeqBuilder.hiitRound(n)
+        Bonus.grows(kind) -> Bonus.amrapRound(n)
+        else -> SeqBuilder.runKm(n)
+    }
 
     /** VS GOAL / VS LAST / VS JIHO / VS BEST (워치와 같음) */
     val deltaWord: String get() = when (mode) { Mode.Race -> "VS GOAL"; Mode.Sim -> simWord; else -> "VS BEST" }
@@ -197,7 +232,19 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         autoDone = null; autoSplits = 0; place = null; route = ArrayList(); lastRoute = null
         segSteps = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
         steps = 0.0; rawSteps = 0.0; pausedSteps = 0.0; pauseStepAt = 0.0; segStepStart = 0.0
-        useGPS = if (isRunKind) !(req.program?.indoor ?: true) else req.mode != Mode.Race && settings.runMode == "outdoor"
+        // 18번: 인터벌 러닝은 러닝 카드처럼 실내/실외, 타바타 · EMOM · AMRAP · 기능성 운동은 GPS 안 씀
+        useGPS = when {
+            Kinds.runLike(kind) -> !(req.program?.indoor ?: true)
+            Kinds.isNew(kind) -> false
+            else -> req.mode != Mode.Race && settings.runMode == "outdoor"
+        }
+        cap = if (kind == Kinds.AMRAP) (req.program?.cap ?: Bonus.AMRAP_CAP) else null
+        tasks = if (kind == Kinds.EMOM || kind == Kinds.AMRAP) req.program?.tasks.orEmpty() else emptyList()
+        segWork = List(seq.size) { null }
+        liftReps = ArrayList<Int?>().apply { repeat(seq.size) { add(null) } }
+        liftKg = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
+        lastLift = if (kind == Kinds.LIFT) seq.filter { it.icon == "lift" }.map { it.name }.distinct()
+            .associateWith { Bonus.lastSets(Store.records, it) } else emptyMap()
         changed()
     }
 
@@ -209,7 +256,8 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         if (!active || finished) return null
         return PhoneRunSnapshot(req, clock(), mode, title, sets, seq, idx, splits, running, startMs, segStart, pauseAt, segPaused,
             useGPS, segDist, segDists.toList(), settings.division, settings.goalTime, simWord, hasPFTBest, kind, runKm, place, route.toList(),
-            steps, rawSteps, pausedSteps, pauseStepAt, segStepStart, segSteps.toList())
+            steps, rawSteps, pausedSteps, pauseStepAt, segStepStart, segSteps.toList(),
+            cap = cap, segWork = segWork, liftReps = liftReps.toList(), liftKg = liftKg.toList())
     }
 
     /** 파일에서 이어 받기 (앱을 다시 열었을 때) */
@@ -224,15 +272,23 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         steps = x.steps; rawSteps = x.rawSteps; pausedSteps = x.pausedSteps; pauseStepAt = x.pauseStepAt; segStepStart = x.segStepStart
         segSteps = ArrayList(x.segSteps); stepCarry = x.rawSteps
         undoPoint = null; canUndo = false; autoDone = null; autoSplits = 0
+        cap = x.cap
+        tasks = if (kind == Kinds.EMOM || kind == Kinds.AMRAP) x.req.program?.tasks.orEmpty() else emptyList()
+        segWork = (x.segWork ?: emptyList()).let { w -> List(seq.size) { w.getOrNull(it) } }
+        liftReps = ArrayList(List(seq.size) { x.liftReps?.getOrNull(it) })
+        liftKg = ArrayList(List(seq.size) { x.liftKg?.getOrNull(it) })
+        lastLift = if (kind == Kinds.LIFT) seq.filter { it.icon == "lift" }.map { it.name }.distinct()
+            .associateWith { Bonus.lastSets(Store.records, it, java.time.Instant.ofEpochMilli(x.startMs)) } else emptyMap()
         finished = false; active = true
     }
 
     /** HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임 */
     private fun growSeq() {
-        val n = seq.size + 1
-        seq = seq + (if (isHIIT) SeqBuilder.hiitRound(n) else SeqBuilder.runKm(n))
+        seq = seq + openSeg(seq.size + 1)
         segDists.add(null)
         segSteps.add(null)
+        segWork = segWork + listOf(null)
+        liftReps.add(null); liftKg.add(null)
     }
 
     // MARK: 진행
@@ -241,13 +297,16 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     fun advance(): Record? {
         if (!active || finished || !running) return null
         if (isRunKind && useGPS) return null            // GPS 러닝은 1km마다 저절로 넘어감
+        // 18번 EMOM: 넘기지 않고 "끝" — 이 라운드에 걸린 시간만 적음 (남은 시간은 휴식)
+        if (Bonus.tapMarksDone(kind)) { markDone(); return null }
         val now = clock()
         val up = UndoPoint(idx, segStart, segPaused, segDist, growsOpen && splits.size + 1 >= seq.size, segStepStart)
         closeSeg(now)
         if (growsOpen && splits.size >= seq.size) growSeq()
         if (splits.size >= seq.size) return finish(true)
         undoPoint = up
-        canUndo = true
+        // 18번: 타바타 · EMOM 은 시계로 넘어가서 되돌리기 없음
+        canUndo = kind != Kinds.TABATA && kind != Kinds.EMOM
         idx = splits.size
         segStart = now; segPaused = 0
         segDist = 0.0
@@ -267,6 +326,9 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         if (u.idx < segSteps.size) segSteps[u.idx] = null
         if (u.grew && seq.size == newIdx + 1) {
             seq = seq.dropLast(1)
+            if (segWork.size > seq.size) segWork = segWork.dropLast(1)
+            if (liftReps.size > seq.size) liftReps.removeAt(liftReps.size - 1)
+            if (liftKg.size > seq.size) liftKg.removeAt(liftKg.size - 1)
             if (segDists.size > seq.size) segDists.removeAt(segDists.size - 1)
             if (segSteps.size > seq.size) segSteps.removeAt(segSteps.size - 1)
         }
@@ -302,7 +364,65 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         if (!active || finished) return null
         if (!running) togglePause()
         closeSeg(clock())
-        return finish(growsOpen || splits.size >= seq.size)
+        // 18번 AMRAP 은 정한 시간을 다 채워야 다 한 것
+        val c = cap
+        return finish(if (c != null) splits.sum() >= c else growsOpen || splits.size >= seq.size)
+    }
+
+    // MARK: 18번 — EMOM 끝 · 기능성 운동 세트 확인 · 시간으로 넘어가기
+
+    /** EMOM "끝": 이 라운드를 끝낸 시간 (한 라운드에 한 번) */
+    fun markDone() {
+        if (!active || finished || !running || kind != Kinds.EMOM) return
+        if (segWork.getOrNull(idx) != null) return
+        val w = segEl()
+        segWork = segWork.mapIndexed { i, v -> if (i == idx) w else v }
+        changed()
+    }
+
+    /** 지금 구간이 기능성 운동 세트인지 (Next 전에 횟수 · 무게 확인) */
+    val isLiftSet: Boolean get() = kind == Kinds.LIFT && cur.icon == "lift"
+
+    /** 세트 끝 확인 칸에 미리 채울 (횟수, 무게): 이번 운동 앞 세트 → 지난번 → 계획 */
+    fun liftPrefill(): Pair<Int, Double> {
+        val done = HashMap<Int, Pair<Int?, Double?>>()
+        for (i in 0 until idx) if (liftReps.getOrNull(i) != null || liftKg.getOrNull(i) != null) done[i] = liftReps.getOrNull(i) to liftKg.getOrNull(i)
+        return Bonus.prefill(seq, idx, done, lastLift[cur.name].orEmpty())
+    }
+
+    /** 세트 끝: 확인한 횟수 · 무게를 적고 휴식(또는 다음)으로. 마지막 세트면 끝내고 기록을 돌려줌 */
+    fun finishSet(reps: Int, kg: Double): Record? {
+        if (!isLiftSet || !active || finished || !running) return null
+        if (idx < liftReps.size) liftReps[idx] = reps.coerceIn(0, 999)
+        if (idx < liftKg.size) liftKg[idx] = kg.coerceIn(0.0, 999.0)
+        return advance()
+    }
+
+    /**
+     * 시간 구간(타바타 · EMOM · 휴식 · 시간 단계)이 끝났으면 다음으로, AMRAP 은 총 시간이 다 되면 끝 (→ autoDone).
+     * 기록되는 시간은 정확히 구간 길이, 넘친 시간은 다음 구간으로. 화면이 0.25초마다 부름
+     */
+    fun timerTick(now: Long = clock()) {
+        if (!active || finished || !running || !Kinds.isNew(kind)) return
+        var moved = false
+        while (active && !finished) {
+            val ms = segMs(now)
+            Bonus.capCut(cap, doneT(), ms)?.let { c ->
+                closeSegWith(c.time)
+                autoDone = finish(true)
+                return
+            }
+            val c = Bonus.timedCut(kind, cur, ms) ?: break
+            undoPoint = null; canUndo = false
+            closeSegWith(c.time)
+            if (splits.size >= seq.size) { autoDone = finish(true); return }
+            idx = splits.size
+            segStart = now - c.overMs; segPaused = 0
+            segDist = 0.0
+            segStepStart = steps
+            moved = true
+        }
+        if (moved) { autoSplits++; changed() }
     }
 
     /** End → Discard */
@@ -311,9 +431,15 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         changed()
     }
 
-    private fun closeSeg(now: Long) {
-        splits = splits + segEl(now)
+    private fun closeSeg(now: Long) = closeSegWith(segEl(now))
+
+    private fun closeSegWith(t: Int) {
+        splits = splits + t
         if (useGPS && cur.kind == SegKind.Run && idx < segDists.size && segDist > 0) segDists[idx] = segDist
+        // 18번 인터벌 러닝: GPS 면 잰 거리 (0 도), 실내 거리 단계는 계획 거리, 실내 시간 단계는 모름(null)
+        if (kind == Kinds.IVRUN && cur.kind == SegKind.Run && idx < segDists.size) {
+            segDists[idx] = if (useGPS) segDist else Bonus.distLen(kind, cur)
+        }
         // 이 구간 걸음 수 (러닝 카드)
         if (isRunKind && cur.kind == SegKind.Run && steps > segStepStart && idx < segSteps.size) segSteps[idx] = steps - segStepStart
     }
@@ -329,7 +455,11 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     private fun makeRecord(complete: Boolean): Record {
         val results = splits.mapIndexedNotNull { i, t ->
             val s = seq.getOrNull(i) ?: return@mapIndexedNotNull null
-            SegResult(s.icon, s.name, s.detail, s.kind, t, s.target, hr = null, dist = segDists.getOrNull(i))
+            val lift = s.icon == "lift"
+            SegResult(s.icon, s.name, s.detail, s.kind, t, s.target, hr = null, dist = segDists.getOrNull(i),
+                reps = if (lift) (liftReps.getOrNull(i) ?: s.reps) else null,
+                kg = if (lift) (liftKg.getOrNull(i) ?: s.kg) else null,
+                work = segWork.getOrNull(i), rep = s.rep)
         }
         val total = splits.sum()
         val tg = seq.take(splits.size).sumOf { it.target }
@@ -339,8 +469,10 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
             goal = if (mode == Mode.Race) settings.goalTime else null,
             vsWord = deltaWord, vsTarget = if (kind == null && (mode != Mode.Pft || hasPFTBest)) tg else null,
             complete = complete, endDate = start.plusSeconds(total.toLong()), place = place, kind = kind,
-            route = if (isRunKind && useGPS && route.size >= 2) route.toList() else null,
-            indoor = if (isRunKind && !useGPS) true else null,         // 94번
+            route = if (Kinds.runLike(kind) && useGPS && route.size >= 2) route.toList() else null,
+            indoor = if (Kinds.runLike(kind) && !useGPS) true else null,         // 94번
+            rounds = if (kind == Kinds.AMRAP) (splits.size - 1).coerceAtLeast(0) else null,
+            cap = Bonus.recordCap(kind, cap, seq),
         )
         // 러닝 카드 — 케이던스 · 보폭(GPS 거리 ÷ 걸음) · 오르막 (경로 높이로)
         if (isRunKind) r = RunMetrics.fill(r, segSteps, null)
@@ -376,7 +508,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
             if (d < 100) segDist += d
         }
         last = p
-        if (isRunKind) {
+        if (Kinds.runLike(kind)) {
             val lr = lastRoute
             if (lr == null || RunMetrics.meters(lr, p) >= 8) {
                 lastRoute = p
@@ -388,11 +520,29 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
 
     /** GPS 러닝: 1km 넘으면 저절로 다음 km (총거리 다 뛰면 끝 → autoDone) */
     private fun autoSplitIfNeeded() {
+        if (kind == Kinds.IVRUN) { ivDistCheck(); return }
         if (!isRunKind || !useGPS || !active || finished || !running || segDist < 1000) return
         val now = clock()
         undoPoint = null; canUndo = false
         closeSeg(now)
         if (runKm == 0 && splits.size >= seq.size) growSeq()
+        if (splits.size >= seq.size) { autoDone = finish(true); return }
+        idx = splits.size
+        segStart = now; segPaused = 0
+        segDist = 0.0
+        segStepStart = steps
+        autoSplits++
+        changed()
+    }
+
+    /** 18번 인터벌 러닝 (GPS): 거리 단계를 다 뛰면 저절로 다음 단계 (마지막이면 끝 → autoDone) */
+    private fun ivDistCheck() {
+        if (kind != Kinds.IVRUN || !useGPS || !active || finished || !running) return
+        val len = Bonus.distLen(kind, cur) ?: return
+        if (segDist < len) return
+        val now = clock()
+        undoPoint = null; canUndo = false
+        closeSeg(now)
         if (splits.size >= seq.size) { autoDone = finish(true); return }
         idx = splits.size
         segStart = now; segPaused = 0

@@ -85,7 +85,11 @@ val copyPhoneRes = tasks.register<CopyPhoneRes>("copyPhoneRes") {
 }
 
 androidComponents {
-    onVariants { v -> v.sources.res?.addGeneratedSourceDirectory(copyPhoneRes, CopyPhoneRes::outputDir) }
+    onVariants { v ->
+        v.sources.res?.addGeneratedSourceDirectory(copyPhoneRes, CopyPhoneRes::outputDir)
+        // 19번: 음성 안내 조각(voice/ko/*.m4a)도 폰 앱 assets 폴더를 그대로 씀 (저장소에 두 번 두지 않음)
+        v.sources.assets?.addStaticSourceDirectory(rootProject.layout.projectDirectory.dir("app/src/main/assets").asFile.absolutePath)
+    }
 }
 
 dependencies {

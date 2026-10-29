@@ -76,6 +76,7 @@ import com.nkssi.splits8.Store
 import com.nkssi.splits8.shared.Division
 import com.nkssi.splits8.shared.Fatigue
 import com.nkssi.splits8.shared.Fm
+import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.Friend
 import com.nkssi.splits8.shared.HyroxBench
 import com.nkssi.splits8.shared.Insight
@@ -227,20 +228,25 @@ private fun DetailContent(rec: Record) {
         HrCard(rec)
         ZonesCard(rec)
     }
-    if (rec.runs.isNotEmpty() && rec.mode != Mode.Pft) PaceCard(rec)
+    if (rec.runs.isNotEmpty() && rec.mode != Mode.Pft && !Kinds.isNew(rec.kind)) PaceCard(rec)
     if (rec.mode == Mode.Sim) {
         Fatigue.analyze(listOf(rec), limit = 1)?.let {
             SectionLabel("RUN FATIGUE", top = 20.dp)
             RunFatigueCard(it, "Based on this Full Sim".l10n)
         }
     }
-    // SPLITS 라벨: margin 20 4 0
-    Row(Modifier.fillMaxWidth().padding(top = 20.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.Bottom) {
-        T(SectionText.shown("SPLITS"), F.t(F.sub, W600), Modifier.weight(1f), maxLines = 1, translate = false)
-        if (rec.mode == Mode.Training) T("VS YOUR BEST", F.t(11, W600, C.text3, tracking = 0.6f), maxLines = 1)
+    if (Kinds.isNew(rec.kind)) {
+        // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동은 종류별 표 (구간 최고와 비교하지 않음)
+        BonusDetail(rec)
+    } else {
+        // SPLITS 라벨: margin 20 4 0
+        Row(Modifier.fillMaxWidth().padding(top = 20.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.Bottom) {
+            T(SectionText.shown("SPLITS"), F.t(F.sub, W600), Modifier.weight(1f), maxLines = 1, translate = false)
+            if (rec.mode == Mode.Training) T("VS YOUR BEST", F.t(11, W600, C.text3, tracking = 0.6f), maxLines = 1)
+        }
+        Splits(rec)
+        BenchSection(rec)
     }
-    Splits(rec)
-    BenchSection(rec)
     // 빌드 25 (66번): 워치 Quick 은 한 번 쓰는 운동 → 마음에 들면 여기서 정식 트레이닝으로
     if (rec.mode == Mode.Training && rec.kind == null && rec.title.startsWith("Quick") && rec.segs.isNotEmpty())
         SaveQuickCard(rec, Modifier.padding(top = 10.dp))
@@ -475,8 +481,10 @@ private fun tiles(rec: Record): List<DetailTile> {
         Mode.Pft -> emptyList()
         Mode.Training -> {
             // VS BEST 는 풀 시뮬 · 레이스에서만. 러닝은 거리, 그 외 트레이닝은 구간 수
-            val second = if (rec.isRunKind) DetailTile("DISTANCE", Units.dist(rec.runDistance, imp), Units.distUnit(imp), unitColor = C.text2,
+            val bt = bonusTileValue(rec)
+            val second = if (rec.isRunKind || rec.kind == Kinds.IVRUN) DetailTile("DISTANCE", Units.dist(rec.runDistance, imp), Units.distUnit(imp), unitColor = C.text2,
                 sub = if (rec.indoor == true) "Indoor · est.".l10n else "")
+            else if (bt != null) DetailTile(bt.first, bt.second, bt.third, unitColor = C.text2)
             else DetailTile("SEGMENTS", "${rec.mainSegs.size}")
             listOf(DetailTile("TOTAL", Fm.t(rec.total)), second)
         }
@@ -489,8 +497,9 @@ private fun tiles(rec: Record): List<DetailTile> {
         DetailTile("AVG HR", if (rec.avgHR > 0) "${rec.avgHR}" else "--", "BPM", unitColor = C.bad),
         DetailTile("MAX HR", if (rec.maxHR > 0) "${rec.maxHR}" else "--", "BPM", unitColor = C.bad),
         DetailTile("CALORIES", grouped(rec.kcal), "KCAL", unitColor = C.text2),
-        DetailTile("RUN PACE", pace, Units.paceUnit(imp), unitColor = C.text2),
-    ) + runTiles(rec) + repTiles(rec) + bestTiles(rec)
+    ) + (if (Kinds.isNew(rec.kind) && rec.kind != Kinds.IVRUN) emptyList()          // 18번: 러닝 없는 종류는 RUN PACE 칸 없음
+        else listOf(DetailTile("RUN PACE", pace, Units.paceUnit(imp), unitColor = C.text2))) +
+        runTiles(rec) + repTiles(rec) + bestTiles(rec)
 }
 
 /** 러닝 기록 — 평균 케이던스 · 보폭 · 오른 높이 (잰 값이 있을 때만) */

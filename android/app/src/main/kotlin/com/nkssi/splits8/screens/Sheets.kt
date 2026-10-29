@@ -91,6 +91,12 @@ fun Overlays() {
 
 @Composable
 private fun BonusSheet(req: BonusRequest) {
+    // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동은 BonusSheets.kt
+    if (com.nkssi.splits8.shared.Kinds.isNew(req.kind)) NewBonusSheet(req) else HiitRunSheet(req)
+}
+
+@Composable
+private fun HiitRunSheet(req: BonusRequest) {
     // 요청마다 처음 값으로 (같은 시트를 다시 열어도 새로)
     var km by remember(req.key) { mutableStateOf(req.existing?.runKm ?: 5) }
     var indoor by remember(req.key) { mutableStateOf(req.existing?.indoor ?: false) }

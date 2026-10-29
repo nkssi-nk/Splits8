@@ -100,6 +100,7 @@ object WearDevice {
         e.reps = RepCounter(c)
         e.buzz = { Buzz.play(c, it) }
         e.onActive = { on -> if (on) WorkoutService.start(c) else WorkoutService.stop(c) }
+        e.voice = { line -> WearVoice.get(c).play(line) }        // 19번: 워치 운동은 워치가 말함
         Calib.sensor = AccelCalibSensor(c)
         Calib.buzz = { Buzz.play(c, it) }
     }

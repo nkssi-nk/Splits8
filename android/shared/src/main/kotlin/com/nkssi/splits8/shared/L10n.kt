@@ -11,7 +11,8 @@ object L10n {
     val isKorean: Boolean get() = lang.startsWith("ko")
 
     fun t(key: String, vararg args: Any?): String {
-        val tmpl = if (isKorean) (L10nKo.get(key) ?: key) else key
+        // 18번: 숫자가 든 이름 ("Round 3" · "Interval timer 40/20") 은 표에 없으면 모양으로 번역
+        val tmpl = if (isKorean) (L10nKo.get(key) ?: Bonus.koName(key) ?: key) else key
         return format(tmpl, args)
     }
 

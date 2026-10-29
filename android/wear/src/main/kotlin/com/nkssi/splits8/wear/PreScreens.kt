@@ -50,6 +50,9 @@ import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.PFT
 import com.nkssi.splits8.shared.ProgItem
 import com.nkssi.splits8.shared.Program
+import com.nkssi.splits8.shared.Bonus
+import com.nkssi.splits8.shared.IvStep
+import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.SegKind
 import com.nkssi.splits8.shared.Station
 import com.nkssi.splits8.shared.l10n
@@ -357,6 +360,16 @@ fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
         RoundList("w.confirm", side = 22f) {
             item { WTitle(if (mode == Mode.Training) program.name else mode.title) }
             when {
+                // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동 — 설명 + 할 일 · 단계 · 종목 목록
+                mode == Mode.Training && Kinds.isNew(program.kind) -> {
+                    item {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon8(Kinds.icon(program.kind), 30.dp, Tint.Yellow)
+                            T(program.watchMeta, F.t(13, color = C.text2), Modifier.fillMaxWidth(), maxLines = 3, align = TextAlign.Center, translate = false)
+                        }
+                    }
+                    for (line in bonusLines(program)) item { SegRow(Kinds.icon(program.kind), line.first, line.second) }
+                }
                 mode == Mode.Training && program.isOpen -> item {
                     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon8(if (program.isHIIT) "hiit" else "run", 30.dp, Tint.Yellow)
@@ -419,7 +432,7 @@ fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
             when {
                 noEvent -> {}
                 // 83번(빌드 28): 러닝은 시작할 때 실외(GPS) / 실내를 고름 — 카드에 저장된 쪽이 노란 단추, 다른 쪽은 회색
-                mode == Mode.Training && program.isRun -> item {
+                mode == Mode.Training && Kinds.runLike(program.kind) -> item {
                     val cardIndoor = program.indoor ?: false
                     // 2026-10-21: 동그란 화면 아래쪽이라 줄 폭을 줄임 (양 끝이 잘렸음)
                     Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
@@ -441,6 +454,20 @@ fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
             }
         }
     }
+}
+
+/** 18번 시작 화면 목록: (이름, 오른쪽 글자) — EMOM · AMRAP 할 일, 인터벌 러닝 단계, 기능성 운동 종목 (번역됨) */
+private fun bonusLines(p: Program): List<Pair<String, String>> = when (p.kind) {
+    Kinds.EMOM, Kinds.AMRAP -> p.tasks.orEmpty().map { it to "" }
+    Kinds.IVRUN -> buildList {
+        p.warm?.let { add(wt("Warm-up") to Bonus.stepText(it)) }
+        for (st in p.steps.orEmpty()) add(wt(IvStep.typeName(st.t)) to (if (st.isTime) Bonus.dur(st.secs) else Bonus.distText(st.meters)))
+        p.cool?.let { add(wt("Cool-down") to Bonus.stepText(it)) }
+    }
+    Kinds.LIFT -> p.lifts.orEmpty().map { l ->
+        wt(l.name) to "${l.sets}×${l.reps}" + (if (l.kg > 0) " · " + Bonus.kgText(l.kg) else "")
+    }
+    else -> emptyList()
 }
 
 @Composable

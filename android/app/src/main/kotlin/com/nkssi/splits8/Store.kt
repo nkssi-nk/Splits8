@@ -458,6 +458,16 @@ object Store {
         save("records.json", ListSerializer(Record.serializer()), records)
     }
 
+    /** 18번: 기록 고치기 (AMRAP 추가 동작 수 · 기능성 운동 횟수 · 무게). 같은 id 를 바꿔 끼움, 기기에만 저장 (서버는 요약만이라 그대로) */
+    fun updateRecord(r: Record) {
+        val i = records.indexOfFirst { it.id == r.id }
+        if (i < 0) return
+        records = records.toMutableList().also { it[i] = r }
+        rebuild()
+        save("records.json", ListSerializer(Record.serializer()), records)
+        Router.detail?.let { if (it.id == r.id) Router.detail = r }
+    }
+
     fun delete(r: Record) {
         records = records.filterNot { it.id == r.id }
         rebuild()

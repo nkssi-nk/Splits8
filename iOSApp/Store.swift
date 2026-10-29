@@ -287,6 +287,14 @@ final class Store: NSObject, WCSessionDelegate {
         if !Demo.enabled { JSONStore.save(records, "records.json") }
     }
 
+    /// 18번: 기록 고치기 (AMRAP 추가 동작 수 등). 이 기기에만 저장
+    func updateRecord(_ r: Record) {
+        guard let i = records.firstIndex(where: { $0.id == r.id }) else { return }
+        records[i] = r
+        if !Demo.enabled { JSONStore.save(records, "records.json") }
+        if r.mode == .training, Router.shared.detail?.id == r.id { Router.shared.detail = r }
+    }
+
     func delete(_ r: Record) {
         records.removeAll { $0.id == r.id }
         if !Demo.enabled { JSONStore.save(records, "records.json") }
@@ -307,7 +315,7 @@ final class Store: NSObject, WCSessionDelegate {
     /// ★ PB: 같은 종류(트레이닝은 같은 이름·세트 수, Full Sim·Race는 각각 전체) 중 가장 빠른 기록.
     /// 비교할 기록이 2개 이상일 때만 표시 (하나뿐이면 PB 표시 없음). 저장·삭제하면 자동으로 다시 계산됨.
     func isPB(_ r: Record) -> Bool {
-        guard r.counts, !r.isHIIT else { return false }      // HIIT 는 PB 없음
+        guard r.counts, !r.isHIIT, !r.isNewKind else { return false }      // HIIT · 18번 새 종류는 PB 없음
         // 64번: 트레이닝은 전체 시간 PB 안 셈(빨리 끝내면 PB 가 되는 건 의미 없음). 러닝은 정해진 거리 PB
         if r.mode == .training { return r.isRunKind && !runPBs(r).isEmpty }
         let same: [Record] = pbGroup(r)
@@ -327,7 +335,7 @@ final class Store: NSObject, WCSessionDelegate {
     var segBests: [String: Int] {
         var b: [String: Int] = [:]
         // 93번: 러닝 카드 · HIIT 기록은 빼고 (스테이션 섞인 트레이닝끼리만 — 워치의 BEST 도 같은 기준)
-        for r in records where r.mode == .training && r.counts && !r.isRunKind && !r.isHIIT {
+        for r in records where r.mode == .training && r.counts && r.kind == nil {      // 18번: 새 종류도 뺌
             for s in r.segs where s.kind != .rox && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.time) {
                 let k = SegKey.of(icon: s.icon, detail: s.detail)
                 b[k] = min(b[k] ?? .max, s.time)
@@ -340,7 +348,7 @@ final class Store: NSObject, WCSessionDelegate {
     func segBestsBefore(_ rec: Record) -> [String: Int] {
         var b: [String: Int] = [:]
         // 93번(빌드 28): 자유러닝 · 러닝 카드 기록의 1 km 는 다리가 멀쩡할 때 뛴 것이라 빼고, 스테이션이 섞인 트레이닝끼리만 비교
-        for r in records where r.mode == .training && r.counts && !r.isRunKind && !r.isHIIT && r.id != rec.id && r.date < rec.date {
+        for r in records where r.mode == .training && r.counts && r.kind == nil && r.id != rec.id && r.date < rec.date {
             for s in r.segs where s.kind != .rox && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.time) {
                 let k: String = SegKey.of(icon: s.icon, detail: s.detail)
                 b[k] = min(b[k] ?? Int.max, s.time)

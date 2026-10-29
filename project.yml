@@ -33,6 +33,10 @@ targets:
       # 개인정보 사용 명세 파일 (앱 묶음 안에 리소스로 들어가야 함)
       - path: Resources/iOS/PrivacyInfo.xcprivacy
         buildPhase: resources
+      # 19번(빌드 29): 음성 안내 소리 조각 — 폴더째 넣어서 앱 안에 Voice/ko/<id>.m4a 로 들어감 (VoiceCoach.folder)
+      - path: Resources/Voice
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
@@ -95,6 +99,10 @@ targets:
       - path: Resources/Watch
         excludes: ["PrivacyInfo.xcprivacy"]
       - path: Resources/Watch/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      # 19번(빌드 29): 음성 안내 — 워치도 같은 소리 조각 (워치로 운동하면 워치에서 바로 말함)
+      - path: Resources/Voice
+        type: folder
         buildPhase: resources
     settings:
       base:

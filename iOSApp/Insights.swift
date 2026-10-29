@@ -28,6 +28,8 @@ enum Insights {
 
     /// 이 기록의 분석 줄 (최대 4)
     static func make(_ r: Record, store: Store) -> [Insight] {
+        // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성은 기록 화면의 종류별 표가 대신함
+        if r.isNewKind { return [] }
         let all: [Insight] = candidates(r, store: store)
         let phone: Bool = r.source == "phone" || r.hr.isEmpty
         let sorted = all
@@ -365,7 +367,7 @@ enum Insights {
         }
 
         // ── 트레이닝 ──────────────────────
-        if r.mode == .training && !r.isHIIT && !r.isRunKind {
+        if r.mode == .training && r.kind == nil {
             let sets: Int = max(1, r.sets)
             if sets >= 2 && main.count % sets == 0 {
                 let per: Int = main.count / sets

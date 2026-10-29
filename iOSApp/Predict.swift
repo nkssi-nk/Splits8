@@ -8,7 +8,8 @@ enum Predict {
     /// 최근 풀 시뮬이 있으면 그 최고 시간보다 길게 나오지는 않음. 스테이션 8개 중 4개 미만이면 nil (자료 부족)
     static func finish(records: [Record], division: String, now: Date = Date()) -> Int? {
         let cutoff: Date = now.addingTimeInterval(-90 * 86400)
-        let recent: [Record] = records.filter { $0.date >= cutoff && $0.counts && ($0.mode == .training || $0.mode == .sim) }
+        // 18번: 인터벌 러닝 · 타바타 등 새 종류는 빼고 (빠른 1 km 반복이 예상 시간을 당기지 않게)
+        let recent: [Record] = records.filter { $0.date >= cutoff && $0.counts && (($0.mode == .training && !$0.isNewKind) || $0.mode == .sim) }
         var bestRun: Int? = nil
         var bestSt: [String: Int] = [:]
         for r in recent {

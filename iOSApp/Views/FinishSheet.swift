@@ -12,7 +12,7 @@ extension Store {
     private func sameKind(_ a: Record, _ r: Record) -> Bool {
         guard a.mode == r.mode, a.counts else { return false }
         switch r.mode {
-        case .training: return a.title == r.title && a.sets == r.sets && !a.isHIIT
+        case .training: return a.title == r.title && a.sets == r.sets && !a.isHIIT && !a.isNewKind
         case .sim: return a.splits16 != nil
         case .race: return true
         case .pft: return a.pftSplits != nil
@@ -39,14 +39,14 @@ extension Store {
             }
         }
         if r.mode == .race, let g = r.goal ?? r.vsTarget { x.goalDelta = r.total - g }
-        if r.counts && !r.isHIIT {
+        if r.counts && !r.isHIIT && !r.isNewKind {
             let same: [Int] = before.filter { sameKind($0, r) }.map(\.total)
             if let best = same.min(), r.total < best { x.pbDelta = r.total - best }
         }
         // 트레이닝: 이번에 최고 기록이 된 스테이션 (이전 최고가 있을 때만)
-        if r.mode == .training && r.counts {
+        if r.mode == .training && r.counts && r.kind == nil {
             var prev: [String: Int] = [:]
-            for b in before where b.mode == .training && b.counts {
+            for b in before where b.mode == .training && b.counts && b.kind == nil {
                 for s in b.segs where s.kind == .st && SegKey.plausible(icon: s.icon, detail: s.detail, time: s.time) {
                     let k = SegKey.of(icon: s.icon, detail: s.detail)
                     prev[k] = min(prev[k] ?? .max, s.time)
@@ -196,8 +196,10 @@ struct FinishSheet: View {
 
     /// "Full Simulation · Thu 8 Oct"
     private var sub: String {
-        let name: String = rec.mode == .training ? rec.title : rec.mode.name.l10n
-        return name + " · " + Fm.wdm.string(from: rec.date)
+        let name: String = rec.mode == .training ? rec.title.l10n : rec.mode.name.l10n
+        // 18번: "EMOM 12분 · 12 라운드 · 10번 시간 안에"
+        let k: String = rec.kindSummary.map { " · " + $0 } ?? ""
+        return name + k + " · " + Fm.wdm.string(from: rec.date)
     }
 
     /// 타일 3개: 칼로리 · 평균 심박 · 러닝 페이스(없으면 최대 심박). 심박이 없으면(아이폰 기록) 구간 수
@@ -208,6 +210,10 @@ struct FinishSheet: View {
         let imp: Bool = store.settings.imperial
         if let p = rec.runPace, rec.mode != .pft { o.append(("RUN PACE", Fm.t(Units.pace(p, imp)), Units.paceUnit(imp))) }
         else if rec.maxHR > 0 { o.append(("MAX HR", "\(rec.maxHR)", "BPM")) }
+        // 18번: 새 종류는 구간 수 대신 라운드 · 볼륨
+        if o.count < 3, rec.kind == WKind.strength { o.append(("VOLUME", grouped(Int(rec.volume.rounded())), "KG")) }
+        if o.count < 3, rec.kind == WKind.amrap { o.append(("ROUNDS", "\(rec.fullRounds)", "")) }
+        if o.count < 3, rec.kind == WKind.tabata { o.append(("ROUNDS", "\(rec.workRounds)", "")) }
         if o.count < 3 { o.append(("SPLITS", "\(rec.mainSegs.count)", "")) }
         return Array(o.prefix(3))
     }

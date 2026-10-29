@@ -56,7 +56,8 @@ struct TrainingView: View {
     /// 노란 "New training" 카드 (radius 20, 16×18, 17/600, + 22). 5개가 꽉 차면 안내만 띄움
     private var newButton: some View {
         Button {
-            if store.programs.count >= Program.freeLimit { limitAlert = true } else { r.newTraining() }
+            // 18번: 종류 고르기 카드 (하이록스 트레이닝 · 러닝 · 인터벌 러닝 · HIIT · 타바타 · EMOM · AMRAP · 기능성)
+            if store.programs.count >= Program.freeLimit { limitAlert = true } else { r.kindPicker = true }
         } label: {
             HStack(spacing: 0) {
                 Text("New training").font(F.t(17, .semibold)).tracking(-0.17)
@@ -134,7 +135,7 @@ struct ProgramCard: View {
             if p.isOpen {
                 // HIIT · 러닝: 칩 대신 아이콘 하나
                 HStack(spacing: 8) {
-                    Icon8(p.isHIIT ? "hiit" : "run", 18, tint: .yellow)
+                    Icon8(WKind.icon(p.kind), 18, tint: .yellow)
                     Text(openLine).font(F.t(13, .semibold)).foregroundStyle(C.d1).lineLimit(1)
                 }
                 .padding(.horizontal, 10).frame(height: 34)
@@ -177,6 +178,7 @@ struct ProgramCard: View {
     /// HIIT: "Intervals" / 러닝: "5 KM · Outdoor"
     private var openLine: String {
         if p.isHIIT { return "Intervals".l10n }
+        if WKind.isNew(p.kind) { return WKind.label(p.kind).l10n }
         let km: Int = p.runKm ?? 0
         let d: String = km > 0 ? "\(km) KM" : "Free run".l10n
         return d + " · " + ((p.indoor ?? false) ? "Indoor" : "Outdoor").l10n
@@ -411,32 +413,16 @@ struct BuilderView: View {
 
     // MARK: HIIT · 러닝 카드 (새로 만들 때만, 맨 아래)
 
+    /// 18번: 하이록스 트레이닝 말고 다른 종류 (러닝 · 인터벌 러닝 · HIIT · 타바타 · EMOM · AMRAP · 기능성)
     private var bonusCards: some View {
-        HStack(spacing: 10) {
-            bonusCard(kind: "hiit", icon: "hiit", title: "HIIT", sub: "High-intensity intervals")
-            bonusCard(kind: "run", icon: "run", title: "Running", sub: "Distance · 1 km splits")
+        let kinds: [String] = WKind.menu.compactMap { $0 }
+        return LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            ForEach(kinds, id: \.self) { k in
+                KindCard(kind: k) { r.bonus = BonusRequest(kind: k) }
+                    .accessibilityIdentifier("builder.bonus." + k)
+            }
         }
         .padding(.top, 8)
-    }
-
-    private func bonusCard(kind: String, icon: String, title: String, sub: String) -> some View {
-        Button { r.bonus = BonusRequest(kind: kind) } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    Icon8(icon, 28, tint: .yellow)
-                    Spacer(minLength: 0)
-                    Chevron8()
-                }
-                Text(title.l10n).font(F.t(17, .semibold)).lineLimit(1).padding(.top, 12)
-                Text(sub.l10n).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 3)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .card8()
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(Press())
-        .accessibilityIdentifier("builder.bonus." + kind)
     }
 
     // MARK: RUN

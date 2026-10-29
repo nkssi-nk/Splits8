@@ -24,8 +24,24 @@ final class WorkoutEngine: NSObject {
     @ObservationIgnored private var outdoorRun = false
     var isHIIT: Bool { kind == "hiit" }
     var isRunKind: Bool { kind == "run" }
-    /// 끝 없이 늘어나는 운동 (HIIT · 자유 러닝)
-    var growsOpen: Bool { isHIIT || (isRunKind && runKm == 0) }
+    /// 끝 없이 늘어나는 운동 (HIIT · AMRAP · 자유 러닝)
+    var growsOpen: Bool { isHIIT || kind == WKind.amrap || (isRunKind && runKm == 0) }
+    // 18번 · 새 종류 (타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성)
+    /// 시작한 카드 (AMRAP 총 시간 · 할 일 글자)
+    @ObservationIgnored private(set) var program: Program?
+    var isNewKind: Bool { WKind.isNew(kind) }
+    var isInterval: Bool { kind == WKind.interval }
+    /// 러닝처럼 GPS · 거리 · 페이스를 쓰는 종류
+    var runLike: Bool { isRunKind || isInterval }
+    /// AMRAP 총 시간(초)
+    var amrapCap: Int? { kind == WKind.amrap ? program?.cap : nil }
+    /// EMOM: 이번 라운드를 "끝" 낸 초 (nil = 아직)
+    private(set) var doneAt: Int? = nil
+    @ObservationIgnored private var segWork: [Int?] = []
+    /// AMRAP: 마지막 구간이 덜 한 라운드인지
+    @ObservationIgnored private var partialLast = false
+    /// 단계 끝 3 · 2 · 1 진동을 이미 울린 자리 ("구간.남은초")
+    @ObservationIgnored private var cdBuzzKey = ""
     // 동네 이름 · 경로
     @ObservationIgnored private var place: String?
     @ObservationIgnored private var placeLookup: PlaceLookup?
@@ -80,6 +96,8 @@ final class WorkoutEngine: NSObject {
     private(set) var countdown: Int? = nil
     @ObservationIgnored private var countTimer: Timer?
     @ObservationIgnored private var pendingStart: (() -> Void)?
+    /// 18번: 타이머 운동이면 3 · 2 · 1 을 소리로도
+    @ObservationIgnored private var countVoice = false
 
     // 잘못 넘김 되돌리기 (방금 넘긴 것 한 번만)
     private struct UndoPoint {
@@ -186,6 +204,8 @@ final class WorkoutEngine: NSObject {
             self?.start(mode: mode, title: title, sets: sets, seq: seq, program: program, buzz: false)
         }
         countdown = WBuzz.countFrom
+        countVoice = mode == .training && WKind.isTimer(program?.kind)
+        if countVoice { VoiceCoach.shared.count(settings, WBuzz.countFrom) }    // 18번: "셋 · 둘 · 하나"
         WKInterfaceDevice.current().play(WBuzz.tick)
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.countTick() }
         RunLoop.main.add(t, forMode: .common)
@@ -196,6 +216,7 @@ final class WorkoutEngine: NSObject {
         guard let c = countdown else { stopCount(); return }
         if c > 1 {
             countdown = c - 1
+            if countVoice { VoiceCoach.shared.count(settings, c - 1) }
             WKInterfaceDevice.current().play(WBuzz.tick)
         } else {
             stopCount()
@@ -228,8 +249,11 @@ final class WorkoutEngine: NSObject {
     func start(mode: Mode, title: String, sets: Int = 1, seq: [Seg], program: Program? = nil, buzz: Bool = true) {
         guard !active else { return }
         kind = mode == .training ? program?.kind : nil
+        self.program = mode == .training ? program : nil
         runKm = program?.runKm ?? 0
-        outdoorRun = isRunKind && !(program?.indoor ?? true)
+        outdoorRun = runLike && !(program?.indoor ?? true)
+        doneAt = nil; partialLast = false; cdBuzzKey = ""
+        segWork = Array(repeating: nil, count: seq.count)
         hasPFTBest = mode == .pft && WatchStore.shared.ctx.pftBest?.count == PFT.items.count
         place = nil; routePts = []; lastRouteLoc = nil
         simWordAtStart = mode == .sim ? WatchStore.shared.simPick.word : nil
@@ -254,12 +278,17 @@ final class WorkoutEngine: NSObject {
         active = true
         startTick()
         repCounter.start(icon: cur.icon)
+        // 19번: 음성 안내 "운동을 시작합니다" (+ 첫 구간)
+        VoiceCoach.shared.begin(settings, seq: seq, runCard: runLike, open: growsOpen, kind: kind)
 
         let cfg = HKWorkoutConfiguration()
-        if isHIIT {
+        if isHIIT || WKind.isTimer(kind) {
             cfg.activityType = .highIntensityIntervalTraining
             cfg.locationType = .indoor
-        } else if isRunKind {
+        } else if kind == WKind.strength {
+            cfg.activityType = .traditionalStrengthTraining
+            cfg.locationType = .indoor
+        } else if runLike {
             cfg.activityType = .running
             cfg.locationType = outdoorRun ? .outdoor : .indoor
         } else {
@@ -271,7 +300,7 @@ final class WorkoutEngine: NSObject {
             let b = s.associatedWorkoutBuilder()
             let src = HKLiveWorkoutDataSource(healthStore: health, workoutConfiguration: cfg)
             // 62번: 러닝 카드는 걸음 수 · 보폭도 모음 (케이던스 계산용)
-            if isRunKind {
+            if runLike {
                 src.enableCollection(for: HKQuantityType(.stepCount), predicate: nil)
                 src.enableCollection(for: HKQuantityType(.runningStrideLength), predicate: nil)
             }
@@ -364,12 +393,17 @@ final class WorkoutEngine: NSObject {
     /// 다음 구간 (왼쪽 스와이프 · 더블탭 · Next)
     func advance() {
         guard active, !finished, running else { return }
+        if kind == WKind.emom { markDone(); return }     // 18번: EMOM 은 "끝" (남은 시간 = 휴식)
         if isRunKind && !outdoorRun && distance <= 0 {
             // 실내 러닝인데 워치 거리값이 없으면 손으로 1km 넘김
         } else if isRunKind {
             return                                    // 러닝은 1km마다 자동으로 넘어감
         }
-        let now = Date()
+        advanceCore(Date(), manual: true)
+    }
+
+    /// 다음 구간으로 (손으로 넘김 · 18번 시간/거리 자동 넘김 모두). now = 이 구간이 끝난 시각
+    private func advanceCore(_ now: Date, manual: Bool) {
         let prevIdx: Int = idx
         let prevStart: Date = segStart
         let prevPaused: Double = segPaused
@@ -377,7 +411,7 @@ final class WorkoutEngine: NSObject {
         let prevStepStart: Double = segStepStart
         closeSeg(now)
         var grew = false
-        if splits.count >= seq.count && (isHIIT || (isRunKind && runKm == 0)) {
+        if splits.count >= seq.count && growsOpen {
             growSeq()
             grew = true
         }
@@ -388,13 +422,22 @@ final class WorkoutEngine: NSObject {
             undoPoint = UndoPoint(idx: prevIdx, segStart: prevStart, segPaused: prevPaused, segDistStart: prevDistStart,
                                   grew: grew, reps: segReps.indices.contains(prevIdx) ? segReps[prevIdx] : nil,
                                   segStepStart: prevStepStart)
-            canUndo = !isRunKind
+            canUndo = manual && !isRunKind && kind != WKind.tabata
             idx = splits.count
             segStart = now; segPaused = 0
             segDistStart = distance
             segStepStart = steps
+            doneAt = nil
             advanceCount += 1
             repCounter.start(icon: cur.icon)
+            // 19번: 음성 안내 — 다음 구간 이름 (실내 러닝 카드를 손으로 넘기면 1 km 안내)
+            if isNewKind {
+                VoiceCoach.shared.phase(seq, idx: idx)
+            } else if isRunKind {
+                VoiceCoach.shared.runMark(meters: Double(idx) * 1000, totalSec: total(now), avgHR: avgHRNow)
+            } else {
+                VoiceCoach.shared.segment(seq, idx: idx)
+            }
             // 다음 구간 알림: .click 은 너무 약해서 운동 중에는 느껴지지 않음
             WKInterfaceDevice.current().play(.notification)
             pushLive()
@@ -421,6 +464,7 @@ final class WorkoutEngine: NSObject {
             if segDists.count > seq.count { segDists.removeLast() }
             if segReps.count > seq.count { segReps.removeLast() }
             if segSteps.count > seq.count { segSteps.removeLast() }
+            if segWork.count > seq.count { segWork.removeLast() }
         }
         idx = u.idx
         segStart = u.segStart
@@ -439,15 +483,22 @@ final class WorkoutEngine: NSObject {
     /// HIIT 다음 라운드 / 자유 러닝 다음 km 를 순서 끝에 붙임
     private func growSeq() {
         let n: Int = seq.count + 1
-        seq.append(isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n))
+        seq.append(kind == WKind.amrap ? SeqBuilder.amrapRound(n) : (isHIIT ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n)))
         segHR.append([])
         segDists.append(nil)
         segReps.append(nil)
         segSteps.append(nil)
+        segWork.append(nil)
     }
 
     /// 러닝: 1km 넘으면 자동으로 다음 km (총거리 다 뛰면 끝)
     private func autoSplitIfNeeded() {
+        // 18번: 인터벌 러닝 거리 단계 — 그 거리를 뛰면 다음 단계
+        if isInterval {
+            guard active, !finished, running, let m = cur.autoM, segDist >= Double(m) else { return }
+            advanceCore(Date(), manual: false)
+            return
+        }
         guard isRunKind, active, !finished, running, segDist >= 1000 else { return }
         let now = Date()
         undoPoint = nil; canUndo = false
@@ -473,11 +524,13 @@ final class WorkoutEngine: NSObject {
             curSpeed = 0                                // 빌드 27: 멈추면 속도 모름
             session?.pause()
             repCounter.setPaused(true)
+            VoiceCoach.shared.paused()
         } else {
             if let p = pauseAt { segPaused += Date().timeIntervalSince(p) }
             pauseAt = nil; running = true
             session?.resume()
             repCounter.setPaused(false)
+            VoiceCoach.shared.resumed()
         }
         pushLive()
     }
@@ -490,6 +543,12 @@ final class WorkoutEngine: NSObject {
         closeSeg(now)
         // HIIT·자유 러닝은 끝이 없으니 End 가 정상 종료. 그 외는 마지막 구간에서 End 눌러도 다 한 것
         let open: Bool = isHIIT || (isRunKind && runKm == 0)
+        if let c = amrapCap {
+            // 18번: AMRAP 을 시간 전에 끝냄 → 하던 라운드는 덜 한 라운드
+            partialLast = true
+            finish(now, complete: total(now) >= c - 1)
+            return
+        }
         finish(now, complete: open || splits.count >= seq.count)
     }
 
@@ -501,6 +560,7 @@ final class WorkoutEngine: NSObject {
         undoPoint = nil; canUndo = false
         mirroring = false
         mirrorLost = false
+        VoiceCoach.shared.stop()
         session?.end()
         builder?.discardWorkout()
         builder = nil
@@ -548,6 +608,11 @@ final class WorkoutEngine: NSObject {
             }
         }
         guard active, !finished, running else { return }
+        if isNewKind {
+            timedTick()
+            guard active, !finished else { return }
+        }
+        voiceTick()
         guard settings.hapticPace, mode == .race || mode == .sim else { return }
         let c: Seg = cur
         guard c.kind != .rox, c.target > 0, !paceBuzzed.contains(idx) else { return }
@@ -555,6 +620,71 @@ final class WorkoutEngine: NSObject {
             paceBuzzed.insert(idx)
             WKInterfaceDevice.current().play(.retry)
         }
+    }
+
+    /// 19번: 음성 안내 1초마다 — 러닝 카드는 알림 간격마다 거리 · 시간 · 평균 페이스 · 평균 심박, 그 외는 스테이션 중간 응원
+    private func voiceTick() {
+        let now = Date()
+        if isNewKind {
+            VoiceCoach.shared.timerTick(seq: seq, idx: idx, segEl: segEl(now), total: total(now), cap: amrapCap)
+            if isInterval && distance > 0 { VoiceCoach.shared.runMark(meters: distance, totalSec: total(now), avgHR: avgHRNow) }
+        } else if isRunKind {
+            if distance > 0 { VoiceCoach.shared.runMark(meters: distance, totalSec: total(now), avgHR: avgHRNow) }
+        } else {
+            VoiceCoach.shared.tick(seq: seq, idx: idx, segEl: segEl(now))
+        }
+    }
+
+    // MARK: 18번 · 시간 · 라운드
+
+    /// 1초마다: 시간 단계가 끝나면 다음 (경계 시각을 정확히 맞춤 → 20초 단계는 꼭 20초),
+    /// 끝나기 3 · 2 · 1초 전 진동, AMRAP 총 시간이 되면 끝
+    private func timedTick() {
+        let now = Date()
+        if let c = amrapCap, c > 0, total(now) >= c {
+            amrapEnd(now, cap: c)
+            return
+        }
+        var n = 0
+        while n < 20, active, !finished, running, let a = cur.auto, segEl(now) >= a {
+            // 타이머가 조금 늦게 불려도 이 구간은 a 초 (끝난 시각 = 시작 + 일시정지 + a)
+            advanceCore(segStart.addingTimeInterval(segPaused + Double(a)), manual: false)
+            n += 1
+        }
+        guard active, !finished, let a = cur.auto else { return }
+        let left: Int = a - segEl(now)
+        if left >= 1 && left <= 3 {
+            let key: String = "\(idx).\(left)"
+            if key != cdBuzzKey {
+                cdBuzzKey = key
+                WKInterfaceDevice.current().play(WBuzz.tick)
+            }
+        }
+    }
+
+    /// EMOM: 할 일을 끝냄 → 그 라운드 시간 저장, 남은 시간은 휴식 (다음 라운드는 간격이 끝나면 저절로)
+    func markDone() {
+        guard active, !finished, running, kind == WKind.emom, doneAt == nil else { return }
+        let el: Int = segEl(Date())
+        doneAt = el
+        if segWork.indices.contains(idx) { segWork[idx] = el }
+        WKInterfaceDevice.current().play(.success)
+        pushLive()
+    }
+
+    /// AMRAP: 총 시간이 다 됨 → 하던 라운드는 덜 한 라운드로 저장하고 끝
+    private func amrapEnd(_ now: Date, cap: Int) {
+        closeSeg(now)
+        let before: Int = splits.dropLast().reduce(0, +)
+        if !splits.isEmpty { splits[splits.count - 1] = max(0, cap - before) }
+        partialLast = true
+        finish(now, complete: true)
+    }
+
+    /// 지금까지 평균 심박 (5초마다 모은 값). 없으면 nil
+    private var avgHRNow: Int? {
+        guard !hrSamples.isEmpty else { return nil }
+        return hrSamples.map(\.b).reduce(0, +) / hrSamples.count
     }
 
     /// 심박 존이 바뀌면: 올라가면 .directionUp, 내려가면 .directionDown (첫 측정값 제외, 10초에 한 번까지)
@@ -587,10 +717,13 @@ final class WorkoutEngine: NSObject {
         for (i, t) in splits.enumerated() where seq.indices.contains(i) {
             let s = seq[i]
             let h = segHR.indices.contains(i) ? segHR[i] : []
-            results.append(SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
-                                     hr: h.isEmpty ? nil : Int((h.reduce(0, +) / Double(h.count)).rounded()),
-                                     dist: segDists.indices.contains(i) ? segDists[i] : nil,
-                                     reps: segReps.indices.contains(i) ? segReps[i] : nil))
+            var sr = SegResult(icon: s.icon, name: s.name, detail: s.detail, kind: s.kind, time: t, target: s.target,
+                               hr: h.isEmpty ? nil : Int((h.reduce(0, +) / Double(h.count)).rounded()),
+                               dist: segDists.indices.contains(i) ? segDists[i] : nil,
+                               reps: segReps.indices.contains(i) ? segReps[i] : nil)
+            if isNewKind { sr.fillKind(s, kind: kind, work: segWork.indices.contains(i) ? segWork[i] : nil,
+                                       partial: partialLast && i == splits.count - 1) }
+            results.append(sr)
         }
         let total = splits.reduce(0, +)
         let tg = seq.prefix(splits.count).map(\.target).reduce(0, +)
@@ -602,7 +735,7 @@ final class WorkoutEngine: NSObject {
         r.endDate = startDate.addingTimeInterval(Double(total))
         r.place = place
         r.kind = kind
-        if isRunKind && !outdoorRun { r.indoor = true }     // 94번
+        if runLike && !outdoorRun { r.indoor = true }     // 94번 · 18번 인터벌 러닝도
         if outdoorRun && routePts.count >= 2 { r.route = routePts }
         // 62번: 러닝 카드 — 케이던스 · 보폭 · 오르막 (경로 높이로)
         if isRunKind { RunMetrics.fill(&r, segSteps: segSteps, strideHK: strideAvg) }
@@ -621,6 +754,7 @@ final class WorkoutEngine: NSObject {
         mirrorLost = false
         WatchStore.shared.send(r)
         WKInterfaceDevice.current().play(.success)
+        if isNewKind { VoiceCoach.shared.endedKind(kind, timeUp: complete) } else { VoiceCoach.shared.ended() }   // 19번: "운동 끝! 수고하셨어요."
 
         session?.end()
         let b = builder

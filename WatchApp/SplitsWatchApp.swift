@@ -565,7 +565,7 @@ struct WConfirm: View {
                 }
 
                 if noEvent {
-                } else if mode == .training && program.isRun {
+                } else if mode == .training && (program.isRun || program.isInterval) {
                     runStartButtons
                 } else {
                     startButton
@@ -648,9 +648,9 @@ struct WConfirm: View {
     /// HIIT · 러닝: 이름 + 한 줄 설명
     private var openInfo: some View {
         VStack(spacing: 6) {
-            Icon8(program.isHIIT ? "hiit" : "run", 30, tint: .yellow)
+            Icon8(WKind.icon(program.kind), 30, tint: .yellow)
             Text(program.name.l10n).font(F.t(18, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-            Text((program.meta ?? "").l10n).font(F.t(15)).foregroundStyle(C.text2)
+            Text(program.kindLine ?? (program.meta ?? "").l10n).font(F.t(15)).foregroundStyle(C.text2)
                 .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85)
         }
         .padding(.horizontal, 20)

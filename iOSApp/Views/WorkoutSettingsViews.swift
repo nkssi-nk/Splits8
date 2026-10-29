@@ -48,8 +48,67 @@ struct SetWorkoutView: View {
             }
             .card8()
             Note8(text: "Apple Watch alerts you with a vibration during workouts.")
+
+            voiceSection
         }
         .padding(.horizontal, 16)
+    }
+
+    // MARK: 19번(빌드 29) · 음성 안내 — 지금은 한국어 소리만 있음 (다른 언어면 흐리게 · 못 누름)
+
+    private var voiceSection: some View {
+        let ok: Bool = store.settings.voiceLangOK
+        let on: Bool = store.settings.voiceOn && ok
+        return VStack(spacing: 10) {
+            SectionLabel(text: "VOICE GUIDANCE", top: 14)
+            VStack(spacing: 0) {
+                toggleRow("Voice guidance", sub: nil, on: voiceBinding, last: !on)
+                    .accessibilityIdentifier("settings.voice")
+                if on {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Running alerts".l10n).font(F.t(17)).lineLimit(1)
+                        Seg8(items: [("500", "Every 0.5 km"), ("1000", "Every 1 km"), ("0", "Off")],
+                             selected: String(store.settings.voiceEvery), height: 34, radius: 11, fontSize: 14) { k in
+                            store.settings.voiceEvery = Int(k) ?? 1000
+                        }
+                        .accessibilityIdentifier("settings.voiceEvery")
+                    }
+                    .padding(.vertical, 12).padding(.horizontal, 18)
+                    .rowLine(true)
+                    if store.settings.voiceEvery > 0 {
+                        toggleRow("Distance", sub: nil, on: voiceDistBinding, last: false)
+                            .accessibilityIdentifier("settings.voiceDist")
+                        toggleRow("Total time", sub: nil, on: voiceTimeBinding, last: false)
+                            .accessibilityIdentifier("settings.voiceTime")
+                        toggleRow("Average pace", sub: nil, on: voicePaceBinding, last: false)
+                            .accessibilityIdentifier("settings.voicePace")
+                        toggleRow("Average heart rate", sub: "Apple Watch only", on: voiceHrBinding, last: true)
+                            .accessibilityIdentifier("settings.voiceHr")
+                    }
+                }
+            }
+            .card8()
+            .opacity(ok ? 1 : 0.4)
+            .allowsHitTesting(ok)
+            Note8(text: ok ? "Spoken during workouts: segment names on Race, Full Sim and Training, and your running stats at each alert. Other audio gets quieter while it speaks."
+                           : "Voice guidance is available in Korean for now.")
+        }
+    }
+
+    private var voiceBinding: Binding<Bool> {
+        Binding(get: { store.settings.voiceOn && store.settings.voiceLangOK }, set: { store.settings.voiceOn = $0 })
+    }
+    private var voiceDistBinding: Binding<Bool> {
+        Binding(get: { store.settings.voiceDist }, set: { store.settings.voiceDist = $0 })
+    }
+    private var voiceTimeBinding: Binding<Bool> {
+        Binding(get: { store.settings.voiceTime }, set: { store.settings.voiceTime = $0 })
+    }
+    private var voicePaceBinding: Binding<Bool> {
+        Binding(get: { store.settings.voicePace }, set: { store.settings.voicePace = $0 })
+    }
+    private var voiceHrBinding: Binding<Bool> {
+        Binding(get: { store.settings.voiceHr }, set: { store.settings.voiceHr = $0 })
     }
 
     /// 종목 이름 · 오른쪽 상태(기본값 / 보정됨 · 날짜)

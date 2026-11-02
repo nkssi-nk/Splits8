@@ -127,6 +127,8 @@ final class Router {
     // 빌드 27: 링크로 받은 더블 계획 (보낸 사람 입장 그대로 · nil 이면 닫힘) · 읽을 수 없는 더블 링크
     var incomingDoubles: IncomingDoubles? = nil
     var dblLinkError = false
+    /// 1.2.1: 내가 보낸 더블 계획 링크를 내 폰에서 열었을 때 (받으면 파트너가 나 자신이 되므로 받지 않음)
+    var dblOwnLink = false
 
     /// splits8://t?d=… (트레이닝) · splits8://d?d=… (더블 계획) 로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함
     func handle(url: URL) {
@@ -136,6 +138,12 @@ final class Router {
         if isDoubles {
             guard let token = DoublesLink.token(from: url), let got = DoublesLink.read(token) else {
                 dblLinkError = true
+                return
+            }
+            // 1.2.1: 보낸 사람이 나면 받지 않음 (파트너 = 나 자신이 되고 순서가 뒤집히는 사고 막기)
+            if let me = Store.shared.settings.nickname, let s = got.sender,
+               me.caseInsensitiveCompare(s) == .orderedSame {
+                dblOwnLink = true
                 return
             }
             incomingDoubles = IncomingDoubles(plan: got.plan, sender: got.sender)
@@ -174,6 +182,8 @@ final class Router {
 
     // 계정
     var authReturn: Scr = .training     // 가입 끝나면 돌아갈 화면
+    /// 1.2.1: 첫 화면에서 "계정이 있어요"로 로그인한 사람 (질문 없이 워치 연결 → 홈, 백업 가져오기 안내)
+    var returning = false
     var authMode = "signup"             // signup / signin
     var email = ""
     var code = ""
@@ -394,6 +404,11 @@ struct IncomingTrainingAlerts: ViewModifier {
                 Button("Cancel", role: .cancel) { r.incomingDoubles = nil }
             } message: { _ in
                 Text("Your doubles plan will be replaced. Who goes first is swapped so it fits you.")
+            }
+            .alert("This is your own doubles plan", isPresented: $r.dblOwnLink) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("You sent this link. Send it to your partner instead.")
             }
             .alert("This doubles plan link can't be read", isPresented: $r.dblLinkError) {
                 Button("OK", role: .cancel) {}

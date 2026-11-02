@@ -151,7 +151,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
             return PFT.seq(div: s.div, targets: store.pftBest?.pftSplits)
         case .training:
             let p: Program = program ?? Program.presets()[0]
-            return SeqBuilder.training(p, div: s.div, bests: store.segBests)
+            return SeqBuilder.training(p, div: s.div, bests: store.segBests, roxTarget: s.roxTarget)
         }
     }
 

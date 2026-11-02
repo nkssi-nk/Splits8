@@ -93,6 +93,13 @@ extension Router {
 
     /// 로그인 · 가입 직후 (빌드 24 순서): 새 계정이면 닉네임 → 프로필 4단계 → 원래 화면
     func afterSignIn(newAccount: Bool) {
+        // 1.2.1: 첫 화면 "계정이 있어요" 에서 왔으면
+        //  - 있던 계정: 서버의 닉네임 · 사진 · 디비전 · 프로필을 이미 받았으므로 질문 없이 워치 연결(ob3) → 홈
+        //  - 계정이 없었음: 닉네임 → 프로필 → 처음 온 사람과 같은 질문(ob1)
+        if authReturn == .splash {
+            authReturn = newAccount ? .ob1 : .ob3
+            returning = !newAccount
+        }
         let done: Bool = Store.shared.settings.profileDone == true
         if done {
             // 가입 전에 이 기기에서 프로필을 채워 둔 경우 → 서버에도 올림

@@ -747,6 +747,20 @@
 "%@ reps" = "%@개";
 "%@ each" = "%@씩";
 "1 length (12.5 m)" = "한 바퀴(12.5 m)씩";
+"Half length (6.25 m)" = "반 바퀴(6.25 m)씩";
+"2 lengths (25 m)" = "두 바퀴(25 m)씩";
+"½ length" = "½ 바퀴";
+"1 length" = "1 바퀴";
+"2 lengths" = "2 바퀴";
+"Custom turns" = "직접 정한 차례";
+"Remainder" = "나머지";
+"Tap + or − to change a turn. The last turn is whatever is left, so the total always adds up." = "+ · − 로 차례의 양을 바꿀 수 있어요. 마지막 차례는 남은 양이라 합계가 늘 맞아요.";
+"Reset your custom turns?" = "직접 정한 차례를 지울까요?";
+"Choosing a new amount per turn replaces the turns you changed by hand." = "한 번 양을 새로 고르면 손으로 고친 차례가 처음 모양으로 돌아가요.";
+"Only %@ left — can't split it further." = "%@밖에 안 남아서 더 나눌 수 없어요.";
+"A turn is at least %@." = "한 차례는 최소 %@예요.";
+"The last turn is whatever is left." = "마지막 차례는 남은 양이에요.";
+"%@ is %@ in total — nothing left to add." = "%@는 모두 %@예요. 더 더할 게 없어요.";
 "Me first" = "나 먼저";
 "%@ first" = "%@ 먼저";
 "%lld turns" = "%lld번 교대";
@@ -758,6 +772,8 @@
 "Get %@'s doubles plan?" = "%@님의 더블 계획을 받을까요?";
 "Your doubles plan will be replaced. Who goes first is swapped so it fits you." = "지금 더블 계획이 바뀌어요. 누가 먼저 할지는 내 입장에 맞게 바꿔서 저장해요.";
 "This doubles plan link can't be read" = "더블 계획 링크를 읽을 수 없어요";
+"This is your own doubles plan" = "내가 보낸 더블 계획이에요";
+"You sent this link. Send it to your partner instead." = "이 링크는 내가 보낸 거예요. 파트너에게 보내 주세요.";
 
 /* build23 · 같은 기록대 선수 비교 · 예상 완주 시간 */
 "VS ATHLETES AT YOUR TIME" = "같은 기록대 선수들과 비교";
@@ -1093,3 +1109,11 @@
 "REPS DONE" = "한 횟수";
 "LOAD" = "무게";
 "TARGET REPS" = "목표 횟수";
+
+/* 1.2.1 첫 화면 · 다시 로그인 */
+"I'm new here" = "처음이에요";
+"I have an account" = "계정이 있어요";
+"Welcome back" = "다시 오신 걸 환영해요";
+"Your profile and friends are back. Allow access so Apple Watch can record again." = "프로필과 친구는 그대로 돌아왔어요. Apple Watch로 다시 기록할 수 있게 접근을 허용해 주세요.";
+"Bring back your workout records (optional)" = "운동 기록 되살리기 (선택)";
+"Workout records are saved on each phone, not in your account. If you saved a backup file, restore it here or later in Settings." = "운동 기록은 계정이 아니라 폰마다 저장돼요. 백업 파일이 있으면 여기서, 또는 나중에 설정에서 가져오세요.";

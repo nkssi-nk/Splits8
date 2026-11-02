@@ -136,7 +136,7 @@ struct DoublesPlanSheet: View {
                     Icon8(s.key, 20, C.accent)
                     Text(s.name.l10n).font(F.t(15, .semibold)).foregroundStyle(.white).lineLimit(1)
                     Spacer(minLength: 8)
-                    Text(DblText.summary(plan, i)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                    Text(DblText.summaryLine(plan, i)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Chevron8()
                 }
@@ -199,10 +199,26 @@ enum DblText {
     static func summary(_ p: DoublesPlan, _ i: Int) -> String {
         chunkLabel(p.chunk(i), i) + " · " + firstLabel(p, me: p.meFirst(i))
     }
-    /// "150 m씩" / "1 length (12.5 m)"
+    /// "150 m씩" / "한 바퀴(12.5 m)씩" (1.2.1: 슬레드는 반 · 한 · 두 바퀴)
     static func chunkLabel(_ v: Double, _ i: Int) -> String {
-        if DoublesPlan.isFixed(i) { return "1 length (12.5 m)".l10n }
+        if DoublesPlan.isSled(i) { return sledLabel(v) }
         return String(format: "%@ each".l10n, DoublesPlan.amountText(i, v))
+    }
+    /// 슬레드 한 번 양 이름
+    static func sledLabel(_ v: Double) -> String {
+        if abs(v - 6.25) < 0.001 { return "Half length (6.25 m)".l10n }
+        if abs(v - 25) < 0.001 { return "2 lengths (25 m)".l10n }
+        return "1 length (12.5 m)".l10n
+    }
+    /// 세그먼트 버튼용 짧은 이름 ("½ 바퀴" · "1 바퀴" · "2 바퀴")
+    static func sledShort(_ v: Double) -> String {
+        if abs(v - 6.25) < 0.001 { return "½ length".l10n }
+        if abs(v - 25) < 0.001 { return "2 lengths".l10n }
+        return "1 length".l10n
+    }
+    /// 스테이션 줄 요약: 손으로 고쳤으면 "직접 설정 · 나 먼저"
+    static func summaryLine(_ p: DoublesPlan, _ i: Int) -> String {
+        (p.isEdited(i) ? "Custom turns".l10n : chunkLabel(p.chunk(i), i)) + " · " + firstLabel(p, me: p.meFirst(i))
     }
     /// "나 먼저" / "가테부 먼저"
     static func firstLabel(_ p: DoublesPlan, me: Bool) -> String {
@@ -261,6 +277,11 @@ struct DoublesStationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: DoublesPlan = DoublesPlan()
     @State private var loaded = false
+    /// 1.2.1: 고친 차례가 있을 때 한 번 양을 다시 고르면 먼저 물어봄
+    @State private var pendingChunk: Double? = nil
+    /// 1.2.1: 못 누르는 이유 안내 ("SkiErg 는 모두 1000 m 예요" 등). 잠깐 보였다 사라짐
+    @State private var hint: String = ""
+    @State private var hintTick: Int = 0
 
     var body: some View {
         let s: Station = Station.all[index]
@@ -271,6 +292,7 @@ struct DoublesStationSheet: View {
                 VStack(spacing: 10) {
                     choiceCard
                     listCard
+                    Note8(text: "Tap + or − to change a turn. The last turn is whatever is left, so the total always adds up.")
                 }
                 .padding(.top, 4).padding(.bottom, 16)
             }
@@ -280,6 +302,26 @@ struct DoublesStationSheet: View {
         .onAppear {
             if !loaded { draft = plan; loaded = true }
         }
+        .alert("Reset your custom turns?", isPresented: Binding(get: { pendingChunk != nil }, set: { if !$0 { pendingChunk = nil } }),
+               presenting: pendingChunk) { c in
+            Button("Reset", role: .destructive) { draft.resetTurns(index); draft.setChunk(index, c); pendingChunk = nil }
+            Button("Cancel", role: .cancel) { pendingChunk = nil }
+        } message: { _ in
+            Text("Choosing a new amount per turn replaces the turns you changed by hand.")
+        }
+    }
+
+    private func pick(_ c: Double) {
+        if draft.isEdited(index) { pendingChunk = c } else { draft.setChunk(index, c) }
+    }
+
+    private func showHint(_ t: String) {
+        hint = t
+        hintTick += 1
+        let tick: Int = hintTick
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            if hintTick == tick { hint = "" }
+        }
     }
 
     private var choiceCard: some View {
@@ -287,15 +329,12 @@ struct DoublesStationSheet: View {
         let opts: [Double] = DoublesPlan.options[i]
         return VStack(alignment: .leading, spacing: 12) {
             Label8("EACH TURN")
-            if DoublesPlan.isFixed(i) {
-                Text("1 length (12.5 m)".l10n).font(F.t(15, .semibold))
-            } else {
-                Seg8(items: opts.map { (DoublesPlan.num($0), DoublesPlan.amountText(i, $0)) },
-                     selected: DoublesPlan.num(draft.chunk(i))) { k in
-                    if let v = opts.first(where: { DoublesPlan.num($0) == k }) { draft.setChunk(i, v) }
-                }
-                .accessibilityIdentifier("dbl.chunk")
+            // 1.2.1: 슬레드도 반 · 한 · 두 바퀴 중 고름. 고친 차례가 있으면 바꾸기 전에 확인
+            Seg8(items: opts.map { (DoublesPlan.num($0), DoublesPlan.isSled(i) ? DblText.sledShort($0) : DoublesPlan.amountText(i, $0)) },
+                 selected: draft.isEdited(i) ? "" : DoublesPlan.num(draft.chunk(i))) { k in
+                if let v = opts.first(where: { DoublesPlan.num($0) == k }) { pick(v) }
             }
+            .accessibilityIdentifier("dbl.chunk")
             Label8("WHO GOES FIRST").padding(.top, 4)
             Seg8(items: [("me", "Me"), ("partner", draft.partnerShown)],
                  selected: draft.meFirst(i) ? "me" : "partner") { k in
@@ -314,31 +353,86 @@ struct DoublesStationSheet: View {
         .card8()
     }
 
-    /// "1  나  150 m   0 → 150 m"
+    /// "1  나  150 m   0 → 150 m   − +"  (1.2.1: 줄마다 +/−, 마지막 줄은 나머지)
     private var listCard: some View {
         let i: Int = index
         let seq: [(me: Bool, amount: Double)] = draft.sequence(i)
+        let fixedCount: Int = draft.fixedTurns(i).count
         var starts: [Double] = []
         var acc: Double = 0
         for t in seq { starts.append(acc); acc += t.amount }
         let unit: String = DoublesPlan.isReps(i) ? "" : " m"
+        let full: Bool = draft.remainder(i) < DoublesPlan.eps
         return VStack(spacing: 0) {
             ForEach(Array(seq.enumerated()), id: \.offset) { n, t in
-                HStack(spacing: 12) {
-                    Text("\(n + 1)").font(F.num(13)).foregroundStyle(C.text3).frame(width: 22, alignment: .leading)
-                    Circle().fill(t.me ? DblColor.me : DblColor.partner).frame(width: 8, height: 8)
-                    Text(t.me ? "Me".l10n : draft.partnerShown).font(F.t(15, .semibold)).lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text(DoublesPlan.amountText(i, t.amount)).font(F.num(15)).foregroundStyle(.white)
-                    Text(DoublesPlan.num(starts[n]) + " → " + DoublesPlan.num(starts[n] + t.amount) + unit)
-                        .font(F.num(13, .regular)).foregroundStyle(C.text2)
-                        .frame(minWidth: 96, alignment: .trailing)
+                let isRest: Bool = n >= fixedCount
+                HStack(spacing: 10) {
+                    Text("\(n + 1)").font(F.num(13)).foregroundStyle(C.text3).frame(width: 20, alignment: .leading)
+                    Circle().fill(t.me ? DblColor.me : DblColor.partner).frame(width: 8, height: 8).opacity(isRest ? 0.6 : 1)
+                    HStack(spacing: 6) {
+                        Text(t.me ? "Me".l10n : draft.partnerShown).font(F.t(15, isRest ? .medium : .semibold)).lineLimit(1)
+                            .foregroundStyle(isRest ? C.text2 : .white)
+                        if isRest {
+                            Text("Remainder".l10n).font(F.t(10, .semibold)).foregroundStyle(C.text3)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(C.line, lineWidth: 1))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(DoublesPlan.amountText(i, t.amount)).font(F.num(15)).foregroundStyle(isRest ? C.text2 : .white)
+                        Text(DoublesPlan.num(starts[n]) + " → " + DoublesPlan.num(starts[n] + t.amount) + unit)
+                            .font(F.num(11, .regular)).foregroundStyle(C.text3)
+                    }
+                    HStack(spacing: 6) {
+                        stepButton("minus", on: isRest ? draft.canSplitRemainder(i) : draft.canMinus(i, n), id: "dbl.minus.\(n)") {
+                            if isRest { draft.splitRemainder(i) } else { draft.minus(i, n) }
+                        } blocked: {
+                            showHint(isRest ? String(format: "Only %@ left — can't split it further.".l10n, DoublesPlan.amountText(i, t.amount))
+                                            : String(format: "A turn is at least %@.".l10n, DoublesPlan.amountText(i, DoublesPlan.unit(i))))
+                        }
+                        stepButton("plus", on: !isRest && !full, id: "dbl.plus.\(n)") {
+                            draft.plus(i, n)
+                        } blocked: {
+                            showHint(isRest ? "The last turn is whatever is left.".l10n
+                                            : String(format: "%@ is %@ in total — nothing left to add.".l10n, Station.all[i].name.l10n, DoublesPlan.amountText(i, DoublesPlan.total(i))))
+                        }
+                    }
                 }
-                .padding(.vertical, 11).padding(.horizontal, 16)
+                .padding(.vertical, 9).padding(.horizontal, 16)
                 .rowLine(n < seq.count - 1)
+                .accessibilityIdentifier("dbl.turn.\(n)")
+            }
+            if !hint.isEmpty {
+                Text(hint).font(F.t(12)).foregroundStyle(C.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .transition(.opacity)
             }
         }
+        .animation(.easeOut(duration: 0.15), value: hint)
         .card8()
+    }
+
+    /// 동그란 +/− 버튼. 못 누르는 상태면 흐리게 보이고, 누르면 이유를 알려 줌
+    private func stepButton(_ symbol: String, on: Bool, id: String, action: @escaping () -> Void, blocked: @escaping () -> Void) -> some View {
+        Button {
+            if on {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.easeOut(duration: 0.15)) { action() }
+            } else {
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                blocked()
+            }
+        } label: {
+            Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(on ? Color.white : C.text3)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.white.opacity(on ? 0.12 : 0.05)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
     }
 }
 
@@ -381,7 +475,7 @@ struct DoublesShareCard: View {
                 Icon8(s.key, 16, C.accent)
                 Text(s.name.l10n).font(F.t(13, .semibold)).foregroundStyle(.white).lineLimit(1)
                 Spacer(minLength: 6)
-                Text(DblText.chunkLabel(plan.chunk(i), i)).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1)
+                Text(plan.isEdited(i) ? "Custom turns".l10n : DblText.chunkLabel(plan.chunk(i), i)).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1)
             }
             Text(DblText.flow(plan, i)).font(F.num(13, .regular)).foregroundStyle(C.d1).lineLimit(1)
                 .minimumScaleFactor(0.7)

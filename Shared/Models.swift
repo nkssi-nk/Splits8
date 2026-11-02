@@ -329,8 +329,10 @@ struct ProgItem: Codable, Hashable {
     var icon: String          // run 또는 스테이션 key
     var run: String?          // 러닝 거리 라벨 (200M/400M/800M/1KM)
 
-    func name() -> String { icon == "run" ? "Run" : (Station.of(icon)?.name ?? icon) }
-    func detail(_ d: Division) -> String { icon == "run" ? (run ?? "1KM") : (Station.of(icon)?.detail(d) ?? "") }
+    /// 1.2.1: 트레이닝에도 Roxzone 을 종목처럼 넣을 수 있음 (대표님 10-30)
+    var isRox: Bool { icon == "roxzone" }
+    func name() -> String { icon == "run" ? "Run" : isRox ? "Roxzone" : (Station.of(icon)?.name ?? icon) }
+    func detail(_ d: Division) -> String { icon == "run" ? (run ?? "1KM") : isRox ? "Transition" : (Station.of(icon)?.detail(d) ?? "") }
 }
 
 struct Program: Codable, Hashable, Identifiable {
@@ -1052,8 +1054,8 @@ enum SeqBuilder {
     /// 기본(워치 ST) 목표 16개
     static var defaultTargets16: [Int] { (0..<8).flatMap { [270, Station.all[$0].target] } }
 
-    /// 트레이닝: 순서 × 세트, Roxzone 없음
-    static func training(_ p: Program, div: Division, bests: [String: Int]) -> [Seg] {
+    /// 트레이닝: 순서 × 세트. Roxzone 은 빌더에서 넣은 자리에만 (1.2.1, 목표 = roxTarget)
+    static func training(_ p: Program, div: Division, bests: [String: Int], roxTarget: Int = Defaults.roxTarget) -> [Seg] {
         if WKind.isNew(p.kind) { return newKind(p) }
         if p.isHIIT { return [hiitRound(1)] }
         if p.isRun {
@@ -1063,6 +1065,10 @@ enum SeqBuilder {
         var o: [Seg] = []
         for _ in 0..<max(1, p.sets) {
             for it in p.seq {
+                if it.isRox {
+                    o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget))
+                    continue
+                }
                 let d = it.detail(div)
                 let key = SegKey.of(icon: it.icon, detail: d)
                 // 최고 기록이 아직 없으면 0 (= 비교 안 함). 예전에는 기본 목표와 비교해서 헷갈렸음

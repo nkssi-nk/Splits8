@@ -259,10 +259,10 @@ struct WLive: View {
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(height: m.name + 6)
+            // 1.2.1: SPLIT · GOAL · ♥ BPM 세 칸 (시안 D2). 세 칸이라 숫자를 조금 줄이고(0.86), 세로줄은 더 잘 보이게(0.32)
             HStack(alignment: .top, spacing: 0) {
                 col("SPLIT", Fm.t(el), splitColor)
-                Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: m.seg * 1.05)
-                    .padding(.top, 12)
+                colSep
                 if isRun {
                     col(engine.settings.imperial ? (curvedRun ? "PACE/MI ≈" : "PACE /MI") : (curvedRun ? "PACE ≈" : "PACE"),
                         pace(el: el, dist: engine.segDist), rightColor)
@@ -271,6 +271,9 @@ struct WLive: View {
                 } else {
                     col("", cur.detail, C.text2, small: true)
                 }
+                colSep
+                col("♥ BPM", engine.hr > 0 ? String(Int(engine.hr.rounded())) : "--",
+                    engine.hr > 0 && !aod ? C.zone(engine.zone) : C.text3, labelColor: engine.hr > 0 && !aod ? C.zone(engine.zone) : C.text3)
             }
             .padding(.top, 2)
             Text(detailLine(cur))
@@ -287,23 +290,35 @@ struct WLive: View {
     private func detailLine(_ cur: Seg) -> String {
         if cur.icon == "run" { return runLine(cur: cur) }
         if cur.kind == .rox { return "" }
-        if let d = doublesLine(for: cur, plan: WatchStore.shared.ctx.doublesPlan, division: engine.settings.division) { return d }
+        // 1.2.1: 교대 줄은 시뮬 · 레이스에서만 (트레이닝은 교대를 정한 게 아님 — 대표님 10-30)
+        if engine.mode != .training,
+           let d = doublesLine(for: cur, plan: WatchStore.shared.ctx.doublesPlan, division: engine.settings.division) { return d }
         return cur.target > 0 ? Units.detail(cur.detail, engine.settings.imperial) : ""
     }
 
-    /// 작은 이름표 + 큰 숫자 (두 칸이 같은 크기)
-    private func col(_ label: String, _ value: String, _ color: Color, small: Bool = false) -> some View {
+    /// 세 칸일 때 숫자 크기 (1.2.1: 28 → 24 정도)
+    private var segFont: CGFloat { (m.seg * 0.86).rounded() }
+
+    /// 칸 사이 세로줄 (1.2.1: 14% → 32%, 대표님 "너무 안 보여")
+    private var colSep: some View {
+        Rectangle().fill(Color.white.opacity(0.32)).frame(width: 1, height: segFont * 1.05)
+            .padding(.top, 12)
+    }
+
+    /// 작은 이름표 + 큰 숫자 (세 칸이 같은 크기). labelColor = 이름표 색 (♥ BPM 은 존 색)
+    private func col(_ label: String, _ value: String, _ color: Color, small: Bool = false, labelColor: Color = C.text3) -> some View {
         VStack(spacing: 0) {
-            Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(C.text3)
+            Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(labelColor)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .frame(height: 12)
             Text(value)
-                .font(small ? F.t(13, .semibold) : F.num(m.seg)).tracking(small ? 0 : -0.01 * m.seg)
+                .font(small ? F.t(13, .semibold) : F.num(segFont)).tracking(small ? 0 : -0.01 * segFont)
                 .foregroundStyle(color)
                 .lineLimit(1).minimumScaleFactor(0.55)
                 .frame(height: m.seg * 1.12)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 2)
     }
 
     private var curvedRun: Bool { engine.settings.runMode == "curved" && engine.mode != .race }

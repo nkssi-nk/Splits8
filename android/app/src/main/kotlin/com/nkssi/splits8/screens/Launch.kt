@@ -3,6 +3,10 @@ package com.nkssi.splits8.screens
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import com.nkssi.splits8.ui.press
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,9 +42,7 @@ import com.nkssi.splits8.ui.W600
 import com.nkssi.splits8.ui.Wordmark
 import com.nkssi.splits8.ui.YellowButton
 import com.nkssi.splits8.ui.navBottom
-import com.nkssi.splits8.ui.tap
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.testTag
 
 /** 사진 초점 (CSS background-position center 30%) */
 private val splashFocus = BiasAlignment(0f, -0.4f)
@@ -50,7 +52,7 @@ private fun SplashPhoto() {
     Image(painterResource(R.drawable.splash), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = splashFocus)
 }
 
-/** 처음 화면 (아이폰 SplashView): 사진 + 8 RUNS · 8 STATIONS + 로고 + 설명 + Get started + Sign in */
+/** 처음 화면 (아이폰 SplashView): 사진 + 8 RUNS · 8 STATIONS + 로고 + 설명 + 처음이에요 / 계정이 있어요 */
 @Composable
 fun SplashView() {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -58,8 +60,7 @@ fun SplashView() {
         Box(
             Modifier.fillMaxSize()
                 .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.3f to Color.Transparent,
-                    0.45f to Color.Transparent, 0.78f to Color.Black.copy(alpha = 0.92f)))
-                .tap { Router.go(Scr.Ob1) },
+                    0.45f to Color.Transparent, 0.78f to Color.Black.copy(alpha = 0.92f))),
         )
         Column(
             Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal = 28.dp).padding(bottom = 30.dp + navBottom()),
@@ -69,11 +70,13 @@ fun SplashView() {
             Wordmark(72f)
             T("Every run. Every station. Every second on your wrist.",
                 F.t(15, color = Color.White.copy(alpha = 0.78f)).copy(lineHeight = 21.75.sp), Modifier.widthIn(max = 300.dp))
-            YellowButton("Get started", Modifier.padding(top = 10.dp), tag = "splash.start") { Router.go(Scr.Ob1) }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                T("Have an account? ", F.t(15, color = Color.White.copy(alpha = 0.7f)))
-                T("Sign in", F.t(15, W600), Modifier.tap { Router.toAuth(Scr.Splash, "signin") }.testTag("splash.signin"))
-            }
+            // 1.2.1: 처음 깐 사람 · 계정이 있는 사람을 첫 화면에서 바로 나눔 (같은 크기 버튼 두 개)
+            YellowButton("I'm new here", Modifier.padding(top = 10.dp), tag = "splash.start") { Router.returning = false; Router.go(Scr.Ob1) }
+            Box(
+                Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.14f))
+                    .press(tag = "splash.signin") { Router.toAuth(Scr.Splash, "signin") },
+                contentAlignment = Alignment.Center,
+            ) { T("I have an account", F.t(17, W600), maxLines = 1) }
         }
     }
 }

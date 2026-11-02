@@ -2,6 +2,7 @@ package com.nkssi.splits8.screens
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,9 +83,27 @@ object DblText {
     /** "150 m씩 · 나 먼저" / "한 바퀴(12.5 m)씩 · 가테부 먼저" */
     fun summary(p: DoublesPlan, i: Int): String = chunkLabel(p.chunk(i), i) + " · " + firstLabel(p, p.meFirst(i))
 
-    /** "150 m씩" / "1 length (12.5 m)" */
+    /** "150 m씩" / "한 바퀴(12.5 m)씩" (1.2.1: 슬레드는 반 · 한 · 두 바퀴) */
     fun chunkLabel(v: Double, i: Int): String =
-        if (DoublesPlan.isFixed(i)) "1 length (12.5 m)".l10n else L10n.t("%@ each", DoublesPlan.amountText(i, v))
+        if (DoublesPlan.isSled(i)) sledLabel(v) else L10n.t("%@ each", DoublesPlan.amountText(i, v))
+
+    /** 슬레드 한 번 양 이름 */
+    fun sledLabel(v: Double): String = when {
+        kotlin.math.abs(v - 6.25) < 0.001 -> "Half length (6.25 m)".l10n
+        kotlin.math.abs(v - 25.0) < 0.001 -> "2 lengths (25 m)".l10n
+        else -> "1 length (12.5 m)".l10n
+    }
+
+    /** 세그먼트 버튼용 짧은 이름 */
+    fun sledShort(v: Double): String = when {
+        kotlin.math.abs(v - 6.25) < 0.001 -> "½ length".l10n
+        kotlin.math.abs(v - 25.0) < 0.001 -> "2 lengths".l10n
+        else -> "1 length".l10n
+    }
+
+    /** 스테이션 줄 요약: 손으로 고쳤으면 "직접 정한 차례 · 나 먼저" */
+    fun summaryLine(p: DoublesPlan, i: Int): String =
+        (if (p.isEdited(i)) "Custom turns".l10n else chunkLabel(p.chunk(i), i)) + " · " + firstLabel(p, p.meFirst(i))
 
     /** "나 먼저" / "가테부 먼저" */
     fun firstLabel(p: DoublesPlan, me: Boolean): String = if (me) "Me first".l10n else L10n.t("%@ first", p.partnerShown)
@@ -170,7 +189,7 @@ fun DoublesPlanSheet() {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon8(st.key, 20.dp, C.accent)
                             T(st.name, F.t(15, W600), Modifier.weight(1f), maxLines = 1)
-                            T(DblText.summary(plan, i), F.t(13, color = C.text2), maxLines = 1, translate = false)
+                            T(DblText.summaryLine(plan, i), F.t(13, color = C.text2), maxLines = 1, translate = false)
                             Chevron8()
                         }
                         DoublesBar(plan, i, 8.dp)
@@ -233,10 +252,20 @@ private fun PartnerCard(plan: DoublesPlan, onChange: (DoublesPlan) -> Unit) {
     }
 }
 
-/** 스테이션 하나 고치기 (Cancel · 이름 · Done): 한 번 양 · 누가 먼저 · 막대 · 차례 목록 */
+/** 스테이션 하나 고치기 (Cancel · 이름 · Done): 한 번 양 · 누가 먼저 · 막대 · 차례 목록 (1.2.1: 줄마다 +/−, 마지막 줄은 나머지) */
 @Composable
 private fun DoublesStationPage(plan: DoublesPlan, index: Int, onCancel: () -> Unit, onDone: (DoublesPlan) -> Unit) {
     var draft by remember(index) { mutableStateOf(plan) }
+    // 못 누르는 이유 안내 ("SkiErg 는 모두 1000 m 예요" 등). 잠깐 보였다 사라짐
+    var hint by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var hintJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    fun showHint(t: String) {
+        hint = t
+        hintJob?.cancel()
+        hintJob = scope.launch { kotlinx.coroutines.delay(2200); hint = "" }
+    }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val st = Station.all[index]
     val i = index
     Column(Modifier.padding(horizontal = 16.dp)) {
@@ -244,14 +273,18 @@ private fun DoublesStationPage(plan: DoublesPlan, index: Int, onCancel: () -> Un
         Column(Modifier.verticalScroll(rememberScrollState()).padding(top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.fillMaxWidth().card8().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Label8("EACH TURN")
-                if (DoublesPlan.isFixed(i)) {
-                    T("1 length (12.5 m)", F.t(15, W600), maxLines = 1)
-                } else {
-                    val opts = DoublesPlan.options[i]
-                    Seg8(opts.map { DoublesPlan.num(it) to DoublesPlan.amountText(i, it) }, DoublesPlan.num(draft.chunk(i)),
-                        Modifier.fillMaxWidth().testTag("dbl.chunk")) { k ->
-                        opts.firstOrNull { DoublesPlan.num(it) == k }?.let { draft = draft.setChunk(i, it) }
-                    }
+                // 1.2.1: 슬레드도 반 · 한 · 두 바퀴 중 고름. 고친 차례가 있으면 바꾸기 전에 확인
+                val opts = DoublesPlan.options[i]
+                Seg8(opts.map { DoublesPlan.num(it) to (if (DoublesPlan.isSled(i)) DblText.sledShort(it) else DoublesPlan.amountText(i, it)) },
+                    if (draft.isEdited(i)) "" else DoublesPlan.num(draft.chunk(i)),
+                    Modifier.fillMaxWidth().testTag("dbl.chunk")) { k ->
+                    val v = opts.firstOrNull { DoublesPlan.num(it) == k } ?: return@Seg8
+                    if (draft.isEdited(i)) {
+                        Router.ask = com.nkssi.splits8.Ask("Reset your custom turns?",
+                            "Choosing a new amount per turn replaces the turns you changed by hand.".l10n, ok = "Reset", destructive = true) {
+                            draft = draft.resetTurns(i).setChunk(i, v)
+                        }
+                    } else draft = draft.setChunk(i, v)
                 }
                 Label8("WHO GOES FIRST", Modifier.padding(top = 4.dp))
                 Seg8(listOf("me" to "Me", "partner" to draft.partnerShown), if (draft.meFirst(i)) "me" else "partner",
@@ -262,26 +295,71 @@ private fun DoublesStationPage(plan: DoublesPlan, index: Int, onCancel: () -> Un
                     T(DblText.turns(draft.turns(i)), F.t(13, color = C.text3), maxLines = 1, translate = false)
                 }
             }
-            // "1  나  150 m   0 → 150 m"
+            // "1  나  150 m   0 → 150 m   − +"
             val seq = draft.sequence(i)
+            val fixedCount = draft.fixedTurns(i).size
+            val full = draft.remainder(i) < DoublesPlan.EPS
             val unit = if (DoublesPlan.isReps(i)) "" else " m"
             Column(Modifier.fillMaxWidth().card8()) {
                 var acc = 0.0
                 seq.forEachIndexed { n, t ->
                     val start = acc
                     acc += t.amount
-                    Row(Modifier.fillMaxWidth().rowLine(n < seq.size - 1).padding(vertical = 11.dp, horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        T("${n + 1}", F.num(13, color = C.text3), Modifier.width(22.dp), maxLines = 1, translate = false)
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(if (t.me) DblColor.me else DblColor.partner))
-                        T(if (t.me) "Me".l10n else draft.partnerShown, F.t(15, W600), Modifier.weight(1f), maxLines = 1, translate = false)
-                        T(DoublesPlan.amountText(i, t.amount), F.num(15), maxLines = 1, translate = false)
-                        T(DoublesPlan.num(start) + " → " + DoublesPlan.num(start + t.amount) + unit, F.num(13, androidx.compose.ui.text.font.FontWeight.Normal, C.text2),
-                            Modifier.widthIn(min = 96.dp), maxLines = 1, align = TextAlign.End, translate = false)
+                    val isRest = n >= fixedCount
+                    Row(Modifier.fillMaxWidth().rowLine(n < seq.size - 1).padding(vertical = 9.dp, horizontal = 16.dp).testTag("dbl.turn.$n"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        T("${n + 1}", F.num(13, color = C.text3), Modifier.width(20.dp), maxLines = 1, translate = false)
+                        Box(Modifier.size(8.dp).clip(CircleShape).background((if (t.me) DblColor.me else DblColor.partner).copy(alpha = if (isRest) 0.6f else 1f)))
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            T(if (t.me) "Me".l10n else draft.partnerShown, F.t(15, if (isRest) androidx.compose.ui.text.font.FontWeight.Medium else W600, if (isRest) C.text2 else Color.White),
+                                maxLines = 1, translate = false)
+                            if (isRest) {
+                                Box(Modifier.border(1.dp, C.line, RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp)) {
+                                    T("Remainder", F.t(10, W600, C.text3), maxLines = 1)
+                                }
+                            }
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            T(DoublesPlan.amountText(i, t.amount), F.num(15, color = if (isRest) C.text2 else Color.White), maxLines = 1, translate = false)
+                            T(DoublesPlan.num(start) + " → " + DoublesPlan.num(start + t.amount) + unit, F.num(11, androidx.compose.ui.text.font.FontWeight.Normal, C.text3),
+                                maxLines = 1, translate = false)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val minusOn = if (isRest) draft.canSplitRemainder(i) else draft.canMinus(i, n)
+                            StepButton("−", minusOn, "dbl.minus.$n", onTap = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.VirtualKey)
+                                draft = if (isRest) draft.splitRemainder(i) else draft.minus(i, n)
+                            }, onBlocked = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Reject)
+                                showHint(if (isRest) L10n.t("Only %@ left — can't split it further.", DoublesPlan.amountText(i, t.amount))
+                                         else L10n.t("A turn is at least %@.", DoublesPlan.amountText(i, DoublesPlan.unit(i))))
+                            })
+                            StepButton("+", !isRest && !full, "dbl.plus.$n", onTap = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.VirtualKey)
+                                draft = draft.plus(i, n)
+                            }, onBlocked = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Reject)
+                                showHint(if (isRest) "The last turn is whatever is left.".l10n
+                                         else L10n.t("%@ is %@ in total — nothing left to add.", st.name.l10n, DoublesPlan.amountText(i, DoublesPlan.total(i))))
+                            })
+                        }
                     }
                 }
+                if (hint.isNotEmpty()) {
+                    T(hint, F.t(12, color = C.accent), Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), maxLines = 2, translate = false)
+                }
             }
+            Note8("Tap + or − to change a turn. The last turn is whatever is left, so the total always adds up.".l10n)
         }
+    }
+}
+
+/** 동그란 +/− 버튼. 못 누르는 상태면 흐리게 보이고, 누르면 이유를 알려 줌 */
+@Composable
+private fun StepButton(glyph: String, on: Boolean, tag: String, onTap: () -> Unit, onBlocked: () -> Unit) {
+    Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = if (on) 0.12f else 0.05f))
+        .tap { if (on) onTap() else onBlocked() }.testTag(tag), contentAlignment = Alignment.Center) {
+        T(glyph, F.t(17, W600, if (on) Color.White else C.text3), maxLines = 1, translate = false)
     }
 }
 
@@ -302,7 +380,7 @@ fun DoublesShareCard(plan: DoublesPlan, division: String) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon8(st.key, 16.dp, C.accent)
                         T(st.name, F.t(13, W600), Modifier.weight(1f), maxLines = 1)
-                        T(DblText.chunkLabel(plan.chunk(i), i), F.t(11, color = C.text2), maxLines = 1, translate = false)
+                        T(if (plan.isEdited(i)) "Custom turns".l10n else DblText.chunkLabel(plan.chunk(i), i), F.t(11, color = C.text2), maxLines = 1, translate = false)
                     }
                     T(DblText.flow(plan, i), F.num(13, androidx.compose.ui.text.font.FontWeight.Normal, C.d1), maxLines = 1, translate = false)
                     DoublesBar(plan, i, 5.dp)

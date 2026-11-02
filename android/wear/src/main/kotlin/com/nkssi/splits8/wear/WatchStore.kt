@@ -168,7 +168,7 @@ object WatchStore {
         return when (mode) {
             Mode.Race -> SeqBuilder.full(s.div, s.roxAuto, if (s.goals.size == 16) s.goals else Defaults.goals, s.roxTarget)
             Mode.Sim -> SeqBuilder.full(s.div, s.roxAuto, simPick.first, s.roxTarget)
-            Mode.Training -> SeqBuilder.training(program ?: Program.presets()[0], s.div, ctx.segBests)
+            Mode.Training -> SeqBuilder.training(program ?: Program.presets()[0], s.div, ctx.segBests, s.roxTarget)
             Mode.Pft -> PFT.seq(s.div, ctx.pftBest)
         }
     }

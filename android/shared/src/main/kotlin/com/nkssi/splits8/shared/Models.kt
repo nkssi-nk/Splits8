@@ -302,8 +302,10 @@ data class ProgItem(
     /** 러닝 거리 라벨 (200M/400M/800M/1KM) */
     val run: String? = null,
 ) {
-    fun name(): String = if (icon == "run") "Run" else (Station.of(icon)?.name ?: icon)
-    fun detail(d: Division): String = if (icon == "run") (run ?: "1KM") else (Station.of(icon)?.detail(d) ?: "")
+    /** 1.2.1: 트레이닝에도 Roxzone 을 종목처럼 넣을 수 있음 */
+    val isRox: Boolean get() = icon == "roxzone"
+    fun name(): String = if (icon == "run") "Run" else if (isRox) "Roxzone" else (Station.of(icon)?.name ?: icon)
+    fun detail(d: Division): String = if (icon == "run") (run ?: "1KM") else if (isRox) "Transition" else (Station.of(icon)?.detail(d) ?: "")
 }
 
 @Serializable
@@ -1099,7 +1101,7 @@ object SeqBuilder {
     val defaultTargets16: List<Int> get() = (0 until 8).flatMap { listOf(270, Station.all[it].target) }
 
     /** 트레이닝: 순서 × 세트, Roxzone 없음 */
-    fun training(p: Program, div: Division, bests: Map<String, Int>): List<Seg> {
+    fun training(p: Program, div: Division, bests: Map<String, Int>, roxTarget: Int = Defaults.roxTarget): List<Seg> {
         if (p.isHIIT) return listOf(hiitRound(1))
         if (Kinds.isNew(p.kind)) return Bonus.seq(p)
         if (p.isRun) {
@@ -1109,6 +1111,7 @@ object SeqBuilder {
         val o = ArrayList<Seg>()
         repeat(maxOf(1, p.sets)) {
             for (it in p.seq) {
+                if (it.isRox) { o.add(Seg("roxzone", "Roxzone", "Transition", SegKind.Rox, roxTarget)); continue }   // 1.2.1
                 val d = it.detail(div)
                 o.add(Seg(it.icon, it.name(), d, if (it.icon == "run") SegKind.Run else SegKind.St, bests[SegKey.of(it.icon, d)] ?: 0))
             }

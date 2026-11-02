@@ -63,6 +63,8 @@ class Shots {
 
     @Test fun splash() = shot("01_splash", s = Scr.Splash)
     @Test fun splashKo() = shot("01_splash_ko", "ko", Scr.Splash)
+    /** 1.2.1: 다시 로그인한 사람의 워치 연결 화면 (다시 오신 걸 환영 · 백업 가져오기) */
+    @Test fun welcomeBackKo() { Router.returning = true; shot("01_welcome_back_ko", "ko", Scr.Ob3); Router.returning = false }
     @Test fun home() = shot("02_home", s = Scr.Home)
 
     /** 예시 기록이 있는 홈 (아이폰 --demo --friends --racenear 와 같은 데이터). 화면 전체를 보려고 아주 긴 화면으로 */

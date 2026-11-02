@@ -458,7 +458,18 @@ private fun RunSection() {
 private fun StationSection() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle("STATIONS")
-        Grid4(Station.all.size, 8.dp) { i, m ->
+        // 1.2.1: 마지막 칸 = Roxzone (종목처럼 원하는 자리에 — 대표님 10-30). 모양은 시뮬과 같은 회색
+        Grid4(Station.all.size + 1, 8.dp) { i, m ->
+            if (i == Station.all.size) {
+                AddTile(ProgItem("roxzone"), "roxzone", 16.dp, m.aspectRatio(1f / 1.08f), count = Router.draftSeq.count { it.icon == "roxzone" },
+                    tag = "builder.st.roxzone") {
+                    Column(Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon8("roxzone", 32.dp, C.text2)
+                        T("Roxzone", F.t(11, W600, C.text2, tracking = 0.11f).copy(lineHeight = 13.sp), align = TextAlign.Center, translate = false)
+                    }
+                }
+                return@Grid4
+            }
             val s = Station.all[i]
             AddTile(ProgItem(s.key), s.key, 16.dp, m.aspectRatio(1f / 1.08f), count = Router.draftSeq.count { it.icon == s.key },
                 tag = "builder.st.${s.key}") {

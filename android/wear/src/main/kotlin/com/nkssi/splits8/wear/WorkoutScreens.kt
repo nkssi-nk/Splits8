@@ -229,16 +229,22 @@ private fun Current(now: Long, m: LiveMetrics, aod: Boolean) {
             Icon8(cur.icon, m.icon.dp, if (aod) Tint.Dim else if (isRox) Tint.Mute else Tint.Yellow)
             T(cur.name, F.t(m.name, W600, if (isRox) C.text2 else fg), minScale = 0.8f, translate = false)
         }
+        // 1.2.1: SPLIT · GOAL · ♥ BPM 세 칸 (시안 D2). 세 칸이라 숫자를 조금 줄이고(0.86), 세로줄은 더 잘 보이게(0.32)
+        val seg = (m.seg * 0.86f).let { kotlin.math.round(it) }
+        val hrOn = e.hr > 0 && !aod
+        val hrColor = if (hrOn) C.zone(e.zone.coerceIn(1, 5)) else C.text3
         Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.Top) {
-            Col("SPLIT", if (aod) Fm.t(el).dropLast(2) + "––" else Fm.t(el), splitColor, m.seg, "w.split")
-            Box(Modifier.padding(top = 12.dp).width(1.dp).height((m.seg * 1.05f).dp).background(Color.White.copy(alpha = 0.14f)))
+            Col("SPLIT", if (aod) Fm.t(el).dropLast(2) + "––" else Fm.t(el), splitColor, seg, "w.split", rowH = m.seg)
+            ColSep(seg)
             when {
                 isRun -> Col(if (imp) (if (curvedRun()) "PACE/MI ≈" else "PACE /MI") else (if (curvedRun()) "PACE ≈" else "PACE"),
-                    e.paceText(el, e.segDist, imp) ?: wt("Measuring"), rightColor, m.seg, "w.pace")
+                    e.paceText(el, e.segDist, imp) ?: wt("Measuring"), rightColor, seg, "w.pace", rowH = m.seg)
                 // 빌드 24: 차이(±) 대신 목표 시간 그대로 (Roxzone 도). 트레이닝은 최고 기록 = BEST
-                cur.target > 0 -> Col(if (e.mode == Mode.Training) "BEST" else "GOAL", Fm.t(cur.target), rightColor, m.seg, "w.goal")
-                else -> Col("", cur.detail, C.text2, 13f, "w.detail", small = true)
+                cur.target > 0 -> Col(if (e.mode == Mode.Training) "BEST" else "GOAL", Fm.t(cur.target), rightColor, seg, "w.goal", rowH = m.seg)
+                else -> Col("", cur.detail, C.text2, 13f, "w.detail", small = true, rowH = m.seg)
             }
+            ColSep(seg)
+            Col("♥ BPM", if (e.hr > 0) e.hr.toInt().toString() else "--", hrColor, seg, "w.bpm", labelColor = hrColor, rowH = m.seg)
         }
         T(detailLine(now), if (isRun) F.num(11, W500, C.text2) else F.t(11, W500, C.text2),
             Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
@@ -333,7 +339,8 @@ private fun detailLine(now: Long): String {
     val cur = e.cur
     if (cur.icon == "run") return runLine(now)
     if (cur.kind == SegKind.Rox) return ""
-    doublesLine(cur, WatchStore.ctx.doublesPlan, e.settings.division)?.let { return it }
+    // 1.2.1: 교대 줄은 시뮬 · 레이스에서만 (트레이닝은 교대를 정한 게 아님)
+    if (e.mode != Mode.Training) doublesLine(cur, WatchStore.ctx.doublesPlan, e.settings.division)?.let { return it }
     return if (cur.target > 0) Units.detail(cur.detail, e.settings.imperial) else ""
 }
 
@@ -356,14 +363,21 @@ private fun runLine(now: Long): String {
 
 private fun curvedRun(): Boolean = WatchStore.engine.settings.runMode == "curved" && WatchStore.engine.mode != Mode.Race
 
-/** 작은 이름표 + 큰 숫자 (두 칸이 같은 크기) */
+/** 작은 이름표 + 큰 숫자 (세 칸이 같은 크기). rowH = 줄 높이 기준(화면 높이를 두 칸 때와 같게), labelColor = 이름표 색(♥ BPM 은 존 색) */
 @Composable
-private fun RowScope.Col(label: String, value: String, color: Color, size: Float, tag: String, small: Boolean = false) {
-    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-        T(label, F.t(10, W600, C.text3, tracking = 0.8f), Modifier.height(12.dp))
+private fun RowScope.Col(label: String, value: String, color: Color, size: Float, tag: String, small: Boolean = false,
+                         labelColor: Color = C.text3, rowH: Float = size) {
+    Column(Modifier.weight(1f).padding(horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        T(label, F.t(10, W600, labelColor, tracking = 0.8f), Modifier.height(12.dp), minScale = 0.7f)
         T(value, if (small) F.t(13, W600, color) else F.num(size, color = color, tracking = -0.01f * size),
-            Modifier.fillMaxWidth().height((size * 1.12f).dp).testTag(tag), minScale = 0.55f, translate = false)
+            Modifier.fillMaxWidth().height((rowH * 1.12f).dp).testTag(tag), minScale = 0.55f, translate = false)
     }
+}
+
+/** 칸 사이 세로줄 (1.2.1: 14% → 32%) */
+@Composable
+private fun ColSep(size: Float) {
+    Box(Modifier.padding(top = 12.dp).width(1.dp).height((size * 1.05f).dp).background(Color.White.copy(alpha = 0.32f)))
 }
 
 /** 러닝 모드(거리 있음)는 1 km 마다 자동으로 넘어감 → 가운데 단추 대신 안내 */

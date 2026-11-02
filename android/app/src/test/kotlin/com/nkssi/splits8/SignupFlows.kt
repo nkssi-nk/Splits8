@@ -66,7 +66,7 @@ class SignupFlows {
 
     @After fun tearDown() {
         Accounts.api = NotConnected
-        Router.ask = null; Router.toast = null; Router.signupFlow = false; Router.profileEdit = false
+        Router.ask = null; Router.toast = null; Router.signupFlow = false; Router.profileEdit = false; Router.returning = false
         Router.email = ""; Router.code = ""; Router.nickDraft = ""
     }
 
@@ -95,6 +95,38 @@ class SignupFlows {
         tap("ob.next")
         assertEquals(Scr.Home, Router.scr)
         assertTrue(Store.settings.hasOnboarded)
+    }
+
+    /** 1.2.1: 첫 화면 "계정이 있어요" → 있던 계정이면 질문 없이 워치 연결(다시 오신 걸 환영) → 홈 */
+    @Test fun signInFromSplashSkipsQuestions() {
+        show(Scr.Splash)
+        tap("splash.signin")
+        assertEquals(Scr.Auth, Router.scr)
+        assertEquals(Scr.Splash, Router.authReturn)
+        // 서버에서 프로필까지 받은 상태라고 치고
+        Store.update { it.copy(profileDone = true, nickname = "jiho") }
+        Router.afterSignIn(newAccount = false)
+        rule.waitForIdle()
+        assertEquals(Scr.Ob3, Router.scr)
+        assertTrue(Router.returning)
+        rule.onNodeWithTag("ob.restore").assertExists()
+        org.robolectric.Shadows.shadowOf(rule.activity.application).grantPermissions(android.Manifest.permission.ACCESS_FINE_LOCATION)
+        Router.go(Scr.Ob1); rule.waitForIdle(); Router.go(Scr.Ob3); rule.waitForIdle()
+        tap("ob.next")
+        assertEquals(Scr.Home, Router.scr)
+        assertTrue(Store.settings.hasOnboarded)
+        assertTrue(!Router.returning)
+    }
+
+    /** 1.2.1: "계정이 있어요" 를 눌렀는데 계정이 없었으면 → 닉네임 → (프로필) → 처음 온 사람과 같은 질문 */
+    @Test fun signInFromSplashNewAccountGoesToQuestions() {
+        show(Scr.Splash)
+        tap("splash.signin")
+        Router.afterSignIn(newAccount = true)
+        rule.waitForIdle()
+        assertEquals(Scr.Nick, Router.scr)
+        assertEquals(Scr.Ob1, Router.authReturn)
+        assertTrue(!Router.returning)
     }
 
     @Test fun notConnectedShowsMessage() {

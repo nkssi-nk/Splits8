@@ -286,6 +286,8 @@ object Router {
 
     // 계정
     var authReturn by mutableStateOf(Scr.Training)
+    /** 1.2.1: 첫 화면 "계정이 있어요"로 로그인한 사람 (질문 없이 워치 연결 → 홈, 백업 가져오기 안내) */
+    var returning by mutableStateOf(false)
     var authMode by mutableStateOf("signup")
     fun toAuth(from: Scr, mode: String = "signup") {
         authReturn = from; authMode = mode; code = ""; nickDraft = ""; go(Scr.Auth)
@@ -298,6 +300,12 @@ object Router {
 
     /** 로그인 · 가입 직후: 새 계정이면 닉네임 → 가입 프로필, 아니면 (프로필을 안 했으면) 가입 프로필 → 원래 화면 */
     fun afterSignIn(newAccount: Boolean) {
+        // 1.2.1: 첫 화면에서 왔으면 — 있던 계정은 서버 프로필을 이미 받았으므로 질문 없이 워치 연결(Ob3) → 홈,
+        // 계정이 없었으면 닉네임 → 프로필 → 처음 온 사람과 같은 질문(Ob1). (전에는 로그인 뒤 첫 화면으로 돌아갔음)
+        if (authReturn == Scr.Splash) {
+            authReturn = if (newAccount) Scr.Ob1 else Scr.Ob3
+            returning = !newAccount
+        }
         if (newAccount) {
             signupFlow = true; nickDraft = ""; go(Scr.Nick)
         } else if (Store.settings.profileDone != true) {
@@ -339,6 +347,12 @@ object Router {
             val got = com.nkssi.splits8.shared.DoublesLink.token(url)?.let { com.nkssi.splits8.shared.DoublesLink.read(it) }
             if (got == null) {
                 ask = Ask("This doubles plan link can't be read", "The link may be cut off. Ask for it again.".l10n, cancel = null)
+                return
+            }
+            // 1.2.1: 보낸 사람이 나면 받지 않음 (파트너 = 나 자신이 되고 순서가 뒤집히는 사고 막기)
+            val me = Store.settings.nickname
+            if (me != null && got.second != null && me.equals(got.second, ignoreCase = true)) {
+                ask = Ask("This is your own doubles plan", "You sent this link. Send it to your partner instead.".l10n, cancel = null)
                 return
             }
             // "가테부님의 더블 계획을 받을까요?"

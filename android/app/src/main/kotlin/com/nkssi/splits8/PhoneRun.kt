@@ -187,7 +187,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
                 Mode.Race -> SeqBuilder.full(s.div, s.roxAuto, if (s.goals.size == 16) s.goals else com.nkssi.splits8.shared.Defaults.goals, s.roxTarget)
                 Mode.Sim -> SeqBuilder.full(s.div, s.roxAuto, simPick().first, s.roxTarget)
                 Mode.Pft -> PFT.seq(s.div, book.pftBest?.pftSplits)
-                Mode.Training -> SeqBuilder.training(program ?: Program.presets()[0], s.div, book.segBests)
+                Mode.Training -> SeqBuilder.training(program ?: Program.presets()[0], s.div, book.segBests, s.roxTarget)
             }
         }
 

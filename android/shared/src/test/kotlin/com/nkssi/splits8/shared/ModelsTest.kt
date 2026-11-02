@@ -136,13 +136,17 @@ class ModelsTest {
     @Test fun doublesPlan() {
         var p = DoublesPlan()
         assertTrue(p.isDefault)
-        // 스키 1000 m 를 150 m 씩, 내가 먼저 → 7번 교대 (나 4번 · 파트너 3번, 마지막 100 m)
+        // 스키 1000 m 를 150 m 씩, 내가 먼저 → 6번 교대 (1.2.1: 남는 100 m 는 마지막 두 차례에 반씩 → 150×4 + 200 + 200)
         p = p.setChunk(0, 150.0)
-        assertEquals(7, p.turns(0))
-        assertEquals(4, p.myTurns(0))
-        assertEquals(550.0, p.mine(0), 0.001)
-        assertEquals(450.0, p.partners(0), 0.001)
-        assertEquals(100.0, p.sequence(0).last().amount, 0.001)
+        assertEquals(6, p.turns(0))
+        assertEquals(3, p.myTurns(0))
+        assertEquals(500.0, p.mine(0), 0.001)
+        assertEquals(500.0, p.partners(0), 0.001)
+        assertEquals(200.0, p.sequence(0).last().amount, 0.001)
+        assertFalse(p.isEdited(0))                     // 빠르게 채운 모양은 "고친 것" 아님
+        // 1.2.1: 슬레드 반 바퀴 · 숫자 둘째 자리
+        assertEquals(8, p.setChunk(1, 6.25).turns(1))
+        assertEquals("6.25", DoublesPlan.num(6.25))
         // 고를 수 없는 값은 무시
         assertEquals(150.0, p.setChunk(0, 333.0).chunk(0), 0.001)
         assertEquals(12.5, p.chunk(1), 0.001)
@@ -158,6 +162,61 @@ class ModelsTest {
         assertEquals("ab", DoublesPlan.cleanName("  a\nb "))
         assertNull(DoublesPlan.cleanName("   "))
         assertEquals(20, DoublesPlan.cleanName("x".repeat(30))!!.length)
+    }
+
+    /** 1.2.1: 차례마다 양 고치기 — 마지막 줄은 늘 나머지, 넘침 · 모자람 없음 (시험 페이지와 같은 예) */
+    @Test fun doublesTurnsEdit() {
+        // 혼성 예 1: Sled Push 50 · 12.5 씩 → 2번 · 4번 줄을 6.25 로 → 나 37.5 / 파 12.5, 5번 교대
+        var p = DoublesPlan()
+        assertEquals(4, p.turns(1))
+        assertFalse(p.canPlus(1, 0))                    // 이미 꽉 참
+        p = p.minus(1, 1)                                // 2번 줄 12.5 → 6.25, 나머지 6.25 (나)
+        assertEquals(5, p.turns(1))
+        assertTrue(p.lastIsRemainder(1))
+        assertEquals(6.25, p.remainder(1), 0.001)
+        p = p.minus(1, 3)                                // 4번 줄 → 6.25, 나머지 12.5
+        val s1 = p.sequence(1)
+        assertEquals(listOf(12.5, 6.25, 12.5, 6.25, 12.5), s1.map { it.amount })
+        assertEquals(listOf(true, false, true, false, true), s1.map { it.me })
+        assertEquals(37.5, p.mine(1), 0.001)
+        assertEquals(12.5, p.partners(1), 0.001)
+        assertEquals(50.0, s1.sumOf { it.amount }, 0.001)
+        assertTrue(p.isEdited(1))
+        // 혼성 예 2: BBJ 80 · 20 씩 → 1 · 3번 줄 10 → 나머지 20 → 나머지 줄 − → 파 10 생김 = 나 30 / 파 50
+        p = p.setChunk(3, 20.0).minus(3, 0).minus(3, 2)
+        assertEquals(listOf(10.0, 20.0, 10.0, 20.0, 20.0), p.sequence(3).map { it.amount })
+        assertTrue(p.canSplitRemainder(3))
+        p = p.splitRemainder(3)
+        assertEquals(listOf(10.0, 20.0, 10.0, 20.0, 10.0, 10.0), p.sequence(3).map { it.amount })
+        assertEquals(30.0, p.mine(3), 0.001)
+        assertEquals(50.0, p.partners(3), 0.001)
+        assertFalse(p.canSplitRemainder(3))              // 나머지 10 = 1칸 → 더 못 나눔
+        // 최소 1칸 · 나머지가 있으면 + 가능(나머지를 먹음) · 꽉 차면 + 잠금 · 합은 늘 총량
+        assertFalse(p.canMinus(3, 0))
+        assertTrue(p.canPlus(3, 4))
+        val q = p.plus(3, 4)
+        assertEquals(listOf(10.0, 20.0, 10.0, 20.0, 20.0), q.sequence(3).map { it.amount })
+        assertFalse(q.canPlus(3, 4))
+        assertFalse(q.lastIsRemainder(3))
+        for (i in 0 until 8) assertEquals(DoublesPlan.total(i), p.sequence(i).sumOf { it.amount }, 0.001)
+        // 한 번 양을 다시 고르면(초기화) 고친 차례 사라짐
+        assertFalse(p.resetTurns(1).isEdited(1))
+        // 받은 계획 뒤집기: 양 그대로 · 사람만 뒤집힘
+        val sw = p.swapped("yuna")
+        assertEquals(p.sequence(1).map { it.amount }, sw.sequence(1).map { it.amount })
+        assertEquals(p.sequence(1).map { !it.me }, sw.sequence(1).map { it.me })
+        // 저장 · 링크에 차례가 들어가고, 옛 모양(차례 없음)도 그대로 읽힘
+        val j = SplitsJson.encodeToString(DoublesPlan.serializer(), p)
+        assertTrue(j.contains("\"turns\""))
+        assertEquals(p.sequence(1).map { it.amount }, SplitsJson.decodeFromString(DoublesPlan.serializer(), j).sequence(1).map { it.amount })
+        val tok = DoublesLink.token(p, "kim")
+        val got = DoublesLink.read(tok)!!.first
+        assertEquals(p.sequence(3).map { it.amount }, got.sequence(3).map { it.amount })
+        // 이상한 차례(단위 안 맞음 · 총량 넘음)는 버리고 한 번 양 방식으로
+        val bad = SplitsJson.decodeFromString(DoublesPlan.serializer(), """{"chunks":[250,12.5,12.5,20,250,50,25,20],"firsts":[true,true,true,true,true,true,true,true],"turns":[[333],null,null,null,null,null,null,[60,60]]}""")
+        assertFalse(bad.isEdited(0))
+        assertFalse(bad.isEdited(7))
+        assertTrue(bad.isDefault)
     }
 
     @Test fun doublesOldFileAndJson() {

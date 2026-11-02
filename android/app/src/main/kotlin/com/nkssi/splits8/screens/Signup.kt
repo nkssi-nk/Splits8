@@ -267,12 +267,23 @@ fun Onboarding3() {
         if (hcStatus == Health.READY && !health) runCatching { askHealth.launch(Health.perms) }.onFailure { asked = true }
         else asked = true
     }
+    val returning = Router.returning
+    // 1.2.1: 다시 로그인한 사람 — 운동 기록은 폰에만 있으므로 백업 파일이 있으면 여기서 바로 가져오기
+    var restoreMsg by remember { mutableStateOf<String?>(null) }
+    val openFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() } }.getOrNull()
+        restoreMsg = restoreMessage(text)
+    }
     fun finish() {
         Store.update { it.copy(hasOnboarded = true) }
+        Router.returning = false
         Router.go(Scr.Home)
     }
     val done = asked || (loc && (health || hcStatus != Health.READY))
-    ObFrame(2, "Connect your watch", "Workouts and heart rate are measured on your watch. Please allow access to Health Connect.",
+    ObFrame(2, if (returning) "Welcome back" else "Connect your watch",
+        if (returning) "Your profile and friends are back. Allow access so your watch can record again."
+        else "Workouts and heart rate are measured on your watch. Please allow access to Health Connect.",
         if (done) "Start training" else "Allow & connect",
         {
             when {
@@ -293,13 +304,24 @@ fun Onboarding3() {
                 Modifier.testTag("ob.health"), onClick = if (hcStatus == Health.NEEDS_INSTALL) ({ Health.install(ctx) }) else null)
             PermRow("i_permLoc", "Location", if (loc) "Allowed · outdoor runs" else "Outdoor run pace (optional)", loc, true)
         }
-        Note8("No account needed. Records are saved only on this device.")
+        if (returning) {
+            Column(Modifier.fillMaxWidth().card8()) {
+                PermRow("i_device", "Restore from backup", restoreMsg ?: "Bring back your workout records (optional)", false, true,
+                    Modifier.testTag("ob.restore"), wrap = true) {
+                    openFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                }
+            }
+            Note8("Workout records are saved on each phone, not in your account. If you saved a backup file, restore it here or later in Settings.")
+        } else {
+            Note8("No account needed. Records are saved only on this device.")
+        }
     }
 }
 
 /** 36 사각 아이콘 (허용 전 #2C2C2E / 후 초록 0.15) · 이름 17/500 · 설명 13 · 초록 체크 */
 @Composable
-private fun PermRow(icon: String, name: String, sub: String, on: Boolean, last: Boolean, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+private fun PermRow(icon: String, name: String, sub: String, on: Boolean, last: Boolean, modifier: Modifier = Modifier,
+                    wrap: Boolean = false, onClick: (() -> Unit)? = null) {
     Row(modifier.fillMaxWidth().rowLine(!last).let { if (onClick != null) it.tap { onClick() } else it }.padding(vertical = 16.dp, horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(if (on) C.good.copy(alpha = 0.15f) else C.control), contentAlignment = Alignment.Center) {
@@ -307,7 +329,7 @@ private fun PermRow(icon: String, name: String, sub: String, on: Boolean, last: 
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             T(name, F.t(17, W500), maxLines = 1)
-            T(sub, F.t(13, color = C.text2), maxLines = 1)
+            T(sub, F.t(13, color = C.text2), maxLines = if (wrap) 3 else 1)
         }
         if (on) Check8(C.good, 20.dp)
     }

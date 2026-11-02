@@ -1,6 +1,7 @@
 import SwiftUI
 import HealthKit
 import CoreLocation
+import UniformTypeIdentifiers
 
 // MARK: - 가입·온보딩 공통 틀
 
@@ -59,8 +60,6 @@ struct SplashView: View {
                                    .init(color: .clear, location: 0.45), .init(color: .black.opacity(0.92), location: 0.78)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture { r.go(.ob1) }      // 시안: 화면 아무 곳이나 누르면 온보딩
             bottomBlock
                 .padding(.horizontal, 28).padding(.bottom, 30)
                 .ignoresSafeArea(edges: .bottom)
@@ -76,19 +75,18 @@ struct SplashView: View {
                 .font(F.t(15)).lineSpacing(15 * 0.45 - 3).foregroundStyle(.white.opacity(0.78))
                 .frame(maxWidth: 300, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            YellowButton(action: { r.go(.ob1) }) { Text("Get started") }
+            // 1.2.1: 처음 깐 사람 · 계정이 있는 사람을 첫 화면에서 바로 나눔 (같은 크기 버튼 두 개)
+            YellowButton(action: { r.returning = false; r.go(.ob1) }) { Text("I'm new here") }
                 .padding(.top, 10)
                 .accessibilityIdentifier("splash.start")
-            HStack(spacing: 0) {
-                Text("Have an account? ").foregroundStyle(.white.opacity(0.7))
-                Button { r.toAuth(from: .ob1, mode: "signin") } label: {
-                    Text("Sign in").font(F.t(15, .semibold)).foregroundStyle(.white)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("splash.signin")
+            Button { r.toAuth(from: .splash, mode: "signin") } label: {
+                Text("I have an account").font(F.t(17, .semibold)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).frame(height: 54)
+                    .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .font(F.t(15))
-            .frame(maxWidth: .infinity)
+            .buttonStyle(Press())
+            .accessibilityIdentifier("splash.signin")
         }
     }
 }
@@ -287,12 +285,16 @@ struct Onboarding2: View {
 
 struct Onboarding3: View {
     let store = Store.shared
+    let r = Router.shared
     @State private var granted = false
     @State private var loc = CLLocationManager()
+    @State private var importing = false
+    @State private var restoreMessage: String?
 
     var body: some View {
-        ObFrame(step: 2, title: "Connect Apple Watch",
-                sub: "Workouts and heart rate are measured on Apple Watch. Please allow access to Health data.",
+        ObFrame(step: 2, title: r.returning ? "Welcome back" : "Connect Apple Watch",
+                sub: r.returning ? "Your profile and friends are back. Allow access so Apple Watch can record again."
+                                 : "Workouts and heart rate are measured on Apple Watch. Please allow access to Health data.",
                 button: granted ? "Start training" : "Allow & connect", action: tap) {
             VStack(spacing: 0) {
                 perm("i_permWatch", "Apple Watch", granted ? "Connected" : "Tap Allow to pair", last: false)
@@ -300,7 +302,56 @@ struct Onboarding3: View {
                 perm("i_permLoc", "Location", granted ? "Allowed · outdoor runs" : "Outdoor run pace (optional)", last: true)
             }
             .card8()
-            Note8(text: "No account needed. Records are saved only on this device.")
+            if r.returning {
+                // 1.2.1: 운동 기록은 서버에 없고 폰에만 있음 → 백업 파일이 있으면 여기서 바로 가져오기
+                restoreCard
+                Note8(text: "Workout records are saved on each phone, not in your account. If you saved a backup file, restore it here or later in Settings.")
+            } else {
+                Note8(text: "No account needed. Records are saved only on this device.")
+            }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [UTType.json]) { restore($0) }
+    }
+
+    private var restoreCard: some View {
+        Button { importing = true } label: {
+            HStack(spacing: 14) {
+                Glyph("i_device", 18, .white)
+                    .frame(width: 36, height: 36)
+                    .background(C.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Restore from backup").font(F.t(17, .medium)).foregroundStyle(.white)
+                    Text((restoreMessage ?? "Bring back your workout records (optional)").l10n)
+                        .font(F.t(13)).foregroundStyle(C.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 16).padding(.horizontal, 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .card8()
+        .accessibilityIdentifier("ob.restore")
+    }
+
+    /// 설정 › 백업에서 가져오기와 같은 동작
+    private func restore(_ result: Result<URL, Error>) {
+        guard case .success(let url) = result else { return }
+        let scoped: Bool = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else {
+            restoreMessage = String(localized: "Couldn't open the file. If it's in iCloud, wait for it to download and try again.")
+            return
+        }
+        guard let added = store.importBackup(data) else {
+            restoreMessage = String(localized: "This file isn't a SPLITS8 backup.")
+            return
+        }
+        if added.records == 0 && added.programs == 0 {
+            restoreMessage = String(localized: "Nothing new to restore. Everything in this file is already here.")
+        } else {
+            restoreMessage = String(localized: "Restored \(added.records) records and \(added.programs) trainings.")
         }
     }
 
@@ -324,6 +375,7 @@ struct Onboarding3: View {
     private func tap() {
         if granted {
             store.settings.hasOnboarded = true
+            r.returning = false
             Router.shared.go(.home)
             return
         }

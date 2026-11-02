@@ -459,8 +459,33 @@ struct BuilderView: View {
                         .buttonStyle(TileTap(radius: 16))
                         .accessibilityIdentifier("builder.st." + s.key)
                 }
+                // 1.2.1: Roxzone 도 종목처럼 (원하는 자리에만 — 대표님 10-30). 모양은 시뮬과 같은 회색 Roxzone
+                Button { add(ProgItem(icon: "roxzone"), key: "roxzone") } label: {
+                    roxTile
+                        .modifier(TapMark(count: count(station: "roxzone"), flash: flashKey == "roxzone", radius: 16))
+                }
+                    .buttonStyle(TileTap(radius: 16))
+                    .accessibilityIdentifier("builder.st.roxzone")
             }
         }
+    }
+
+    private var roxTile: some View {
+        Color.clear
+            .aspectRatio(1 / 1.08, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                VStack(spacing: 8) {
+                    Icon8("roxzone", 32, tint: .mute)
+                    Text("Roxzone").font(F.t(11, .semibold)).tracking(0.11)
+                        .multilineTextAlignment(.center).lineSpacing(1)
+                        .foregroundStyle(C.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(6)
+            }
+            .card8(16)
+            .contentShape(Rectangle())
     }
 
     private func stationTile(_ s: Station) -> some View {

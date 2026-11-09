@@ -18,5 +18,7 @@ func doublesLine(for seg: Seg, plan: DoublesPlan?, division: String) -> String? 
     let secondAmount: Double = seq.count > 1 ? seq[1].amount : 0
     let head: String = firstName + " " + DoublesPlan.num(first.amount) + " → " + secondName + " " + DoublesPlan.num(secondAmount)
     let turns: String = String(format: "%lld turns".l10n, Int64(seq.count))
-    return head + " · " + turns
+    // 1.2.2: 차례마다 양이 다르면(직접 정한 차례 · 남는 양) 첫 두 차례 뒤에 "…" 를 붙여 더 있다고 알려 줌
+    let uneven: Bool = seq.contains { abs($0.amount - first.amount) > 0.001 }
+    return head + (uneven ? " …" : "") + " · " + turns
 }

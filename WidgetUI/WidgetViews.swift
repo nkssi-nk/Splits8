@@ -177,29 +177,26 @@ struct DdayMediumView: View {
         }
     }
 
+    /// 1.2.2 (대표님 11-09 "바가 뭐하러 있어"): 막대 대신 목표 · 최고 시간 두 줄 + 목표까지 남은 차이
+    ///  (예전엔 GOAL · BEST 둘 다 거의 꽉 찬 막대라 아무 뜻이 없었음)
     private var bars: some View {
         let g: Int = snap.goal ?? 0, b: Int = snap.best ?? 0
-        let mx: Double = Double(max(g, b, 1)) * 1.04
-        return VStack(spacing: 9) {
-            bar("GOAL", g, mx, pal.accent)
-            bar("BEST", b, mx, pal.light ? Color(hex: 0xAEAEB2) : Color(hex: 0x8E8E93))
+        return VStack(alignment: .leading, spacing: 5) {
+            row("GOAL", g, pal.accent)
+            row("BEST", b, pal.fg)
+            if g > 0 && b > 0 {
+                Text(b <= g ? "Goal reached".l10n : String(format: "%@ to goal".l10n, Fm.t(b - g)))
+                    .font(F.t(11, .semibold)).foregroundStyle(b <= g ? pal.accent : pal.sub)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
         }
     }
 
-    private func bar(_ label: String, _ v: Int, _ mx: Double, _ c: Color) -> some View {
-        VStack(spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(pal.sub)
-                Spacer(minLength: 4)
-                Text(v > 0 ? Fm.t(v) : "--:--").font(F.num(13)).foregroundStyle(pal.fg).lineLimit(1)
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(pal.track)
-                    Capsule().fill(c).frame(width: geo.size.width * CGFloat(Double(v) / mx))
-                }
-            }
-            .frame(height: 5)
+    private func row(_ label: String, _ v: Int, _ c: Color) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(pal.sub)
+            Spacer(minLength: 4)
+            Text(v > 0 ? Fm.t(v) : "--:--").font(F.num(15)).foregroundStyle(v > 0 ? c : pal.sub).lineLimit(1)
         }
     }
 }

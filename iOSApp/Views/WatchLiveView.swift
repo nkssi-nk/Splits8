@@ -69,7 +69,7 @@ struct WatchLiveView: View {
                 }
                 .padding(.top, m.top * 0.6)
                 chips(st).padding(.top, 14 * m.k)
-                LiveNextRow(next: nextSeg(st), m: m, dividerTop: m.dividerTop * 0.7)
+                if !isRunCard(st) { LiveNextRow(next: nextSeg(st), m: m, dividerTop: m.dividerTop * 0.7) }
                 Spacer(minLength: 16)
                 buttons(st, m)
             }
@@ -83,7 +83,13 @@ struct WatchLiveView: View {
                   segEl: st.segEl(now, received: mirror.received), total: st.total(now, received: mirror.received),
                   running: st.running, open: st.open, segDist: st.segDist, totalDist: st.dist,
                   runKind: st.mode == .training && st.cur?.icon == "run",
-                  speed: st.running ? st.spd : nil)
+                  speed: st.running ? st.spd : nil,
+                  runCard: isRunCard(st), runGoalKm: isRunCard(st) && !st.open ? st.seq.count : 0)
+    }
+
+    /// 1.2.2: 워치의 러닝 카드인지 (구간이 모두 "KM n" 러닝)
+    private func isRunCard(_ st: LiveState) -> Bool {
+        st.mode == .training && !st.seq.isEmpty && st.seq.allSatisfy { $0.icon == "run" && $0.name.hasPrefix("KM ") }
     }
 
     /// 다음 구간 (HIIT · 자유 러닝은 아직 순서에 없는 다음 라운드/km)

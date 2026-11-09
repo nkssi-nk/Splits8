@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// MARK: - 더블 계획 시트 (빌드 27) — Race 설정에서 디비전이 더블일 때만 열림
+// MARK: - 교대 계획 시트 (빌드 27) — Race 설정에서 디비전이 더블일 때만 열림
 // 스테이션마다 "몇 m(개)씩 번갈아 · 누가 먼저"를 정함. 저장하면 워치로도 감 (WatchContext.doublesPlan).
 // 공유: 계획 그림 + 링크 (받은 사람은 먼저 하는 사람이 바뀐 채로 저장됨 — Router.acceptIncomingDoubles)
 
@@ -24,7 +24,7 @@ struct DoublesPlanSheet: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            NavBar3(left: "Cancel", title: "Doubles plan", right: "Save",
+            NavBar3(left: "Cancel", title: "Swap plan", right: "Save",
                     onLeft: { dismiss() }, onRight: save, edgeBack: false)
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 10) {
@@ -185,7 +185,7 @@ struct DoublesPlanSheet: View {
         let sender: String? = store.settings.nickname
         var items: [Any] = []
         if let img = DoublesShare.image(plan: plan, division: store.div.name) { items.append(img) }
-        var text: String = "SPLITS8 Doubles plan".l10n
+        var text: String = "SPLITS8 Swap plan".l10n
         if let u = DoublesLink.webURL(plan, sender: sender) { text += "\n" + u.absoluteString }
         items.append(text)
         ShareSheet.present(items)
@@ -446,7 +446,7 @@ struct DoublesShareCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark(size: 22)
-            Text("Our doubles plan".l10n).font(F.t(28, .semibold)).foregroundStyle(.white)
+            Text("Our swap plan".l10n).font(F.t(28, .semibold)).foregroundStyle(.white)
                 .padding(.top, 18)
             Text(division.l10n + " · " + "Me".l10n + " & " + plan.partnerShown)
                 .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)

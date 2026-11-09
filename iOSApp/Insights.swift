@@ -59,6 +59,7 @@ enum Insights {
     // swiftlint:disable:next function_body_length cyclomatic_complexity
     private static func candidates(_ r: Record, store: Store) -> [Insight] {
         guard r.isComplete || r.mode == .training else { return [] }
+        guard !r.hasSkipped else { return [] }      // 1.2.2: 건너뛴 구간(0초)이 섞이면 비교가 틀어져서 분석 없음
         var o: [Insight] = []
         let main: [SegResult] = r.mainSegs
         let runs: [SegResult] = r.runs

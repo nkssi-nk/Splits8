@@ -264,6 +264,16 @@ struct DetailView: View {
         }
     }
 
+    /// 미완료 · 확인 필요 · 건너뜀 설명 한 줄
+    private func flagNote(_ f: RecordFlag) -> LocalizedStringKey {
+        switch f {
+        case .incomplete: return "Ended early, so it isn't counted as a complete result."
+        case .check: return "This looks too fast to be a valid result. A tap may have been missed."
+        case .skipped: return "Some segments were skipped, so this isn't counted for bests, rankings or badges."
+        case .partial: return "3 or more segments were skipped, so this counts as a partial simulation."
+        }
+    }
+
     /// "오전 7:02 – 8:21 · 성수동, 서울" (동네 이름은 있을 때만)
     private func timePlace(_ rec: Record) -> String {
         let f: DateFormatter = Fm.time12
@@ -295,8 +305,7 @@ struct DetailView: View {
                 .padding(.top, rec.mode == .pft ? 10 : 6)
                 .accessibilityIdentifier("detail.timePlace")
             if let f = rec.flag {
-                Text(f == .incomplete ? LocalizedStringKey("Ended early, so it isn't counted as a complete result.")
-                                      : LocalizedStringKey("This looks too fast to be a valid result. A tap may have been missed."))
+                Text(flagNote(f))
                     .font(F.t(13)).foregroundStyle(C.text2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
@@ -820,23 +829,54 @@ struct DetailView: View {
         let sub = "\(first) · \(bpm) BPM" + reps + runExtra + bestNote
         // 95번: 마지막 덜 뛴 구간은 "KM 7" 대신 실제 거리로 ("마지막 0.42 km")
         let title: String = partial ? String(localized: "Last \(Units.dist(s.dist ?? 0, imp)) \(Units.distUnit(imp).lowercased())") : s.name
+        // 1.2.2: 건너뛴 구간 — 시간 대신 "건너뜀", 차이 없음. 꾹 누르면 건너뜀 표시 / 되돌리기 (하이록스 구간만)
+        let sk: Bool = s.isSkipped
+        // 운동 중에 건너뛴 구간(0초)은 되돌리면 0:00 기록이 남으므로 표시만 하는 구간에서만 되돌림
+        let canMark: Bool = !rec.isNewKind && !rec.isRunKind && !rec.isHIIT && s.kind != .rox && !(sk && s.time == 0)
         return HStack(spacing: 12) {
-            Icon8(s.icon, 24, tint: s.kind == .run ? .white : .yellow)
+            Icon8(s.icon, 24, tint: sk ? .dim : s.kind == .run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(F.t(15, .medium)).lineLimit(1)
-                Text(sub).font(F.num(11, .medium)).tracking(0.02 * 11)
+                Text(title).font(F.t(15, .medium)).lineLimit(1).foregroundStyle(sk ? C.text2 : Color.white)
+                Text(sk ? Units.detail(s.detail, imp) : sub).font(F.num(11, .medium)).tracking(0.02 * 11)
                     .foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
-                Text(Fm.t(s.time)).font(F.num(17)).tracking(-0.01 * 17).lineLimit(1)
-                Text(showDelta ? Fm.d(d) : "–").font(F.num(11))
-                    .foregroundStyle(showDelta ? deltaColor(d) : C.text3).lineLimit(1)
+                if sk {
+                    Text("Skipped").font(F.t(14, .medium)).foregroundStyle(C.text2).lineLimit(1)
+                } else {
+                    Text(Fm.t(s.time)).font(F.num(17)).tracking(-0.01 * 17).lineLimit(1)
+                    Text(showDelta ? Fm.d(d) : "–").font(F.num(11))
+                        .foregroundStyle(showDelta ? deltaColor(d) : C.text3).lineLimit(1)
+                }
             }
             .fixedSize()
         }
         .padding(.vertical, 11).padding(.horizontal, 18)
+        .contentShape(Rectangle())
+        .contextMenu {
+            if canMark {
+                Button {
+                    toggleSkipped(rec, s)
+                } label: {
+                    Label(sk ? "Undo skipped" : "Mark as skipped", systemImage: sk ? "arrow.uturn.backward" : "forward.end")
+                }
+            }
+        }
         .rowLine(!last)
+    }
+
+    /// 1.2.2: 끝난 기록에서 구간을 건너뛴 것으로 표시 / 되돌림. 시간은 그대로 두고 표시만 (이 기기에만 저장)
+    ///  → PB · 순위 · 배지에서 빠지고, 서버에 올라갔던 기록이면 서버에서도 지움
+    private func toggleSkipped(_ rec: Record, _ s: SegResult) {
+        guard let i = rec.segs.firstIndex(where: { $0 == s }) else { return }
+        var x: Record = rec
+        x.segs[i].skipped = x.segs[i].isSkipped ? nil : true
+        // 총 시간은 건너뛴 구간을 뺀 합 (운동 중 Skip 한 것과 같은 모양)
+        x.total = x.segs.filter { !$0.isSkipped }.map(\.time).reduce(0, +)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        store.updateRecord(x, syncServer: true)
+        r.detail = x
     }
 
     // MARK: 66번 · Quick → 내 트레이닝으로 저장

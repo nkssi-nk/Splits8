@@ -161,7 +161,7 @@ struct WLive: View {
             VStack(spacing: 0) {
                 totalBlock(now: now)
                 lower(now: now)
-                    .id(engine.idx)
+                    .id(engine.isRunKind ? 0 : engine.idx)      // 1.2.2: 러닝 카드는 1 km 마다 밀지 않음
                     .transition(slide)
             }
             .padding(.top, m.top).padding(.horizontal, 14).padding(.bottom, 6)
@@ -226,8 +226,11 @@ struct WLive: View {
             current(now: now)
             Spacer(minLength: 4)
             if !aod {
-                nextLabel
-                Spacer(minLength: 4)
+                // 1.2.2: 러닝 카드는 "NEXT KM 10" 을 안 보여 줌 (헷갈림 — 대표님 11-09)
+                if !engine.isRunKind {
+                    nextLabel
+                    Spacer(minLength: 4)
+                }
                 controls
             }
         }
@@ -245,6 +248,63 @@ struct WLive: View {
     /// 구간 이름 · SPLIT | PACE(러닝) / GOAL·BEST(스테이션) · 아래 줄
     /// Roxzone 은 같은 모양인데 이름 · 숫자가 회색 (점선 테두리 안 씀 — 대표님 결정)
     private func current(now: Date) -> some View {
+        Group {
+            if engine.isRunKind { runCurrent(now: now) } else { segCurrent(now: now) }
+        }
+    }
+
+    /// 1.2.2 러닝 카드 (대표님 11-09): 1 km 씩 끊어 보이지 않고 DIST(지금까지 총 거리) · PACE(지금 페이스) · ♥ BPM.
+    /// 아래 줄 = 목표 거리 · 평균 페이스 (처음부터 계속). 1 km 기록은 뒤에서 그대로 저장 (기록 화면 구간 표)
+    private func runCurrent(now: Date) -> some View {
+        let imp: Bool = engine.settings.imperial
+        let d: Double = engine.runDistance
+        let total: Int = engine.total(now)
+        return VStack(spacing: 0) {
+            HStack(spacing: 5) {
+                Icon8("run", m.icon, tint: curTint)
+                Text(engine.title.isEmpty ? "Run".l10n : engine.title)
+                    .font(F.t(m.name, .semibold))
+                    .foregroundStyle(fg)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .frame(height: m.name + 6)
+            HStack(alignment: .top, spacing: 0) {
+                col(imp ? "DIST MI" : "DIST KM", Units.dist(d, imp), aod ? C.text3 : C.accent)
+                colSep
+                // 지금 속도 → 모르면 처음부터의 평균 (구간마다 "측정 중" 으로 돌아가지 않게)
+                col(imp ? (curvedRun ? "PACE/MI ≈" : "PACE /MI") : (curvedRun ? "PACE ≈" : "PACE"),
+                    engine.paceText(el: total, dist: d, imperial: imp) ?? "Measuring".l10n, fg)
+                colSep
+                col("♥ BPM", engine.hr > 0 ? String(Int(engine.hr.rounded())) : "--",
+                    engine.hr > 0 && !aod ? C.zone(engine.zone) : C.text3, labelColor: engine.hr > 0 && !aod ? C.zone(engine.zone) : C.text3)
+            }
+            .padding(.top, 2)
+            Text(runSummary(d: d, total: total))
+                .font(F.num(11, .medium))
+                .foregroundStyle(C.text2)
+                .lineLimit(1).minimumScaleFactor(0.75)
+                .frame(height: 14)
+                .padding(.top, 1)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// 러닝 카드 아래 줄: "목표 10 km · 평균 5:12" (자유 러닝은 평균만, 200 m 전엔 목표만)
+    private func runSummary(d: Double, total: Int) -> String {
+        let imp: Bool = engine.settings.imperial
+        var parts: [String] = []
+        if engine.runGoalKm > 0 {
+            parts.append(String(format: (imp ? "Goal %@ mi" : "Goal %@ km").l10n,
+                                imp ? Units.dist(Double(engine.runGoalKm) * 1000, true) : String(engine.runGoalKm)))
+        }
+        if d >= 200 {
+            let avg: Int = Units.pace(Int((Double(total) / d * 1000).rounded()), imp)
+            if avg > 0 && avg < 3600 { parts.append(String(format: "Avg %@".l10n, Fm.t(avg))) }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func segCurrent(now: Date) -> some View {
         let cur: Seg = engine.cur
         let el: Int = engine.segEl(now)
         let isRun: Bool = cur.icon == "run"
@@ -468,7 +528,11 @@ struct WControls: View {
                 VStack(spacing: 5) {
                     endPill
                     pausePill
-                    undoPill
+                    // 1.2.2: Undo · Skip 을 한 줄에 (건너뛴 구간은 시간 0 · 기록에 "건너뜀")
+                    HStack(spacing: 5) {
+                        undoPill
+                        skipPill
+                    }
                     nextPill
                 }
                 .padding(.vertical, 8)
@@ -517,15 +581,36 @@ struct WControls: View {
     /// 잘못 넘겼을 때 방금 넘긴 것을 한 번 되돌림. 되돌릴 것이 없으면 흐리게
     private var undoPill: some View {
         let on: Bool = engine.canUndo
-        return pill("Undo", glyph: "", symbol: "arrow.uturn.backward", fg: on ? .white : C.text3,
-                    bg: Color.white.opacity(on ? 0.12 : 0.05),
-                    dot: Color.white.opacity(on ? 0.20 : 0.07), glyphColor: on ? .white : C.text3,
-                    action: {
-                        withAnimation(WLive.slideCurve) { engine.undo() }
-                        onBack()
-                    })
-            .disabled(!on)
-            .accessibilityIdentifier("w.undo")
+        return halfPill("Undo", symbol: "arrow.uturn.backward", on: on) {
+            withAnimation(WLive.slideCurve) { engine.undo() }
+            onBack()
+        }
+        .accessibilityIdentifier("w.undo")
+    }
+
+    /// 1.2.2: 지금 구간 건너뛰기 (스테이션 · 러닝만, Roxzone 은 흐리게). 되돌리려면 Undo
+    private var skipPill: some View {
+        halfPill("Skip", symbol: "forward.end.fill", on: engine.canSkip) {
+            withAnimation(WLive.slideCurve) { engine.skip() }
+            onBack()
+        }
+        .accessibilityIdentifier("w.skip")
+    }
+
+    /// 반 폭 알약 (Undo · Skip): 동그라미 없이 아이콘 + 글자. 못 누르면 흐리게
+    private func halfPill(_ label: String, symbol: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 12, weight: .bold))
+                Text(label.l10n).font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(on ? Color.white : C.text3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.white.opacity(on ? 0.12 : 0.05), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!on)
     }
 
     /// 가로로 긴 알약: 왼쪽 동그라미 안에 아이콘(세 버튼이 같은 자리), 글자는 버튼 가운데에서 살짝 오른쪽.
@@ -614,6 +699,7 @@ struct WSegmentList: View {
     }
 
     private func rowTime(_ i: Int, _ s: Seg, now: Date) -> String {
+        if i < engine.idx && engine.skippedIdx.contains(i) { return "Skipped".l10n }    // 1.2.2
         if i < engine.idx { return Fm.t(engine.splits.indices.contains(i) ? engine.splits[i] : 0) }
         if i == engine.idx { return Fm.t(engine.segEl(now)) }
         return s.target > 0 ? Fm.t(s.target) : "–"
@@ -631,7 +717,7 @@ struct WSegmentList: View {
             Text(s.name).font(F.t(13, c ? .semibold : .regular))
                 .foregroundStyle(nameColor).lineLimit(1).minimumScaleFactor(0.85)
             Spacer(minLength: 0)
-            if d {
+            if d && !engine.skippedIdx.contains(i) {
                 Icon8("i_check", 10, C.good)
             }
             Text(rowTime(i, s, now: now)).font(F.num(13, .medium))

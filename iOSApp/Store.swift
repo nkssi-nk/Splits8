@@ -248,7 +248,39 @@ final class Store: NSObject, WCSessionDelegate {
         records.append(r)
         if !Demo.enabled { JSONStore.save(records, "records.json") }
         pushToWatch()
-        if signedIn { Task { try? await sb.upload(r) } }
+        if signedIn { Task { await upload(r) } }
+    }
+
+    // MARK: 1.2.2 서버 올리기 (실패하면 기억해 뒀다가 다음에 앱을 켤 때 다시)
+
+    /// 아직 서버에 못 올린 기록 id (앱을 껐다 켜도 기억)
+    var pendingUploads: [String] {
+        get { UserDefaults.standard.stringArray(forKey: "records.pending") ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: "records.pending") }
+    }
+
+    /// 기록 하나 올리기. 안 올려도 되는 기록(미완료 · 확인 필요 · PFT 등)은 조용히 끝남. 통신이 안 되면 다음에 다시
+    @MainActor
+    func upload(_ r: Record) async {
+        let id: String = r.id.uuidString
+        do {
+            try await sb.upload(r)
+            pendingUploads.removeAll { $0 == id }
+        } catch {
+            if !pendingUploads.contains(id) { pendingUploads.append(id) }
+        }
+    }
+
+    /// 앱이 앞으로 올 때: 지난번에 못 올린 기록을 조용히 다시 올림
+    @MainActor
+    func retryUploadsIfNeeded() async {
+        guard signedIn else { return }
+        let ids: Set<String> = Set(pendingUploads)
+        guard !ids.isEmpty else { return }
+        let todo: [Record] = records.filter { ids.contains($0.id.uuidString) }
+        // 지워진 기록은 목록에서 뺌
+        pendingUploads = todo.map { $0.id.uuidString }
+        for r in todo { await upload(r) }
     }
 
     // MARK: 백업 파일 (서버를 쓰지 않음 — 파일 하나로 내보내고 다시 가져옴)
@@ -276,7 +308,7 @@ final class Store: NSObject, WCSessionDelegate {
         }
         if mergedP.1 > 0 { programs = mergedP.0 }
         pushToWatch()
-        if signedIn && !fresh.isEmpty { Task { for r in fresh { try? await sb.upload(r) } } }
+        if signedIn && !fresh.isEmpty { Task { for r in fresh { await upload(r) } } }
         return (mergedR.1, mergedP.1)
     }
 
@@ -288,11 +320,17 @@ final class Store: NSObject, WCSessionDelegate {
     }
 
     /// 18번: 기록 고치기 (AMRAP 추가 동작 수 등). 이 기기에만 저장
-    func updateRecord(_ r: Record) {
+    func updateRecord(_ r: Record, syncServer: Bool = false) {
         guard let i = records.firstIndex(where: { $0.id == r.id }) else { return }
         records[i] = r
         if !Demo.enabled { JSONStore.save(records, "records.json") }
         if r.mode == .training, Router.shared.detail?.id == r.id { Router.shared.detail = r }
+        // 1.2.2: 건너뜀 표시가 바뀌면 서버 쪽도 맞춤 — 안 올릴 기록이 되면 지우고, 다시 올릴 기록이 되면 올림
+        if syncServer && signedIn {
+            Task {
+                if r.counts { await upload(r) } else { try? await sb.deleteRecord(r.id) }
+            }
+        }
     }
 
     func delete(_ r: Record) {
@@ -614,7 +652,7 @@ final class Store: NSObject, WCSessionDelegate {
         s.email = sb.session?.email ?? s.email
         settings = s
         if let d = photo?.jpegData(compressionQuality: 0.85), avatarUrl == nil { await syncAvatar(d) }
-        for r in records { try? await sb.upload(r) }
+        for r in records { await upload(r) }
         await refreshSocial()
     }
 

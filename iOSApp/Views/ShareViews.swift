@@ -58,8 +58,8 @@ struct ShareData {
             Pair(no: String(format: "%02d", i + 1),
                  icon: i < sts.count ? sts[i].icon : "run",
                  sn: i < sts.count ? ShareData.short(sts[i].name) : "",
-                 rt: i < runs.count ? Fm.t(runs[i].time) : "",
-                 st: i < sts.count ? Fm.t(sts[i].time) : "",
+                 rt: i < runs.count ? (runs[i].isSkipped ? "–" : Fm.t(runs[i].time)) : "",     // 1.2.2: 건너뜀은 "–"
+                 st: i < sts.count ? (sts[i].isSkipped ? "–" : Fm.t(sts[i].time)) : "",
                  spec: i < sts.count ? ShareData.spec(Units.detail(sts[i].detail, imp)) : "")
         }
         seq = r.mainSegs.map { Part(t: $0.time, run: $0.kind == .run, icon: $0.icon) }

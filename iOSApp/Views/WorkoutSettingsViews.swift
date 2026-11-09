@@ -75,6 +75,17 @@ struct SetWorkoutView: View {
                     }
                     .padding(.vertical, 12).padding(.horizontal, 18)
                     .rowLine(true)
+                    // 1.2.2: 레이스 · 시뮬 응원 양 (적게 = 구간당 1번 · 보통 = 2번 + 종목 요령 · 많이 = 3번)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Cheers".l10n).font(F.t(17)).lineLimit(1)
+                        Seg8(items: [("low", "Few"), ("mid", "Some"), ("high", "Lots")],
+                             selected: store.settings.voiceCheer, height: 34, radius: 11, fontSize: 14) { k in
+                            store.settings.voiceCheer = k
+                        }
+                        .accessibilityIdentifier("settings.voiceCheer")
+                    }
+                    .padding(.vertical, 12).padding(.horizontal, 18)
+                    .rowLine(true)
                     if store.settings.voiceEvery > 0 {
                         toggleRow("Distance", sub: nil, on: voiceDistBinding, last: false)
                             .accessibilityIdentifier("settings.voiceDist")
@@ -90,7 +101,7 @@ struct SetWorkoutView: View {
             .card8()
             .opacity(ok ? 1 : 0.4)
             .allowsHitTesting(ok)
-            Note8(text: ok ? "Spoken during workouts: segment names on Race, Full Sim and Training, and your running stats at each alert. Other audio gets quieter while it speaks."
+            Note8(text: ok ? "Spoken during workouts: a coach guides each segment of Race and Full Sim, segment names on Training, and your running stats at each alert. Other audio gets quieter while it speaks."
                            : "Voice guidance is available in Korean for now.")
         }
     }

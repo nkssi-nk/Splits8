@@ -26,6 +26,9 @@ struct LiveFrame {
     var runKind: Bool
     /// 빌드 27: 지금 속도(m/s) — 실시간 페이스. nil · 0 = 모름
     var speed: Double? = nil
+    /// 1.2.2: 러닝 카드 (1 km 씩 끊어 보이지 않고 총 거리 · 지금 페이스) · 목표 거리(km, 0 = 자유 러닝)
+    var runCard: Bool = false
+    var runGoalKm: Int = 0
 
     var cur: Seg { seq.indices.contains(idx) ? seq[idx] : (seq.last ?? Seg(icon: "run", name: "Run", detail: "1KM", kind: .run, target: 0)) }
     var countTotal: Int { seq.liveCountTotal }
@@ -56,6 +59,25 @@ struct LiveFrame {
         }
         return c.target > 0 ? Units.detail(c.detail, imp) : ""
     }
+
+    /// 1.2.2 러닝 카드: 지금까지 거리(m). 잰 거리가 없으면(실내 손으로 넘김) 지난 km 수
+    var runDist: Double { (totalDist ?? 0) > 0 ? (totalDist ?? 0) : Double(idx) * 1000 }
+
+    /// 1.2.2 러닝 카드 아래 줄: "목표 10 km · 평균 5:12"
+    var runSummary: String {
+        let imp: Bool = imperial
+        var parts: [String] = []
+        if runGoalKm > 0 {
+            parts.append(String(format: (imp ? "Goal %@ mi" : "Goal %@ km").l10n,
+                                imp ? Units.dist(Double(runGoalKm) * 1000, true) : String(runGoalKm)))
+        }
+        let d: Double = runDist
+        if d >= 200 {
+            let avg: Int = Units.pace(Int((Double(total) / d * 1000).rounded()), imp)
+            if avg > 0 && avg < 3600 { parts.append(String(format: "Avg %@".l10n, Fm.t(avg))) }
+        }
+        return parts.joined(separator: " · ")
+    }
 }
 
 /// 머리: 제목 · ● 상태 줄 · n / 16 · 진행 막대
@@ -78,7 +100,7 @@ struct LiveHeader: View {
                     }
                 }
                 Spacer(minLength: 12)
-                if !f.open {
+                if !f.open && !f.runCard {
                     Text("\(f.countNow) / \(f.countTotal)")
                         .font(F.num(12)).foregroundStyle(C.accent)
                         .padding(.horizontal, 8).frame(height: 22)
@@ -86,7 +108,7 @@ struct LiveHeader: View {
                         .accessibilityIdentifier("\(idPrefix).of")
                 }
             }
-            if !f.open { LiveProgress(idx: f.idx, count: f.countTotal, fraction: f.progress) }
+            if !f.open && !f.runCard { LiveProgress(idx: f.idx, count: f.countTotal, fraction: f.progress) }
         }
         .padding(.top, 8)
     }
@@ -113,9 +135,24 @@ struct LiveBody: View {
                 .accessibilityIdentifier("\(idPrefix).total")
             HStack(spacing: 10) {
                 Icon8(cur.icon, m.icon * 0.7, tint: cur.kind == .rox ? .mute : .yellow)
-                Text(cur.name).font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                // 1.2.2: 러닝 카드는 "KM 9" 대신 운동 이름
+                Text(f.runCard ? (f.title.isEmpty ? "Run" : f.title) : cur.name)
+                    .font(F.t(m.nameFont, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
             }
             .padding(.top, m.segTop * 0.6)
+            if f.runCard {
+                // 1.2.2 러닝 카드 (대표님 11-09): DIST(지금까지 총 거리) | PACE(지금 페이스, 모르면 처음부터 평균 — 1 km 마다 "측정 중" 안 됨)
+                HStack(alignment: .top, spacing: 0) {
+                    LiveCol(label: f.imperial ? "DIST MI" : "DIST KM", value: Units.dist(f.runDist, f.imperial),
+                            color: f.running ? C.accent : C.text2, size: size)
+                        .accessibilityIdentifier("\(idPrefix).dist")
+                    Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: size * 0.82).padding(.top, 18 + size * 0.14)
+                    LiveCol(label: f.imperial ? "PACE /MI" : "PACE /KM",
+                            value: LivePace.text(el: f.total, dist: f.runDist, imperial: f.imperial, speed: f.speed),
+                            color: timeColor, size: size)
+                }
+                .padding(.top, m.nameTop)
+            } else {
             HStack(alignment: .top, spacing: 0) {
                 LiveCol(label: "SPLIT", value: Fm.t(f.segEl), color: segColor, size: size)
                     .accessibilityIdentifier("\(idPrefix).seg")
@@ -131,7 +168,8 @@ struct LiveBody: View {
                 }
             }
             .padding(.top, m.nameTop)
-            Text(f.detailLine)
+            }
+            Text(f.runCard ? f.runSummary : f.detailLine)
                 .font(F.num(m.detailFont, .regular)).foregroundStyle(C.aeb)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .frame(height: m.detailFont * 1.4)

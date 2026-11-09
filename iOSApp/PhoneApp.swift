@@ -74,7 +74,7 @@ enum Scr: String {
     case widgets            // 화면 확인용: 위젯 · 잠금 화면 미리보기 (--demo 에서만)
 }
 
-/// 링크로 받은 더블 계획 (보낸 사람 입장의 계획 + 보낸 사람 닉네임)
+/// 링크로 받은 교대 계획 (보낸 사람 입장의 계획 + 보낸 사람 닉네임)
 struct IncomingDoubles: Identifiable {
     let id = UUID()
     var plan: DoublesPlan
@@ -124,15 +124,15 @@ final class Router {
     var linkError = false
     var linkFull = false
 
-    // 빌드 27: 링크로 받은 더블 계획 (보낸 사람 입장 그대로 · nil 이면 닫힘) · 읽을 수 없는 더블 링크
+    // 빌드 27: 링크로 받은 교대 계획 (보낸 사람 입장 그대로 · nil 이면 닫힘) · 읽을 수 없는 더블 링크
     var incomingDoubles: IncomingDoubles? = nil
     var dblLinkError = false
-    /// 1.2.1: 내가 보낸 더블 계획 링크를 내 폰에서 열었을 때 (받으면 파트너가 나 자신이 되므로 받지 않음)
+    /// 1.2.1: 내가 보낸 교대 계획 링크를 내 폰에서 열었을 때 (받으면 파트너가 나 자신이 되므로 받지 않음)
     var dblOwnLink = false
 
-    /// splits8://t?d=… (트레이닝) · splits8://d?d=… (더블 계획) 로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함
+    /// splits8://t?d=… (트레이닝) · splits8://d?d=… (교대 계획) 로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함
     func handle(url: URL) {
-        // 더블 계획: splits8://d?d=d1.…  또는  https://…/t.html#d1.…
+        // 교대 계획: splits8://d?d=d1.…  또는  https://…/t.html#d1.…
         let isDoubles: Bool = (url.scheme?.lowercased() == ProgramLink.scheme && url.host?.lowercased() == DoublesLink.host)
             || (url.fragment?.hasPrefix(DoublesLink.prefix) ?? false)
         if isDoubles {
@@ -157,7 +157,7 @@ final class Router {
         incoming = p
     }
 
-    /// 받은 더블 계획을 내 계획으로 저장 (확인창에서 받기를 눌렀을 때). 먼저 하는 사람을 바꾸고 파트너 = 보낸 사람
+    /// 받은 교대 계획을 내 계획으로 저장 (확인창에서 받기를 눌렀을 때). 먼저 하는 사람을 바꾸고 파트너 = 보낸 사람
     func acceptIncomingDoubles(_ d: IncomingDoubles) {
         incomingDoubles = nil
         let store = Store.shared
@@ -403,14 +403,14 @@ struct IncomingTrainingAlerts: ViewModifier {
                 Button("Get plan") { r.acceptIncomingDoubles(d) }
                 Button("Cancel", role: .cancel) { r.incomingDoubles = nil }
             } message: { _ in
-                Text("Your doubles plan will be replaced. Who goes first is swapped so it fits you.")
+                Text("Your swap plan will be replaced. Who goes first is swapped so it fits you.")
             }
-            .alert("This is your own doubles plan", isPresented: $r.dblOwnLink) {
+            .alert("This is your own swap plan", isPresented: $r.dblOwnLink) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("You sent this link. Send it to your partner instead.")
             }
-            .alert("This doubles plan link can't be read", isPresented: $r.dblLinkError) {
+            .alert("This swap plan link can't be read", isPresented: $r.dblLinkError) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("The link may be cut off. Ask for it again.")
@@ -427,11 +427,11 @@ struct IncomingTrainingAlerts: ViewModifier {
             }
     }
 
-    /// "가테부님의 더블 계획을 받을까요?"
+    /// "가테부님의 교대 계획을 받을까요?"
     static func doublesTitle(_ d: IncomingDoubles?) -> String {
         let n: String = d?.sender ?? ""
-        if n.isEmpty { return "Get this doubles plan?".l10n }
-        return String(format: "Get %@'s doubles plan?".l10n, n)
+        if n.isEmpty { return "Get this swap plan?".l10n }
+        return String(format: "Get %@'s swap plan?".l10n, n)
     }
 
     /// "Leg day\n8 segments × 2 sets"
@@ -668,6 +668,7 @@ struct PhoneRoot: View {
             guard scenePhase == .active, !Demo.enabled else { return }
             await Store.shared.checkDevice()
             await Store.shared.retryAvatarIfNeeded()   // 15번
+            await Store.shared.retryUploadsIfNeeded()  // 1.2.2: 못 올린 기록 다시
             await r.askProfileIfNeeded()
             await r.checkNotice()
             await r.checkUpdate()   // 4번

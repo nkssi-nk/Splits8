@@ -631,6 +631,10 @@ struct SegResult: Codable, Hashable {
     var cad: Int? = nil
     /// 62번 · 러닝 구간에서 오른 높이(m, 3 m 미만 흔들림은 뺌). 높이 있는 실외 경로가 있을 때만
     var up: Double? = nil
+    /// 1.2.2: 건너뛴 구간 (운동 중 Skip, 또는 기록 화면에서 표시). 시간은 0, PB · 순위 · 배지에선 빠짐. 예전 기록엔 없음
+    var skipped: Bool? = nil
+
+    var isSkipped: Bool { skipped == true }
 }
 
 /// 스키 · 로잉 · 월볼 횟수 요약 (기록 화면 카드용). 워치가 팔 움직임으로 센 값이라 참고용
@@ -873,6 +877,8 @@ struct Settings: Codable, Hashable {
     var voiceTimeOpt: Bool? = nil
     var voicePaceOpt: Bool? = nil
     var voiceHrOpt: Bool? = nil
+    /// 1.2.2: 레이스 · 시뮬 응원 양. nil = 적게(기본) · "mid" = 보통 · "high" = 많이
+    var voiceCheerOpt: String? = nil
 
     var voiceOn: Bool {
         get { voiceOpt ?? false }
@@ -897,6 +903,11 @@ struct Settings: Codable, Hashable {
     var voiceHr: Bool {
         get { voiceHrOpt ?? true }
         set { voiceHrOpt = newValue ? nil : false }
+    }
+    /// 1.2.2: 응원 양 "low" · "mid" · "high"
+    var voiceCheer: String {
+        get { voiceCheerOpt ?? "low" }
+        set { voiceCheerOpt = newValue == "low" ? nil : newValue }
     }
     /// 음성 안내 소리가 있는 언어인지 (지금은 한국어만). 앱 안에서 고른 언어 → 없으면 기기 언어
     var voiceLangOK: Bool {
@@ -1205,8 +1216,17 @@ extension Mode {
 enum RecordFlag: String {
     case incomplete     // 끝까지 안 하고 End
     case check          // 말이 안 되게 빠름 (세계기록보다 훨씬 빠르거나 탭 실수)
+    case skipped        // 1.2.2: 구간을 건너뜀 (1~2개) — 정상 기록이지만 PB · 순위 · 배지에선 빠짐
+    case partial        // 1.2.2: 3개 이상 건너뜀 → "부분 시뮬"
 
-    var label: String { self == .incomplete ? "Incomplete" : "Check" }
+    var label: String {
+        switch self {
+        case .incomplete: return "Incomplete"
+        case .check: return "Check"
+        case .skipped: return "Skipped"
+        case .partial: return "Partial"
+        }
+    }
 }
 
 extension Record {
@@ -1243,9 +1263,17 @@ extension Record {
         return mode == .training ? true : splits16 != nil
     }
 
+    /// 1.2.2: 건너뛴 구간 수 (Roxzone 제외)
+    var skippedCount: Int { segs.filter { $0.isSkipped && $0.kind != .rox }.count }
+    var hasSkipped: Bool { skippedCount > 0 }
+    /// 3개 이상 건너뛰면 "부분 시뮬"
+    static let partialSkips: Int = 3
+
     /// nil = 정상
     var flag: RecordFlag? {
         if !isComplete { return .incomplete }
+        // 1.2.2: 건너뛴 구간이 있으면 "너무 빠름" 검사 대신 건너뜀 표시 (시간 0 인 구간이 있어도 정상 기록)
+        if hasSkipped { return skippedCount >= Self.partialSkips ? .partial : .skipped }
         guard mode != .training else { return nil }
         if mode == .pft {
             // PFT: 전체 10분, 러닝 2:30, 그 외 15초보다 빠르면 확인 필요

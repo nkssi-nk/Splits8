@@ -11,7 +11,7 @@ struct SimView: View {
     @State private var chipsOpen = false
     /// 빌드 26: 큰 시간을 누르면 목표 시간 시트
     @State private var goalSheet = false
-    /// 87번(빌드 28): Full Sim 도 Race 처럼 더블 계획 줄
+    /// 87번(빌드 28): Full Sim 도 Race 처럼 교대 계획 줄
     @State private var dblSheet = false
     fileprivate struct Metric { let key: String; let label: String; let caption: String; let st: Int? }
     private static let stationMetrics: [(String, String, String)] = [
@@ -234,9 +234,9 @@ struct SimView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("sim.division")
             .rowLine(true)
-            // 87번(빌드 28): Race 와 같은 줄 — 더블 계획(더블일 때) · 목표 시간 · 구간 목표. 목표는 Race 와 같은 값을 씀
+            // 87번(빌드 28): Race 와 같은 줄 — 교대 계획(더블일 때) · 목표 시간 · 구간 목표. 목표는 Race 와 같은 값을 씀
             if store.settings.division.hasPrefix("dbl") {
-                simRow("Doubles plan", value: simDoublesValue) { dblSheet = true }
+                simRow("Swap plan", value: simDoublesValue) { dblSheet = true }
             }
             simRow("Goal time", value: Fm.t(store.settings.goalTime) + " ›", numeric: true) { goalSheet = true }
             Button { r.sub(.setGoals, from: .sim) } label: { simSplitTargets }
@@ -494,7 +494,7 @@ struct RaceView: View {
         return e.isSet ? "\(e.name) · \(Fm.wdmy.string(from: e.date)) ›" : "Not set".l10n + " ›"
     }
 
-    /// 더블 계획 줄의 값: 안 정했으면 Not set, 파트너가 있으면 그 이름, 아니면 Custom
+    /// 교대 계획 줄의 값: 안 정했으면 Not set, 파트너가 있으면 그 이름, 아니면 Custom
     private var doublesValue: String {
         guard let p = store.settings.doublesPlan else { return "Not set".l10n + " ›" }
         if let n = p.partnerName, !n.isEmpty { return n + " ›" }
@@ -507,7 +507,7 @@ struct RaceView: View {
             row("Division", value: "\(store.div.name) ›") { r.sub(.setDiv, from: .race) }
             // 더블일 때만: 파트너와 스테이션 나누기 계획 (빌드 23)
             if store.settings.division.hasPrefix("dbl") {
-                row("Doubles plan", value: doublesValue) { dblSheet = true }
+                row("Swap plan", value: doublesValue) { dblSheet = true }
             }
             row("Goal time", value: Fm.t(store.settings.goalTime) + " ›", numeric: true) { goalSheet = true }
             splitTargets

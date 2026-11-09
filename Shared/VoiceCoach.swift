@@ -28,7 +28,8 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
     static let lineGap: Double = 0.35
     /// 응원은 바로 앞 안내 뒤 이 시간(초) 안에는 안 함
     static let cheerQuiet: Double = 15
-    static let cheerCount = 15
+    /// 응원 cheer_01 ~ cheer_25 (1.2.2: 15 → 25개)
+    static let cheerCount = 25
 
     /// 이번 운동에서 말할지 (설정 켜짐 + 한국어)
     private(set) var enabled = false
@@ -67,12 +68,32 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
     /// AMRAP 남은 시간 안내를 이미 한 것 (60 · 30 · 10)
     private var capSaid: Set<Int> = []
 
+    // 1.2.2 · 레이스 · 풀 시뮬 코치 (RaceCoach 규칙 — 안드로이드 shared Voice.kt RaceVoice 와 같음)
+    /// 레이스 · 시뮬이고 순서가 하이록스 그대로(러닝 8 · 스테이션 8)일 때만 true
+    private var race = false
+    /// 응원 양 "low" · "mid" · "high"
+    private var cheerLevel = "low"
+    /// 이번 레이스에서 이미 말한 응원 · 거의 끝 · 과속 문장 (같은 문장 다시 안 나옴)
+    private var used: Set<String> = []
+    private var paceWarned = false
+    /// 구간별: 응원을 말할 때(구간 시작부터 초) · 이미 말한 수 · 거의 끝 / 과속 확인을 한 구간
+    private var plannedIdx = -1
+    private var cheerTimes: [Int] = []
+    private var cheerDone: [Int: Int] = [:]
+    private var nearDone: Set<Int> = []
+    private var paceChecked: Set<Int> = []
+
     // MARK: 운동 안내 (엔진이 부름)
 
     /// 운동 시작. announce = false 면 말없이 상태만 (아이폰 운동 이어 받기)
-    func begin(_ s: Settings, seq: [Seg], runCard: Bool, open: Bool, announce: Bool = true, kind: String? = nil) {
+    func begin(_ s: Settings, seq: [Seg], runCard: Bool, open: Bool, announce: Bool = true, kind: String? = nil,
+               mode: Mode? = nil) {
         cutAll()
         enabled = s.voiceActive
+        race = !runCard && !open && !WKind.isNew(kind) && (mode == .race || mode == .sim) && RaceVoice.isRace(seq)
+        cheerLevel = s.voiceCheer
+        used = []; paceWarned = false
+        plannedIdx = -1; cheerTimes = []; cheerDone = [:]; nearDone = []; paceChecked = []
         self.kind = WKind.isNew(kind) ? kind : nil
         warnedIdx = -1
         capSaid = []
@@ -94,14 +115,23 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
             say(ids, .segment, interrupt: true)
             return
         }
+        // 1.2.2 레이스: "자, 첫 번째 러닝입니다 …" 한 문장 (go_start · ph_start 는 같은 말이라 안 함)
+        if race { say(RaceVoice.transition(seq, 0, level: cheerLevel), .segment); return }
         var ids: [String] = ["go_start"]
         if !runCard, seq.count > 1 { ids += segClips(seq, 0) }
         say(ids, .segment)
     }
 
     /// 다음 구간으로 넘어감 (러닝 카드는 거리 안내로 대신하므로 부르지 않음)
-    func segment(_ seq: [Seg], idx: Int) {
+    func segment(_ seq: [Seg], idx: Int, splits: [Int] = []) {
         guard enabled, !runCard, seq.indices.contains(idx) else { return }
+        if race {
+            // 1.2.2: 전환마다 통문장 하나 → 이어서 목표와 비교 ("목표보다, 12초, 빨라요")
+            say(RaceVoice.transition(seq, idx, level: cheerLevel), .segment)
+            let g: [String] = RaceVoice.goalLine(seq, idx, splits: splits, level: cheerLevel)
+            if !g.isEmpty { say(g, .info) }
+            return
+        }
         var ids: [String] = segClips(seq, idx)
         // 반 지났을 때 (Roxzone 뺀 구간 수 기준, 후반 첫 구간에서 한 번)
         let s: Seg = seq[idx]
@@ -195,7 +225,11 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
     func paused() { if enabled { say(["go_pause"], .segment, interrupt: true) } }
     func resumed() { if enabled { say(["go_resume"], .segment, interrupt: true) } }
     /// 운동 끝 (저장). 말하는 중인 것은 끊고 "운동 끝"
-    func ended() { if enabled { say(["go_end"], .segment, interrupt: true) } }
+    /// 1.2.2: 레이스를 끝까지 하면 "완주! 결승선 통과했어요" (rf_1), 중간에 끝내면 "운동 끝"
+    func ended(complete: Bool = false) {
+        guard enabled else { return }
+        say([race && complete ? "rf_1" : "go_end"], .segment, interrupt: true)
+    }
     /// 버리기 · 화면 닫힘: 조용히 멈춤
     func stop() {
         cutAll()
@@ -203,8 +237,9 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
     }
 
     /// 1초마다 (러닝 카드가 아닐 때): 스테이션 구간 중간쯤 응원 한 번
-    func tick(seq: [Seg], idx: Int, segEl: Int) {
+    func tick(seq: [Seg], idx: Int, segEl: Int, segDist: Double? = nil) {
         guard enabled, !runCard, seq.indices.contains(idx) else { return }
+        if race { raceTick(seq, idx, segEl, segDist); return }
         let s: Seg = seq[idx]
         guard s.kind == .st, cheeredIdx != idx else { return }
         if cheerPlanIdx != idx {
@@ -240,6 +275,53 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
         }
         if sayHr, let h = avgHR, let c = VoiceCoach.hr(h) { ids.append(c) }
         say(ids, .info)
+    }
+
+    // MARK: 1.2.2 · 레이스 1초마다: 초반 과속 경고 · 거의 끝 · 응원 (우선순위: 전환 > 거의 끝 > 응원)
+
+    private func raceTick(_ seq: [Seg], _ idx: Int, _ segEl: Int, _ segDist: Double?) {
+        let s: Seg = seq[idx]
+        let T: Int = RaceVoice.expected(s)
+        if plannedIdx != idx {
+            plannedIdx = idx
+            cheerTimes = RaceVoice.cheerTimes(seq, idx, level: cheerLevel, jitter: { Double.random(in: -0.1...0.1) })
+        }
+        // 초반 과속 (러닝 1 · 2, 목표의 60 % 지점, 잰 거리가 있을 때만, 레이스당 1번)
+        if !paceWarned, !paceChecked.contains(idx), RaceVoice.paceCheckSeg(seq, idx), segEl >= Int(Double(T) * 0.6) {
+            paceChecked.insert(idx)
+            if RaceVoice.tooFast(s, segEl: segEl, segDist: segDist) {
+                paceWarned = true
+                if let c = pick(["pace_fast_1", "pace_fast_2"]) { say([c], .info); return }
+            }
+        }
+        // 거의 끝 (목표의 85 %): 러닝 1 · 2 · 마지막 월볼만
+        if !nearDone.contains(idx), segEl >= Int(Double(T) * 0.85) {
+            nearDone.insert(idx)
+            let opts: [String] = RaceVoice.nearOptions(seq, idx)
+            if !opts.isEmpty, let c = pick(opts) { say([c], .info); return }
+        }
+        // 응원: 정해 둔 때가 지났고, 조용한 지 quiet 초가 지났을 때
+        let done: Int = cheerDone[idx] ?? 0
+        guard done < cheerTimes.count, segEl >= cheerTimes[done] else { return }
+        guard segEl <= RaceVoice.cheerEnd(seq, idx) else { cheerDone[idx] = cheerTimes.count; return }     // 늦었으면 이 구간은 그만
+        guard playingPri == nil, pending.isEmpty,
+              Date().timeIntervalSince(lastLineAt) >= RaceVoice.quiet(cheerLevel) else { return }
+        // 흐름 문장(ph_*)을 이미 썼으면 보통 응원으로
+        guard let c = pick(RaceVoice.cheerOptions(seq, idx, nth: done, level: cheerLevel))
+                ?? pick(RaceVoice.cheerOptions(seq, idx, nth: done + 1, level: cheerLevel)) else {
+            cheerDone[idx] = cheerTimes.count; return
+        }
+        cheerDone[idx] = done + 1
+        say([c], .cheer)
+    }
+
+    /// 아직 안 쓴 것 중 하나 (모두 썼으면 nil). 첫 칸이 정해진 흐름 문장(ph_*)이면 그것
+    private func pick(_ opts: [String]) -> String? {
+        let free: [String] = opts.filter { !used.contains($0) }
+        guard !free.isEmpty else { return nil }
+        let c: String = free.first(where: { $0.hasPrefix("ph_") }) ?? free.randomElement()!
+        used.insert(c)
+        return c
     }
 
     // MARK: 문장 만들기

@@ -35,3 +35,7 @@
 "Choose the widget background." = "위젯 바탕색을 골라요.";
 
 "HYROX RACE" = "HYROX 대회";
+
+/* 1.2.2 · D-day 위젯 (막대 대신 목표까지 차이) */
+"%@ to goal" = "목표까지 %@";
+"Goal reached" = "목표 달성";

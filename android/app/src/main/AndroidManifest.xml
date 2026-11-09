@@ -50,7 +50,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="splits8" android:host="t" />
             </intent-filter>
-            <!-- 빌드 27: 더블 계획 링크 splits8://d?d=<토큰> -->
+            <!-- 빌드 27: 교대 계획 링크 splits8://d?d=<토큰> -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

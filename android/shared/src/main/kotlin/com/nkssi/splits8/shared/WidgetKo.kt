@@ -5,6 +5,7 @@ package com.nkssi.splits8.shared
 /** 홈 화면 위젯 한국어 (앱 표보다 먼저 봄) */
 object WidgetKo {
     private val map: Map<String, String> = hashMapOf(
+        "%@ to goal" to "목표까지 %@",
         "Add a race" to "대회 추가",
         "Automatic" to "자동",
         "BEST" to "최고",
@@ -17,6 +18,7 @@ object WidgetKo {
         "Days to your next race." to "다음 대회까지 남은 날.",
         "Full Simulation" to "풀 시뮬레이션",
         "GOAL" to "목표",
+        "Goal reached" to "목표 달성",
         "HYROX RACE" to "HYROX 대회",
         "NEXT" to "다음",
         "NEXT RACE" to "다음 대회",

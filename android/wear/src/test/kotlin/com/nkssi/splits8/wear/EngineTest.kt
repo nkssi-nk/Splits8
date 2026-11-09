@@ -392,6 +392,9 @@ class EngineTest {
         assertEquals("Me 250 → Jihoon 250 · 4 turns", doublesLine(ski, plan, "dblM"))
         assertNull(doublesLine(ski, plan, "openM"))
         assertNull(doublesLine(ski, null, "dblM"))
+        // 1.2.2: 차례마다 양이 다르면 "…" (스키 1000 m 를 300 · 300 · 200 · 200 으로)
+        val edited = plan.setTurns(0, listOf(300.0, 300.0, 200.0))
+        assertEquals("Me 300 → Jihoon 300 … · 4 turns", doublesLine(ski, edited, "dblM"))
         val run = SeqBuilder.full(dbl, true, Defaults.goals).first { it.kind == SegKind.Run }
         assertNull(doublesLine(run, plan, "dblM"))
     }

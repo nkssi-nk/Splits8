@@ -8,6 +8,7 @@ import android.media.MediaPlayer
 import android.os.Handler
 import android.os.HandlerThread
 import com.nkssi.splits8.shared.VoiceCoach
+import com.nkssi.splits8.shared.VoiceDur
 import java.io.File
 
 // 19번: 음성 안내 재생 (워치 — 스피커 또는 연결된 이어폰). 폰 앱 VoicePlayer.kt 와 같은 것.
@@ -38,6 +39,11 @@ class VoicePlayer(context: Context) {
     /** 줄이 바뀔 때마다 +1 (멈춘 줄의 늦은 콜백 무시) */
     private var gen = 0
     private var hasFocus = false
+
+    init {
+        // 1.2.2: 조각 길이(clips.json 의 dur) — 응원이 안내와 겹치지 않게 VoiceCoach 가 씀
+        if (!VoiceDur.loaded) h.post { runCatching { VoiceDur.load(app.assets.open("voice/ko/clips.json").bufferedReader().use { it.readText() }) } }
+    }
 
     fun play(line: VoiceCoach.Line) {
         if (line.clips.isEmpty()) return

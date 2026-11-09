@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
     /** 위젯을 눌러서 열었을 때 (다음 대회 → Race 탭, 이번 주 → 홈). 폰으로 기록 중이면 그 화면 그대로 */
     private fun openFrom(i: android.content.Intent?) {
-        // 트레이닝 · 더블 계획 링크 (splits8://t?d=… · splits8://d?d=…)
+        // 트레이닝 · 교대 계획 링크 (splits8://t?d=… · splits8://d?d=…)
         i?.data?.toString()?.let { u ->
             if (u.lowercase().startsWith("splits8://") || u.contains("#")) { Router.handleUrl(u); return }
         }
@@ -84,6 +84,7 @@ fun App(showLogo: Boolean = true) {
             if (!Cloud.live) return@repeatOnLifecycle
             Cloud.checkDevice()
             Cloud.retryAvatarIfNeeded()       // 15번
+            Cloud.launch { Cloud.retryUploadsIfNeeded() }     // 1.2.2: 못 올린 기록 다시 (느려도 아래 일을 막지 않게)
             Cloud.refreshSocial()
             Router.showNoticeIfAny()          // 빌드 27: 받은 응원 · 친구 요청 알림 띠
             while (true) {

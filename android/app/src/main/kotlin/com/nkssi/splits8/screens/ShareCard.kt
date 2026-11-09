@@ -151,8 +151,8 @@ data class ShareData(
                         String.format(Locale.US, "%02d", i + 1),
                         if (i < sts.size) sts[i].icon else "run",
                         if (i < sts.size) short(sts[i].name) else "",
-                        if (i < runs.size) Fm.t(runs[i].time) else "",
-                        if (i < sts.size) Fm.t(sts[i].time) else "",
+                        if (i < runs.size) (if (runs[i].isSkipped) "–" else Fm.t(runs[i].time)) else "",     // 1.2.2: 건너뜀은 "–"
+                        if (i < sts.size) (if (sts[i].isSkipped) "–" else Fm.t(sts[i].time)) else "",
                         if (i < sts.size) spec(Units.detail(sts[i].detail, imp)) else "",
                     )
                 }.takeIf { !run && !bonus } ?: emptyList(),

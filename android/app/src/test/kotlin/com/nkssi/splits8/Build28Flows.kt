@@ -73,7 +73,7 @@ class Build28Flows {
         val sent = DoublesPlan().setChunk(0, 150.0).setMeFirst(1, false)
         Router.handleUrl("splits8://d?d=" + DoublesLink.token(sent, "gatebu"))
         rule.waitForIdle()
-        assertEquals("Get gatebu's doubles plan?", Router.ask?.title)
+        assertEquals("Get gatebu's swap plan?", Router.ask?.title)
         tap("ask.ok")
         val p = Store.settings.doublesPlan!!
         assertEquals(150.0, p.chunk(0), 0.001)
@@ -86,7 +86,7 @@ class Build28Flows {
     @Test fun badLinksSayCantRead() {
         show(Scr.Home)
         Router.handleUrl("splits8://d?d=d1.@@@")
-        assertEquals("This doubles plan link can't be read", Router.ask?.title)
+        assertEquals("This swap plan link can't be read", Router.ask?.title)
         Router.ask = null
         Router.handleUrl("https://splits8.com/splits8/t.html#1.xxxx")
         assertEquals("This training link can't be read", Router.ask?.title)

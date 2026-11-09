@@ -475,9 +475,9 @@ private fun SimSettingsCard() {
             T(s.div.name, F.t(15, color = C.text2), maxLines = 1, translate = false)
             Chevron8()
         }
-        // 87번(빌드 28): Race 와 같은 줄 — 더블 계획(더블일 때) · 목표 시간 · 구간 목표. 목표는 Race 와 같은 값을 씀
+        // 87번(빌드 28): Race 와 같은 줄 — 교대 계획(더블일 때) · 목표 시간 · 구간 목표. 목표는 Race 와 같은 값을 씀
         if (s.division.startsWith("dbl")) {
-            SimRow("Doubles plan", doublesValue()) { Router.raceSheet = "doubles" }
+            SimRow("Swap plan", doublesValue()) { Router.raceSheet = "doubles" }
         }
         SimRow("Goal time", Fm.t(s.goalTime) + " ›", numeric = true) { Router.raceSheet = "goal" }
         Column(Modifier.fillMaxWidth().rowLine(true).tap { Router.sub(Scr.SetGoals, Scr.Sim) }.testTag("sim.splitTargets")

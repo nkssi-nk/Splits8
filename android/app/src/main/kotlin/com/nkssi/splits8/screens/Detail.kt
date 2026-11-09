@@ -62,6 +62,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.nkssi.splits8.Ask
 import com.nkssi.splits8.shared.newId
 import com.nkssi.splits8.shared.Program
@@ -313,9 +315,12 @@ private fun Header(rec: Record) {
             T(timePlace(rec), F.t(F.sub, color = C.text2),
                 Modifier.padding(top = if (rec.mode == Mode.Pft) 10.dp else 6.dp).testTag("detail.timePlace"), maxLines = 1, translate = false)
             rec.flag?.let { fl ->
-                T(if (fl == RecordFlag.Incomplete) "Ended early, so it isn't counted as a complete result."
-                  else "This looks too fast to be a valid result. A tap may have been missed.",
-                    F.t(13, color = C.text2), Modifier.padding(top = 6.dp))
+                T(when (fl) {
+                    RecordFlag.Incomplete -> "Ended early, so it isn't counted as a complete result."
+                    RecordFlag.Check -> "This looks too fast to be a valid result. A tap may have been missed."
+                    RecordFlag.Skipped -> "Some segments were skipped, so this isn't counted for bests, rankings or badges."
+                    RecordFlag.Partial -> "3 or more segments were skipped, so this counts as a partial simulation."
+                }, F.t(13, color = C.text2), Modifier.padding(top = 6.dp))
             }
             partnerNick(rec)?.let { PartnerChip(rec, it) }
         }
@@ -912,20 +917,47 @@ private fun SplitRow(rec: Record, s: SegResult, last: Boolean, prior: Map<String
     val sub = "$first · $bpm BPM$reps$runExtra$bestNote"
     // 95번: 마지막 덜 뛴 구간은 "KM 7" 대신 실제 거리로 ("마지막 0.42 km")
     val title = if (partial) L10n.t("Last %@ %@", Units.dist(s.dist ?: 0.0, imp), Units.distUnit(imp).lowercase()) else s.name
+    // 1.2.2: 건너뛴 구간 — 시간 대신 "건너뜀", 차이 없음. 꾹 누르면 건너뜀 표시 / 되돌리기 (하이록스 구간만)
+    val sk = s.isSkipped
+    // 운동 중에 건너뛴 구간(0초)은 되돌리면 0:00 기록이 남으므로 표시만 하는 구간에서만 되돌림
+    val canMark = rec.kind == null && s.kind != SegKind.Rox && !(sk && s.time == 0)
     Row(
-        Modifier.fillMaxWidth().rowLine(!last).padding(vertical = 11.dp, horizontal = 18.dp),
+        Modifier.fillMaxWidth().rowLine(!last)
+            .pointerInput(rec.id, sk, canMark) {
+                detectTapGestures(onLongPress = {
+                    if (!canMark) return@detectTapGestures
+                    Router.ask = Ask(if (sk) "Undo skipped" else "Mark as skipped",
+                        if (sk) "" else "It won't count for bests, rankings or badges.", ok = if (sk) "Undo" else "Mark") { toggleSkipped(rec, s) }
+                })
+            }
+            .padding(vertical = 11.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon8(s.icon, 24.dp, if (s.kind == SegKind.Run) Color.White else C.accent)
+        Icon8(s.icon, 24.dp, if (sk) C.text3 else if (s.kind == SegKind.Run) Color.White else C.accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            T(title, F.t(15, W500), maxLines = 1, translate = !partial)
-            T(sub, F.num(11, W500, C.text2, tracking = 0.22f), maxLines = 1, translate = false)
+            T(title, F.t(15, W500, if (sk) C.text2 else Color.White), maxLines = 1, translate = !partial)
+            T(if (sk) Units.detail(s.detail, imp) else sub, F.num(11, W500, C.text2, tracking = 0.22f), maxLines = 1, translate = false)
         }
         Column(horizontalAlignment = Alignment.End) {
-            T(Fm.t(s.time), F.num(17, tracking = -0.17f), maxLines = 1, translate = false)
-            T(if (showDelta) Fm.d(d) else "–", F.num(11, color = if (showDelta) deltaColor(d) else C.text3), maxLines = 1, translate = false)
+            if (sk) {
+                T("Skipped", F.t(14, W500, C.text2), maxLines = 1)
+            } else {
+                T(Fm.t(s.time), F.num(17, tracking = -0.17f), maxLines = 1, translate = false)
+                T(if (showDelta) Fm.d(d) else "–", F.num(11, color = if (showDelta) deltaColor(d) else C.text3), maxLines = 1, translate = false)
+            }
         }
     }
+}
+
+/** 1.2.2: 끝난 기록에서 구간을 건너뛴 것으로 표시 / 되돌림 (아이폰 DetailView.toggleSkipped 과 같음). 이 기기에 저장, 서버 쪽도 맞춤 */
+private fun toggleSkipped(rec: Record, s: SegResult) {
+    val i = rec.segs.indexOfFirst { it == s }
+    if (i < 0) return
+    val segs = rec.segs.toMutableList().also { it[i] = it[i].copy(skipped = if (it[i].isSkipped) null else true) }
+    // 총 시간은 건너뛴 구간을 뺀 합 (운동 중 Skip 한 것과 같은 모양)
+    val x = rec.copy(segs = segs, total = segs.filter { !it.isSkipped }.sumOf { it.time })
+    Store.updateRecord(x, syncServer = true)
+    Router.detail = x
 }
 
 // MARK: 같은 기록대 선수들과 비교 (Full Sim · Race, 16구간이 다 있을 때)

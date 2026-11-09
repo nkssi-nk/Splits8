@@ -114,13 +114,20 @@ private fun VoiceSection(s: Settings) {
                 Seg8(listOf("500" to "0.5 km", "1000" to "1 km", "0" to "Off"), "${s.voiceEvery}", Modifier.width(196.dp).testTag("settings.voiceEvery"),
                     height = 30.dp, radius = 9.dp, fontSize = 13) { k -> Store.update { it.withVoiceEvery(k.toIntOrNull() ?: 1000) } }
             }
+            // 1.2.2: 레이스 · 시뮬 응원 양 (적게 = 구간당 1번 · 보통 = 2번 + 종목 요령 · 많이 = 3번)
+            Row(Modifier.fillMaxWidth().rowLine(true).padding(vertical = 10.dp, horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                T("Cheers", F.t(17), Modifier.weight(1f), maxLines = 1)
+                Seg8(listOf("low" to "Few", "mid" to "Some", "high" to "Lots"), s.voiceCheer, Modifier.width(196.dp).testTag("settings.voiceCheer"),
+                    height = 30.dp, radius = 9.dp, fontSize = 13) { k -> Store.update { it.withVoiceCheer(k) } }
+            }
             WToggleRow("Distance", null, s.voiceDist, false, "settings.voiceDist") { v -> Store.update { it.withVoiceDist(v) } }
             WToggleRow("Total time", null, s.voiceTime, false, "settings.voiceTime") { v -> Store.update { it.withVoiceTime(v) } }
             WToggleRow("Average pace", null, s.voicePace, false, "settings.voicePace") { v -> Store.update { it.withVoicePace(v) } }
             WToggleRow("Average heart rate", "Watch workouts only", s.voiceHr, true, "settings.voiceHr") { v -> Store.update { it.withVoiceHr(v) } }
         }
     }
-    Note8(if (ko) "Speaks on the device you work out with: the watch for watch workouts, this phone for phone workouts. Other sound gets quieter while it speaks. Running alerts are for Run cards."
+    Note8(if (ko) "Speaks on the device you work out with: the watch for watch workouts, this phone for phone workouts. Race and Full Sim get a coach for each segment. Other sound gets quieter while it speaks. Running alerts are for Run cards."
         else "Voice guidance is available in Korean for now.")
 }
 

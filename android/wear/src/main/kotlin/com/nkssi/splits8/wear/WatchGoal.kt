@@ -37,7 +37,7 @@ object WatchGoal {
 }
 
 /**
- * 75번 (빌드 27): 운동 화면 스테이션 아래 줄에 붙일 더블 계획 한 줄. 예: "Me 150 → Jiho 150 · 7 turns"
+ * 75번 (빌드 27): 운동 화면 스테이션 아래 줄에 붙일 교대 계획 한 줄. 예: "Me 150 → Jiho 150 · 7 turns"
  * 더블 디비전(키가 "dbl" 로 시작)이고 지금 구간이 스테이션이며 계획이 있을 때만. 아니면 null. 파트너 이름은 6글자까지
  */
 fun doublesLine(seg: Seg, plan: DoublesPlan?, division: String): String? {
@@ -53,5 +53,7 @@ fun doublesLine(seg: Seg, plan: DoublesPlan?, division: String): String? {
     // 둘째 차례 양 (한 번에 끝나면 0) — 보통은 같은 양
     val secondAmount = if (seq.size > 1) seq[1].amount else 0.0
     val head = firstName + " " + DoublesPlan.num(first.amount) + " → " + secondName + " " + DoublesPlan.num(secondAmount)
-    return head + " · " + wt("%lld turns", seq.size)
+    // 1.2.2: 차례마다 양이 다르면(직접 정한 차례 · 남는 양) 첫 두 차례 뒤에 "…" 를 붙여 더 있다고 알려 줌
+    val uneven = seq.any { kotlin.math.abs(it.amount - first.amount) > 0.001 }
+    return head + (if (uneven) " …" else "") + " · " + wt("%lld turns", seq.size)
 }

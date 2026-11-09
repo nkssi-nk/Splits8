@@ -40,6 +40,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.text.style.TextAlign
+import com.nkssi.splits8.shared.Seg
+import com.nkssi.splits8.ui.W400
+import com.nkssi.splits8.ui.W500
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -235,9 +245,26 @@ fun PhoneLiveView() {
             LiveHeader(frame, "Phone · No HR", live = false, tagPrefix = "phone")
             // 1.1.2: 가운데는 남는 자리만 씀 → 글자가 커도 아래 버튼(Next/완료 · End · Undo · Pause)은 항상 보임 (아이폰 Spacer(minLength: 16) 와 같음)
             Column(Modifier.weight(1f).clipToBounds()) {
-                if (Kinds.isNew(eng.kind)) BonusLiveBody(eng, now, m, Modifier.padding(top = (m.top * 0.6f).dp))
-                else LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
-                LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
+                if (Kinds.isNew(eng.kind)) {
+                    BonusLiveBody(eng, now, m, Modifier.padding(top = (m.top * 0.6f).dp))
+                    LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
+                } else {
+                    // 1.2.2: 워치처럼 왼쪽으로 넘기면 구간 목록 (끝난 구간 = 내 시간 + 비교 기준과 차이, 남은 구간 = 기준 시간)
+                    val pager = rememberPagerState(pageCount = { 2 })
+                    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth().testTag("phone.pages")) { page ->
+                        if (page == 0) Column(Modifier.fillMaxSize()) {
+                            LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
+                            if (!eng.isRunKind) LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")     // 1.2.2: 러닝 카드는 NEXT KM 안 보임
+                        } else PhoneSegmentList(eng.seq, eng.idx, eng.splits, eng.skippedIdx, eng.segEl(now), eng.deltaWord, m)
+                    }
+                    // 쪽 표시 점 두 개
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.Center) {
+                        repeat(2) { i ->
+                            Box(Modifier.padding(horizontal = 4.dp).size(6.dp).clip(RoundedCornerShape(50))
+                                .background(if (pager.currentPage == i) Color.White else Color.White.copy(alpha = 0.3f)))
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(16.dp))
             // Next 버튼 (GPS 러닝은 1 km 마다 저절로)
@@ -262,10 +289,18 @@ fun PhoneLiveView() {
                     else if (eng.hasNext || eng.growsOpen) "Next" else "Finish"
                 T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (looksOn) Color.Black else C.text3), maxLines = 1, translate = false)
             }
-            Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill(R.drawable.sym_stop, "End", C.bad, hex(0xFF453A, 0.22f), m.pillH, "phone.end") { askEnd() }
                 Pill(R.drawable.sym_undo, "Undo", if (eng.canUndo) Color.White else C.text3,
                     Color.White.copy(alpha = if (eng.canUndo) 0.12f else 0.05f), m.pillH, "phone.undo", eng.canUndo) { buzz(); eng.undo() }
+                // 1.2.2: 지금 구간 건너뛰기 (시간 0 · 기록에 "건너뜀"). 스테이션 · 러닝만, Roxzone 은 흐리게
+                if (!Kinds.isNew(eng.kind) && !eng.isRunKind && !eng.growsOpen) {
+                    Pill(R.drawable.sym_skip, "Skip", if (eng.canSkip) Color.White else C.text3,
+                        Color.White.copy(alpha = if (eng.canSkip) 0.12f else 0.05f), m.pillH, "phone.skip", eng.canSkip) {
+                        buzz(true); flashNow()
+                        eng.skip()?.let { success(); done(it) }
+                    }
+                }
                 Pill(if (eng.running) R.drawable.sym_pause else R.drawable.sym_play, if (eng.running) "Pause" else "Resume",
                     if (eng.running) Color.White else C.accent, Color.White.copy(alpha = 0.12f), m.pillH, "phone.pause") { eng.togglePause() }
             }
@@ -304,6 +339,51 @@ fun PhoneLiveView() {
     }
 }
 
+// MARK: 1.2.2 구간 목록 (워치 WSegments 와 같은 규칙, 폰 크기)
+
+/** 끝난 구간: 내 시간 + 비교 기준(목표 · 지난번 · 친구 · 최고)과 차이. 지금 구간: 흐르는 시간. 남은 구간: 기준 시간 */
+@Composable
+internal fun PhoneSegmentList(seq: List<Seg>, idx: Int, splits: List<Int>, skipped: Set<Int>, segEl: Int, word: String, m: LiveMetrics) {
+    val state = rememberLazyListState()
+    LaunchedEffect(idx) { if (seq.isNotEmpty()) state.animateScrollToItem(max(0, min(idx, seq.size - 1))) }
+    Column(Modifier.fillMaxSize().testTag("phone.segments")) {
+        Row(Modifier.fillMaxWidth().padding(top = (m.top * 0.6f).dp, bottom = 8.dp, start = 6.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            T("SEGMENTS", F.t(13, W600, C.accent, tracking = 1f))
+            T("${min(idx + 1, seq.size)}/${seq.size}", F.num(13, W400, C.text2), Modifier.weight(1f), translate = false)
+            T(word, F.t(12, W600, C.text2, tracking = 0.8f), translate = false)
+        }
+        LazyColumn(Modifier.fillMaxSize(), state = state, verticalArrangement = Arrangement.spacedBy(2.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 10.dp)) {
+            items(seq.size) { i ->
+                val s = seq[i]
+                val done = i < idx
+                val c = i == idx
+                val tint = when { c -> Color.Black; done -> C.text3; s.kind == SegKind.Rox -> C.text2; else -> Color.White }
+                val my = splits.getOrElse(i) { 0 }
+                val sk = done && i in skipped
+                val diff: Int? = if (done && !sk && s.target > 0) my - s.target else null
+                val time = when {
+                    sk -> "Skipped".l10n
+                    done -> Fm.t(my)
+                    c -> Fm.t(segEl)
+                    else -> if (s.target > 0) Fm.t(s.target) else "–"
+                }
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (c) C.accent else Color.Transparent).padding(vertical = 9.dp, horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon8(s.icon, 18.dp, tint)
+                    T(s.name, F.t(16, if (c) W600 else W400, if (c) Color.Black else if (done) C.text2 else Color.White), Modifier.weight(1f),
+                        maxLines = 1, align = TextAlign.Start, translate = false)
+                    if (diff != null) T(Fm.d(diff), F.num(13, W500, if (diff <= 0) C.good else C.bad), translate = false)
+                    else if (done && !sk) Icon8("i_check", 11.dp, C.good)
+                    T(time, if (sk) F.t(14, W500, C.text3) else F.num(16, W500, if (c) Color.Black else if (done) Color.White else C.text3),
+                        Modifier.widthIn(min = 58.dp), maxLines = 1, align = TextAlign.End, translate = false)
+                }
+            }
+        }
+    }
+}
+
 /** 엔진 → 화면 한 장면 */
 private fun phoneFrame(eng: PhoneRunEngine, now: Long) = LiveFrame(
     mode = eng.mode, title = eng.title, seq = eng.seq, idx = eng.idx, segEl = eng.segEl(now), total = eng.total(now),
@@ -312,6 +392,7 @@ private fun phoneFrame(eng: PhoneRunEngine, now: Long) = LiveFrame(
     runKind = eng.isRunKind, next = eng.nextSeg,
     speed = if (eng.useGPS) eng.speedNow(now) else null,
     imperial = com.nkssi.splits8.Store.settings.imperial,
+    runCard = eng.isRunKind, runGoalKm = eng.runGoalKm,
 )
 
 /** ■ End · ↩ Undo · ❚❚ Pause (둥근 알약) */

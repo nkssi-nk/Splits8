@@ -15,7 +15,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 
-// 더블 계획 (아이폰 빌드 27 Shared/DoublesPlan.swift 와 같은 규칙 · 같은 링크 글자)
+// 교대 계획 (아이폰 빌드 27 Shared/DoublesPlan.swift 와 같은 규칙 · 같은 링크 글자)
 
 /**
  * 더블에서 스테이션 8개를 파트너와 "몇 m(개)씩 번갈아 할지, 누가 먼저 할지" 적어 두는 계획.
@@ -285,10 +285,10 @@ object DoublesPlanSerializer : KSerializer<DoublesPlan> {
     }
 }
 
-// MARK: 더블 계획 링크
+// MARK: 교대 계획 링크
 
 /**
- * 더블 계획을 링크 글자에 담아 보냄 (서버 없이). ProgramLink 와 같은 방식, 아이폰과 한 글자까지 같음.
+ * 교대 계획을 링크 글자에 담아 보냄 (서버 없이). ProgramLink 와 같은 방식, 아이폰과 한 글자까지 같음.
  * 앱 주소 = splits8://d?d=token,  홈페이지 = ProgramLink.base + "#" + token,  token = "d1." + base64url(JSON)
  * JSON: {"c": [한 번 양 8개], "f": [먼저 1/0 8개], "n": 보낸 사람 닉네임}
  */
@@ -369,7 +369,7 @@ object DoublesLink {
         return frag.takeIf { it.startsWith(prefix) }
     }
 
-    /** 이 주소가 더블 계획 링크인지 */
+    /** 이 주소가 교대 계획 링크인지 */
     fun isDoubles(url: String): Boolean {
         val lower = url.lowercase()
         if (lower.startsWith(ProgramLink.scheme + "://")) {

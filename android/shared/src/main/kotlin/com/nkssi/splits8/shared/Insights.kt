@@ -79,6 +79,7 @@ object Insights {
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun candidates(r: Record, book: RecordBook): List<Insight> {
         if (!(r.isComplete || r.mode == Mode.Training)) return emptyList()
+        if (r.hasSkipped) return emptyList()      // 1.2.2: 건너뛴 구간(0초)이 섞이면 비교가 틀어져서 분석 없음
         // 18번 종류(타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동)는 하이록스 분석을 하지 않음
         if (Kinds.isNew(r.kind)) return emptyList()
         val o = ArrayList<Insight>()

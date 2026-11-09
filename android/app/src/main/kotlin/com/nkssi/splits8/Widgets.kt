@@ -166,24 +166,28 @@ object WidgetArt {
         val barsW = dp(140f, k)
         pen.text(c, ddayText(d), pad, bottom - bigH + fm.descent * 0.6f, big, if (wide) inner - barsW - dp(16f, k) else inner, 0.6f)
         if (wide) {
+            // 1.2.2 (대표님 11-09 "바가 뭐하러 있어"): 막대 대신 목표 · 최고 시간 두 줄 + 목표까지 남은 차이 (아이폰 DdayMediumView 와 같음)
             val g = snap.goal ?: 0; val b = snap.best ?: 0
-            val mx = max(max(g, b), 1) * 1.04f
             val left = w - pad - barsW
             val mid = bottom - bigH / 2
-            bar(c, pen, left, mid - dp(30f, k), barsW, "GOAL", g, mx, pen.pal.accent)
-            bar(c, pen, left, mid + dp(2f, k), barsW, "BEST", b, mx, if (pen.pal.light) pen.pal.dim else pen.pal.sub)
+            val gap = g > 0 && b > 0
+            var y = mid - dp(if (gap) 30f else 22f, k)
+            y += timeRow(c, pen, left, y, barsW, "GOAL", g, pen.pal.accent) + dp(5f, k)
+            y += timeRow(c, pen, left, y, barsW, "BEST", b, pen.pal.fg) + dp(5f, k)
+            if (gap) {
+                val s = if (b <= g) WidgetKo.t("Goal reached") else WidgetKo.t("%@ to goal").replace("%@", Fm.t(b - g))
+                pen.text(c, s, left, y, pen.paint(11f, 600, if (b <= g) pen.pal.accent else pen.pal.sub), barsW, 0.8f)
+            }
         }
         return bmp
     }
 
-    private fun bar(c: Canvas, pen: Pen, x: Float, y: Float, w: Float, label: String, v: Int, mx: Float, color: Int) {
+    /** 이름표(왼쪽) · 시간(오른쪽) 한 줄. 줄 높이를 돌려줌 */
+    private fun timeRow(c: Canvas, pen: Pen, x: Float, y: Float, w: Float, label: String, v: Int, color: Int): Float {
         val k = pen.k
-        val lh = pen.text(c, WidgetKo.t(label), x, y + dp(2f, k), pen.paint(10f, 600, pen.pal.sub, track = 0.8f))
-        pen.text(c, if (v > 0) Fm.t(v) else "--:--", x + w, y, pen.paint(13f, 600, pen.pal.fg, num = true), right = true)
-        val top = y + max(lh, dp(16f, k)) + dp(4f, k)
-        val r = dp(2.5f, k)
-        c.drawRoundRect(RectF(x, top, x + w, top + dp(5f, k)), r, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = pen.pal.track })
-        if (v > 0) c.drawRoundRect(RectF(x, top, x + w * min(1f, v / mx), top + dp(5f, k)), r, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+        val lh = pen.text(c, WidgetKo.t(label), x, y + dp(3f, k), pen.paint(10f, 600, pen.pal.sub, track = 0.8f))
+        val th = pen.text(c, if (v > 0) Fm.t(v) else "--:--", x + w, y, pen.paint(15f, 600, if (v > 0) color else pen.pal.sub, num = true), right = true)
+        return max(lh + dp(3f, k), th)
     }
 
     /** 대회가 없을 때: "Add a race" */

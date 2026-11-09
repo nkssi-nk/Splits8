@@ -120,7 +120,7 @@ class CompatTest {
         // 이 모듈 코드가 쓰는 번역 열쇠가 아이폰 한국어 표에 다 있는지
         val keys = listOf(
             "1 set · %lld segments", "%lld sets · %lld segments",
-            "%@ reps", "Partner", "Measuring", "SPLITS8 Doubles plan",
+            "%@ reps", "Partner", "Measuring", "SPLITS8 Swap plan",
             "Saved. A few splits look off.", "Ended early. All the way next time.",
             "Your first record. Welcome to SPLITS8.", "Day one. Every split counts from here.",
             "Goal beaten by %@. Great race.", "Race done. You did it.", "That's a race in the books.",

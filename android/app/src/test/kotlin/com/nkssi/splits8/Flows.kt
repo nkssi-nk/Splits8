@@ -274,10 +274,10 @@ class Flows {
     @Test fun doublesPlanOnlyForDoubles() {
         useRaceDemo()
         show(Scr.Race)
-        rule.onAllNodesWithTag("race.Doubles plan").fetchSemanticsNodes().let { assertTrue(it.isEmpty()) }
+        rule.onAllNodesWithTag("race.Swap plan").fetchSemanticsNodes().let { assertTrue(it.isEmpty()) }
         Store.update { it.copy(division = "dblM") }
         rule.waitForIdle()
-        tap("race.Doubles plan")
+        tap("race.Swap plan")
         assertEquals("doubles", Router.raceSheet)
         // 빌드 27: 스테이션을 누르면 같은 시트 안에서 고침 (150 m씩 · 파트너 먼저)
         tap("dbl.skiErg")
@@ -292,7 +292,7 @@ class Flows {
         useRaceDemo()
         Store.update { it.copy(division = "dblM") }
         show(Scr.Race)
-        tap("race.Doubles plan")
+        tap("race.Swap plan")
         tap("dbl.wallBalls")
         rule.onAllNodesWithText("10 reps").onFirst().performClick()
         rule.onAllNodesWithText("Partner").onFirst().performClick()   // 누가 먼저 → 파트너

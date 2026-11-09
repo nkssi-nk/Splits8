@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.VoiceCoach
+import com.nkssi.splits8.shared.VoiceDur
 import com.nkssi.splits8.shared.VoicePrefs
 import java.io.File
 
@@ -40,6 +41,11 @@ class VoicePlayer(context: Context) {
     /** 줄이 바뀔 때마다 +1 (멈춘 줄의 늦은 콜백 무시) */
     private var gen = 0
     private var hasFocus = false
+
+    init {
+        // 1.2.2: 조각 길이(clips.json 의 dur) — 응원이 안내와 겹치지 않게 VoiceCoach 가 씀
+        if (!VoiceDur.loaded) h.post { runCatching { VoiceDur.load(app.assets.open("voice/ko/clips.json").bufferedReader().use { it.readText() }) } }
+    }
 
     fun play(line: VoiceCoach.Line) {
         if (line.clips.isEmpty()) return
@@ -163,7 +169,8 @@ object PhoneVoice {
         // 끝났으면 기록의 총 시간 (AMRAP 이 정한 시간에 딱 끝났는지)
         val tot = if (eng.finished) eng.splits.sum() else eng.total(now)
         val o = VoiceCoach.Obs(eng.active, eng.finished, eng.running, eng.mode, eng.kind, eng.seq, eng.idx,
-            eng.segEl(now), tot, dist, null, eng.cap, eng.segMs(now))
+            eng.segEl(now), tot, dist, null, eng.cap, eng.segMs(now),
+            splits = eng.splits, segDist = if (eng.useGPS && eng.segDist > 0) eng.segDist else null)
         val line = c.update(o, now) ?: return
         (player ?: VoicePlayer(ctx).also { player = it }).play(line)
     }

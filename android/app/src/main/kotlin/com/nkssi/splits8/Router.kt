@@ -339,25 +339,25 @@ object Router {
     /** 16번: 되돌리기 띠 (null = 안 보임) */
     var undo by mutableStateOf<UndoNote?>(null)
 
-    // MARK: 링크로 받은 트레이닝 · 더블 계획 (아이폰 Router.handle(url:))
+    // MARK: 링크로 받은 트레이닝 · 교대 계획 (아이폰 Router.handle(url:))
 
-    /** splits8://t?d=… (트레이닝) · splits8://d?d=… (더블 계획) · https://…/t.html#… 로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함 */
+    /** splits8://t?d=… (트레이닝) · splits8://d?d=… (교대 계획) · https://…/t.html#… 로 앱이 열렸을 때. 우리 링크가 아니면 아무것도 안 함 */
     fun handleUrl(url: String) {
         if (com.nkssi.splits8.shared.DoublesLink.isDoubles(url)) {
             val got = com.nkssi.splits8.shared.DoublesLink.token(url)?.let { com.nkssi.splits8.shared.DoublesLink.read(it) }
             if (got == null) {
-                ask = Ask("This doubles plan link can't be read", "The link may be cut off. Ask for it again.".l10n, cancel = null)
+                ask = Ask("This swap plan link can't be read", "The link may be cut off. Ask for it again.".l10n, cancel = null)
                 return
             }
             // 1.2.1: 보낸 사람이 나면 받지 않음 (파트너 = 나 자신이 되고 순서가 뒤집히는 사고 막기)
             val me = Store.settings.nickname
             if (me != null && got.second != null && me.equals(got.second, ignoreCase = true)) {
-                ask = Ask("This is your own doubles plan", "You sent this link. Send it to your partner instead.".l10n, cancel = null)
+                ask = Ask("This is your own swap plan", "You sent this link. Send it to your partner instead.".l10n, cancel = null)
                 return
             }
-            // "가테부님의 더블 계획을 받을까요?"
-            val title = got.second?.let { L10n.t("Get %@'s doubles plan?", it) } ?: "Get this doubles plan?".l10n
-            ask = Ask(title, "Your doubles plan will be replaced. Who goes first is swapped so it fits you.".l10n, ok = "Get plan") {
+            // "가테부님의 교대 계획을 받을까요?"
+            val title = got.second?.let { L10n.t("Get %@'s swap plan?", it) } ?: "Get this swap plan?".l10n
+            ask = Ask(title, "Your swap plan will be replaced. Who goes first is swapped so it fits you.".l10n, ok = "Get plan") {
                 acceptIncomingDoubles(got)
             }
             return
@@ -389,7 +389,7 @@ object Router {
         if (Store.settings.hasOnboarded && scr != Scr.PhoneLive && scr != Scr.Builder) go(Scr.Training)
     }
 
-    /** 받은 더블 계획을 내 계획으로 저장 (확인 창에서 받기). 먼저 하는 사람을 바꾸고 파트너 = 보낸 사람 */
+    /** 받은 교대 계획을 내 계획으로 저장 (확인 창에서 받기). 먼저 하는 사람을 바꾸고 파트너 = 보낸 사람 */
     fun acceptIncomingDoubles(d: Pair<com.nkssi.splits8.shared.DoublesPlan, String?>) {
         Store.update { it.copy(doublesPlan = d.first.swapped(d.second)) }
         // 처음 안내 화면 · 운동 중에는 화면을 옮기지 않음

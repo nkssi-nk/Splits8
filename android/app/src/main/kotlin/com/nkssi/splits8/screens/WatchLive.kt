@@ -78,8 +78,13 @@ fun watchFrame(st: LiveState, nowMs: Long, receivedMs: Long): LiveFrame {
         next = next,
         speed = if (st.running) st.spd else null,
         imperial = com.nkssi.splits8.Store.settings.imperial,
+        runCard = isRunCard(st), runGoalKm = if (isRunCard(st) && !st.open) st.seq.size else 0,
     )
 }
+
+/** 1.2.2: 워치의 러닝 카드인지 (구간이 모두 "KM n" 러닝) */
+private fun isRunCard(st: com.nkssi.splits8.shared.LiveState): Boolean =
+    st.mode == com.nkssi.splits8.shared.Mode.Training && st.seq.isNotEmpty() && st.seq.all { it.icon == "run" && it.name.startsWith("KM ") }
 
 @Composable
 fun WatchLiveView() {
@@ -122,7 +127,7 @@ fun WatchLiveView() {
                         LiveBody(f, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "watchLive",
                             Modifier.padding(top = (m.top * 0.6f).dp))
                         Chips(st, Modifier.padding(top = (14 * m.k).dp))
-                        LiveNextRow(f.next, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop * 0.7f, m.k, "watchLive")
+                        if (!f.runCard) LiveNextRow(f.next, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop * 0.7f, m.k, "watchLive")
                     }
                     Spacer(Modifier.height(16.dp))
                     Buttons(st, m) { strong -> view.performHapticFeedback(if (strong) HapticFeedbackConstants.LONG_PRESS else HapticFeedbackConstants.VIRTUAL_KEY) }

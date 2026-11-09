@@ -459,13 +459,15 @@ object Store {
     }
 
     /** 18번: 기록 고치기 (AMRAP 추가 동작 수 · 기능성 운동 횟수 · 무게). 같은 id 를 바꿔 끼움, 기기에만 저장 (서버는 요약만이라 그대로) */
-    fun updateRecord(r: Record) {
+    fun updateRecord(r: Record, syncServer: Boolean = false) {
         val i = records.indexOfFirst { it.id == r.id }
         if (i < 0) return
         records = records.toMutableList().also { it[i] = r }
         rebuild()
         save("records.json", ListSerializer(Record.serializer()), records)
         Router.detail?.let { if (it.id == r.id) Router.detail = r }
+        // 1.2.2: 건너뜀 표시가 바뀌면 서버 쪽도 맞춤 — 안 올릴 기록이 되면 지우고, 다시 올릴 기록이 되면 올림
+        if (syncServer) { if (r.counts) Cloud.upload(r) else Cloud.deleteRecord(r.id) }
     }
 
     fun delete(r: Record) {

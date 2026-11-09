@@ -599,7 +599,11 @@ data class SegResult(
     val work: Int? = null,
     /** 18번: 몇 번째 라운드 · 반복 · 세트 */
     val rep: Int? = null,
-)
+    /** 1.2.2: 건너뛴 구간 (운동 중 Skip, 또는 기록 화면에서 표시). 시간은 0, PB · 순위 · 배지에선 빠짐. 예전 기록엔 없음 */
+    val skipped: Boolean? = null,
+) {
+    val isSkipped: Boolean get() = skipped == true
+}
 
 /** 스키 · 로잉 · 월볼 횟수 요약 (기록 화면 카드용) */
 data class RepSummary(val icon: String, val count: Int, val seconds: Int) {
@@ -633,6 +637,10 @@ enum class RecordFlag(val label: String) {
     Incomplete("Incomplete"),
     /** 말이 안 되게 빠름 */
     Check("Check"),
+    /** 1.2.2: 구간을 건너뜀 (1~2개) — 정상 기록이지만 PB · 순위 · 배지에선 빠짐 */
+    Skipped("Skipped"),
+    /** 1.2.2: 3개 이상 건너뜀 → "부분 시뮬" */
+    Partial("Partial"),
 }
 
 @Serializable
@@ -735,9 +743,15 @@ data class Record(
         }
 
     /** null = 정상 */
+    /** 1.2.2: 건너뛴 구간 수 (Roxzone 제외) */
+    val skippedCount: Int get() = segs.count { it.isSkipped && it.kind != SegKind.Rox }
+    val hasSkipped: Boolean get() = skippedCount > 0
+
     val flag: RecordFlag?
         get() {
             if (!isComplete) return RecordFlag.Incomplete
+            // 1.2.2: 건너뛴 구간이 있으면 "너무 빠름" 검사 대신 건너뜀 표시 (시간 0 인 구간이 있어도 정상 기록)
+            if (hasSkipped) return if (skippedCount >= PARTIAL_SKIPS) RecordFlag.Partial else RecordFlag.Skipped
             if (mode == Mode.Training) return null
             if (mode == Mode.Pft) {
                 if (total < MIN_PFT) return RecordFlag.Check
@@ -767,6 +781,8 @@ data class Record(
         const val MIN_STATION = 30
         const val MIN_PFT = 10 * 60
         const val MIN_PFT_STATION = 15
+        /** 1.2.2: 3개 이상 건너뛰면 "부분 시뮬" */
+        const val PARTIAL_SKIPS = 3
     }
 }
 
@@ -898,7 +914,7 @@ data class Settings(
     /** 대회 최고 완주 시간(초) — 가입 프로필 ① 에서 (빌드 24). 목표 시간 기본값에 씀 */
     val bestFinish: Int? = null,
     val divPicked: Boolean? = null,
-    /** 더블 계획 (빌드 27: 몇 m씩 번갈아 · 누가 먼저 · 파트너). 안 정했으면 null. 워치로도 감 */
+    /** 교대 계획 (빌드 27: 몇 m씩 번갈아 · 누가 먼저 · 파트너). 안 정했으면 null. 워치로도 감 */
     val doublesPlan: DoublesPlan? = null,
     /** 빌드 27: 단위. null / "metric" = kg · km, "imperial" = lb · mi (화면에만 적용, Units.kt) */
     val units: String? = null,
@@ -919,6 +935,8 @@ data class Settings(
     val voiceTimeOpt: Boolean? = null,
     val voicePaceOpt: Boolean? = null,
     val voiceHrOpt: Boolean? = null,
+    /** 1.2.2: 레이스 · 시뮬 응원 양. null = 적게(기본) · "mid" = 보통 · "high" = 많이 (아이폰 voiceCheerOpt 와 같은 이름) */
+    val voiceCheerOpt: String? = null,
 ) {
     /** lb · mi 로 보여 주는지 */
     val imperial: Boolean get() = units == "imperial"
@@ -935,6 +953,8 @@ data class Settings(
     val voiceTime: Boolean get() = voiceTimeOpt ?: true
     val voicePace: Boolean get() = voicePaceOpt ?: true
     val voiceHr: Boolean get() = voiceHrOpt ?: true
+    /** 1.2.2: 응원 양 "low" · "mid" · "high" */
+    val voiceCheer: String get() = voiceCheerOpt ?: "low"
     val glow: GlowTheme get() = GlowTheme.of(themeOpt)
     /** 워치 운동을 폰에 같이 보여 주기 (기본 켬) */
     val mirror: Boolean get() = mirrorOpt ?: true
@@ -955,6 +975,7 @@ data class Settings(
     fun withVoiceTime(v: Boolean) = copy(voiceTimeOpt = if (v) null else false)
     fun withVoicePace(v: Boolean) = copy(voicePaceOpt = if (v) null else false)
     fun withVoiceHr(v: Boolean) = copy(voiceHrOpt = if (v) null else false)
+    fun withVoiceCheer(v: String) = copy(voiceCheerOpt = if (v == "low") null else v)
     fun withGlow(v: GlowTheme) = copy(themeOpt = if (v == GlowTheme.Yellow) null else v.raw)
     fun withMirror(v: Boolean) = copy(mirrorOpt = if (v) null else false)
 
@@ -1145,7 +1166,7 @@ data class WatchContext(
     val pftBest: List<Int>? = null,
     val pftBestTotal: Int? = null,
     val simLast: List<Int>? = null,
-    /** 빌드 27: 더블 계획 (번갈아 하기) — 워치 스테이션 화면 아래 줄 */
+    /** 빌드 27: 교대 계획 (번갈아 하기) — 워치 스테이션 화면 아래 줄 */
     val doublesPlan: DoublesPlan? = null,
 )
 

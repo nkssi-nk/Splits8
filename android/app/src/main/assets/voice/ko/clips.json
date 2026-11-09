@@ -1,1532 +1,2150 @@
 [
  {
-  "id": "m_500",
-  "cat": "dist",
-  "text": "500미터.",
-  "dur": 0.97
+  "id": "rr_1",
+  "cat": "race",
+  "text": "첫 번째 러닝입니다. 편하게 시작해요. 러닝 다음엔 스키 에르그예요.",
+  "dur": 6.51
  },
  {
-  "id": "km_1",
-  "cat": "dist",
-  "text": "1킬로미터.",
-  "dur": 1.11
+  "id": "rr_2",
+  "cat": "race",
+  "text": "두 번째 러닝이에요. 뛰고 나면 슬레드 푸쉬입니다.",
+  "dur": 4.76
  },
  {
-  "id": "km_1_5",
-  "cat": "dist",
-  "text": "1.5킬로미터.",
-  "dur": 1.41
+  "id": "rr_3",
+  "cat": "race",
+  "text": "세 번째 러닝 시작합니다. 이 다음은 슬레드 풀이에요.",
+  "dur": 4.99
  },
  {
-  "id": "km_2",
-  "cat": "dist",
-  "text": "2킬로미터.",
-  "dur": 1.05
+  "id": "rr_4",
+  "cat": "race",
+  "text": "네 번째 러닝이에요. 리듬 찾아가요. 다음 스테이션은 버피 브로드 점프입니다.",
+  "dur": 5.77
  },
  {
-  "id": "km_2_5",
-  "cat": "dist",
-  "text": "2.5킬로미터.",
-  "dur": 1.19
+  "id": "rr_5",
+  "cat": "race",
+  "text": "절반 지났어요. 다섯 번째 러닝, 뛰고 나면 로잉이에요.",
+  "dur": 5.95
  },
  {
-  "id": "km_3",
-  "cat": "dist",
-  "text": "3킬로미터.",
-  "dur": 1.14
+  "id": "rr_6",
+  "cat": "race",
+  "text": "여섯 번째 러닝입니다. 이 다음은 파머스 캐리예요.",
+  "dur": 5.06
  },
  {
-  "id": "km_3_5",
-  "cat": "dist",
-  "text": "3.5킬로미터.",
-  "dur": 1.57
+  "id": "rr_7",
+  "cat": "race",
+  "text": "일곱 번째 러닝이에요. 이제 두 종목, 다음은 샌드백 런지입니다.",
+  "dur": 6.79
  },
  {
-  "id": "km_4",
-  "cat": "dist",
-  "text": "4킬로미터.",
-  "dur": 0.89
+  "id": "rr_8",
+  "cat": "race",
+  "text": "마지막 러닝이에요. 끝나면 월볼만 남아요.",
+  "dur": 5.15
  },
  {
-  "id": "km_4_5",
-  "cat": "dist",
-  "text": "4.5킬로미터.",
-  "dur": 1.557333
+  "id": "ri_1",
+  "cat": "race",
+  "text": "록스존입니다. 다음 스테이션은 스키 에르그예요. 록스존도 기록이에요.",
+  "dur": 6.19
  },
  {
-  "id": "km_5",
-  "cat": "dist",
-  "text": "5킬로미터.",
-  "dur": 1.1
+  "id": "ri_2",
+  "cat": "race",
+  "text": "록스존이에요. 좋아요, 슬레드 푸쉬로 갑니다.",
+  "dur": 4.0
  },
  {
-  "id": "km_5_5",
-  "cat": "dist",
-  "text": "5.5킬로미터.",
-  "dur": 1.44
+  "id": "ri_3",
+  "cat": "race",
+  "text": "록스존입니다. 이제 슬레드 풀이에요.",
+  "dur": 3.47
  },
  {
-  "id": "km_6",
-  "cat": "dist",
-  "text": "6킬로미터.",
-  "dur": 1.08
+  "id": "ri_4",
+  "cat": "race",
+  "text": "록스존이에요. 다음은 버피 브로드 점프입니다. 호흡 정리하면서 가요.",
+  "dur": 5.96
  },
  {
-  "id": "km_6_5",
-  "cat": "dist",
-  "text": "6.5킬로미터.",
-  "dur": 1.46
+  "id": "ri_5",
+  "cat": "race",
+  "text": "록스존입니다. 로잉으로 갑니다. 록스존도 기록이니 바로 가요.",
+  "dur": 5.88
  },
  {
-  "id": "km_7",
-  "cat": "dist",
-  "text": "7킬로미터.",
-  "dur": 1.01
+  "id": "ri_6",
+  "cat": "race",
+  "text": "록스존이에요. 다음은 파머스 캐리입니다.",
+  "dur": 4.03
  },
  {
-  "id": "km_7_5",
-  "cat": "dist",
-  "text": "7.5킬로미터.",
-  "dur": 1.386667
+  "id": "ri_7",
+  "cat": "race",
+  "text": "록스존입니다. 이제 샌드백 런지예요. 하나 남았어요.",
+  "dur": 4.89
  },
  {
-  "id": "km_8",
-  "cat": "dist",
-  "text": "8킬로미터.",
-  "dur": 1.17
+  "id": "ri_8",
+  "cat": "race",
+  "text": "록스존이에요. 마지막 스테이션, 월볼입니다.",
+  "dur": 4.0
  },
  {
-  "id": "km_8_5",
-  "cat": "dist",
-  "text": "8.5킬로미터.",
-  "dur": 1.19
+  "id": "rs_1",
+  "cat": "race",
+  "text": "스키 에르그입니다.",
+  "dur": 1.99
  },
  {
-  "id": "km_9",
-  "cat": "dist",
-  "text": "9킬로미터.",
-  "dur": 0.832
+  "id": "rs_2",
+  "cat": "race",
+  "text": "슬레드 푸쉬입니다.",
+  "dur": 2.17
  },
  {
-  "id": "km_9_5",
-  "cat": "dist",
-  "text": "9.5킬로미터.",
-  "dur": 1.408
+  "id": "rs_3",
+  "cat": "race",
+  "text": "슬레드 풀입니다.",
+  "dur": 2.09
  },
  {
-  "id": "km_10",
-  "cat": "dist",
-  "text": "10킬로미터.",
-  "dur": 1.11
+  "id": "rs_4",
+  "cat": "race",
+  "text": "버피 브로드 점프입니다.",
+  "dur": 2.67
  },
  {
-  "id": "km_11",
-  "cat": "dist",
-  "text": "11킬로미터.",
-  "dur": 1.41
+  "id": "rs_5",
+  "cat": "race",
+  "text": "로잉입니다.",
+  "dur": 1.72
  },
  {
-  "id": "km_12",
-  "cat": "dist",
-  "text": "12킬로미터.",
-  "dur": 1.34
+  "id": "rs_6",
+  "cat": "race",
+  "text": "파머스 캐리입니다.",
+  "dur": 1.86
  },
  {
-  "id": "km_13",
-  "cat": "dist",
-  "text": "13킬로미터.",
-  "dur": 1.34
+  "id": "rs_7",
+  "cat": "race",
+  "text": "샌드백 런지입니다.",
+  "dur": 2.31
  },
  {
-  "id": "km_14",
-  "cat": "dist",
-  "text": "14킬로미터.",
-  "dur": 1.17
+  "id": "rs_8",
+  "cat": "race",
+  "text": "월볼입니다. 마지막 종목이에요.",
+  "dur": 3.03
  },
  {
-  "id": "km_15",
-  "cat": "dist",
-  "text": "15킬로미터.",
-  "dur": 1.15
+  "id": "rf_1",
+  "cat": "race",
+  "text": "완주! 결승선 통과했어요. 수고 많았어요.",
+  "dur": 5.91
  },
  {
-  "id": "km_16",
-  "cat": "dist",
-  "text": "16킬로미터.",
-  "dur": 1.4
+  "id": "ro_1",
+  "cat": "race",
+  "text": "록스존입니다. 다음은 두 번째 러닝이에요.",
+  "dur": 4.66
  },
  {
-  "id": "km_17",
-  "cat": "dist",
-  "text": "17킬로미터.",
-  "dur": 1.2
+  "id": "ro_2",
+  "cat": "race",
+  "text": "록스존이에요. 숨 고르고, 세 번째 러닝 갑니다.",
+  "dur": 4.58
  },
  {
-  "id": "km_18",
-  "cat": "dist",
-  "text": "18킬로미터.",
-  "dur": 1.35
+  "id": "ro_3",
+  "cat": "race",
+  "text": "록스존입니다. 네 번째 러닝으로 이어져요.",
+  "dur": 3.83
  },
  {
-  "id": "km_19",
-  "cat": "dist",
-  "text": "19킬로미터.",
-  "dur": 1.16
+  "id": "ro_4",
+  "cat": "race",
+  "text": "록스존이에요. 다음은 다섯 번째 러닝입니다.",
+  "dur": 4.25
  },
  {
-  "id": "km_20",
-  "cat": "dist",
-  "text": "20킬로미터.",
-  "dur": 1.11
+  "id": "ro_5",
+  "cat": "race",
+  "text": "록스존입니다. 여섯 번째 러닝이에요.",
+  "dur": 3.86
  },
  {
-  "id": "km_21",
-  "cat": "dist",
-  "text": "21킬로미터.",
-  "dur": 1.365333
+  "id": "ro_6",
+  "cat": "race",
+  "text": "록스존이에요. 다음은 일곱 번째 러닝입니다.",
+  "dur": 4.92
  },
  {
-  "id": "half",
-  "cat": "dist",
-  "text": "하프 완주!",
-  "dur": 0.91
+  "id": "ro_7",
+  "cat": "race",
+  "text": "록스존입니다. 마지막 러닝이 남았어요.",
+  "dur": 4.09
  },
  {
-  "id": "full",
-  "cat": "dist",
-  "text": "풀코스 완주!",
-  "dur": 1.62
+  "id": "tip_1",
+  "cat": "race",
+  "text": "팔로 당기지 말고 몸으로 눌러요. 호흡은 길게 가져가요.",
+  "dur": 5.77
  },
  {
-  "id": "m_100",
-  "cat": "dist",
-  "text": "100미터.",
-  "dur": 0.725333
+  "id": "tip_2",
+  "cat": "race",
+  "text": "자세는 낮게, 슬레드에 온몸의 무게를 실어요.",
+  "dur": 4.8
  },
  {
-  "id": "m_200",
-  "cat": "dist",
-  "text": "200미터.",
-  "dur": 1.05
+  "id": "tip_3",
+  "cat": "race",
+  "text": "허리 세우고, 줄이 늘어지지 않게 계속 당겨요. 발은 박스 안에서요.",
+  "dur": 5.82
  },
  {
-  "id": "m_300",
-  "cat": "dist",
-  "text": "300미터.",
-  "dur": 0.89
+  "id": "tip_4",
+  "cat": "race",
+  "text": "선을 밟으면 안 돼요. 점프는 길게, 일어나는 건 빠르게요.",
+  "dur": 5.57
  },
  {
-  "id": "m_400",
-  "cat": "dist",
-  "text": "400미터.",
-  "dur": 0.874667
+  "id": "tip_5",
+  "cat": "race",
+  "text": "다리, 몸, 팔 순서로 길게 저어요. 숨 고르는 구간이에요.",
+  "dur": 5.77
  },
  {
-  "id": "m_600",
-  "cat": "dist",
-  "text": "600미터.",
-  "dur": 0.91
+  "id": "tip_6",
+  "cat": "race",
+  "text": "어깨 내리고 걸음은 빠르게요. 안 내려놓는 게 제일 빨라요.",
+  "dur": 6.17
  },
  {
-  "id": "m_800",
-  "cat": "dist",
-  "text": "800미터.",
-  "dur": 1.0
+  "id": "tip_7",
+  "cat": "race",
+  "text": "뒷무릎은 바닥에 살짝 닿게, 보폭은 일정하게요.",
+  "dur": 4.23
  },
  {
-  "id": "min_1",
-  "cat": "min",
-  "text": "1분.",
-  "dur": 0.59
+  "id": "tip_8",
+  "cat": "race",
+  "text": "엉덩이는 무릎 아래까지, 공은 선 위로. 리듬 끊기지 않게요.",
+  "dur": 6.18
  },
  {
-  "id": "min_2",
-  "cat": "min",
-  "text": "2분.",
-  "dur": 0.64
+  "id": "goal_ahead",
+  "cat": "goal",
+  "text": "목표보다 빨라요. 이대로 가요.",
+  "dur": 2.93
  },
  {
-  "id": "min_3",
-  "cat": "min",
-  "text": "3분.",
-  "dur": 0.62
+  "id": "goal_behind",
+  "cat": "goal",
+  "text": "목표보다 조금 늦어요. 급하지 않게 따라잡아요.",
+  "dur": 4.43
  },
  {
-  "id": "min_4",
-  "cat": "min",
-  "text": "4분.",
-  "dur": 0.72
+  "id": "goal_on",
+  "cat": "goal",
+  "text": "목표 페이스 딱 맞아요.",
+  "dur": 3.48
  },
  {
-  "id": "min_5",
-  "cat": "min",
-  "text": "5분.",
-  "dur": 0.67
- },
- {
-  "id": "min_6",
-  "cat": "min",
-  "text": "6분.",
-  "dur": 0.77
- },
- {
-  "id": "min_7",
-  "cat": "min",
-  "text": "7분.",
-  "dur": 0.6
- },
- {
-  "id": "min_8",
-  "cat": "min",
-  "text": "8분.",
-  "dur": 0.85
- },
- {
-  "id": "min_9",
-  "cat": "min",
-  "text": "9분.",
-  "dur": 0.55
- },
- {
-  "id": "min_10",
-  "cat": "min",
-  "text": "10분.",
-  "dur": 0.768
- },
- {
-  "id": "min_11",
-  "cat": "min",
-  "text": "11분.",
-  "dur": 1.05
- },
- {
-  "id": "min_12",
-  "cat": "min",
-  "text": "12분.",
-  "dur": 0.89
- },
- {
-  "id": "min_13",
-  "cat": "min",
-  "text": "13분.",
-  "dur": 1.13
- },
- {
-  "id": "min_14",
-  "cat": "min",
-  "text": "14분.",
-  "dur": 1.0
- },
- {
-  "id": "min_15",
-  "cat": "min",
-  "text": "15분.",
-  "dur": 0.79
- },
- {
-  "id": "min_16",
-  "cat": "min",
-  "text": "16분.",
-  "dur": 1.03
- },
- {
-  "id": "min_17",
-  "cat": "min",
-  "text": "17분.",
-  "dur": 0.82
- },
- {
-  "id": "min_18",
-  "cat": "min",
-  "text": "18분.",
-  "dur": 0.81
- },
- {
-  "id": "min_19",
-  "cat": "min",
-  "text": "19분.",
-  "dur": 1.03
- },
- {
-  "id": "min_20",
-  "cat": "min",
-  "text": "20분.",
-  "dur": 0.67
- },
- {
-  "id": "min_21",
-  "cat": "min",
-  "text": "21분.",
-  "dur": 0.97
- },
- {
-  "id": "min_22",
-  "cat": "min",
-  "text": "22분.",
-  "dur": 0.91
- },
- {
-  "id": "min_23",
-  "cat": "min",
-  "text": "23분.",
-  "dur": 1.28
- },
- {
-  "id": "min_24",
-  "cat": "min",
-  "text": "24분.",
-  "dur": 0.8
- },
- {
-  "id": "min_25",
-  "cat": "min",
-  "text": "25분.",
-  "dur": 1.21
- },
- {
-  "id": "min_26",
-  "cat": "min",
-  "text": "26분.",
-  "dur": 0.97
- },
- {
-  "id": "min_27",
-  "cat": "min",
-  "text": "27분.",
-  "dur": 1.09
- },
- {
-  "id": "min_28",
-  "cat": "min",
-  "text": "28분.",
-  "dur": 1.08
- },
- {
-  "id": "min_29",
-  "cat": "min",
-  "text": "29분.",
-  "dur": 0.92
- },
- {
-  "id": "min_30",
-  "cat": "min",
-  "text": "30분.",
-  "dur": 0.8
- },
- {
-  "id": "min_31",
-  "cat": "min",
-  "text": "31분.",
-  "dur": 1.03
- },
- {
-  "id": "min_32",
-  "cat": "min",
-  "text": "32분.",
-  "dur": 0.86
- },
- {
-  "id": "min_33",
-  "cat": "min",
-  "text": "33분.",
-  "dur": 1.21
- },
- {
-  "id": "min_34",
-  "cat": "min",
-  "text": "34분.",
-  "dur": 0.98
- },
- {
-  "id": "min_35",
-  "cat": "min",
-  "text": "35분.",
-  "dur": 1.2
- },
- {
-  "id": "min_36",
-  "cat": "min",
-  "text": "36분.",
-  "dur": 0.82
- },
- {
-  "id": "min_37",
-  "cat": "min",
-  "text": "37분.",
-  "dur": 1.12
- },
- {
-  "id": "min_38",
-  "cat": "min",
-  "text": "38분.",
-  "dur": 0.81
- },
- {
-  "id": "min_39",
-  "cat": "min",
-  "text": "39분.",
-  "dur": 0.98
- },
- {
-  "id": "min_40",
-  "cat": "min",
-  "text": "40분.",
-  "dur": 0.86
- },
- {
-  "id": "min_41",
-  "cat": "min",
-  "text": "41분.",
-  "dur": 0.917333
- },
- {
-  "id": "min_42",
-  "cat": "min",
-  "text": "42분.",
-  "dur": 0.74
- },
- {
-  "id": "min_43",
-  "cat": "min",
-  "text": "43분.",
-  "dur": 0.86
- },
- {
-  "id": "min_44",
-  "cat": "min",
-  "text": "44분.",
-  "dur": 0.93
- },
- {
-  "id": "min_45",
-  "cat": "min",
-  "text": "45분.",
-  "dur": 0.91
- },
- {
-  "id": "min_46",
-  "cat": "min",
-  "text": "46분.",
-  "dur": 1.01
- },
- {
-  "id": "min_47",
-  "cat": "min",
-  "text": "47분.",
-  "dur": 0.78
- },
- {
-  "id": "min_48",
-  "cat": "min",
-  "text": "48분.",
-  "dur": 1.1
- },
- {
-  "id": "min_49",
-  "cat": "min",
-  "text": "49분.",
-  "dur": 0.896
- },
- {
-  "id": "min_50",
-  "cat": "min",
-  "text": "50분.",
-  "dur": 0.76
- },
- {
-  "id": "min_51",
-  "cat": "min",
-  "text": "51분.",
-  "dur": 0.938667
- },
- {
-  "id": "min_52",
-  "cat": "min",
-  "text": "52분.",
-  "dur": 0.69
- },
- {
-  "id": "min_53",
-  "cat": "min",
-  "text": "53분.",
-  "dur": 1.0
- },
- {
-  "id": "min_54",
-  "cat": "min",
-  "text": "54분.",
-  "dur": 1.0
- },
- {
-  "id": "min_55",
-  "cat": "min",
-  "text": "55분.",
-  "dur": 0.85
- },
- {
-  "id": "min_56",
-  "cat": "min",
-  "text": "56분.",
-  "dur": 0.99
- },
- {
-  "id": "min_57",
-  "cat": "min",
-  "text": "57분.",
-  "dur": 0.85
- },
- {
-  "id": "min_58",
-  "cat": "min",
-  "text": "58분.",
-  "dur": 0.85
- },
- {
-  "id": "min_59",
-  "cat": "min",
-  "text": "59분.",
-  "dur": 1.08
- },
- {
-  "id": "sec_1",
-  "cat": "sec",
-  "text": "1초.",
-  "dur": 0.704
- },
- {
-  "id": "sec_2",
-  "cat": "sec",
-  "text": "2초.",
-  "dur": 0.64
- },
- {
-  "id": "sec_3",
-  "cat": "sec",
-  "text": "3초.",
-  "dur": 0.71
- },
- {
-  "id": "sec_4",
-  "cat": "sec",
-  "text": "4초.",
-  "dur": 0.57
- },
- {
-  "id": "sec_5",
-  "cat": "sec",
-  "text": "5초.",
-  "dur": 0.661333
- },
- {
-  "id": "sec_6",
-  "cat": "sec",
-  "text": "6초.",
-  "dur": 0.768
- },
- {
-  "id": "sec_7",
-  "cat": "sec",
-  "text": "7초.",
-  "dur": 0.89
- },
- {
-  "id": "sec_8",
-  "cat": "sec",
-  "text": "8초.",
-  "dur": 0.62
- },
- {
-  "id": "sec_9",
-  "cat": "sec",
-  "text": "9초.",
-  "dur": 0.72
- },
- {
-  "id": "sec_10",
-  "cat": "sec",
-  "text": "10초.",
-  "dur": 0.661333
- },
- {
-  "id": "sec_11",
-  "cat": "sec",
-  "text": "11초.",
-  "dur": 0.896
- },
- {
-  "id": "sec_12",
-  "cat": "sec",
-  "text": "12초.",
-  "dur": 0.810667
- },
- {
-  "id": "sec_13",
-  "cat": "sec",
-  "text": "13초.",
-  "dur": 0.85
- },
- {
-  "id": "sec_14",
-  "cat": "sec",
-  "text": "14초.",
-  "dur": 0.87
- },
- {
-  "id": "sec_15",
-  "cat": "sec",
-  "text": "15초.",
-  "dur": 0.85
- },
- {
-  "id": "sec_16",
-  "cat": "sec",
-  "text": "16초.",
-  "dur": 0.84
- },
- {
-  "id": "sec_17",
-  "cat": "sec",
-  "text": "17초.",
-  "dur": 0.99
- },
- {
-  "id": "sec_18",
-  "cat": "sec",
-  "text": "18초.",
-  "dur": 0.79
- },
- {
-  "id": "sec_19",
-  "cat": "sec",
-  "text": "19초.",
-  "dur": 0.84
- },
- {
-  "id": "sec_20",
-  "cat": "sec",
-  "text": "20초.",
-  "dur": 0.86
- },
- {
-  "id": "sec_21",
-  "cat": "sec",
-  "text": "21초.",
-  "dur": 0.99
- },
- {
-  "id": "sec_22",
-  "cat": "sec",
-  "text": "22초.",
-  "dur": 0.83
- },
- {
-  "id": "sec_23",
-  "cat": "sec",
-  "text": "23초.",
-  "dur": 1.08
- },
- {
-  "id": "sec_24",
-  "cat": "sec",
-  "text": "24초.",
-  "dur": 1.01
- },
- {
-  "id": "sec_25",
-  "cat": "sec",
-  "text": "25초.",
-  "dur": 0.92
- },
- {
-  "id": "sec_26",
-  "cat": "sec",
-  "text": "26초.",
-  "dur": 0.85
- },
- {
-  "id": "sec_27",
-  "cat": "sec",
-  "text": "27초.",
-  "dur": 0.97
- },
- {
-  "id": "sec_28",
-  "cat": "sec",
-  "text": "28초.",
-  "dur": 1.07
- },
- {
-  "id": "sec_29",
-  "cat": "sec",
-  "text": "29초.",
-  "dur": 0.83
- },
- {
-  "id": "sec_30",
-  "cat": "sec",
-  "text": "30초.",
-  "dur": 1.11
- },
- {
-  "id": "sec_31",
-  "cat": "sec",
-  "text": "31초.",
-  "dur": 1.01
- },
- {
-  "id": "sec_32",
-  "cat": "sec",
-  "text": "32초.",
-  "dur": 0.93
- },
- {
-  "id": "sec_33",
-  "cat": "sec",
-  "text": "33초.",
-  "dur": 0.88
- },
- {
-  "id": "sec_34",
-  "cat": "sec",
-  "text": "34초.",
-  "dur": 1.09
- },
- {
-  "id": "sec_35",
-  "cat": "sec",
-  "text": "35초.",
-  "dur": 1.04
- },
- {
-  "id": "sec_36",
-  "cat": "sec",
-  "text": "36초.",
-  "dur": 1.05
- },
- {
-  "id": "sec_37",
-  "cat": "sec",
-  "text": "37초.",
-  "dur": 0.99
- },
- {
-  "id": "sec_38",
-  "cat": "sec",
-  "text": "38초.",
-  "dur": 0.96
- },
- {
-  "id": "sec_39",
-  "cat": "sec",
-  "text": "39초.",
-  "dur": 0.92
- },
- {
-  "id": "sec_40",
-  "cat": "sec",
-  "text": "40초.",
-  "dur": 0.69
- },
- {
-  "id": "sec_41",
-  "cat": "sec",
-  "text": "41초.",
-  "dur": 0.98
- },
- {
-  "id": "sec_42",
-  "cat": "sec",
-  "text": "42초.",
-  "dur": 0.9
- },
- {
-  "id": "sec_43",
-  "cat": "sec",
-  "text": "43초.",
-  "dur": 0.94
- },
- {
-  "id": "sec_44",
-  "cat": "sec",
-  "text": "44초.",
-  "dur": 0.92
- },
- {
-  "id": "sec_45",
-  "cat": "sec",
-  "text": "45초.",
-  "dur": 0.96
- },
- {
-  "id": "sec_46",
-  "cat": "sec",
-  "text": "46초.",
-  "dur": 0.96
- },
- {
-  "id": "sec_47",
-  "cat": "sec",
-  "text": "47초.",
-  "dur": 1.26
- },
- {
-  "id": "sec_48",
-  "cat": "sec",
-  "text": "48초.",
-  "dur": 1.06
- },
- {
-  "id": "sec_49",
-  "cat": "sec",
-  "text": "49초.",
-  "dur": 0.87
- },
- {
-  "id": "sec_50",
-  "cat": "sec",
-  "text": "50초.",
-  "dur": 0.77
- },
- {
-  "id": "sec_51",
-  "cat": "sec",
-  "text": "51초.",
-  "dur": 1.05
- },
- {
-  "id": "sec_52",
-  "cat": "sec",
-  "text": "52초.",
-  "dur": 0.87
- },
- {
-  "id": "sec_53",
-  "cat": "sec",
-  "text": "53초.",
-  "dur": 0.97
- },
- {
-  "id": "sec_54",
-  "cat": "sec",
-  "text": "54초.",
-  "dur": 0.97
- },
- {
-  "id": "sec_55",
-  "cat": "sec",
-  "text": "55초.",
-  "dur": 1.22
- },
- {
-  "id": "sec_56",
-  "cat": "sec",
-  "text": "56초.",
-  "dur": 1.05
- },
- {
-  "id": "sec_57",
-  "cat": "sec",
-  "text": "57초.",
-  "dur": 1.02
- },
- {
-  "id": "sec_58",
-  "cat": "sec",
-  "text": "58초.",
-  "dur": 0.85
- },
- {
-  "id": "sec_59",
-  "cat": "sec",
-  "text": "59초.",
-  "dur": 0.87
- },
- {
-  "id": "hour_1",
-  "cat": "hour",
-  "text": "한 시간.",
-  "dur": 0.746667
- },
- {
-  "id": "hour_2",
-  "cat": "hour",
-  "text": "두 시간.",
-  "dur": 0.704
- },
- {
-  "id": "hour_3",
-  "cat": "hour",
-  "text": "세 시간.",
-  "dur": 0.78
- },
- {
-  "id": "hr_60",
-  "cat": "hr",
-  "text": "심박 60.",
-  "dur": 1.066667
- },
- {
-  "id": "hr_65",
-  "cat": "hr",
-  "text": "심박 65.",
-  "dur": 1.130667
- },
- {
-  "id": "hr_70",
-  "cat": "hr",
-  "text": "심박 70.",
-  "dur": 1.045333
- },
- {
-  "id": "hr_75",
-  "cat": "hr",
-  "text": "심박 75.",
-  "dur": 1.13
- },
- {
-  "id": "hr_80",
-  "cat": "hr",
-  "text": "심박 80.",
-  "dur": 0.96
- },
- {
-  "id": "hr_85",
-  "cat": "hr",
-  "text": "심박 85.",
-  "dur": 1.32
- },
- {
-  "id": "hr_90",
-  "cat": "hr",
-  "text": "심박 90.",
-  "dur": 1.194667
- },
- {
-  "id": "hr_95",
-  "cat": "hr",
-  "text": "심박 95.",
-  "dur": 1.29
- },
- {
-  "id": "hr_100",
-  "cat": "hr",
-  "text": "심박 100.",
-  "dur": 0.91
- },
- {
-  "id": "hr_105",
-  "cat": "hr",
-  "text": "심박 105.",
-  "dur": 1.43
- },
- {
-  "id": "hr_110",
-  "cat": "hr",
-  "text": "심박 110.",
-  "dur": 1.066667
- },
- {
-  "id": "hr_115",
-  "cat": "hr",
-  "text": "심박 115.",
-  "dur": 1.429333
- },
- {
-  "id": "hr_120",
-  "cat": "hr",
-  "text": "심박 120.",
-  "dur": 1.322667
- },
- {
-  "id": "hr_125",
-  "cat": "hr",
-  "text": "심박 125.",
-  "dur": 1.536
- },
- {
-  "id": "hr_130",
-  "cat": "hr",
-  "text": "심박 130.",
-  "dur": 1.216
- },
- {
-  "id": "hr_135",
-  "cat": "hr",
-  "text": "심박 135.",
-  "dur": 1.48
- },
- {
-  "id": "hr_140",
-  "cat": "hr",
-  "text": "심박 140.",
-  "dur": 1.33
- },
- {
-  "id": "hr_145",
-  "cat": "hr",
-  "text": "심박 145.",
-  "dur": 1.36
- },
- {
-  "id": "hr_150",
-  "cat": "hr",
-  "text": "심박 150.",
-  "dur": 1.066667
- },
- {
-  "id": "hr_155",
-  "cat": "hr",
-  "text": "심박 155.",
-  "dur": 1.258667
- },
- {
-  "id": "hr_160",
-  "cat": "hr",
-  "text": "심박 160.",
-  "dur": 1.237333
- },
- {
-  "id": "hr_165",
-  "cat": "hr",
-  "text": "심박 165.",
-  "dur": 1.32
- },
- {
-  "id": "hr_170",
-  "cat": "hr",
-  "text": "심박 170.",
-  "dur": 1.13
- },
- {
-  "id": "hr_175",
-  "cat": "hr",
-  "text": "심박 175.",
+  "id": "goal_pre",
+  "cat": "goal",
+  "text": "목표보다",
   "dur": 1.51
  },
  {
-  "id": "hr_180",
-  "cat": "hr",
-  "text": "심박 180.",
-  "dur": 1.130667
+  "id": "goal_fast",
+  "cat": "goal",
+  "text": "빨라요.",
+  "dur": 1.42
  },
  {
-  "id": "hr_185",
-  "cat": "hr",
-  "text": "심박 185.",
-  "dur": 1.47
+  "id": "goal_slow",
+  "cat": "goal",
+  "text": "늦어요.",
+  "dur": 1.72
  },
  {
-  "id": "hr_190",
-  "cat": "hr",
-  "text": "심박 190.",
-  "dur": 1.152
+  "id": "pb_new",
+  "cat": "goal",
+  "text": "개인 최고 기록이에요! 축하해요.",
+  "dur": 3.24
  },
  {
-  "id": "hr_195",
-  "cat": "hr",
-  "text": "심박 195.",
-  "dur": 1.18
+  "id": "pace_fast_1",
+  "cat": "goal",
+  "text": "초반 페이스 빨라요. 조금 아껴요.",
+  "dur": 3.91
  },
  {
-  "id": "hr_200",
-  "cat": "hr",
-  "text": "심박 200.",
-  "dur": 0.93
+  "id": "pace_fast_2",
+  "cat": "goal",
+  "text": "지금 좀 빠른데요. 후반 생각해서 살짝 늦춰요.",
+  "dur": 4.61
  },
  {
-  "id": "pre_pace",
-  "cat": "pre",
-  "text": "페이스.",
-  "dur": 0.75
+  "id": "cheer_01",
+  "cat": "cheer",
+  "text": "좋아요, 이대로.",
+  "dur": 2.04
  },
  {
-  "id": "pre_time",
-  "cat": "pre",
-  "text": "지금까지.",
-  "dur": 0.810667
+  "id": "cheer_02",
+  "cat": "cheer",
+  "text": "잘하고 있어요.",
+  "dur": 1.73
  },
  {
-  "id": "pre_avg",
-  "cat": "pre",
-  "text": "평균 페이스.",
-  "dur": 0.98
+  "id": "cheer_03",
+  "cat": "cheer",
+  "text": "호흡만 챙겨요.",
+  "dur": 1.87
  },
  {
-  "id": "pre_lap",
-  "cat": "pre",
-  "text": "이번 구간.",
-  "dur": 0.84
+  "id": "cheer_04",
+  "cat": "cheer",
+  "text": "리듬 좋아요.",
+  "dur": 1.78
  },
  {
-  "id": "pre_left",
-  "cat": "pre",
-  "text": "남은 시간.",
-  "dur": 0.81
+  "id": "cheer_05",
+  "cat": "cheer",
+  "text": "조금만 더.",
+  "dur": 1.61
  },
  {
-  "id": "pre_next",
-  "cat": "pre",
-  "text": "다음은.",
-  "dur": 0.64
+  "id": "cheer_06",
+  "cat": "cheer",
+  "text": "여기서 안 무너져요.",
+  "dur": 2.5
  },
  {
-  "id": "pre_round",
-  "cat": "pre",
-  "text": "라운드.",
-  "dur": 0.69
+  "id": "cheer_07",
+  "cat": "cheer",
+  "text": "어깨 내리고, 편하게.",
+  "dur": 2.48
  },
  {
-  "id": "st_run",
-  "cat": "station",
-  "text": "러닝.",
-  "dur": 0.62
+  "id": "cheer_08",
+  "cat": "cheer",
+  "text": "지금 페이스 딱 좋아요.",
+  "dur": 2.55
  },
  {
-  "id": "st_ski",
-  "cat": "station",
-  "text": "스키 에르그.",
-  "dur": 0.99
+  "id": "cheer_09",
+  "cat": "cheer",
+  "text": "힘들죠? 그게 맞아요.",
+  "dur": 2.44
  },
  {
-  "id": "st_push",
-  "cat": "station",
-  "text": "슬레드 푸시.",
-  "dur": 1.13
+  "id": "cheer_10",
+  "cat": "cheer",
+  "text": "하나씩만 생각해요.",
+  "dur": 2.58
  },
  {
-  "id": "st_pull",
-  "cat": "station",
-  "text": "슬레드 풀.",
-  "dur": 0.853333
+  "id": "cheer_11",
+  "cat": "cheer",
+  "text": "힘 빼고, 꾸준히.",
+  "dur": 2.17
  },
  {
-  "id": "st_bbj",
-  "cat": "station",
-  "text": "버피 브로드 점프.",
-  "dur": 1.27
+  "id": "cheer_12",
+  "cat": "cheer",
+  "text": "끝까지 가요.",
+  "dur": 1.55
  },
  {
-  "id": "st_row",
-  "cat": "station",
-  "text": "로잉.",
-  "dur": 0.51
+  "id": "cheer_13",
+  "cat": "cheer",
+  "text": "거의 다 했어요.",
+  "dur": 2.03
  },
  {
-  "id": "st_farm",
-  "cat": "station",
-  "text": "파머스 캐리.",
-  "dur": 0.89
+  "id": "cheer_14",
+  "cat": "cheer",
+  "text": "멋져요, 진짜.",
+  "dur": 2.66
  },
  {
-  "id": "st_lunge",
-  "cat": "station",
-  "text": "샌드백 런지.",
-  "dur": 1.2
+  "id": "cheer_15",
+  "cat": "cheer",
+  "text": "오늘 컨디션 좋은데요.",
+  "dur": 2.4
  },
  {
-  "id": "st_wb",
-  "cat": "station",
-  "text": "월볼.",
-  "dur": 0.96
+  "id": "cheer_16",
+  "cat": "cheer",
+  "text": "괜찮아요, 계속 가요.",
+  "dur": 2.21
  },
  {
-  "id": "st_rox",
-  "cat": "station",
-  "text": "록스존.",
-  "dur": 0.64
+  "id": "cheer_17",
+  "cat": "cheer",
+  "text": "숨 한 번 크게.",
+  "dur": 2.05
  },
  {
-  "id": "run_1",
-  "cat": "runno",
-  "text": "첫 번째 러닝.",
-  "dur": 0.981333
+  "id": "cheer_18",
+  "cat": "cheer",
+  "text": "나쁘지 않아요. 유지!",
+  "dur": 2.49
  },
  {
-  "id": "run_2",
-  "cat": "runno",
-  "text": "두 번째 러닝.",
-  "dur": 1.03
+  "id": "cheer_19",
+  "cat": "cheer",
+  "text": "이 구간만 넘기면 돼요.",
+  "dur": 2.48
  },
  {
-  "id": "run_3",
-  "cat": "runno",
-  "text": "세 번째 러닝.",
-  "dur": 0.96
+  "id": "cheer_20",
+  "cat": "cheer",
+  "text": "집중해요, 집중.",
+  "dur": 1.87
  },
  {
-  "id": "run_4",
-  "cat": "runno",
-  "text": "네 번째 러닝.",
-  "dur": 1.09
+  "id": "cheer_21",
+  "cat": "cheer",
+  "text": "잘 버티고 있어요.",
+  "dur": 1.83
  },
  {
-  "id": "run_5",
-  "cat": "runno",
-  "text": "다섯 번째 러닝.",
-  "dur": 1.002667
+  "id": "cheer_22",
+  "cat": "cheer",
+  "text": "서두르지 말고 꾸준히.",
+  "dur": 3.15
  },
  {
-  "id": "run_6",
-  "cat": "runno",
-  "text": "여섯 번째 러닝.",
-  "dur": 1.13
+  "id": "cheer_23",
+  "cat": "cheer",
+  "text": "좋아요, 그 느낌이에요.",
+  "dur": 2.7
  },
  {
-  "id": "run_7",
-  "cat": "runno",
-  "text": "일곱 번째 러닝.",
-  "dur": 1.17
+  "id": "cheer_24",
+  "cat": "cheer",
+  "text": "여기까지 온 게 어디예요.",
+  "dur": 2.64
  },
  {
-  "id": "run_8",
-  "cat": "runno",
-  "text": "여덟 번째 러닝.",
-  "dur": 1.322667
+  "id": "cheer_25",
+  "cat": "cheer",
+  "text": "자, 다시 모아 볼게요.",
+  "dur": 2.27
+ },
+ {
+  "id": "cr_01",
+  "cat": "cheer_run",
+  "text": "발은 가볍게 가요.",
+  "dur": 2.66
+ },
+ {
+  "id": "cr_02",
+  "cat": "cheer_run",
+  "text": "페이스 올리지 말고 유지해요.",
+  "dur": 2.84
+ },
+ {
+  "id": "cr_03",
+  "cat": "cheer_run",
+  "text": "팔 흔들림 줄이고 편하게.",
+  "dur": 3.68
+ },
+ {
+  "id": "cr_04",
+  "cat": "cheer_run",
+  "text": "이 러닝은 회복이에요. 호흡 고르세요.",
+  "dur": 3.6
+ },
+ {
+  "id": "cr_05",
+  "cat": "cheer_run",
+  "text": "한 바퀴만 더 가요.",
+  "dur": 2.67
+ },
+ {
+  "id": "cr_06",
+  "cat": "cheer_run",
+  "text": "다음 스테이션 생각하면서 뛰어요.",
+  "dur": 3.59
+ },
+ {
+  "id": "cs_ski_1",
+  "cat": "cheer_st",
+  "text": "팔 당기지 말고 몸으로 눌러요.",
+  "dur": 2.88
+ },
+ {
+  "id": "cs_ski_2",
+  "cat": "cheer_st",
+  "text": "스키는 리듬이에요. 길게 밀어요.",
+  "dur": 3.46
+ },
+ {
+  "id": "cs_push_1",
+  "cat": "cheer_st",
+  "text": "낮게 잡고 다리로 밀어요.",
+  "dur": 2.97
+ },
+ {
+  "id": "cs_push_2",
+  "cat": "cheer_st",
+  "text": "멈추지 말고 짧게 짧게 밀어요.",
+  "dur": 3.82
+ },
+ {
+  "id": "cs_push_3",
+  "cat": "cheer_st",
+  "text": "다리로 밀어요.",
+  "dur": 2.22
+ },
+ {
+  "id": "cs_pull_3",
+  "cat": "cheer_st",
+  "text": "다리로 버티고 팔은 거들어요.",
+  "dur": 2.84
+ },
+ {
+  "id": "cs_pull_1",
+  "cat": "cheer_st",
+  "text": "허리 세우고 뒤로 걸어요.",
+  "dur": 3.15
+ },
+ {
+  "id": "cs_pull_2",
+  "cat": "cheer_st",
+  "text": "줄 늘어지지 않게 계속 당겨요.",
+  "dur": 3.95
+ },
+ {
+  "id": "cs_bbj_1",
+  "cat": "cheer_st",
+  "text": "점프 길게, 일어나는 건 빠르게.",
+  "dur": 3.45
+ },
+ {
+  "id": "cs_bbj_2",
+  "cat": "cheer_st",
+  "text": "호흡 끊기지 않게 리듬으로.",
+  "dur": 3.11
+ },
+ {
+  "id": "cs_row_1",
+  "cat": "cheer_st",
+  "text": "다리, 몸, 팔 순서로 가요.",
+  "dur": 3.38
+ },
+ {
+  "id": "cs_row_2",
+  "cat": "cheer_st",
+  "text": "스트로크 길게 가져가요.",
+  "dur": 2.98
+ },
+ {
+  "id": "cs_farm_1",
+  "cat": "cheer_st",
+  "text": "어깨 내리고, 걸음 빠르게.",
+  "dur": 2.62
+ },
+ {
+  "id": "cs_farm_2",
+  "cat": "cheer_st",
+  "text": "안 내려놓는 게 제일 빨라요.",
+  "dur": 2.98
+ },
+ {
+  "id": "cs_lunge_1",
+  "cat": "cheer_st",
+  "text": "무릎 살짝만 찍고 바로 일어나요.",
+  "dur": 3.81
+ },
+ {
+  "id": "cs_lunge_2",
+  "cat": "cheer_st",
+  "text": "보폭 일정하게, 숨 쉬면서.",
+  "dur": 2.84
+ },
+ {
+  "id": "cs_wb_1",
+  "cat": "cheer_st",
+  "text": "공은 벽에 맡기고, 다리로.",
+  "dur": 3.47
+ },
+ {
+  "id": "cs_wb_2",
+  "cat": "cheer_st",
+  "text": "내 리듬대로만 가요.",
+  "dur": 2.05
+ },
+ {
+  "id": "cs_wb_3",
+  "cat": "cheer_st",
+  "text": "이게 마지막이에요. 다 쏟아요.",
+  "dur": 3.23
  },
  {
   "id": "go_start",
   "cat": "cue",
-  "text": "운동을 시작합니다.",
-  "dur": 1.25
+  "text": "시작합니다. 오늘도 잘해 봐요.",
+  "dur": 3.53
  },
  {
   "id": "go_end",
   "cat": "cue",
-  "text": "운동 끝! 수고하셨어요.",
-  "dur": 1.57
+  "text": "운동 끝. 수고했어요.",
+  "dur": 3.28
  },
  {
   "id": "go_pause",
   "cat": "cue",
-  "text": "잠시 멈췄어요.",
-  "dur": 1.39
+  "text": "잠깐 쉬어요.",
+  "dur": 2.98
  },
  {
   "id": "go_resume",
   "cat": "cue",
-  "text": "다시 시작합니다.",
-  "dur": 1.14
+  "text": "다시 갑니다.",
+  "dur": 1.6
  },
  {
   "id": "cd_3",
   "cat": "cue",
   "text": "셋.",
-  "dur": 0.597333
+  "dur": 1.6
  },
  {
   "id": "cd_2",
   "cat": "cue",
   "text": "둘.",
-  "dur": 0.618667
+  "dur": 1.16
  },
  {
   "id": "cd_1",
   "cat": "cue",
   "text": "하나.",
-  "dur": 0.59
+  "dur": 1.16
  },
  {
   "id": "cd_go",
   "cat": "cue",
   "text": "시작!",
-  "dur": 0.62
+  "dur": 1.37
  },
  {
   "id": "iv_fast",
   "cat": "cue",
-  "text": "빠르게!",
-  "dur": 0.99
+  "text": "빠르게 갑니다!",
+  "dur": 1.34
  },
  {
   "id": "iv_easy",
   "cat": "cue",
   "text": "천천히, 숨 고르세요.",
-  "dur": 1.75
+  "dur": 2.49
  },
  {
   "id": "iv_rest",
   "cat": "cue",
   "text": "휴식.",
-  "dur": 0.62
+  "dur": 1.46
  },
  {
   "id": "iv_work",
   "cat": "cue",
-  "text": "운동!",
-  "dur": 0.83
+  "text": "운동 시작!",
+  "dur": 1.8
  },
  {
   "id": "iv_last_set",
   "cat": "cue",
   "text": "마지막 세트예요.",
-  "dur": 1.450667
+  "dur": 2.23
  },
  {
   "id": "t_10s",
   "cat": "cue",
   "text": "10초 남았어요.",
-  "dur": 1.18
+  "dur": 1.88
  },
  {
   "id": "t_30s",
   "cat": "cue",
   "text": "30초 남았어요.",
-  "dur": 1.4
+  "dur": 1.9
  },
  {
   "id": "t_1m",
   "cat": "cue",
   "text": "1분 남았어요.",
-  "dur": 1.16
+  "dur": 1.88
  },
  {
   "id": "t_half",
   "cat": "cue",
   "text": "절반 왔어요.",
-  "dur": 0.94
+  "dur": 2.44
  },
  {
   "id": "emom_next",
   "cat": "cue",
   "text": "다음 라운드.",
-  "dur": 1.109333
+  "dur": 1.96
  },
  {
   "id": "amrap_end",
   "cat": "cue",
-  "text": "시간 끝! 몇 라운드 하셨는지 적어 주세요.",
-  "dur": 2.77
+  "text": "시간 끝! 라운드 수 기억해 두세요.",
+  "dur": 3.8
  },
  {
   "id": "tabata_set",
   "cat": "cue",
   "text": "다음 세트.",
-  "dur": 0.88
+  "dur": 2.39
  },
  {
   "id": "sim_last",
   "cat": "cue",
   "text": "거의 다 왔어요. 라스트!",
-  "dur": 1.85
+  "dur": 3.33
  },
  {
   "id": "sim_lastrun",
   "cat": "cue",
   "text": "마지막 러닝이에요.",
-  "dur": 1.37
+  "dur": 2.22
  },
  {
   "id": "sim_wb",
   "cat": "cue",
   "text": "마지막 월볼. 끝까지!",
-  "dur": 1.79
+  "dur": 2.8
  },
  {
-  "id": "pb_new",
-  "cat": "cue",
-  "text": "개인 최고 기록이에요!",
-  "dur": 1.67
+  "id": "min_1",
+  "cat": "min",
+  "text": "1분.",
+  "dur": 1.29
  },
  {
-  "id": "goal_ahead",
-  "cat": "cue",
-  "text": "목표보다 빨라요.",
+  "id": "min_2",
+  "cat": "min",
+  "text": "2분.",
+  "dur": 1.29
+ },
+ {
+  "id": "min_3",
+  "cat": "min",
+  "text": "3분.",
+  "dur": 1.53
+ },
+ {
+  "id": "min_4",
+  "cat": "min",
+  "text": "4분.",
+  "dur": 1.06
+ },
+ {
+  "id": "min_5",
+  "cat": "min",
+  "text": "5분.",
+  "dur": 1.55
+ },
+ {
+  "id": "min_6",
+  "cat": "min",
+  "text": "6분.",
+  "dur": 1.46
+ },
+ {
+  "id": "min_7",
+  "cat": "min",
+  "text": "7분.",
+  "dur": 1.39
+ },
+ {
+  "id": "min_8",
+  "cat": "min",
+  "text": "8분.",
+  "dur": 1.28
+ },
+ {
+  "id": "min_9",
+  "cat": "min",
+  "text": "9분.",
+  "dur": 1.62
+ },
+ {
+  "id": "min_10",
+  "cat": "min",
+  "text": "10분.",
+  "dur": 1.51
+ },
+ {
+  "id": "min_11",
+  "cat": "min",
+  "text": "11분.",
+  "dur": 1.26
+ },
+ {
+  "id": "min_12",
+  "cat": "min",
+  "text": "12분.",
+  "dur": 1.11
+ },
+ {
+  "id": "min_13",
+  "cat": "min",
+  "text": "13분.",
+  "dur": 1.5
+ },
+ {
+  "id": "min_14",
+  "cat": "min",
+  "text": "14분.",
+  "dur": 1.56
+ },
+ {
+  "id": "min_15",
+  "cat": "min",
+  "text": "15분.",
+  "dur": 2.51
+ },
+ {
+  "id": "min_16",
+  "cat": "min",
+  "text": "16분.",
+  "dur": 1.47
+ },
+ {
+  "id": "min_17",
+  "cat": "min",
+  "text": "17분.",
+  "dur": 0.75
+ },
+ {
+  "id": "min_18",
+  "cat": "min",
+  "text": "18분.",
+  "dur": 1.46
+ },
+ {
+  "id": "min_19",
+  "cat": "min",
+  "text": "19분.",
+  "dur": 1.5
+ },
+ {
+  "id": "min_20",
+  "cat": "min",
+  "text": "20분.",
+  "dur": 1.69
+ },
+ {
+  "id": "min_21",
+  "cat": "min",
+  "text": "21분.",
+  "dur": 1.46
+ },
+ {
+  "id": "min_22",
+  "cat": "min",
+  "text": "22분.",
+  "dur": 1.82
+ },
+ {
+  "id": "min_23",
+  "cat": "min",
+  "text": "23분.",
+  "dur": 1.75
+ },
+ {
+  "id": "min_24",
+  "cat": "min",
+  "text": "24분.",
   "dur": 1.36
  },
  {
-  "id": "goal_behind",
-  "cat": "cue",
-  "text": "목표보다 조금 늦어요.",
-  "dur": 1.32
+  "id": "min_25",
+  "cat": "min",
+  "text": "25분.",
+  "dur": 1.6
  },
  {
-  "id": "cheer_01",
-  "cat": "cheer",
-  "text": "좋아요, 그대로 가요!",
-  "dur": 1.33
+  "id": "min_26",
+  "cat": "min",
+  "text": "26분.",
+  "dur": 1.82
  },
  {
-  "id": "cheer_02",
-  "cat": "cheer",
-  "text": "잘하고 있어요!",
-  "dur": 1.08
+  "id": "min_27",
+  "cat": "min",
+  "text": "27분.",
+  "dur": 2.05
  },
  {
-  "id": "cheer_03",
-  "cat": "cheer",
-  "text": "호흡 유지하세요.",
-  "dur": 1.14
+  "id": "min_28",
+  "cat": "min",
+  "text": "28분.",
+  "dur": 2.12
  },
  {
-  "id": "cheer_04",
-  "cat": "cheer",
-  "text": "리듬 좋아요!",
-  "dur": 1.03
+  "id": "min_29",
+  "cat": "min",
+  "text": "29분.",
+  "dur": 1.46
  },
  {
-  "id": "cheer_05",
-  "cat": "cheer",
-  "text": "조금만 더!",
-  "dur": 1.05
+  "id": "min_30",
+  "cat": "min",
+  "text": "30분.",
+  "dur": 1.42
  },
  {
-  "id": "cheer_06",
-  "cat": "cheer",
-  "text": "포기하지 마세요!",
-  "dur": 1.12
+  "id": "min_31",
+  "cat": "min",
+  "text": "31분.",
+  "dur": 1.79
  },
  {
-  "id": "cheer_07",
-  "cat": "cheer",
-  "text": "자세 잡고, 천천히.",
-  "dur": 1.61
+  "id": "min_32",
+  "cat": "min",
+  "text": "32분.",
+  "dur": 1.68
  },
  {
-  "id": "cheer_08",
-  "cat": "cheer",
-  "text": "지금 페이스 좋아요.",
-  "dur": 1.24
+  "id": "min_33",
+  "cat": "min",
+  "text": "33분.",
+  "dur": 1.66
  },
  {
-  "id": "cheer_09",
-  "cat": "cheer",
-  "text": "힘들 때 실력이 늘어요.",
-  "dur": 1.44
+  "id": "min_34",
+  "cat": "min",
+  "text": "34분.",
+  "dur": 1.64
  },
  {
-  "id": "cheer_10",
-  "cat": "cheer",
-  "text": "한 개씩, 한 개씩.",
-  "dur": 1.23
+  "id": "min_35",
+  "cat": "min",
+  "text": "35분.",
+  "dur": 1.28
  },
  {
-  "id": "cheer_11",
-  "cat": "cheer",
-  "text": "팔 힘 빼고 다리로!",
-  "dur": 1.52
+  "id": "min_36",
+  "cat": "min",
+  "text": "36분.",
+  "dur": 1.77
  },
  {
-  "id": "cheer_12",
-  "cat": "cheer",
-  "text": "끝까지 밀어요!",
+  "id": "min_37",
+  "cat": "min",
+  "text": "37분.",
+  "dur": 2.03
+ },
+ {
+  "id": "min_38",
+  "cat": "min",
+  "text": "38분.",
+  "dur": 1.6
+ },
+ {
+  "id": "min_39",
+  "cat": "min",
+  "text": "39분.",
+  "dur": 1.51
+ },
+ {
+  "id": "min_40",
+  "cat": "min",
+  "text": "40분.",
+  "dur": 1.58
+ },
+ {
+  "id": "min_41",
+  "cat": "min",
+  "text": "41분.",
+  "dur": 1.51
+ },
+ {
+  "id": "min_42",
+  "cat": "min",
+  "text": "42분.",
+  "dur": 1.35
+ },
+ {
+  "id": "min_43",
+  "cat": "min",
+  "text": "43분.",
+  "dur": 1.6
+ },
+ {
+  "id": "min_44",
+  "cat": "min",
+  "text": "44분.",
+  "dur": 1.39
+ },
+ {
+  "id": "min_45",
+  "cat": "min",
+  "text": "45분.",
+  "dur": 1.31
+ },
+ {
+  "id": "min_46",
+  "cat": "min",
+  "text": "46분.",
+  "dur": 1.59
+ },
+ {
+  "id": "min_47",
+  "cat": "min",
+  "text": "47분.",
+  "dur": 1.73
+ },
+ {
+  "id": "min_48",
+  "cat": "min",
+  "text": "48분.",
+  "dur": 1.51
+ },
+ {
+  "id": "min_49",
+  "cat": "min",
+  "text": "49분.",
+  "dur": 1.5
+ },
+ {
+  "id": "min_50",
+  "cat": "min",
+  "text": "50분.",
   "dur": 0.93
  },
  {
-  "id": "cheer_13",
-  "cat": "cheer",
-  "text": "거의 다 했어요!",
+  "id": "min_51",
+  "cat": "min",
+  "text": "51분.",
   "dur": 1.33
  },
  {
-  "id": "cheer_14",
-  "cat": "cheer",
-  "text": "멋져요!",
-  "dur": 0.85
+  "id": "min_52",
+  "cat": "min",
+  "text": "52분.",
+  "dur": 1.56
  },
  {
-  "id": "cheer_15",
-  "cat": "cheer",
-  "text": "오늘 최고예요!",
-  "dur": 1.02
+  "id": "min_53",
+  "cat": "min",
+  "text": "53분.",
+  "dur": 2.0
+ },
+ {
+  "id": "min_54",
+  "cat": "min",
+  "text": "54분.",
+  "dur": 1.69
+ },
+ {
+  "id": "min_55",
+  "cat": "min",
+  "text": "55분.",
+  "dur": 1.36
+ },
+ {
+  "id": "min_56",
+  "cat": "min",
+  "text": "56분.",
+  "dur": 1.48
+ },
+ {
+  "id": "min_57",
+  "cat": "min",
+  "text": "57분.",
+  "dur": 1.46
+ },
+ {
+  "id": "min_58",
+  "cat": "min",
+  "text": "58분.",
+  "dur": 1.71
+ },
+ {
+  "id": "min_59",
+  "cat": "min",
+  "text": "59분.",
+  "dur": 1.34
+ },
+ {
+  "id": "sec_1",
+  "cat": "sec",
+  "text": "1초.",
+  "dur": 2.13
+ },
+ {
+  "id": "sec_2",
+  "cat": "sec",
+  "text": "2초.",
+  "dur": 0.89
+ },
+ {
+  "id": "sec_3",
+  "cat": "sec",
+  "text": "3초.",
+  "dur": 1.3
+ },
+ {
+  "id": "sec_4",
+  "cat": "sec",
+  "text": "4초.",
+  "dur": 1.28
+ },
+ {
+  "id": "sec_5",
+  "cat": "sec",
+  "text": "5초.",
+  "dur": 1.95
+ },
+ {
+  "id": "sec_6",
+  "cat": "sec",
+  "text": "6초.",
+  "dur": 1.68
+ },
+ {
+  "id": "sec_7",
+  "cat": "sec",
+  "text": "7초.",
+  "dur": 1.67
+ },
+ {
+  "id": "sec_8",
+  "cat": "sec",
+  "text": "8초.",
+  "dur": 1.6
+ },
+ {
+  "id": "sec_9",
+  "cat": "sec",
+  "text": "9초.",
+  "dur": 1.07
+ },
+ {
+  "id": "sec_10",
+  "cat": "sec",
+  "text": "10초.",
+  "dur": 1.47
+ },
+ {
+  "id": "sec_11",
+  "cat": "sec",
+  "text": "11초.",
+  "dur": 1.38
+ },
+ {
+  "id": "sec_12",
+  "cat": "sec",
+  "text": "12초.",
+  "dur": 1.56
+ },
+ {
+  "id": "sec_13",
+  "cat": "sec",
+  "text": "13초.",
+  "dur": 1.81
+ },
+ {
+  "id": "sec_14",
+  "cat": "sec",
+  "text": "14초.",
+  "dur": 1.61
+ },
+ {
+  "id": "sec_15",
+  "cat": "sec",
+  "text": "15초.",
+  "dur": 1.45
+ },
+ {
+  "id": "sec_16",
+  "cat": "sec",
+  "text": "16초.",
+  "dur": 1.79
+ },
+ {
+  "id": "sec_17",
+  "cat": "sec",
+  "text": "17초.",
+  "dur": 1.73
+ },
+ {
+  "id": "sec_18",
+  "cat": "sec",
+  "text": "18초.",
+  "dur": 1.82
+ },
+ {
+  "id": "sec_19",
+  "cat": "sec",
+  "text": "19초.",
+  "dur": 1.51
+ },
+ {
+  "id": "sec_20",
+  "cat": "sec",
+  "text": "20초.",
+  "dur": 1.12
+ },
+ {
+  "id": "sec_21",
+  "cat": "sec",
+  "text": "21초.",
+  "dur": 1.9
+ },
+ {
+  "id": "sec_22",
+  "cat": "sec",
+  "text": "22초.",
+  "dur": 1.86
+ },
+ {
+  "id": "sec_23",
+  "cat": "sec",
+  "text": "23초.",
+  "dur": 1.51
+ },
+ {
+  "id": "sec_24",
+  "cat": "sec",
+  "text": "24초.",
+  "dur": 2.13
+ },
+ {
+  "id": "sec_25",
+  "cat": "sec",
+  "text": "25초.",
+  "dur": 1.86
+ },
+ {
+  "id": "sec_26",
+  "cat": "sec",
+  "text": "26초.",
+  "dur": 1.33
+ },
+ {
+  "id": "sec_27",
+  "cat": "sec",
+  "text": "27초.",
+  "dur": 1.65
+ },
+ {
+  "id": "sec_28",
+  "cat": "sec",
+  "text": "28초.",
+  "dur": 1.76
+ },
+ {
+  "id": "sec_29",
+  "cat": "sec",
+  "text": "29초.",
+  "dur": 1.52
+ },
+ {
+  "id": "sec_30",
+  "cat": "sec",
+  "text": "30초.",
+  "dur": 1.37
+ },
+ {
+  "id": "sec_31",
+  "cat": "sec",
+  "text": "31초.",
+  "dur": 1.65
+ },
+ {
+  "id": "sec_32",
+  "cat": "sec",
+  "text": "32초.",
+  "dur": 1.9
+ },
+ {
+  "id": "sec_33",
+  "cat": "sec",
+  "text": "33초.",
+  "dur": 2.17
+ },
+ {
+  "id": "sec_34",
+  "cat": "sec",
+  "text": "34초.",
+  "dur": 1.71
+ },
+ {
+  "id": "sec_35",
+  "cat": "sec",
+  "text": "35초.",
+  "dur": 1.51
+ },
+ {
+  "id": "sec_36",
+  "cat": "sec",
+  "text": "36초.",
+  "dur": 1.96
+ },
+ {
+  "id": "sec_37",
+  "cat": "sec",
+  "text": "37초.",
+  "dur": 1.79
+ },
+ {
+  "id": "sec_38",
+  "cat": "sec",
+  "text": "38초.",
+  "dur": 1.64
+ },
+ {
+  "id": "sec_39",
+  "cat": "sec",
+  "text": "39초.",
+  "dur": 1.47
+ },
+ {
+  "id": "sec_40",
+  "cat": "sec",
+  "text": "40초.",
+  "dur": 1.45
+ },
+ {
+  "id": "sec_41",
+  "cat": "sec",
+  "text": "41초.",
+  "dur": 1.37
+ },
+ {
+  "id": "sec_42",
+  "cat": "sec",
+  "text": "42초.",
+  "dur": 1.57
+ },
+ {
+  "id": "sec_43",
+  "cat": "sec",
+  "text": "43초.",
+  "dur": 2.04
+ },
+ {
+  "id": "sec_44",
+  "cat": "sec",
+  "text": "44초.",
+  "dur": 1.51
+ },
+ {
+  "id": "sec_45",
+  "cat": "sec",
+  "text": "45초.",
+  "dur": 1.52
+ },
+ {
+  "id": "sec_46",
+  "cat": "sec",
+  "text": "46초.",
+  "dur": 2.05
+ },
+ {
+  "id": "sec_47",
+  "cat": "sec",
+  "text": "47초.",
+  "dur": 1.78
+ },
+ {
+  "id": "sec_48",
+  "cat": "sec",
+  "text": "48초.",
+  "dur": 1.46
+ },
+ {
+  "id": "sec_49",
+  "cat": "sec",
+  "text": "49초.",
+  "dur": 1.54
+ },
+ {
+  "id": "sec_50",
+  "cat": "sec",
+  "text": "50초.",
+  "dur": 1.51
+ },
+ {
+  "id": "sec_51",
+  "cat": "sec",
+  "text": "51초.",
+  "dur": 1.73
+ },
+ {
+  "id": "sec_52",
+  "cat": "sec",
+  "text": "52초.",
+  "dur": 1.96
+ },
+ {
+  "id": "sec_53",
+  "cat": "sec",
+  "text": "53초.",
+  "dur": 2.95
+ },
+ {
+  "id": "sec_54",
+  "cat": "sec",
+  "text": "54초.",
+  "dur": 2.0
+ },
+ {
+  "id": "sec_55",
+  "cat": "sec",
+  "text": "55초.",
+  "dur": 1.5
+ },
+ {
+  "id": "sec_56",
+  "cat": "sec",
+  "text": "56초.",
+  "dur": 1.99
+ },
+ {
+  "id": "sec_57",
+  "cat": "sec",
+  "text": "57초.",
+  "dur": 1.55
+ },
+ {
+  "id": "sec_58",
+  "cat": "sec",
+  "text": "58초.",
+  "dur": 1.78
+ },
+ {
+  "id": "sec_59",
+  "cat": "sec",
+  "text": "59초.",
+  "dur": 1.82
+ },
+ {
+  "id": "hr_60",
+  "cat": "hr",
+  "text": "심박 60.",
+  "dur": 1.67
+ },
+ {
+  "id": "hr_65",
+  "cat": "hr",
+  "text": "심박 65.",
+  "dur": 2.32
+ },
+ {
+  "id": "hr_70",
+  "cat": "hr",
+  "text": "심박 70.",
+  "dur": 1.82
+ },
+ {
+  "id": "hr_75",
+  "cat": "hr",
+  "text": "심박 75.",
+  "dur": 2.54
+ },
+ {
+  "id": "hr_80",
+  "cat": "hr",
+  "text": "심박 80.",
+  "dur": 1.53
+ },
+ {
+  "id": "hr_85",
+  "cat": "hr",
+  "text": "심박 85.",
+  "dur": 2.04
+ },
+ {
+  "id": "hr_90",
+  "cat": "hr",
+  "text": "심박 90.",
+  "dur": 1.7
+ },
+ {
+  "id": "hr_95",
+  "cat": "hr",
+  "text": "심박 95.",
+  "dur": 1.69
+ },
+ {
+  "id": "hr_100",
+  "cat": "hr",
+  "text": "심박 100.",
+  "dur": 1.51
+ },
+ {
+  "id": "hr_105",
+  "cat": "hr",
+  "text": "심박 105.",
+  "dur": 2.04
+ },
+ {
+  "id": "hr_110",
+  "cat": "hr",
+  "text": "심박 110.",
+  "dur": 1.77
+ },
+ {
+  "id": "hr_115",
+  "cat": "hr",
+  "text": "심박 115.",
+  "dur": 2.57
+ },
+ {
+  "id": "hr_120",
+  "cat": "hr",
+  "text": "심박 120.",
+  "dur": 1.91
+ },
+ {
+  "id": "hr_125",
+  "cat": "hr",
+  "text": "심박 125.",
+  "dur": 1.14
+ },
+ {
+  "id": "hr_130",
+  "cat": "hr",
+  "text": "심박 130.",
+  "dur": 1.81
+ },
+ {
+  "id": "hr_135",
+  "cat": "hr",
+  "text": "심박 135.",
+  "dur": 1.87
+ },
+ {
+  "id": "hr_140",
+  "cat": "hr",
+  "text": "심박 140.",
+  "dur": 1.53
+ },
+ {
+  "id": "hr_145",
+  "cat": "hr",
+  "text": "심박 145.",
+  "dur": 2.39
+ },
+ {
+  "id": "hr_150",
+  "cat": "hr",
+  "text": "심박 150.",
+  "dur": 1.96
+ },
+ {
+  "id": "hr_155",
+  "cat": "hr",
+  "text": "심박 155.",
+  "dur": 3.21
+ },
+ {
+  "id": "hr_160",
+  "cat": "hr",
+  "text": "심박 160.",
+  "dur": 2.1
+ },
+ {
+  "id": "hr_165",
+  "cat": "hr",
+  "text": "심박 165.",
+  "dur": 2.46
+ },
+ {
+  "id": "hr_170",
+  "cat": "hr",
+  "text": "심박 170.",
+  "dur": 1.86
+ },
+ {
+  "id": "hr_175",
+  "cat": "hr",
+  "text": "심박 175.",
+  "dur": 2.36
+ },
+ {
+  "id": "hr_180",
+  "cat": "hr",
+  "text": "심박 180.",
+  "dur": 1.91
+ },
+ {
+  "id": "hr_185",
+  "cat": "hr",
+  "text": "심박 185.",
+  "dur": 2.76
+ },
+ {
+  "id": "hr_190",
+  "cat": "hr",
+  "text": "심박 190.",
+  "dur": 2.4
+ },
+ {
+  "id": "hr_195",
+  "cat": "hr",
+  "text": "심박 195.",
+  "dur": 2.39
+ },
+ {
+  "id": "hr_200",
+  "cat": "hr",
+  "text": "심박 200.",
+  "dur": 1.52
+ },
+ {
+  "id": "m_500",
+  "cat": "dist",
+  "text": "500미터.",
+  "dur": 1.84
+ },
+ {
+  "id": "km_1",
+  "cat": "dist",
+  "text": "1킬로미터.",
+  "dur": 2.32
+ },
+ {
+  "id": "km_1_5",
+  "cat": "dist",
+  "text": "1.5킬로미터.",
+  "dur": 2.93
+ },
+ {
+  "id": "km_2",
+  "cat": "dist",
+  "text": "2킬로미터.",
+  "dur": 1.8
+ },
+ {
+  "id": "km_2_5",
+  "cat": "dist",
+  "text": "2.5킬로미터.",
+  "dur": 3.29
+ },
+ {
+  "id": "km_3",
+  "cat": "dist",
+  "text": "3킬로미터.",
+  "dur": 1.66
+ },
+ {
+  "id": "km_3_5",
+  "cat": "dist",
+  "text": "3.5킬로미터.",
+  "dur": 1.97
+ },
+ {
+  "id": "km_4",
+  "cat": "dist",
+  "text": "4킬로미터.",
+  "dur": 1.6
+ },
+ {
+  "id": "km_4_5",
+  "cat": "dist",
+  "text": "4.5킬로미터.",
+  "dur": 2.1
+ },
+ {
+  "id": "km_5",
+  "cat": "dist",
+  "text": "5킬로미터.",
+  "dur": 2.08
+ },
+ {
+  "id": "km_5_5",
+  "cat": "dist",
+  "text": "5.5킬로미터.",
+  "dur": 2.26
+ },
+ {
+  "id": "km_6",
+  "cat": "dist",
+  "text": "6킬로미터.",
+  "dur": 1.66
+ },
+ {
+  "id": "km_6_5",
+  "cat": "dist",
+  "text": "6.5킬로미터.",
+  "dur": 2.38
+ },
+ {
+  "id": "km_7",
+  "cat": "dist",
+  "text": "7킬로미터.",
+  "dur": 1.72
+ },
+ {
+  "id": "km_7_5",
+  "cat": "dist",
+  "text": "7.5킬로미터.",
+  "dur": 1.98
+ },
+ {
+  "id": "km_8",
+  "cat": "dist",
+  "text": "8킬로미터.",
+  "dur": 1.96
+ },
+ {
+  "id": "km_8_5",
+  "cat": "dist",
+  "text": "8.5킬로미터.",
+  "dur": 1.99
+ },
+ {
+  "id": "km_9",
+  "cat": "dist",
+  "text": "9킬로미터.",
+  "dur": 1.85
+ },
+ {
+  "id": "km_9_5",
+  "cat": "dist",
+  "text": "9.5킬로미터.",
+  "dur": 2.08
+ },
+ {
+  "id": "km_10",
+  "cat": "dist",
+  "text": "10킬로미터.",
+  "dur": 1.79
+ },
+ {
+  "id": "km_11",
+  "cat": "dist",
+  "text": "11킬로미터.",
+  "dur": 2.18
+ },
+ {
+  "id": "km_12",
+  "cat": "dist",
+  "text": "12킬로미터.",
+  "dur": 1.81
+ },
+ {
+  "id": "km_13",
+  "cat": "dist",
+  "text": "13킬로미터.",
+  "dur": 1.91
+ },
+ {
+  "id": "km_14",
+  "cat": "dist",
+  "text": "14킬로미터.",
+  "dur": 1.77
+ },
+ {
+  "id": "km_15",
+  "cat": "dist",
+  "text": "15킬로미터.",
+  "dur": 1.63
+ },
+ {
+  "id": "km_16",
+  "cat": "dist",
+  "text": "16킬로미터.",
+  "dur": 1.87
+ },
+ {
+  "id": "km_17",
+  "cat": "dist",
+  "text": "17킬로미터.",
+  "dur": 1.96
+ },
+ {
+  "id": "km_18",
+  "cat": "dist",
+  "text": "18킬로미터.",
+  "dur": 1.77
+ },
+ {
+  "id": "km_19",
+  "cat": "dist",
+  "text": "19킬로미터.",
+  "dur": 1.96
+ },
+ {
+  "id": "km_20",
+  "cat": "dist",
+  "text": "20킬로미터.",
+  "dur": 1.79
+ },
+ {
+  "id": "km_21",
+  "cat": "dist",
+  "text": "21킬로미터.",
+  "dur": 2.02
+ },
+ {
+  "id": "half",
+  "cat": "dist",
+  "text": "하프 완주!",
+  "dur": 1.78
+ },
+ {
+  "id": "full",
+  "cat": "dist",
+  "text": "풀코스 완주!",
+  "dur": 2.74
+ },
+ {
+  "id": "m_100",
+  "cat": "dist",
+  "text": "100미터.",
+  "dur": 1.56
+ },
+ {
+  "id": "m_200",
+  "cat": "dist",
+  "text": "200미터.",
+  "dur": 1.61
+ },
+ {
+  "id": "m_300",
+  "cat": "dist",
+  "text": "300미터.",
+  "dur": 1.6
+ },
+ {
+  "id": "m_400",
+  "cat": "dist",
+  "text": "400미터.",
+  "dur": 1.5
+ },
+ {
+  "id": "m_600",
+  "cat": "dist",
+  "text": "600미터.",
+  "dur": 1.36
+ },
+ {
+  "id": "m_800",
+  "cat": "dist",
+  "text": "800미터.",
+  "dur": 1.32
+ },
+ {
+  "id": "hour_1",
+  "cat": "hour",
+  "text": "한 시간.",
+  "dur": 1.43
+ },
+ {
+  "id": "hour_2",
+  "cat": "hour",
+  "text": "두 시간.",
+  "dur": 1.77
+ },
+ {
+  "id": "hour_3",
+  "cat": "hour",
+  "text": "세 시간.",
+  "dur": 1.37
+ },
+ {
+  "id": "pre_pace",
+  "cat": "pre",
+  "text": "페이스.",
+  "dur": 1.96
+ },
+ {
+  "id": "pre_time",
+  "cat": "pre",
+  "text": "지금까지.",
+  "dur": 1.51
+ },
+ {
+  "id": "pre_avg",
+  "cat": "pre",
+  "text": "평균 페이스.",
+  "dur": 2.0
+ },
+ {
+  "id": "pre_lap",
+  "cat": "pre",
+  "text": "이번 구간.",
+  "dur": 1.51
+ },
+ {
+  "id": "pre_left",
+  "cat": "pre",
+  "text": "남은 시간.",
+  "dur": 1.87
+ },
+ {
+  "id": "pre_next",
+  "cat": "pre",
+  "text": "다음은.",
+  "dur": 1.55
+ },
+ {
+  "id": "pre_round",
+  "cat": "pre",
+  "text": "라운드.",
+  "dur": 1.77
+ },
+ {
+  "id": "run_1",
+  "cat": "runno",
+  "text": "첫 번째 러닝.",
+  "dur": 1.59
+ },
+ {
+  "id": "run_2",
+  "cat": "runno",
+  "text": "두 번째 러닝.",
+  "dur": 2.26
+ },
+ {
+  "id": "run_3",
+  "cat": "runno",
+  "text": "세 번째 러닝.",
+  "dur": 2.12
+ },
+ {
+  "id": "run_4",
+  "cat": "runno",
+  "text": "네 번째 러닝.",
+  "dur": 2.04
+ },
+ {
+  "id": "run_5",
+  "cat": "runno",
+  "text": "다섯 번째 러닝.",
+  "dur": 2.31
+ },
+ {
+  "id": "run_6",
+  "cat": "runno",
+  "text": "여섯 번째 러닝.",
+  "dur": 2.39
+ },
+ {
+  "id": "run_7",
+  "cat": "runno",
+  "text": "일곱 번째 러닝.",
+  "dur": 2.22
+ },
+ {
+  "id": "run_8",
+  "cat": "runno",
+  "text": "여덟 번째 러닝.",
+  "dur": 2.27
+ },
+ {
+  "id": "st_run",
+  "cat": "station",
+  "text": "러닝.",
+  "dur": 1.56
+ },
+ {
+  "id": "st_ski",
+  "cat": "station",
+  "text": "스키 에르그.",
+  "dur": 1.87
+ },
+ {
+  "id": "st_push",
+  "cat": "station",
+  "text": "슬레드 푸쉬.",
+  "dur": 1.55
+ },
+ {
+  "id": "st_pull",
+  "cat": "station",
+  "text": "슬레드 풀.",
+  "dur": 1.56
+ },
+ {
+  "id": "st_bbj",
+  "cat": "station",
+  "text": "버피 브로드 점프.",
+  "dur": 1.97
+ },
+ {
+  "id": "st_row",
+  "cat": "station",
+  "text": "로잉.",
+  "dur": 1.43
+ },
+ {
+  "id": "st_farm",
+  "cat": "station",
+  "text": "파머스 캐리.",
+  "dur": 1.77
+ },
+ {
+  "id": "st_lunge",
+  "cat": "station",
+  "text": "샌드백 런지.",
+  "dur": 1.91
+ },
+ {
+  "id": "st_wb",
+  "cat": "station",
+  "text": "월볼.",
+  "dur": 1.31
+ },
+ {
+  "id": "st_rox",
+  "cat": "station",
+  "text": "록스존.",
+  "dur": 1.65
+ },
+ {
+  "id": "next_run",
+  "cat": "next",
+  "text": "다음은 러닝이에요.",
+  "dur": 2.49
+ },
+ {
+  "id": "next_ski",
+  "cat": "next",
+  "text": "다음은 스키 에르그예요.",
+  "dur": 3.38
+ },
+ {
+  "id": "next_push",
+  "cat": "next",
+  "text": "다음은 슬레드 푸쉬예요.",
+  "dur": 3.53
+ },
+ {
+  "id": "next_pull",
+  "cat": "next",
+  "text": "다음은 슬레드 풀이에요.",
+  "dur": 2.81
+ },
+ {
+  "id": "next_bbj",
+  "cat": "next",
+  "text": "다음은 버피 브로드 점프예요.",
+  "dur": 3.79
+ },
+ {
+  "id": "next_row",
+  "cat": "next",
+  "text": "다음은 로잉이에요.",
+  "dur": 2.44
+ },
+ {
+  "id": "next_farm",
+  "cat": "next",
+  "text": "다음은 파머스 캐리예요.",
+  "dur": 3.06
+ },
+ {
+  "id": "next_lunge",
+  "cat": "next",
+  "text": "다음은 샌드백 런지예요.",
+  "dur": 3.32
+ },
+ {
+  "id": "next_wb",
+  "cat": "next",
+  "text": "다음은 월볼이에요.",
+  "dur": 2.57
+ },
+ {
+  "id": "next_rox",
+  "cat": "next",
+  "text": "다음은 록스존이에요.",
+  "dur": 3.09
+ },
+ {
+  "id": "near_run",
+  "cat": "near",
+  "text": "러닝 거의 다 왔어요.",
+  "dur": 3.32
+ },
+ {
+  "id": "near_run_rox",
+  "cat": "near",
+  "text": "러닝 거의 끝. 이제 록스존으로.",
+  "dur": 3.59
+ },
+ {
+  "id": "near_st",
+  "cat": "near",
+  "text": "조금만 더, 거의 끝나요.",
+  "dur": 2.85
+ },
+ {
+  "id": "near_st2",
+  "cat": "near",
+  "text": "마무리 들어갑니다. 끝까지!",
+  "dur": 2.11
+ },
+ {
+  "id": "ph_start",
+  "cat": "phase",
+  "text": "자, 갑니다. 첫 러닝 편하게 시작해요.",
+  "dur": 4.4
+ },
+ {
+  "id": "ph_q1",
+  "cat": "phase",
+  "text": "아직 초반이에요. 힘 아껴요.",
+  "dur": 3.47
+ },
+ {
+  "id": "ph_half",
+  "cat": "phase",
+  "text": "절반 왔어요. 여기서부터가 진짜예요.",
+  "dur": 4.71
+ },
+ {
+  "id": "ph_q3",
+  "cat": "phase",
+  "text": "세 종목 남았어요. 잘 왔어요.",
+  "dur": 3.29
+ },
+ {
+  "id": "ph_two",
+  "cat": "phase",
+  "text": "두 종목 남았어요.",
+  "dur": 2.1
+ },
+ {
+  "id": "ph_lastrun",
+  "cat": "phase",
+  "text": "마지막 러닝이에요. 월볼만 남겨 두고 가요.",
+  "dur": 4.36
+ },
+ {
+  "id": "ph_wb",
+  "cat": "phase",
+  "text": "마지막 월볼. 하나씩 끝까지!",
+  "dur": 3.47
+ },
+ {
+  "id": "ph_finish",
+  "cat": "phase",
+  "text": "완주! 수고 많았어요.",
+  "dur": 2.93
  }
 ]

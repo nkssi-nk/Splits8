@@ -31,6 +31,7 @@ import com.nkssi.splits8.shared.Fm
 import com.nkssi.splits8.shared.L10n
 import com.nkssi.splits8.shared.LivePace
 import com.nkssi.splits8.shared.Units
+import kotlin.math.roundToInt
 import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.Seg
 import com.nkssi.splits8.shared.SegKind
@@ -73,7 +74,26 @@ data class LiveFrame(
     val speed: Double? = null,
     /** 빌드 27: lb · mi 로 보여 주는지 (설정 > Units) */
     val imperial: Boolean = false,
+    /** 1.2.2: 러닝 카드 (1 km 씩 끊어 보이지 않고 총 거리 · 지금 페이스) · 목표 거리(km, 0 = 자유 러닝) */
+    val runCard: Boolean = false,
+    val runGoalKm: Int = 0,
 ) {
+    /** 1.2.2 러닝 카드: 지금까지 거리(m). 잰 거리가 없으면(실내 손으로 넘김) 지난 km 수 */
+    val runDist: Double get() = totalDist?.takeIf { it > 0 } ?: (idx * 1000.0)
+
+    /** 1.2.2 러닝 카드 아래 줄: "목표 10 km · 평균 5:12" */
+    val runSummary: String
+        get() {
+            val parts = ArrayList<String>()
+            if (runGoalKm > 0) parts.add(if (imperial) L10n.t("Goal %@ mi", Units.dist(runGoalKm * 1000.0, true)) else L10n.t("Goal %@ km", "$runGoalKm"))
+            val d = runDist
+            if (d >= 200) {
+                val avg = Units.pace((total / d * 1000).roundToInt(), imperial)
+                if (avg in 1 until 3600) parts.add(L10n.t("Avg %@", Fm.t(avg)))
+            }
+            return parts.joinToString(" · ")
+        }
+
     val cur: Seg get() = seq.getOrNull(idx) ?: seq.lastOrNull() ?: Seg("run", "Run", "1KM", SegKind.Run, 0)
 
     /** Roxzone 을 뺀 전체 구간 수 */
@@ -129,14 +149,14 @@ fun LiveHeader(f: LiveFrame, status: String, live: Boolean, tagPrefix: String) {
                 }
             }
             Spacer(Modifier.width(12.dp))
-            if (!f.open) {
+            if (!f.open && !f.runCard) {
                 Box(Modifier.height(22.dp).border(1.dp, C.accent.copy(alpha = 0.5f), RoundedCornerShape(50)).padding(horizontal = 8.dp),
                     contentAlignment = Alignment.Center) {
                     T("${f.countNow} / ${f.countTotal}", F.num(12, color = C.accent), Modifier.testTag("$tagPrefix.of"), maxLines = 1, translate = false)
                 }
             }
         }
-        if (!f.open) LiveProgressBar(f.progress)
+        if (!f.open && !f.runCard) LiveProgressBar(f.progress)
     }
 }
 
@@ -168,8 +188,18 @@ fun LiveBody(f: LiveFrame, totalFont: Float, segFont: Float, icon: Float, nameFo
             Modifier.testTag("$tagPrefix.total"), minScale = 0.6f)
         Row(Modifier.padding(top = (segTop * 0.6f).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon8(cur.icon, (icon * 0.7f).dp, if (cur.kind == SegKind.Rox) C.text2 else C.accent)
-            FitText(cur.name, F.t(nameFont, W600), minScale = 0.7f)
+            // 1.2.2: 러닝 카드는 "KM 9" 대신 운동 이름
+            FitText(if (f.runCard) f.title.ifEmpty { "Run" } else cur.name, F.t(nameFont, W600), minScale = 0.7f)
         }
+        if (f.runCard) {
+            // 1.2.2 러닝 카드 (대표님 11-09): DIST(지금까지 총 거리) | PACE(지금 페이스, 모르면 처음부터 평균 — 1 km 마다 "측정 중" 안 됨)
+            Row(Modifier.padding(top = nameTop.dp).fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                LiveCol(if (f.imperial) "DIST MI" else "DIST KM", Units.dist(f.runDist, f.imperial), if (f.running) C.accent else C.text2,
+                    segFont * 0.85f, Modifier.testTag("$tagPrefix.dist"))
+                Box(Modifier.padding(top = 22.dp).width(1.dp).height((segFont * 0.85f).dp).background(Color.White.copy(alpha = 0.14f)))
+                LiveCol(if (f.imperial) "PACE /MI" else "PACE /KM", LivePace.text(f.total, f.runDist, f.imperial, f.speed), timeColor, segFont * 0.85f)
+            }
+        } else
         Row(Modifier.padding(top = nameTop.dp).fillMaxWidth(), verticalAlignment = Alignment.Top) {
             LiveCol("SPLIT", Fm.t(f.segEl), segColor, segFont * 0.85f, Modifier.testTag("$tagPrefix.seg"))
             // 가운데 세로선: 숫자 높이에 맞춤
@@ -181,7 +211,7 @@ fun LiveBody(f: LiveFrame, totalFont: Float, segFont: Float, icon: Float, nameFo
                 else -> LiveCol("", Units.detail(cur.detail, f.imperial), C.text2, nameFont)
             }
         }
-        FitText(f.detailLine, F.num(detailFont, androidx.compose.ui.text.font.FontWeight.Normal, C.aeb),
+        FitText(if (f.runCard) f.runSummary else f.detailLine, F.num(detailFont, androidx.compose.ui.text.font.FontWeight.Normal, C.aeb),
             Modifier.padding(top = 6.dp).height((detailFont * 1.4f).dp), minScale = 0.7f)
     }
 }

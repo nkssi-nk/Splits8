@@ -186,7 +186,8 @@ fun WLive(onControls: () -> Unit) {
                 Modifier.fillMaxWidth().height((m.totalFont * 1.18f).dp).testTag("w.total"), translate = false)
             // 지금 구간 + NEXT + 컨트롤 줄 (넘길 때 밀림: 나가는 쪽 왼쪽, 들어오는 쪽 오른쪽에서)
             val curve = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
-            AnimatedContent(e.idx, Modifier.weight(1f).fillMaxWidth(), label = "seg",
+            // 1.2.2: 러닝 카드는 1 km 마다 밀지 않음 (끊어 보이지 않게)
+            AnimatedContent(if (e.isRunKind) 0 else e.idx, Modifier.weight(1f).fillMaxWidth(), label = "seg",
                 transitionSpec = {
                     (slideInHorizontally(tween(220, easing = curve)) { it * 2 / 5 } + fadeIn(tween(220))) togetherWith
                         (slideOutHorizontally(tween(220, easing = curve)) { -it } + fadeOut(tween(220)))
@@ -196,8 +197,11 @@ fun WLive(onControls: () -> Unit) {
                     Current(now, m, aod)
                     Spacer(Modifier.weight(1f).heightIn(min = 4.dp))
                     if (!aod) {
-                        NextLabel(m)
-                        Spacer(Modifier.weight(1f).heightIn(min = 4.dp))
+                        // 1.2.2: 러닝 카드는 "NEXT KM 10" 을 안 보여 줌 (헷갈림 — 대표님 11-09)
+                        if (!e.isRunKind) {
+                            NextLabel(m)
+                            Spacer(Modifier.weight(1f).heightIn(min = 4.dp))
+                        }
                         Controls(m)
                     }
                 }
@@ -214,6 +218,7 @@ private fun Current(now: Long, m: LiveMetrics, aod: Boolean) {
     val e = WatchStore.engine
     // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동은 남은 시간 · 거리를 크게
     if (Kinds.isNew(e.kind)) { BonusCurrent(now, m, aod); return }
+    if (e.isRunKind) { RunCurrent(now, m, aod); return }
     val cur = e.cur
     val el = e.segEl(now)
     val isRox = cur.kind == SegKind.Rox
@@ -308,6 +313,52 @@ private fun BonusCurrent(now: Long, m: LiveMetrics, aod: Boolean) {
             Modifier.fillMaxWidth().height((m.seg * 1.6f).dp).testTag("w.bonusBig"), translate = false)
         T(line, F.t(11, W500, C.text2), Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
     }
+}
+
+/**
+ * 1.2.2 러닝 카드 (대표님 11-09): 1 km 씩 끊어 보이지 않고 DIST(지금까지 총 거리) · PACE(지금 페이스) · ♥ BPM.
+ * 아래 줄 = 목표 거리 · 평균 페이스 (처음부터 계속). 1 km 기록은 뒤에서 그대로 저장 (기록 화면 구간 표)
+ */
+@Composable
+private fun RunCurrent(now: Long, m: LiveMetrics, aod: Boolean) {
+    val e = WatchStore.engine
+    val imp = e.settings.imperial
+    val fg = if (aod) C.text3 else Color.White
+    val d = e.runDistance
+    val total = e.total(now)
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.height((m.name + 6).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Icon8("run", m.icon.dp, if (aod) Tint.Dim else Tint.Yellow)
+            T(e.title.ifEmpty { "Run" }, F.t(m.name, W600, fg), minScale = 0.8f, translate = false)
+        }
+        val seg = (m.seg * 0.86f).let { kotlin.math.round(it) }
+        val hrOn = e.hr > 0 && !aod
+        val hrColor = if (hrOn) C.zone(e.zone.coerceIn(1, 5)) else C.text3
+        Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.Top) {
+            Col(if (imp) "DIST MI" else "DIST KM", Units.dist(d, imp), if (aod) C.text3 else C.accent, seg, "w.dist", rowH = m.seg)
+            ColSep(seg)
+            // 지금 속도 → 모르면 처음부터의 평균 (구간마다 "측정 중" 으로 돌아가지 않게)
+            Col(if (imp) (if (curvedRun()) "PACE/MI ≈" else "PACE /MI") else (if (curvedRun()) "PACE ≈" else "PACE"),
+                e.paceText(total, d, imp) ?: wt("Measuring"), fg, seg, "w.pace", rowH = m.seg)
+            ColSep(seg)
+            Col("♥ BPM", if (e.hr > 0) e.hr.toInt().toString() else "--", hrColor, seg, "w.bpm", labelColor = hrColor, rowH = m.seg)
+        }
+        T(runSummary(now), F.num(11, W500, C.text2), Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
+    }
+}
+
+/** 러닝 카드 아래 줄: "목표 10 km · 평균 5:12" (자유 러닝은 평균만) */
+private fun runSummary(now: Long): String {
+    val e = WatchStore.engine
+    val imp = e.settings.imperial
+    val parts = ArrayList<String>()
+    if (e.runGoalKm > 0) parts.add(if (imp) wt("Goal %@ mi", Units.dist(e.runGoalKm * 1000.0, true)) else wt("Goal %@ km", "${e.runGoalKm}"))
+    val d = e.runDistance
+    if (d >= 200) {
+        val avg = Units.pace((e.total(now) / d * 1000).roundToInt(), imp)
+        if (avg in 1 until 3600) parts.add(wt("Avg %@", Fm.t(avg)))
+    }
+    return parts.joinToString(" · ")
 }
 
 /** 기능성 운동 세트 줄: "5 × 80 kg" */
@@ -482,16 +533,20 @@ fun WControls(onBack: () -> Unit, onEnd: () -> Unit, onNext: () -> Unit) {
                 T(if (e.mode == Mode.Training) e.title else e.mode.title, F.t(12, W600, C.accent), Modifier.width((90 * k).dp), translate = e.mode != Mode.Training)
                 T(Fm.t(e.total(now)), F.num(14), translate = false)
             }
+            // 1.2.2: Skip 이 들어가서 위 줄 세 개(End · Pause · Undo) · 아래 줄 두 개(Skip · Next), 단추는 조금 작게
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy((6 * k).dp, Alignment.CenterVertically)) {
-                Row(horizontalArrangement = Arrangement.spacedBy((14 * k).dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy((8 * k).dp)) {
                     RoundButton("End", "i_x", C.bad, hex(0xFF453A, 0.22f), Color.White, "w.end", onClick = onEnd)
                     RoundButton(if (e.running) "Pause" else "Resume", if (e.running) "i_pause" else "i_play", Color.White,
                         Color.White.copy(alpha = 0.12f), Color.White, "w.pause") { e.togglePause() }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy((14 * k).dp)) {
                     val on = e.canUndo
                     RoundButton("Undo", null, if (on) Color.White else C.text3, Color.White.copy(alpha = if (on) 0.12f else 0.05f),
                         if (on) Color.White else C.text3, "w.undo", enabled = on) { e.undo(); onBack() }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy((14 * k).dp)) {
+                    val sk = e.canSkip
+                    RoundButton("Skip", null, if (sk) Color.White else C.text3, Color.White.copy(alpha = if (sk) 0.12f else 0.05f),
+                        if (sk) Color.White else C.text3, "w.skip", enabled = sk, sym = R.drawable.sym_skip) { e.skip(); onBack() }
                     RoundButton("Next", "i_dblChev", Color.Black, C.accent, Color.Black, "w.controlsNext", labelColor = C.accent, onClick = onNext)
                 }
             }
@@ -502,13 +557,13 @@ fun WControls(onBack: () -> Unit, onEnd: () -> Unit, onNext: () -> Unit) {
 
 @Composable
 private fun RoundButton(label: String, glyph: String?, fg: Color, bg: Color, glyphColor: Color, tag: String,
-                        enabled: Boolean = true, labelColor: Color = fg, onClick: () -> Unit) {
+                        enabled: Boolean = true, labelColor: Color = fg, sym: Int = R.drawable.sym_undo, onClick: () -> Unit) {
     val k = wk()
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Box(Modifier.size((48 * k).dp).clip(CircleShape).background(bg).press(enabled, onClick).testTag(tag), contentAlignment = Alignment.Center) {
-            if (glyph != null) Icon8(glyph, (20 * k).dp, glyphColor) else Sym(R.drawable.sym_undo, (20 * k).dp, glyphColor)
+        Box(Modifier.size((44 * k).dp).clip(CircleShape).background(bg).press(enabled, onClick).testTag(tag), contentAlignment = Alignment.Center) {
+            if (glyph != null) Icon8(glyph, (19 * k).dp, glyphColor) else Sym(sym, (19 * k).dp, glyphColor)
         }
-        T(label, F.t(11, W600, if (labelColor == Color.Black) C.accent else labelColor), Modifier.width((60 * k).dp))
+        T(label, F.t(11, W600, if (labelColor == Color.Black) C.accent else labelColor), Modifier.width((52 * k).dp))
     }
 }
 
@@ -537,7 +592,9 @@ fun WSegmentList() {
                 val done = i < e.idx
                 val c = i == e.idx
                 val tint = when { c -> Tint.Black; done -> Tint.Dim; s.kind == SegKind.Rox -> Tint.Mute; else -> Tint.White }
+                val sk = done && i in e.skippedIdx          // 1.2.2
                 val time = when {
+                    sk -> wt("Skipped")
                     done -> Fm.t(e.splits.getOrElse(i) { 0 })
                     c -> Fm.t(e.segEl(now))
                     else -> if (s.target > 0) Fm.t(s.target) else "–"
@@ -547,7 +604,7 @@ fun WSegmentList() {
                     Icon8(s.icon, 13.dp, tint)
                     T(s.name, F.t(12, if (c) W600 else W400, if (c) Color.Black else if (done) C.text2 else Color.White), Modifier.weight(1f),
                         align = TextAlign.Start, minScale = 0.85f, translate = false)
-                    if (done) Icon8("i_check", 10.dp, C.good)
+                    if (done && !sk) Icon8("i_check", 10.dp, C.good)
                     T(time, F.num(12, W500, if (c) Color.Black else if (done) Color.White else C.text3), translate = false)
                 }
             }

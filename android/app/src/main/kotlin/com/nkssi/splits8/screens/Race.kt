@@ -88,7 +88,7 @@ import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 
 // 아이폰 SimRaceViews.swift 의 RaceView · GoalTimeSheet, EventViews.swift (대회 · 대회 찾기),
-// SettingsViews.swift 의 SetGoalsView (구간 목표). 더블 계획은 Doubles.kt
+// SettingsViews.swift 의 SetGoalsView (구간 목표). 교대 계획은 Doubles.kt
 
 // MARK: - I4 레이스 탭
 
@@ -168,7 +168,7 @@ private fun GoalBar(t: String, frac: Float, fill: Color, value: String, valueCol
     }
 }
 
-/** 설정 줄 카드: Event › · Division › · (더블이면) Doubles plan › · Goal time › · Split targets (16 막대) */
+/** 설정 줄 카드: Event › · Division › · (더블이면) Swap plan › · Goal time › · Split targets (16 막대) */
 @Composable
 private fun RaceRowsCard() {
     val s = Store.settings
@@ -179,7 +179,7 @@ private fun RaceRowsCard() {
         }
         RaceRow("Division", "${s.div.name} ›") { Router.sub(Scr.SetDiv, Scr.Race) }
         if (s.division.startsWith("dbl")) {
-            RaceRow("Doubles plan", doublesValue()) { Router.raceSheet = "doubles" }
+            RaceRow("Swap plan", doublesValue()) { Router.raceSheet = "doubles" }
         }
         RaceRow("Goal time", Fm.t(s.goalTime) + " ›", numeric = true) { Router.raceSheet = "goal" }
         // 누르면 구간별 목표 고치는 화면

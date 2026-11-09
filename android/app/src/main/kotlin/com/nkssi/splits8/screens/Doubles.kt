@@ -67,7 +67,7 @@ import com.nkssi.splits8.ui.rowLine
 import com.nkssi.splits8.ui.tap
 import kotlinx.coroutines.launch
 
-// 아이폰 DoublesPlanViews.swift (빌드 27) — 더블 계획 시트.
+// 아이폰 DoublesPlanViews.swift (빌드 27) — 교대 계획 시트.
 // 스테이션마다 "몇 m(개)씩 번갈아 · 누가 먼저"를 정함. 저장하면 워치로도 감 (WatchContext.doublesPlan).
 // 공유: 계획 그림 + 링크 (받은 사람은 먼저 하는 사람이 바뀐 채로 저장됨 — Router.acceptIncomingDoubles)
 // 아이폰은 스테이션을 누르면 시트 위에 시트를 하나 더 띄우지만, 안드로이드는 같은 시트 안에서 화면을 바꿈
@@ -143,7 +143,7 @@ fun DoublesBar(plan: DoublesPlan, index: Int, height: Dp = 8.dp, modifier: Modif
     })
 }
 
-/** 더블 계획 시트 (Race · Full Sim 의 "Doubles plan" 줄) */
+/** 교대 계획 시트 (Race · Full Sim 의 "Swap plan" 줄) */
 @Composable
 fun DoublesPlanSheet() {
     var plan by remember { mutableStateOf(Store.settings.doublesPlan ?: DoublesPlan()) }
@@ -169,7 +169,7 @@ fun DoublesPlanSheet() {
     fun share() {
         scope.launch {
             val bmp = runCatching { layer.toImageBitmap().asAndroidBitmap() }.getOrNull()
-            var text = "SPLITS8 Doubles plan".l10n
+            var text = "SPLITS8 Swap plan".l10n
             text += "\n" + DoublesLink.webUrl(plan, Store.settings.nickname)
             if (bmp != null) shareImage(ctx, bmp, text)
             else runCatching { ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null)) }
@@ -177,7 +177,7 @@ fun DoublesPlanSheet() {
     }
 
     Column(Modifier.padding(horizontal = 16.dp)) {
-        NavBar3("Cancel", "Doubles plan", right = "Save", edgeBack = false, onLeft = { Router.raceSheet = null }, onRight = { save() })
+        NavBar3("Cancel", "Swap plan", right = "Save", edgeBack = false, onLeft = { Router.raceSheet = null }, onRight = { save() })
         Column(Modifier.verticalScroll(rememberScrollState()).padding(top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             PartnerCard(plan) { plan = it }
             Note8("Choose how much each of you does per turn and who goes first. Tap a station to change it.")
@@ -368,7 +368,7 @@ private fun StepButton(glyph: String, on: Boolean, tag: String, onTap: () -> Uni
 fun DoublesShareCard(plan: DoublesPlan, division: String) {
     Column(Modifier.width(360.dp).background(Color.Black).padding(22.dp)) {
         Wordmark(22f)
-        T("Our doubles plan", F.t(28, W600), Modifier.padding(top = 18.dp), maxLines = 1)
+        T("Our swap plan", F.t(28, W600), Modifier.padding(top = 18.dp), maxLines = 1)
         T(division.l10n + " · " + "Me".l10n + " & " + plan.partnerShown, F.t(13, color = C.text2), Modifier.padding(top = 4.dp),
             maxLines = 1, translate = false)
         Column(Modifier.padding(top = 16.dp)) {
@@ -398,7 +398,7 @@ fun DoublesShareCard(plan: DoublesPlan, division: String) {
     }
 }
 
-/** 더블 계획 줄의 값: 안 정했으면 Not set, 파트너가 있으면 그 이름, 아니면 Custom */
+/** 교대 계획 줄의 값: 안 정했으면 Not set, 파트너가 있으면 그 이름, 아니면 Custom */
 fun doublesValue(): String {
     val p = Store.settings.doublesPlan ?: return "Not set".l10n + " ›"
     val n = p.partnerName

@@ -98,6 +98,24 @@ class ModelsTest {
         assertEquals(16, r.splits16!!.size)
     }
 
+    @Test fun skippedFlags() {
+        // 1.2.2: 건너뛴 구간(0초)이 있으면 "확인 필요" 대신 Skipped, 3개부터 Partial. 둘 다 counts = false
+        val one = sim16(270, 230).mapIndexed { i, s -> if (i == 3) s.copy(time = 0, skipped = true) else s }
+        val r1 = rec(Mode.Sim, 3770, one)
+        assertEquals(RecordFlag.Skipped, r1.flag)
+        assertEquals(1, r1.skippedCount)
+        assertFalse(r1.counts)
+        val three = sim16(270, 230).mapIndexed { i, s -> if (i in listOf(3, 5, 7)) s.copy(time = 0, skipped = true) else s }
+        assertEquals(RecordFlag.Partial, rec(Mode.Sim, 3310, three).flag)
+        // 예전 기록(skipped 없음)은 그대로 — 0초 스테이션은 여전히 확인 필요
+        val old = sim16(270, 230).mapIndexed { i, s -> if (i == 3) s.copy(time = 0) else s }
+        assertEquals(RecordFlag.Check, rec(Mode.Sim, 3770, old).flag)
+        // JSON 으로 갔다 와도 유지
+        val back = SplitsJson.decodeFromString(Record.serializer(), SplitsJson.encodeToString(Record.serializer(), r1))
+        assertTrue(back.segs[3].isSkipped)
+        assertEquals(RecordFlag.Skipped, back.flag)
+    }
+
     @Test fun simTarget() {
         assertEquals("VS GOAL", SimTarget.pick("goal", Defaults.goals, null, null, null, null).second)
         val f = List(16) { 200 }

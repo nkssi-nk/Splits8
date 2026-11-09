@@ -44,6 +44,8 @@ data class PhoneRunSnapshot(
     val segWork: List<Int?>? = null,
     val liftReps: List<Int?>? = null,
     val liftKg: List<Double?>? = null,
+    /** 1.2.2 (예전 파일엔 없음) */
+    val skipped: List<Int>? = null,
 )
 
 /**
@@ -99,6 +101,8 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
     val totalDist: Double get() = segDists.filterNotNull().sum() + segDist
     /** 끝 없이 늘어나는 운동 (HIIT · 자유 러닝 · AMRAP) */
     val growsOpen: Boolean get() = isHIIT || (isRunKind && runKm == 0) || Bonus.grows(kind)
+    /** 1.2.2: 러닝 카드 목표 거리(km). 0 = 자유 러닝 */
+    val runGoalKm: Int get() = runKm
     /** 18번 AMRAP: 정한 총 시간(초) */
     var cap: Int? = null; private set
     /** 18번 EMOM · AMRAP: 할 일 */
@@ -218,7 +222,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         title = title(req.mode, req.program)
         sets = if (req.mode == Mode.Training) max(1, (req.program ?: Program.presets()[0]).sets) else 1
         seq = buildSeq(req.mode, req.program)
-        idx = 0; splits = emptyList(); running = true; finished = false
+        idx = 0; splits = emptyList(); skippedIdx = emptySet(); running = true; finished = false
         segDists = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
         segDist = 0.0; last = null
         curSpeed = 0.0; lastSpeedAt = Long.MIN_VALUE / 2
@@ -257,7 +261,8 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         return PhoneRunSnapshot(req, clock(), mode, title, sets, seq, idx, splits, running, startMs, segStart, pauseAt, segPaused,
             useGPS, segDist, segDists.toList(), settings.division, settings.goalTime, simWord, hasPFTBest, kind, runKm, place, route.toList(),
             steps, rawSteps, pausedSteps, pauseStepAt, segStepStart, segSteps.toList(),
-            cap = cap, segWork = segWork, liftReps = liftReps.toList(), liftKg = liftKg.toList())
+            cap = cap, segWork = segWork, liftReps = liftReps.toList(), liftKg = liftKg.toList(),
+            skipped = skippedIdx.sorted())
     }
 
     /** 파일에서 이어 받기 (앱을 다시 열었을 때) */
@@ -279,6 +284,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         liftKg = ArrayList(List(seq.size) { x.liftKg?.getOrNull(it) })
         lastLift = if (kind == Kinds.LIFT) seq.filter { it.icon == "lift" }.map { it.name }.distinct()
             .associateWith { Bonus.lastSets(Store.records, it, java.time.Instant.ofEpochMilli(x.startMs)) } else emptyMap()
+        skippedIdx = x.skipped.orEmpty().toSet()
         finished = false; active = true
     }
 
@@ -299,9 +305,26 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         if (isRunKind && useGPS) return null            // GPS 러닝은 1km마다 저절로 넘어감
         // 18번 EMOM: 넘기지 않고 "끝" — 이 라운드에 걸린 시간만 적음 (남은 시간은 휴식)
         if (Bonus.tapMarksDone(kind)) { markDone(); return null }
+        return advanceCore(skipped = false)
+    }
+
+    // MARK: 1.2.2 건너뛰기 (아이폰 PhoneRunEngine.skip 과 같음)
+
+    /** 건너뛴 구간 번호 (시간 0 으로 적힘 · 기록에 "건너뜀") */
+    var skippedIdx by mutableStateOf<Set<Int>>(emptySet()); private set
+    /** 하이록스 구간(스테이션 · 러닝)만. Roxzone · 18번 새 종류 · 러닝 카드는 못 건너뜀 */
+    val canSkip: Boolean get() = active && !finished && running && !Kinds.isNew(kind) && !isRunKind && !growsOpen && cur.kind != SegKind.Rox
+    /** 지금 구간을 건너뜀: 시간 0 으로 적고 다음 구간으로 (Undo 로 되돌릴 수 있음). 마지막 구간이면 끝내고 기록을 돌려줌 */
+    fun skip(): Record? {
+        if (!canSkip) return null
+        skippedIdx = skippedIdx + idx
+        return advanceCore(skipped = true)
+    }
+
+    private fun advanceCore(skipped: Boolean): Record? {
         val now = clock()
         val up = UndoPoint(idx, segStart, segPaused, segDist, growsOpen && splits.size + 1 >= seq.size, segStepStart)
-        closeSeg(now)
+        if (skipped) closeSegWith(0) else closeSeg(now)
         if (growsOpen && splits.size >= seq.size) growSeq()
         if (splits.size >= seq.size) return finish(true)
         undoPoint = up
@@ -322,6 +345,7 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
         if (idx != u.idx + 1 || splits.size != u.idx + 1) { undoPoint = null; canUndo = false; return }
         val newIdx = idx
         splits = splits.dropLast(1)
+        skippedIdx = skippedIdx - u.idx                // 1.2.2: 건너뛴 것을 되돌리면 다시 보통 구간
         if (u.idx < segDists.size) segDists[u.idx] = null
         if (u.idx < segSteps.size) segSteps[u.idx] = null
         if (u.grew && seq.size == newIdx + 1) {
@@ -459,7 +483,8 @@ class PhoneRunEngine(private val clock: () -> Long = { System.currentTimeMillis(
             SegResult(s.icon, s.name, s.detail, s.kind, t, s.target, hr = null, dist = segDists.getOrNull(i),
                 reps = if (lift) (liftReps.getOrNull(i) ?: s.reps) else null,
                 kg = if (lift) (liftKg.getOrNull(i) ?: s.kg) else null,
-                work = segWork.getOrNull(i), rep = s.rep)
+                work = segWork.getOrNull(i), rep = s.rep,
+                skipped = if (i in skippedIdx) true else null)      // 1.2.2
         }
         val total = splits.sum()
         val tg = seq.take(splits.size).sumOf { it.target }

@@ -88,7 +88,7 @@ object Cloud {
         }
         Store.update { it.copy(nickname = n, email = Supabase.session?.email ?: it.email) }
         if (Store.avatarUrl == null) Store.photoJpeg()?.let { syncAvatar(it) }
-        for (r in Store.records) runCatching { Supabase.upload(r) }
+        for (r in Store.records) uploadNow(r)
         refreshSocial()
     }
 
@@ -192,7 +192,36 @@ object Cloud {
 
     // MARK: 기록
 
-    fun upload(r: com.nkssi.splits8.shared.Record) { if (on) launch { Supabase.upload(r) } }
+    fun upload(r: com.nkssi.splits8.shared.Record) { if (on) launch { uploadNow(r) } }
+
+    // 1.2.2: 올리기에 실패한 기록은 기억해 뒀다가 다음에 앱을 켤 때 다시 (예전엔 runCatching 으로 조용히 넘김)
+
+    /** 아직 서버에 못 올린 기록 id (앱을 껐다 켜도 기억) */
+    var pendingUploads: List<String>
+        get() = Store.pref("records.pending", "").split(",").filter { it.isNotEmpty() }
+        set(v) = Store.setPref("records.pending", v.joinToString(","))
+
+    /** 기록 하나 올리기. 안 올려도 되는 기록(미완료 · 확인 필요 · PFT 등)은 조용히 끝남. 통신이 안 되면 다음에 다시 */
+    suspend fun uploadNow(r: com.nkssi.splits8.shared.Record) {
+        try {
+            Supabase.upload(r)
+            pendingUploads = pendingUploads.filter { !it.equals(r.id, ignoreCase = true) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (pendingUploads.none { it.equals(r.id, ignoreCase = true) }) pendingUploads = pendingUploads + r.id
+        }
+    }
+
+    /** 앱이 앞으로 올 때: 지난번에 못 올린 기록을 조용히 다시 올림 */
+    suspend fun retryUploadsIfNeeded() {
+        if (!on) return
+        val ids = pendingUploads.map { it.lowercase() }.toSet()
+        if (ids.isEmpty()) return
+        val todo = Store.records.filter { it.id.lowercase() in ids }
+        pendingUploads = todo.map { it.id }   // 지워진 기록은 목록에서 뺌
+        for (r in todo) uploadNow(r)
+    }
     fun deleteRecord(id: String) { if (on) launch { Supabase.deleteRecord(id) } }
 
     // MARK: 로그아웃 · 계정 삭제

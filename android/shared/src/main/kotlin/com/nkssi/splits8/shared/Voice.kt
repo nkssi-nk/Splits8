@@ -11,8 +11,8 @@ import kotlin.random.Random
 
 /** 조각 이름 만들기 */
 object VoiceClips {
-    /** 응원 15개 */
-    val cheers: List<String> = (1..15).map { "cheer_" + it.toString().padStart(2, '0') }
+    /** 응원 25개 (1.2.2: 15 → 25) */
+    val cheers: List<String> = (1..25).map { "cheer_" + it.toString().padStart(2, '0') }
 
     /** 거리 조각 (m → id). half · full 은 하프 · 풀코스 완주 */
     private val dists: List<Pair<Double, String>> = buildList {
@@ -97,12 +97,14 @@ data class VoicePrefs(
     val time: Boolean = true,
     val pace: Boolean = true,
     val hr: Boolean = true,
+    /** 1.2.2: 레이스 · 시뮬 응원 양 "low" · "mid" · "high" */
+    val cheer: String = "low",
 ) {
     companion object {
         /** 지금은 한국어 조각만 있어서, 앱이 한국어가 아니면 끔 */
         fun of(s: Settings, korean: Boolean) = VoicePrefs(
             on = s.voice && korean, everyM = s.voiceEvery,
-            dist = s.voiceDist, time = s.voiceTime, pace = s.voicePace, hr = s.voiceHr,
+            dist = s.voiceDist, time = s.voiceTime, pace = s.voicePace, hr = s.voiceHr, cheer = s.voiceCheer,
         )
     }
 }
@@ -146,6 +148,10 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
         val cap: Int? = null,
         /** 18번: 이번 구간에서 지난 ms (시간 구간 10초 전 안내를 정확히). 모르면 segEl 로 */
         val segMs: Long? = null,
+        /** 1.2.2: 끝난 구간 시간들 (목표 비교 · 끝까지 했는지) */
+        val splits: List<Int> = emptyList(),
+        /** 1.2.2: 이번 구간에서 잰 거리(m). 모르면 null (초반 과속 경고) */
+        val segDist: Double? = null,
     )
 
     private var started = false
@@ -165,6 +171,18 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
     private val tenSaid = HashSet<Int>()
     /** 18번 AMRAP: 이미 말한 남은 시간 (60 · 30 · 10) */
     private val capSaid = HashSet<Int>()
+
+    // 1.2.2 · 레이스 · 풀 시뮬 코치 (아이폰 VoiceCoach + RaceVoice.swift 와 같은 규칙)
+    /** 레이스 · 시뮬이고 순서가 하이록스 그대로일 때 (첫 update 에서 정함) */
+    private var race = false
+    /** 이번 레이스에서 이미 말한 응원 · 거의 끝 · 과속 문장 */
+    private val used = HashSet<String>()
+    private var paceWarned = false
+    private var plannedIdx = -1
+    private var cheerTimes: List<Int> = emptyList()
+    private val cheerDone = HashMap<Int, Int>()
+    private val nearDone = HashSet<Int>()
+    private val paceChecked = HashSet<Int>()
 
     /**
      * 18번: 타이머 운동(타바타 · EMOM · AMRAP) 시작 전 세기. n = 3 · 2 · 1, 0 = 시작.
@@ -191,8 +209,11 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
             lastIdx = o.idx
             lastRunning = o.running
             nextMark = nextMarkAbove(o.dist ?: 0.0)
+            race = o.kind == null && (o.mode == Mode.Race || o.mode == Mode.Sim) && RaceVoice.isRace(o.seq)
             // 앱을 다시 열어 이어 받은 운동이면 시작 안내는 안 함
             if (o.total > 5) return null
+            // 1.2.2 레이스: "자, 첫 번째 러닝입니다 …" 한 문장 (go_start · ph_start 는 같은 말이라 안 함)
+            if (race) return say(Line(RaceVoice.transition(o.seq, o.idx, prefs.cheer)), now)
             val clips = ArrayList<String>()
             if (!(counted && Kinds.isTimer(o.kind))) clips.add("go_start")
             if (o.kind == null) clips.addAll(segIntro(o.seq, o.idx))
@@ -205,6 +226,8 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
             ended = true
             // 18번 AMRAP: 시간이 다 돼서 끝남 → "타임! AMRAP 끝"
             val capped = o.kind == Kinds.AMRAP && o.cap != null && o.total >= o.cap
+            // 1.2.2: 레이스를 끝까지 했으면 "완주! 결승선 통과했어요"
+            if (race && o.splits.size >= o.seq.size) return say(Line(listOf("rf_1")), now)
             val clips = arrayListOf(if (capped) "amrap_end" else "go_end")
             if (o.kind == "run" || o.kind == Kinds.IVRUN) {
                 o.dist?.let { d -> if (prefs.dist) VoiceClips.distance(d)?.let { clips.add(it) } }
@@ -225,6 +248,12 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
                 val clips = bonusStep(o.kind, o.seq, from, o.idx)
                 if (clips.isNotEmpty()) return say(Line(clips), now)
             }
+            if (forward && o.kind == null && race) {
+                // 1.2.2: 전환마다 통문장 하나 + 이어서 목표와 비교 ("목표보다, 12초, 빨라요")
+                val clips = RaceVoice.transition(o.seq, o.idx, prefs.cheer) + RaceVoice.goalLine(o.seq, o.idx, o.splits, prefs.cheer)
+                if (clips.isNotEmpty()) return say(Line(clips), now)
+                return null
+            }
             if (forward && o.kind == null) {
                 val clips = ArrayList<String>()
                 if (!halfSaid && isHalfway(o.seq, o.idx)) { halfSaid = true; clips.add("t_half") }
@@ -243,8 +272,55 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
             }
             return null
         }
+        if (o.kind == null && race) return raceTick(o, now)
         if (o.kind == null) cheerIfDue(o, now)?.let { return it }
         return null
+    }
+
+    /** 1.2.2 · 레이스 운동 중: 초반 과속 경고 · 거의 끝 · 응원 (우선순위: 전환 > 거의 끝 > 응원) */
+    private fun raceTick(o: Obs, now: Long): Line? {
+        val seq = o.seq
+        val i = o.idx
+        val seg = seq.getOrNull(i) ?: return null
+        val t = RaceVoice.expected(seg)
+        if (plannedIdx != i) {
+            plannedIdx = i
+            cheerTimes = RaceVoice.cheerTimes(seq, i, prefs.cheer) { rnd.nextDouble(-0.1, 0.1) }
+        }
+        // 초반 과속 (러닝 1 · 2, 목표의 60 % 지점, 잰 거리가 있을 때만, 레이스당 1번)
+        if (!paceWarned && i !in paceChecked && RaceVoice.paceCheckSeg(seq, i) && o.segEl >= (t * 0.6).toInt()) {
+            paceChecked.add(i)
+            if (RaceVoice.tooFast(seg, o.segEl, o.segDist)) {
+                paceWarned = true
+                pick(listOf("pace_fast_1", "pace_fast_2"))?.let { return say(Line(listOf(it)), now) }
+            }
+        }
+        // 거의 끝 (목표의 85 %): 러닝 1 · 2 · 마지막 월볼만
+        if (i !in nearDone && o.segEl >= (t * 0.85).toInt()) {
+            nearDone.add(i)
+            val opts = RaceVoice.nearOptions(seq, i)
+            if (opts.isNotEmpty()) pick(opts)?.let { return say(Line(listOf(it)), now) }
+        }
+        // 응원: 정해 둔 때가 지났고, 조용한 지 quiet 초가 지났을 때
+        val done = cheerDone[i] ?: 0
+        if (done >= cheerTimes.size || o.segEl < cheerTimes[done]) return null
+        if (o.segEl > RaceVoice.cheerEnd(seq, i)) { cheerDone[i] = cheerTimes.size; return null }     // 늦었으면 이 구간은 그만
+        if (now - quietFrom < (RaceVoice.quiet(prefs.cheer) * 1000).toLong()) return null
+        // 흐름 문장(ph_*)을 이미 썼으면 보통 응원으로
+        val c = pick(RaceVoice.cheerOptions(seq, i, done, prefs.cheer))
+            ?: pick(RaceVoice.cheerOptions(seq, i, done + 1, prefs.cheer))
+        if (c == null) { cheerDone[i] = cheerTimes.size; return null }
+        cheerDone[i] = done + 1
+        return say(Line(listOf(c), Pri.Cheer), now)
+    }
+
+    /** 아직 안 쓴 것 중 하나 (모두 썼으면 null). 흐름 문장(ph_*)이 있으면 그것 */
+    private fun pick(opts: List<String>): String? {
+        val free = opts.filter { it !in used }
+        if (free.isEmpty()) return null
+        val c = free.firstOrNull { it.startsWith("ph_") } ?: free[rnd.nextInt(free.size)]
+        used.add(c)
+        return c
     }
 
     /** 18번: 운동 중 시간 안내 — 시간 구간 끝나기 10초 전 (30초 넘는 구간), AMRAP 남은 1분 · 30초 · 10초 */
@@ -278,8 +354,8 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
     }
 
     private fun say(l: Line, now: Long): Line {
-        // 조각 하나 약 1초로 잡고, 그 뒤 15초는 응원 안 함
-        quietFrom = now + l.clips.size * 1000L
+        // 1.2.2: 조각마다 실제 길이(clips.json 의 dur, 모르면 1초) + 사이 0.12초 → 그 뒤가 조용해지는 때
+        quietFrom = now + l.clips.sumOf { (VoiceDur.of(it) * 1000).toLong() + 120L }
         return l
     }
 
@@ -407,5 +483,192 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
             // 록스존 다음 구간에서 또 말하지 않게, 처음 그 수가 된 자리에서만 (바로 앞이 록스존이면 이미 지나간 자리)
             return i > 0 && seq[i - 1].kind != SegKind.Rox
         }
+    }
+}
+
+/**
+ * 1.2.2: 소리 조각 길이(초) — assets/voice/ko/clips.json 의 dur. 재생기가 앱을 켤 때 load 로 넣어 줌.
+ * 모르는 조각(또는 아직 안 읽음)은 1초로 봄
+ */
+object VoiceDur {
+    @Volatile private var map: Map<String, Double> = emptyMap()
+
+    fun of(id: String): Double = map[id] ?: 1.0
+
+    /** clips.json 글 → 길이 표. 읽을 수 없으면 그대로 둠 */
+    fun load(json: String) {
+        runCatching {
+            val arr = SplitsJson.parseToJsonElement(json) as kotlinx.serialization.json.JsonArray
+            val m = HashMap<String, Double>()
+            for (e in arr) {
+                val o = e as? kotlinx.serialization.json.JsonObject ?: continue
+                val id = (o["id"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: continue
+                val d = (o["dur"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: continue
+                m[id] = d
+            }
+            if (m.isNotEmpty()) map = m
+        }
+    }
+
+    val loaded: Boolean get() = map.isNotEmpty()
+}
+
+/**
+ * 1.2.2 · 레이스 · 풀 시뮬 코치 음성 규칙 (코치 음성 v8). 아이폰 Shared/RaceVoice.swift 와 같은 규칙.
+ *
+ * 하이록스 순서: 러닝1 → 스키 → 러닝2 → 슬레드 푸쉬 → … → 러닝8 → 월볼 (n = 1~8)
+ *  러닝 n 시작 → rr_n / 러닝 끝 · 록스존 IN → ri_n / 스테이션 n 시작 → rs_n (+ 응원 보통 · 많이면 tip_n)
+ *  스테이션 끝 · 록스존 OUT → ro_n (n = 1~7) / 결승 → rf_1
+ *  응원: 적게 = 구간당 1번 · 전환 뒤 30초, 보통 = 2번 · 15초, 많이 = 3번 · 10초. 구간 끝 예상 10초 전까지만.
+ *  거의 끝 (목표 85 %): 러닝 1 · 2 = near_run / near_run_rox, 월볼 = near_st / near_st2
+ *  흐름 응원 (보통 · 많이): 러닝2 ph_q1 · 러닝6 ph_q3 · 러닝7 ph_two · 러닝8 ph_lastrun · 월볼 ph_wb (그 구간 첫 응원 자리)
+ *  초반 과속 (러닝 1 · 2, 목표 60 % 지점, 잰 거리가 목표보다 10 % 넘게 앞서면, 레이스당 1번) → pace_fast_1 / 2
+ *  목표 비교 (구간 끝, 누적): 3초 안 = goal_on, 아니면 goal_pre + 시간 + goal_fast / goal_slow
+ */
+object RaceVoice {
+    /** 스테이션 아이콘 → 응원 조각 이름 (cs_<종목>_*) */
+    val stKey: Map<String, String> = mapOf("skiErg" to "ski", "sledPush" to "push", "sledPull" to "pull", "burpeeBroadJump" to "bbj",
+        "row" to "row", "farmersCarry" to "farm", "sandbagLunges" to "lunge", "wallBalls" to "wb")
+    /** 종목별 응원 수 (clips.json 과 같음) */
+    val stCount: Map<String, Int> = mapOf("ski" to 2, "push" to 3, "pull" to 3, "bbj" to 2, "row" to 2, "farm" to 2, "lunge" to 2, "wb" to 3)
+
+    /** 하이록스 순서 그대로인지 (러닝 8 · 스테이션 8 이 번갈아, 스테이션은 Station.all 순서, 록스존은 있어도 없어도 됨) */
+    fun isRace(seq: List<Seg>): Boolean {
+        val main = seq.filter { it.kind != SegKind.Rox }
+        if (main.size != 16) return false
+        for ((i, s) in main.withIndex()) {
+            if (i % 2 == 0) { if (s.kind != SegKind.Run) return false }
+            else if (s.kind != SegKind.St || s.icon != Station.all[i / 2].key) return false
+        }
+        return true
+    }
+
+    fun runNo(seq: List<Seg>, i: Int): Int = seq.take(i + 1).count { it.kind == SegKind.Run }
+    fun stNo(seq: List<Seg>, i: Int): Int = seq.take(i + 1).count { it.kind == SegKind.St }
+
+    /** 구간 i 를 시작할 때 말할 통문장 */
+    fun transition(seq: List<Seg>, i: Int, level: String): List<String> {
+        val s = seq.getOrNull(i) ?: return emptyList()
+        return when (s.kind) {
+            SegKind.Run -> listOf("rr_${runNo(seq, i).coerceIn(1, 8)}")
+            SegKind.St -> {
+                val n = stNo(seq, i).coerceIn(1, 8)
+                if (level == "low") listOf("rs_$n") else listOf("rs_$n", "tip_$n")
+            }
+            SegKind.Rox -> {
+                val prev = seq.getOrNull(i - 1) ?: return emptyList()
+                when (prev.kind) {
+                    SegKind.Run -> listOf("ri_${runNo(seq, i).coerceIn(1, 8)}")
+                    SegKind.St -> stNo(seq, i).let { n -> if (n in 1..7) listOf("ro_$n") else emptyList() }
+                    else -> emptyList()
+                }
+            }
+        }
+    }
+
+    /**
+     * 구간 i 에 막 들어왔을 때, 앞에서 끝난 러닝 · 스테이션까지 누적으로 목표와 비교.
+     * 적게 = 스테이션이 끝났을 때만, 보통 · 많이 = 러닝 · 스테이션 끝날 때마다. 건너뛴 구간(0초) · 목표 없는 구간이 있으면 안 함
+     */
+    fun goalLine(seq: List<Seg>, i: Int, splits: List<Int>, level: String): List<String> {
+        if (i <= 0 || i >= seq.size || splits.size < i) return emptyList()
+        val prev = seq[i - 1]
+        if (prev.kind == SegKind.Rox) return emptyList()
+        if (level == "low" && prev.kind != SegKind.St) return emptyList()
+        var mine = 0
+        var goal = 0
+        for (k in 0 until i) {
+            if (seq[k].target <= 0 || splits[k] <= 0) return emptyList()
+            mine += splits[k]; goal += seq[k].target
+        }
+        return compare(mine - goal)
+    }
+
+    /** 차이(초, + = 늦음) → 조각. 3초 안 = goal_on, 1시간 넘으면 숫자 없이 */
+    fun compare(diff: Int): List<String> {
+        val a = abs(diff)
+        if (a <= 3) return listOf("goal_on")
+        if (a >= 3600) return listOf(if (diff < 0) "goal_ahead" else "goal_behind")
+        return listOf("goal_pre") + VoiceClips.duration(a) + listOf(if (diff < 0) "goal_fast" else "goal_slow")
+    }
+
+    /** 이 구간 예상 시간(초): 목표, 없으면 기본 목표 */
+    fun expected(s: Seg): Int = when {
+        s.target > 0 -> s.target
+        s.kind == SegKind.Run -> 270
+        s.kind == SegKind.Rox -> Defaults.roxTarget
+        else -> Station.all.firstOrNull { it.key == s.icon }?.target ?: 240
+    }
+
+    /** 전환 안내 뒤 응원까지 조용히 있을 시간(초) */
+    fun quiet(level: String): Double = when (level) { "high" -> 10.0; "mid" -> 15.0; else -> 30.0 }
+    /** 구간당 응원 수 */
+    fun perSeg(level: String): Int = when (level) { "high" -> 3; "mid" -> 2; else -> 1 }
+
+    /** 응원을 말해도 되는 마지막 때(초): 구간 끝 예상 10초 전, 거의 끝을 말하는 구간이면 그 5초 전까지 */
+    fun cheerEnd(seq: List<Seg>, i: Int): Int {
+        val t = expected(seq[i])
+        var e = t - 10
+        if (nearOptions(seq, i).isNotEmpty()) e = minOf(e, (t * 0.85).toInt() - 5)
+        return e
+    }
+
+    /** 응원할 때들 (구간 시작부터 초). 창 = [전환 문장 약 6초 + quiet, cheerEnd], 칸을 고르게 나누고 ±10 % 흔들기 */
+    fun cheerTimes(seq: List<Seg>, i: Int, level: String, jitter: () -> Double): List<Int> {
+        val s = seq.getOrNull(i) ?: return emptyList()
+        if (s.kind == SegKind.Rox) return emptyList()
+        val start = 6 + quiet(level)
+        val end = cheerEnd(seq, i).toDouble()
+        val len = end - start
+        if (len < 0) return emptyList()
+        val fit = (len / maxOf(quiet(level), 8.0)).toInt() + 1
+        val n = minOf(perSeg(level), fit)
+        return (0 until n).map { k ->
+            val t = start + len * (k + 0.5) / n + len / n * jitter()
+            t.coerceIn(start, end).toInt()
+        }
+    }
+
+    /** 응원 후보. nth = 이 구간에서 몇 번째 응원 (0부터). 보통 · 많이면 정해진 구간의 첫 응원은 흐름 문장(ph_*) */
+    fun cheerOptions(seq: List<Seg>, i: Int, nth: Int, level: String): List<String> {
+        val s = seq[i]
+        if (nth == 0 && level != "low") phase(seq, i)?.let { return listOf(it) }
+        val general = VoiceClips.cheers
+        if (s.kind == SegKind.Run) return general + (1..6).map { "cr_" + it.toString().padStart(2, '0') }
+        val k = stKey[s.icon] ?: return general
+        val c = stCount[k] ?: return general
+        return general + (1..c).map { "cs_${k}_$it" }
+    }
+
+    /** 흐름 응원: 러닝2 ph_q1 · 러닝6 ph_q3 · 러닝7 ph_two · 러닝8 ph_lastrun · 월볼 ph_wb */
+    fun phase(seq: List<Seg>, i: Int): String? {
+        val s = seq[i]
+        if (s.kind == SegKind.Run) return when (runNo(seq, i)) {
+            2 -> "ph_q1"; 6 -> "ph_q3"; 7 -> "ph_two"; 8 -> "ph_lastrun"; else -> null
+        }
+        if (s.kind == SegKind.St && s.icon == "wallBalls") return "ph_wb"
+        return null
+    }
+
+    /** 거의 끝 후보: 러닝 1 · 2 (다음이 록스존이면 "이제 록스존으로" 도), 마지막 월볼 */
+    fun nearOptions(seq: List<Seg>, i: Int): List<String> {
+        val s = seq[i]
+        if (s.kind == SegKind.Run && runNo(seq, i) <= 2) {
+            val roxNext = seq.getOrNull(i + 1)?.kind == SegKind.Rox
+            return if (roxNext) listOf("near_run", "near_run_rox") else listOf("near_run")
+        }
+        if (s.kind == SegKind.St && s.icon == "wallBalls") return listOf("near_st", "near_st2")
+        return emptyList()
+    }
+
+    /** 초반 과속을 볼 구간 (러닝 1 · 2) */
+    fun paceCheckSeg(seq: List<Seg>, i: Int): Boolean = seq[i].kind == SegKind.Run && runNo(seq, i) <= 2
+
+    /** 목표 시간의 60 % 지점에서, 잰 거리가 그때 있어야 할 거리보다 10 % 넘게 앞서는지 (거리를 모르면 false) */
+    fun tooFast(s: Seg, segEl: Int, segDist: Double?): Boolean {
+        if (segDist == null || segDist <= 0 || segEl <= 0) return false
+        val t = expected(s).toDouble()
+        val should = runMeters(s.detail) * minOf(1.0, segEl / t)
+        return segDist > should * 1.1
     }
 }

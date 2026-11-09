@@ -227,6 +227,10 @@ class WorkoutEngine(
 
     /** 현재 러닝 구간 거리(m) */
     val segDist: Double get() = max(0.0, distance - segDistStart)
+    /** 1.2.2: 러닝 카드 목표 거리(km). 0 = 자유 러닝 */
+    val runGoalKm: Int get() = runKm
+    /** 1.2.2: 러닝 카드 화면용 지금까지 뛴 거리(m) — 워치가 잰 거리, 없으면(실내 손으로 넘김) 넘긴 km 수 */
+    val runDistance: Double get() = if (distance > 0) distance else splits.size * 1000.0
 
     /**
      * 빌드 27: 워치 화면의 PACE 글자 (1 km 당, imperial 이면 1 mi 당).
@@ -337,7 +341,7 @@ class WorkoutEngine(
         this.title = title
         this.sets = sets
         this.seq = seq
-        idx = 0; splits = emptyList(); running = true; finished = false; lastRecord = null
+        idx = 0; splits = emptyList(); skippedIdx = emptySet(); running = true; finished = false; lastRecord = null
         hr = 0.0; kcal = 0.0; distance = 0.0; hrSamples = ArrayList()
         segHR = ArrayList<ArrayList<Double>>().apply { repeat(seq.size) { add(ArrayList()) } }
         segDists = ArrayList<Double?>().apply { repeat(seq.size) { add(null) } }
@@ -376,13 +380,30 @@ class WorkoutEngine(
         if (isRunKind && autoSplit) return            // 러닝은 1km마다 저절로 넘어감
         // 18번 EMOM: 넘기지 않고 "끝" — 이 라운드에 걸린 시간만 적음 (남은 시간은 휴식)
         if (Bonus.tapMarksDone(kind)) { markDone(); return }
+        advanceCore(skipped = false)
+    }
+
+    // MARK: 1.2.2 건너뛰기 (아이폰 WorkoutEngine.skip 과 같음)
+
+    /** 건너뛴 구간 번호 (시간 0 으로 적힘 · 기록에 "건너뜀") */
+    var skippedIdx by mutableStateOf<Set<Int>>(emptySet()); private set
+    /** 하이록스 구간(스테이션 · 러닝)만. Roxzone · 18번 새 종류 · 러닝 카드는 못 건너뜀 */
+    val canSkip: Boolean get() = active && !finished && running && !Kinds.isNew(kind) && !isRunKind && !growsOpen && cur.kind != SegKind.Rox
+    /** 지금 구간을 건너뜀: 시간 0 으로 적고 다음 구간으로 (Undo 로 되돌릴 수 있음) */
+    fun skip() {
+        if (!canSkip) return
+        skippedIdx = skippedIdx + idx
+        advanceCore(skipped = true)
+    }
+
+    private fun advanceCore(skipped: Boolean) {
         val now = clock()
         val prevIdx = idx
         val prevStart = segStart
         val prevPaused = segPaused
         val prevDistStart = segDistStart
         val prevStepStart = segStepStart
-        closeSeg(now)
+        if (skipped) closeSegWith(0) else closeSeg(now)
         var grew = false
         if (splits.size >= seq.size && growsOpen) {
             growSeq()
@@ -413,6 +434,7 @@ class WorkoutEngine(
         if (idx != u.idx + 1 || splits.size != u.idx + 1) { undoPoint = null; canUndo = false; return }
         val newIdx = idx
         splits = splits.dropLast(1)
+        skippedIdx = skippedIdx - u.idx                // 1.2.2: 건너뛴 것을 되돌리면 다시 보통 구간
         if (newIdx < segHR.size && u.idx < segHR.size) {
             segHR[u.idx].addAll(segHR[newIdx])
             segHR[newIdx] = ArrayList()
@@ -646,8 +668,9 @@ class WorkoutEngine(
             val lift = s.icon == "lift"
             SegResult(s.icon, s.name, s.detail, s.kind, t, s.target,
                 hr = if (h.isEmpty()) null else (h.sum() / h.size).roundToInt(),
-                dist = segDists.getOrNull(i), reps = if (lift) (s.reps ?: segReps.getOrNull(i)) else segReps.getOrNull(i),
-                kg = if (lift) s.kg else null, work = segWork.getOrNull(i), rep = s.rep)
+                dist = segDists.getOrNull(i), reps = if (i in skippedIdx) null else if (lift) (s.reps ?: segReps.getOrNull(i)) else segReps.getOrNull(i),
+                kg = if (lift) s.kg else null, work = segWork.getOrNull(i), rep = s.rep,
+                skipped = if (i in skippedIdx) true else null)      // 1.2.2
         }
         val total = splits.sum()
         val tg = seq.take(splits.size).sumOf { it.target }
@@ -694,7 +717,8 @@ class WorkoutEngine(
         val d = if (distance > 0) distance else if (isRunKind) splits.size * 1000.0 else null
         // 끝났으면 기록의 총 시간 (AMRAP 이 정한 시간에 딱 끝났는지)
         val tot = if (finished) splits.sum() else total(now)
-        val line = c.update(VoiceCoach.Obs(active, finished, running, mode, kind, seq, idx, segEl(now), tot, d, avg, cap, segMs(now)), now) ?: return
+        val line = c.update(VoiceCoach.Obs(active, finished, running, mode, kind, seq, idx, segEl(now), tot, d, avg, cap, segMs(now),
+            splits = splits, segDist = if (segDist > 0) segDist else null), now) ?: return
         v(line)
     }
 

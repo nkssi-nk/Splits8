@@ -1139,3 +1139,9 @@
 /* 1.2.2 · D-day 위젯 (막대 대신 목표까지 차이) */
 "%@ to goal" = "목표까지 %@";
 "Goal reached" = "목표 달성";
+
+/* 1.2.3 · 바퀴 안내 · 러닝 페이스로 목표 나누기 */
+"Lap guide" = "바퀴 안내";
+"Race · when laps per run are known" = "레이스 · 대회 바퀴 수를 알 때";
+"Runs %@ · Stations %@ · Roxzone %@" = "러닝 %@ · 스테이션 %@ · 록스존 %@";
+"Runs alone go over the goal. Set the pace again." = "러닝만으로 목표를 넘어요. 페이스를 다시 정해 주세요.";

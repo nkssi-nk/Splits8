@@ -113,9 +113,75 @@ enum GoalSplit {
     /// 16칸 목표(초). 5초 단위, 칸마다 최소 30초, 합계 = (총 목표 − Roxzone) 을 5초 단위로 맞춘 값
     static func split(total: Int, style: String, current: [Int], best: [Int]?, division: String = "openM", rox: Int = Defaults.roxTarget) -> [Int] {
         let w: [Double] = weights(style, current: current, best: best, total: total, division: division, rox: rox)
-        let sumW: Double = max(1, w.reduce(0, +))
         let raw: Int = max(16 * 30, total - 8 * rox)
-        let target: Int = Int((Double(raw) / 5).rounded()) * 5
+        return fit(w, target: Int((Double(raw) / 5).rounded()) * 5)
+    }
+
+    // MARK: 1.2.3 · 러닝 평균 페이스 먼저 → 남은 시간을 스테이션 · Roxzone 에 나눔
+
+    /// 스테이션 한 칸 · Roxzone 한 번 최소(초)
+    static let minStation: Int = 30
+    static let minRox: Int = 20
+    /// 러닝 페이스 고르는 범위(초/km)
+    static let paceRange: ClosedRange<Int> = 150...720
+
+    /// 나눈 결과: 16칸 목표 · Roxzone 1번 목표
+    struct PaceSplit: Equatable {
+        var goals: [Int]
+        var rox: Int
+        var runSum: Int { stride(from: 0, to: goals.count, by: 2).map { goals[$0] }.reduce(0, +) }
+        var stSum: Int { stride(from: 1, to: goals.count, by: 2).map { goals[$0] }.reduce(0, +) }
+        var roxSum: Int { rox * 8 }
+    }
+
+    /// 지금 방식(style)으로 나눴을 때 러닝 1 km 평균(초, 5초 단위) — 페이스 기본값
+    static func defaultPace(total: Int, style: String, current: [Int], best: [Int]?, division: String, rox: Int) -> Int {
+        let g: [Int] = split(total: total, style: style, current: current, best: best, division: division, rox: rox)
+        return roundPace(runAvg(g) ?? 270)
+    }
+
+    /// 저장된 16칸의 러닝 평균(초). 없으면 nil
+    static func runAvg(_ goals: [Int]) -> Int? {
+        guard goals.count == 16 else { return nil }
+        let runs: [Int] = stride(from: 0, to: 16, by: 2).map { goals[$0] }
+        guard runs.allSatisfy({ $0 > 0 }) else { return nil }
+        return Int((Double(runs.reduce(0, +)) / 8).rounded())
+    }
+
+    static func roundPace(_ p: Int) -> Int {
+        min(paceRange.upperBound, max(paceRange.lowerBound, Int((Double(p) / 5).rounded()) * 5))
+    }
+
+    /// 러닝 8칸 = 페이스 × 1 km. 남은 시간(총 목표 − 러닝 합)을 스테이션 8칸 + Roxzone 에 지금 방식의 비율 그대로 나눔.
+    /// 남은 시간이 최소(스테이션 8 × 30초 + Roxzone 8 × 20초)보다 적으면 nil (= 러닝만으로 목표를 넘음)
+    static func byPace(total: Int, pace: Int, style: String, current: [Int], best: [Int]?, division: String, rox: Int) -> PaceSplit? {
+        let remain: Int = total - pace * 8
+        guard remain >= 8 * (minStation + minRox) else { return nil }
+        let w: [Double] = weights(style, current: current, best: best, total: total, division: division, rox: rox)
+        guard w.count == 16 else { return nil }
+        let stW: [Double] = stride(from: 1, to: 16, by: 2).map { max(0.0001, w[$0]) }
+        // 지금 방식의 스테이션 : Roxzone 비율 (Roxzone = 그 시간대 1번 목표 × 8)
+        let base: [Int] = split(total: total, style: style, current: current, best: best, division: division, rox: rox)
+        let baseSt: Double = Double(stride(from: 1, to: 16, by: 2).map { base[$0] }.reduce(0, +))
+        let baseRox: Double = Double(8 * rox)
+        let roxShare: Double = Double(remain) * baseRox / max(1, baseSt + baseRox)
+        var roxEach: Int = Int((roxShare / 8 / 5).rounded()) * 5
+        roxEach = min(120, max(minRox, roxEach))
+        var stTotal: Int = Int((Double(remain - 8 * roxEach) / 5).rounded()) * 5
+        if stTotal < 8 * minStation {
+            roxEach = max(minRox, (remain - 8 * minStation) / 8 / 5 * 5)
+            stTotal = Int((Double(remain - 8 * roxEach) / 5).rounded()) * 5
+        }
+        guard stTotal >= 8 * minStation else { return nil }
+        let st: [Int] = fit(stW, target: stTotal)
+        var goals: [Int] = []
+        for i in 0..<8 { goals.append(pace); goals.append(st[i]) }
+        return PaceSplit(goals: goals, rox: roxEach)
+    }
+
+    /// 비율 w 대로 target 을 5초 단위 칸으로 나눔 (칸마다 최소 30초, 합계 = target)
+    static func fit(_ w: [Double], target: Int) -> [Int] {
+        let sumW: Double = max(0.0001, w.reduce(0, +))
         let exact: [Double] = w.map { $0 / sumW * Double(target) }
         var out: [Int] = exact.map { max(30, Int(($0 / 5).rounded()) * 5) }
         // 반올림으로 생긴 차이를 5초씩 나눠서 합계를 맞춤 (반올림에서 손해·이득을 가장 많이 본 칸부터)
@@ -545,6 +611,14 @@ struct RaceEvent: Codable, Hashable {
     /// 출발 시각 "HH:mm". 비어 있으면 아직 모름 (티켓에는 날짜만 있고, 출발 시간은 보통 대회장에서 등록할 때 나옴)
     var time: String = ""
     var dateEnd: Date? = nil
+    /// 1.2.3: 러닝 한 번에 도는 바퀴 수 (대회 목록에서 고를 때 넣음). nil = 예전 저장값 → 대회 목록에서 찾음
+    var laps: Int? = nil
+    /// 1.2.3: 러닝 바퀴 수 (0 = 모름). 저장값이 없으면 같은 도시 · 같은 시작일의 대회 목록 값
+    var lapsPerRun: Int {
+        if let l = laps { return l }
+        let d: String = Fm.ymd.string(from: date)
+        return EventItem.knownLaps(city: name, start: d) ?? 0
+    }
     var hasTime: Bool { time.split(separator: ":").compactMap { Int($0) }.count == 2 }
     var isSet: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 }
@@ -576,7 +650,15 @@ struct EventItem: Codable, Hashable, Identifiable {
     var region: String         // korea / asia / europe / americas
     var start: String          // yyyy-MM-dd
     var end: String
+    /// 1.2.3: 러닝 한 번에 도는 바퀴 수. nil = 모름. 2026 서울 = 2 (공식 안내 "IN 은 두 번째에").
+    /// 서버 목록에는 이 칸이 없어서 앱 안 목록(bundled)에서 찾아 넣음 (Supabase.events)
+    var laps: Int? = nil
+    var lapsPerRun: Int { laps ?? 0 }
     var id: String { city + start }
+    /// 1.2.3: 앱 안 목록에 적어 둔 바퀴 수 (도시 + 시작일)
+    static func knownLaps(city: String, start: String) -> Int? {
+        city == "Seoul" && start == "2026-11-13" ? 2 : nil
+    }
 
     static let regions = [("all", "All"), ("korea", "Korea"), ("asia", "Asia-Pacific"), ("europe", "Europe"), ("americas", "Americas")]
     static let bundled: [EventItem] = [
@@ -605,7 +687,8 @@ struct EventItem: Codable, Hashable, Identifiable {
         ["Dallas","USA","americas","2026-11-18","2026-11-22"],
         ["Anaheim","USA","americas","2026-12-03","2026-12-06"],
         ["Chicago","USA","americas","2027-02-11","2027-02-15"],
-    ].map { EventItem(city: $0[0], venue: $0[1], region: $0[2], start: $0[3], end: $0[4]) }
+    ].map { EventItem(city: $0[0], venue: $0[1], region: $0[2], start: $0[3], end: $0[4],
+                      laps: knownLaps(city: $0[0], start: $0[3])) }
 }
 
 // MARK: - 기록
@@ -879,6 +962,8 @@ struct Settings: Codable, Hashable {
     var voiceHrOpt: Bool? = nil
     /// 1.2.2: 레이스 · 시뮬 응원 양. nil = 적게(기본) · "mid" = 보통 · "high" = 많이
     var voiceCheerOpt: String? = nil
+    /// 1.2.3: 레이스 바퀴 안내 (대회 바퀴 수를 알 때). nil = 켜기(기본)
+    var voiceLapOpt: Bool? = nil
 
     var voiceOn: Bool {
         get { voiceOpt ?? false }
@@ -908,6 +993,11 @@ struct Settings: Codable, Hashable {
     var voiceCheer: String {
         get { voiceCheerOpt ?? "low" }
         set { voiceCheerOpt = newValue == "low" ? nil : newValue }
+    }
+    /// 1.2.3: 바퀴 안내 (기본 켬)
+    var voiceLap: Bool {
+        get { voiceLapOpt ?? true }
+        set { voiceLapOpt = newValue ? nil : false }
     }
     /// 음성 안내 소리가 있는 언어인지 (지금은 한국어만). 앱 안에서 고른 언어 → 없으면 기기 언어
     var voiceLangOK: Bool {

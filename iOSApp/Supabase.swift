@@ -395,6 +395,7 @@ final class Supabase {
     func events() async throws -> [EventItem] {
         struct Row: Codable { var city: String; var venue: String; var region: String; var start_date: String; var end_date: String }
         let d = try await request("/rest/v1/events?select=city,venue,region,start_date,end_date&order=start_date", auth: false)
-        return try decode([Row].self, d).map { EventItem(city: $0.city, venue: $0.venue, region: $0.region, start: $0.start_date, end: $0.end_date) }
+        return try decode([Row].self, d).map { EventItem(city: $0.city, venue: $0.venue, region: $0.region, start: $0.start_date, end: $0.end_date,
+                                                             laps: EventItem.knownLaps(city: $0.city, start: $0.start_date)) }
     }
 }

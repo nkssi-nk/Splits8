@@ -86,6 +86,10 @@ struct SetWorkoutView: View {
                     }
                     .padding(.vertical, 12).padding(.horizontal, 18)
                     .rowLine(true)
+                    // 1.2.3: 레이스 바퀴 안내 (대회 바퀴 수를 알 때만 — 지금은 2026 서울)
+                    toggleRow("Lap guide", sub: "Race · when laps per run are known", on: voiceLapBinding,
+                              last: store.settings.voiceEvery == 0)
+                        .accessibilityIdentifier("settings.voiceLap")
                     if store.settings.voiceEvery > 0 {
                         toggleRow("Distance", sub: nil, on: voiceDistBinding, last: false)
                             .accessibilityIdentifier("settings.voiceDist")
@@ -104,6 +108,10 @@ struct SetWorkoutView: View {
             Note8(text: ok ? "Spoken during workouts: a coach guides each segment of Race and Full Sim, segment names on Training, and your running stats at each alert. Other audio gets quieter while it speaks."
                            : "Voice guidance is available in Korean for now.")
         }
+    }
+
+    private var voiceLapBinding: Binding<Bool> {
+        Binding(get: { store.settings.voiceLap }, set: { store.settings.voiceLap = $0 })
     }
 
     private var voiceBinding: Binding<Bool> {

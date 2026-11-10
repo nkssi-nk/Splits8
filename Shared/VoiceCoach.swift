@@ -82,6 +82,10 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
     private var cheerDone: [Int: Int] = [:]
     private var nearDone: Set<Int> = []
     private var paceChecked: Set<Int> = []
+    /// 1.2.3 바퀴 안내: 레이스 모드 + 대회 바퀴 수를 알 때만 (0 = 안 함). 이미 안내한(또는 건너뛴) 러닝 · 바로 앞 문장
+    private var lapCount = 0
+    private var lapDone: Set<Int> = []
+    private var lastLap: String? = nil
 
     // MARK: 운동 안내 (엔진이 부름)
 
@@ -91,6 +95,9 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
         cutAll()
         enabled = s.voiceActive
         race = !runCard && !open && !WKind.isNew(kind) && (mode == .race || mode == .sim) && RaceVoice.isRace(seq)
+        // 1.2.3: 바퀴 안내는 레이스(대회) 모드만 — 풀 시뮬 · 트레이닝은 어디서 뛸지 몰라서 안 함
+        lapCount = race && mode == .race && s.voiceLap ? s.event.lapsPerRun : 0
+        lapDone = []; lastLap = nil
         cheerLevel = s.voiceCheer
         used = []; paceWarned = false
         plannedIdx = -1; cheerTimes = []; cheerDone = [:]; nearDone = []; paceChecked = []
@@ -285,6 +292,25 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
         if plannedIdx != idx {
             plannedIdx = idx
             cheerTimes = RaceVoice.cheerTimes(seq, idx, level: cheerLevel, jitter: { Double.random(in: -0.1...0.1) })
+        }
+        // 1.2.3 바퀴 안내 (전환 다음으로 먼저): 러닝 목표의 40 %. 다른 말을 하고 있으면 끝난 뒤 바로 — 5초 넘게 밀리면 건너뜀
+        if lapCount > 0, s.kind == .run, !lapDone.contains(idx) {
+            let due: Int = Int(Double(T) * RaceVoice.lapAt)
+            if segEl >= due {
+                if segEl > due + 5 {
+                    lapDone.insert(idx)
+                } else if playingPri == nil, pending.isEmpty {
+                    lapDone.insert(idx)
+                    let opts: [String] = RaceVoice.lapOptions(seq, idx, laps: lapCount, last: lastLap)
+                    if let c = opts.randomElement() {
+                        lastLap = c
+                        say([c], .info)
+                        return
+                    }
+                } else {
+                    return      // 말이 끝나길 기다림 (응원 · 거의 끝은 그 뒤에)
+                }
+            }
         }
         // 초반 과속 (러닝 1 · 2, 목표의 60 % 지점, 잰 거리가 있을 때만, 레이스당 1번)
         if !paceWarned, !paceChecked.contains(idx), RaceVoice.paceCheckSeg(seq, idx), segEl >= Int(Double(T) * 0.6) {

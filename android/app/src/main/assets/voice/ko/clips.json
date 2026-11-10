@@ -2146,5 +2146,167 @@
   "cat": "phase",
   "text": "완주! 수고 많았어요.",
   "dur": 2.93
+ },
+ {
+  "id": "goal_fast_s",
+  "cat": "goal",
+  "text": "목표보다 조금 빨라요.",
+  "dur": 2.44
+ },
+ {
+  "id": "goal_slow_s",
+  "cat": "goal",
+  "text": "목표보다 조금 늦어요.",
+  "dur": 2.19
+ },
+ {
+  "id": "goal_fast_1",
+  "cat": "goal",
+  "text": "목표보다 1분 빨라요.",
+  "dur": 2.3
+ },
+ {
+  "id": "goal_fast_2",
+  "cat": "goal",
+  "text": "목표보다 2분 빨라요.",
+  "dur": 2.42
+ },
+ {
+  "id": "goal_fast_3",
+  "cat": "goal",
+  "text": "목표보다 3분 빨라요.",
+  "dur": 2.4
+ },
+ {
+  "id": "goal_fast_4",
+  "cat": "goal",
+  "text": "목표보다 4분 빨라요.",
+  "dur": 2.33
+ },
+ {
+  "id": "goal_fast_5",
+  "cat": "goal",
+  "text": "목표보다 5분 빨라요.",
+  "dur": 2.5
+ },
+ {
+  "id": "goal_fast_6",
+  "cat": "goal",
+  "text": "목표보다 6분 빨라요.",
+  "dur": 2.33
+ },
+ {
+  "id": "goal_fast_7",
+  "cat": "goal",
+  "text": "목표보다 7분 빨라요.",
+  "dur": 2.76
+ },
+ {
+  "id": "goal_fast_8",
+  "cat": "goal",
+  "text": "목표보다 8분 빨라요.",
+  "dur": 2.83
+ },
+ {
+  "id": "goal_fast_9",
+  "cat": "goal",
+  "text": "목표보다 9분 빨라요.",
+  "dur": 2.52
+ },
+ {
+  "id": "goal_fast_10",
+  "cat": "goal",
+  "text": "목표보다 10분 빨라요.",
+  "dur": 2.31
+ },
+ {
+  "id": "goal_slow_1",
+  "cat": "goal",
+  "text": "목표보다 1분 늦어요.",
+  "dur": 2.48
+ },
+ {
+  "id": "goal_slow_2",
+  "cat": "goal",
+  "text": "목표보다 2분 늦어요.",
+  "dur": 2.27
+ },
+ {
+  "id": "goal_slow_3",
+  "cat": "goal",
+  "text": "목표보다 3분 늦어요.",
+  "dur": 2.18
+ },
+ {
+  "id": "goal_slow_4",
+  "cat": "goal",
+  "text": "목표보다 4분 늦어요.",
+  "dur": 2.28
+ },
+ {
+  "id": "goal_slow_5",
+  "cat": "goal",
+  "text": "목표보다 5분 늦어요.",
+  "dur": 1.98
+ },
+ {
+  "id": "goal_slow_6",
+  "cat": "goal",
+  "text": "목표보다 6분 늦어요.",
+  "dur": 2.27
+ },
+ {
+  "id": "goal_slow_7",
+  "cat": "goal",
+  "text": "목표보다 7분 늦어요.",
+  "dur": 2.45
+ },
+ {
+  "id": "goal_slow_8",
+  "cat": "goal",
+  "text": "목표보다 8분 늦어요.",
+  "dur": 2.04
+ },
+ {
+  "id": "goal_slow_9",
+  "cat": "goal",
+  "text": "목표보다 9분 늦어요.",
+  "dur": 2.27
+ },
+ {
+  "id": "goal_slow_10",
+  "cat": "goal",
+  "text": "목표보다 10분 늦어요.",
+  "dur": 2.24
+ },
+ {
+  "id": "goal_fast_far",
+  "cat": "goal",
+  "text": "목표보다 훨씬 빨라요.",
+  "dur": 2.18
+ },
+ {
+  "id": "goal_slow_far",
+  "cat": "goal",
+  "text": "목표보다 많이 늦어요. 남은 구간 힘내요.",
+  "dur": 3.64
+ },
+ {
+  "id": "lap2_1",
+  "cat": "lap",
+  "text": "인은 두 번째에 들어갑니다. 첫 번째 인은, 그냥 지나가세요.",
+  "dur": 5.41
+ },
+ {
+  "id": "lap2_2",
+  "cat": "lap",
+  "text": "이번 러닝도 두 바퀴입니다. 인은, 두 번째에 들어갑니다.",
+  "dur": 4.57
+ },
+ {
+  "id": "lap2_3",
+  "cat": "lap",
+  "text": "두 바퀴 코스입니다. 인은 한 번 지나가고, 들어갑니다.",
+  "dur": 4.38
  }
 ]

@@ -26,7 +26,8 @@ struct WWorkoutPager: View {
                               withAnimation(WLive.slideCurve) { engine.advance() }
                               withAnimation { page = 0 }
                           }).tag(1)
-                WSegmentList().tag(2)
+                // 1.2.3: 러닝 카드는 구간(KM 1 · KM 2) 목록 페이지 없음
+                if !engine.isRunKind { WSegmentList().tag(2) }
             }
             .tabViewStyle(.verticalPage)
 
@@ -48,7 +49,7 @@ struct WWorkoutPager: View {
         .ignoresSafeArea()
         // 오른쪽 위 시스템 시계는 앱에서 숨길 수 없음 → 각 화면이 시계 자리를 비워 둠 (WClock)
         .onChange(of: engine.advanceCount) { _, _ in
-            flashNow()
+            if !engine.isRunKind { flashNow() }      // 1.2.3: 러닝 카드는 1 km 마다 번쩍이지 않음
         }
     }
 
@@ -451,8 +452,13 @@ struct WLive: View {
     /// 컨트롤 줄: 되돌리기 (작은 회색) · 다음 (큰 노란, 삼각형 머리 화살표) · 일시정지 (작은 회색)
     private var controls: some View {
         HStack(spacing: 0) {
-            sideButton(symbol: "arrow.uturn.backward", on: engine.canUndo, id: "w.undoLive") {
-                withAnimation(WLive.slideCurve) { engine.undo() }
+            if engine.isRunKind {
+                // 1.2.3: 러닝 카드는 넘기기 · 되돌리기가 없음 (자리만 비움)
+                Color.clear.frame(width: m.side, height: m.side)
+            } else {
+                sideButton(symbol: "arrow.uturn.backward", on: engine.canUndo, id: "w.undoLive") {
+                    withAnimation(WLive.slideCurve) { engine.undo() }
+                }
             }
             Spacer(minLength: 0)
             mainButton
@@ -466,11 +472,8 @@ struct WLive: View {
 
     @ViewBuilder private var mainButton: some View {
         if autoSplit {
-            // 러닝은 1 km 마다 자동 → 누를 수 없음, 안내만
-            Text("Auto split every 1 km".l10n)
-                .font(F.t(10, .semibold)).foregroundStyle(C.text2)
-                .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
-                .frame(width: m.main * 1.6, height: m.main)
+            // 1.2.3: 러닝 카드는 그냥 달림 — "1 km 마다 자동 넘김" 글씨도 없앰 (대표님 11-10, 자리만 둠)
+            Color.clear.frame(width: m.main * 1.6, height: m.main)
         } else {
             Button(action: next) {
                 ZStack {

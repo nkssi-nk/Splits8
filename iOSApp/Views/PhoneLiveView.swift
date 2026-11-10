@@ -661,7 +661,7 @@ final class PhoneRunEngine: NSObject, CLLocationManagerDelegate {
         segStart = now; segPaused = 0
         segDist = 0
         segStepStart = steps
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        // 1.2.3: 1 km 마다 진동하지 않음 (러닝 카드는 구간을 넘기는 운동이 아님 — 거리 안내는 음성 설정대로)
         persist()
     }
 
@@ -880,6 +880,12 @@ struct PhoneLiveView: View {
                                   paceColor: paceColor(ctx.date))
                 }
                 .padding(.top, m.top * 0.6)
+            } else if eng.isRunKind {
+                // 1.2.3: 러닝 카드는 구간 목록 페이지 없이 한 화면 (KM 1 · KM 2 목록 = 구간 넘김 흔적 — 대표님 11-10)
+                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+                    LiveBody(f: frame(ctx.date), m: m, idPrefix: "phone")
+                }
+                .padding(.top, m.top * 0.6)
             } else {
                 // 1.2.2: 워치처럼 왼쪽으로 넘기면 구간 목록 (끝난 구간 = 내 시간 + 비교 기준과 차이, 남은 구간 = 기준 시간)
                 TabView(selection: $page) {
@@ -903,10 +909,11 @@ struct PhoneLiveView: View {
                 .accessibilityIdentifier("phone.pages")
             }
             Spacer(minLength: 16)
-            nextButton(m)
+            // 1.2.3: 러닝 카드(GPS)는 1 km 마다 넘기는 것이 아니라 그냥 달림 — 넘기기 버튼 · 되돌리기 없음 (대표님 11-10)
+            if !(eng.isRunKind && eng.useGPS) { nextButton(m) }
             HStack(spacing: 8) {
                 endPill(m)
-                undoPill(m)
+                if !eng.isRunKind { undoPill(m) }
                 if !eng.isNewKind && !eng.isRunKind && !eng.growsOpen { skipPill(m) }     // 1.2.2
                 pausePill(m)
             }
@@ -945,7 +952,6 @@ struct PhoneLiveView: View {
 
     /// 가운데 큰 버튼 글자 (18번 새 종류는 종류마다 다름)
     private var nextLabel: String {
-        if eng.isRunKind && eng.useGPS { return "Auto split every 1 km" }
         switch eng.kind ?? "" {
         case WKind.emom: return eng.doneAt == nil ? "Done" : "Resting"
         case WKind.amrap: return "Round done"

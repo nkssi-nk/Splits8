@@ -782,14 +782,30 @@ private struct RaceLbAvatar: View {
 // MARK: - Goal time 고르기 → 구간 목표를 같은 비율로 나눔
 
 struct GoalTimeSheet: View {
-    static let height: CGFloat = 470
+    static let height: CGFloat = 600
     let store = Store.shared
     @Environment(\.dismiss) private var dismiss
     @State private var h = 1
     @State private var m = 12
     @State private var s = 0
-    /// 구간으로 나누는 방식 (GoalSplit.styles)
+    /// 구간으로 나누는 방식 (GoalSplit.styles) — 1.2.3: 스테이션 · Roxzone 비율에 씀
     @State private var style = "keep"
+    /// 1.2.3: 러닝 평균 페이스(초/km). 손으로 바꾸기 전에는 목표 시간 · 방식에 따라 기본값으로 따라감
+    @State private var pace = 270
+    @State private var paceTouched = false
+
+    /// 처음 값은 init 에서 (onAppear 에서 넣으면 onChange 가 불려 페이스가 기본값으로 덮임)
+    init() {
+        let st: Settings = Store.shared.settings
+        let t: Int = st.goalTime
+        _h = State(initialValue: t / 3600)
+        _m = State(initialValue: (t % 3600) / 60)
+        _s = State(initialValue: t % 60)
+        // 1.2.3: 저장된 러닝 목표 평균 → 없으면 지금 방식으로 계산한 값
+        let auto: Int = GoalSplit.defaultPace(total: max(600, t), style: "keep", current: st.goals, best: Store.shared.simBest?.splits16,
+                                              division: st.division, rox: HyroxBench.roxEach(goal: max(600, t), division: st.division))
+        _pace = State(initialValue: GoalSplit.runAvg(st.goals).map(GoalSplit.roundPace) ?? auto)
+    }
 
     private var total: Int { h * 3600 + m * 60 + s }
     private var bestSplits: [Int]? { store.simBest?.splits16 }
@@ -797,24 +813,31 @@ struct GoalTimeSheet: View {
     private var styles: [String] { GoalSplit.styles.filter { $0 != "best" || bestSplits != nil } }
     /// 이동 목표: 그 시간대 실제 중간값 (대표님 결정 2026-10-12 — 30초 고정 대신)
     private var roxEach: Int { HyroxBench.roxEach(goal: max(600, total), division: store.settings.division) }
-    private var preview: [Int] {
-        GoalSplit.split(total: max(600, total), style: style, current: store.settings.goals, best: bestSplits,
-                        division: store.settings.division, rox: roxEach)
+    /// 1.2.3: 러닝 페이스 먼저 → 남은 시간을 스테이션 · Roxzone 에 나눔. nil = 러닝만으로 목표를 넘음
+    private var result: GoalSplit.PaceSplit? {
+        GoalSplit.byPace(total: max(600, total), pace: pace, style: style, current: store.settings.goals, best: bestSplits,
+                         division: store.settings.division, rox: roxEach)
+    }
+    private var autoPace: Int {
+        GoalSplit.defaultPace(total: max(600, total), style: style, current: store.settings.goals, best: bestSplits,
+                              division: store.settings.division, rox: roxEach)
     }
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             NavBar3(left: "Cancel", title: "Goal time", right: "Save", onLeft: { dismiss() }, onRight: save, edgeBack: false)
             HStack(spacing: 0) {
                 picker($h, 0..<3, String(localized: "unit.h", defaultValue: "h")); picker($m, 0..<60, String(localized: "unit.m", defaultValue: "m")); picker($s, 0..<60, String(localized: "unit.s", defaultValue: "s"))
             }
-            .frame(height: 150)
-            // 구간으로 나누는 방식: 지금 비율 · 균형형 · 러너형 · 근력형 · 내 최고 기록 비율
+            .frame(height: 140)
+            paceRow
+            // 구간으로 나누는 방식: 지금 비율 · 균형형 · 러너형 · 근력형 · 내 최고 기록 비율 (스테이션 · Roxzone 나누기)
             Seg8(items: styles.map { ($0, GoalSplit.name($0)) }, selected: style, height: 34, radius: 11, fontSize: 13) { k in
                 withAnimation(.easeOut(duration: 0.2)) { style = k }
             }
             .accessibilityIdentifier("goal.style")
             bars
+            sumLine
             Text(GoalSplit.note(style).l10n).font(F.t(13)).foregroundStyle(C.text3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -822,15 +845,61 @@ struct GoalTimeSheet: View {
         }
         .padding(.horizontal, 16).padding(.top, 8)
         .background(Color(hex: 0x141414).ignoresSafeArea())
-        .onAppear {
-            let t = store.settings.goalTime
-            h = t / 3600; m = (t % 3600) / 60; s = t % 60
+        .onChange(of: total) { _, _ in if !paceTouched { pace = autoPace } }
+        .onChange(of: style) { _, _ in if !paceTouched { pace = autoPace } }
+    }
+
+    /// Run Pace  [−] 5:00 /km [+]  (5초씩)
+    private var paceRow: some View {
+        HStack(spacing: 10) {
+            Text("Run Pace").font(F.t(17))
+            Spacer(minLength: 0)
+            stepButton("minus", id: "goal.paceDown") { bumpPace(-5) }
+            Text(Fm.t(pace) + " /km").font(F.num(20)).monospacedDigit()
+                .frame(minWidth: 96)
+                .accessibilityIdentifier("goal.pace")
+            stepButton("plus", id: "goal.paceUp") { bumpPace(5) }
+        }
+        .padding(.vertical, 10).padding(.horizontal, 14)
+        .card8(14)
+    }
+
+    private func stepButton(_ sym: String, id: String, _ act: @escaping () -> Void) -> some View {
+        Button(action: act) {
+            Image(systemName: sym).font(.system(size: 15, weight: .bold))
+                .frame(width: 36, height: 36)
+                .background(Color.white.opacity(0.08), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .buttonRepeatBehavior(.enabled)
+        .accessibilityIdentifier(id)
+    }
+
+    private func bumpPace(_ d: Int) {
+        paceTouched = true
+        pace = min(GoalSplit.paceRange.upperBound, max(GoalSplit.paceRange.lowerBound, pace + d))
+    }
+
+    /// 러닝 · 스테이션 · Roxzone 합계 한 줄, 러닝만으로 목표를 넘으면 경고
+    @ViewBuilder
+    private var sumLine: some View {
+        if let r = result {
+            Text(String(format: "Runs %@ · Stations %@ · Roxzone %@".l10n, Fm.t(r.runSum), Fm.t(r.stSum), Fm.t(r.roxSum)))
+                .font(F.num(14)).foregroundStyle(C.text2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("goal.sum")
+        } else {
+            Text("Runs alone go over the goal. Set the pace again.".l10n)
+                .font(F.t(14, .semibold)).foregroundStyle(C.bad)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("goal.paceOver")
         }
     }
 
     /// 나눈 결과 미리 보기: 16 막대 (러닝 회색 · 종목 노랑), 가장 긴 칸 기준 높이
     private var bars: some View {
-        let g: [Int] = preview
+        let g: [Int] = result?.goals ?? Array(repeating: 0, count: 16)
         let mx: CGFloat = CGFloat(max(1, g.max() ?? 1))
         return HStack(alignment: .bottom, spacing: 3) {
             ForEach(Array(g.enumerated()), id: \.offset) { i, t in
@@ -842,6 +911,7 @@ struct GoalTimeSheet: View {
         .frame(height: 44, alignment: .bottom)
         .padding(.vertical, 12).padding(.horizontal, 14)
         .card8(14)
+        .opacity(result == nil ? 0.35 : 1)
         .accessibilityIdentifier("goal.preview")
     }
 
@@ -852,10 +922,10 @@ struct GoalTimeSheet: View {
 
     private func save() {
         guard total > 600 else { dismiss(); return }
+        guard let r = result else { return }          // 러닝만으로 목표를 넘으면 저장 안 함 (화면에 경고)
         var st = store.settings
-        st.roxGoal = roxEach
-        st.goals = GoalSplit.split(total: total, style: style, current: st.goals, best: bestSplits,
-                                   division: st.division, rox: roxEach)
+        st.roxGoal = r.rox
+        st.goals = r.goals
         st.goalTime = total
         store.settings = st
         dismiss()

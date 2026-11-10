@@ -129,6 +129,8 @@ struct WatchLiveView: View {
     private func buttons(_ st: LiveState, _ m: PhoneLiveMetrics) -> some View {
         let on: Bool = !mirror.reconnecting
         return VStack(spacing: 0) {
+            // 1.2.3: 러닝 카드(1 km 자동)는 넘기기 버튼 없음 — "1 km 마다 자동 넘김" 글씨도 없앰 (대표님 11-10)
+            if !st.autoSplit {
             YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: on && st.running && !st.autoSplit,
                          action: {
                              UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -141,6 +143,7 @@ struct WatchLiveView: View {
                 .font(F.t(m.buttonFont, .semibold))
             }
             .accessibilityIdentifier("watchLive.next")
+            }
             HStack(spacing: 10) {
                 pill("End", icon: "stop.fill", color: C.bad, bg: Color(hex: 0xFF453A, alpha: 0.22), enabled: on) { askEnd = true }
                     .accessibilityIdentifier("watchLive.end")

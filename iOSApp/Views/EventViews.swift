@@ -21,7 +21,7 @@ struct SetEventView: View {
             findCard
 
             SectionLabel(text: "EVENT", top: 6)
-            Field8(placeholder: "Event name (e.g. Incheon)", text: Binding(get: { ev.name }, set: { v in set { $0.name = v } }))
+            Field8(placeholder: "Event name (e.g. Incheon)", text: Binding(get: { ev.name }, set: { v in set { $0.name = v; $0.laps = nil } }))
                 .accessibilityIdentifier("ev.name")
             Field8(placeholder: "Venue / City", text: Binding(get: { ev.loc }, set: { v in set { $0.loc = v } }))
                 .accessibilityIdentifier("ev.loc")
@@ -165,7 +165,7 @@ struct SetEventView: View {
         let past = dt < today
         let fg: Color = on ? Color.black : (past ? C.chev : (isT ? C.accent : Color.white))
         return Button {
-            if !past { set { $0.date = dt }; pick = nil }
+            if !past { set { $0.date = dt; $0.laps = nil }; pick = nil }
         } label: {
             Text("\(d)").font(F.num(17, on || isT ? .semibold : .regular))
                 .foregroundStyle(fg)
@@ -355,6 +355,7 @@ struct FindEventView: View {
         d.name = e.city; d.loc = e.venue
         d.date = Fm.ymd.date(from: e.start) ?? d.date
         d.dateEnd = Fm.ymd.date(from: e.end)
+        d.laps = e.laps          // 1.2.3: 바퀴 수 (모르면 nil)
         r.evDraft = d
         r.go(.setEvent)
     }

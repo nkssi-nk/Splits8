@@ -10,7 +10,8 @@ import Foundation
 //  거의 끝 (목표 85 %): 러닝 1 · 2 = near_run / near_run_rox, 월볼 = near_st / near_st2
 //  흐름 응원 (보통 · 많이): 러닝2 ph_q1 · 러닝6 ph_q3 · 러닝7 ph_two · 러닝8 ph_lastrun · 월볼 ph_wb (그 구간 첫 응원 자리)
 //  초반 과속 (러닝 1 · 2, 목표 60 % 지점, 잰 거리가 목표보다 10 % 넘게 앞서면, 레이스당 1번) → pace_fast_1 / 2
-//  목표 비교 (구간 끝, 누적): 3초 안 = goal_on, 아니면 goal_pre + 시간 + goal_fast / goal_slow
+//  목표 비교 (구간 끝, 누적): 1.2.3 통문장 — 15초 안 goal_on · 1분 안 goal_fast_s/slow_s · 1~10분 goal_fast_n · 넘으면 _far
+//  바퀴 안내 (1.2.3, 레이스 모드 + 바퀴 수 2): 러닝마다 목표 40 % 에 lap2_1~3 돌려 쓰기
 
 enum RaceVoice {
     /// 스테이션 아이콘 → 응원 조각 이름 (cs_<종목>_*)
@@ -74,12 +75,26 @@ enum RaceVoice {
         return compare(mine - goal)
     }
 
-    /// 차이(초, + = 늦음) → 조각. 3초 안 = goal_on, 1시간 넘으면 숫자 없이
+    /// 차이(초, + = 늦음) → 통문장 하나 (1.2.3: 조각을 이어 붙이면 버벅여서 — 대표님 11-10).
+    /// 15초 안 = goal_on / 1분 안 = "조금" / 1~10분 = 반올림한 분 / 그 넘으면 "훨씬 · 많이"
     static func compare(_ diff: Int) -> [String] {
         let a: Int = abs(diff)
-        if a <= 3 { return ["goal_on"] }
-        if a >= 3600 { return [diff < 0 ? "goal_ahead" : "goal_behind"] }
-        return ["goal_pre"] + VoiceCoach.dur(a) + [diff < 0 ? "goal_fast" : "goal_slow"]
+        let w: String = diff < 0 ? "fast" : "slow"
+        if a < 15 { return ["goal_on"] }
+        if a < 60 { return ["goal_\(w)_s"] }
+        let m: Int = Int((Double(a) / 60).rounded())
+        if m <= 10 { return ["goal_\(w)_\(max(1, m))"] }
+        return ["goal_\(w)_far"]
+    }
+
+    // MARK: 1.2.3 · 바퀴 안내 (레이스 모드 + 대회 바퀴 수를 알 때만)
+
+    /// 러닝 목표의 이 비율 지점에서 한 번
+    static let lapAt: Double = 0.4
+    /// 바퀴 안내 후보: 러닝 1~8 모두 lap2_1 · lap2_2 · lap2_3 (바로 앞과 같은 문장은 빼고). 지금 문장은 두 바퀴용뿐
+    static func lapOptions(_ seq: [Seg], _ i: Int, laps: Int, last: String?) -> [String] {
+        guard laps == 2, seq.indices.contains(i), seq[i].kind == .run else { return [] }
+        return ["lap2_1", "lap2_2", "lap2_3"].filter { $0 != last }
     }
 
     /// 이 구간 예상 시간(초): 목표, 없으면 기본 목표

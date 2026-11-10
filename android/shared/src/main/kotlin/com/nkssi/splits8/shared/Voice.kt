@@ -99,12 +99,15 @@ data class VoicePrefs(
     val hr: Boolean = true,
     /** 1.2.2: 레이스 · 시뮬 응원 양 "low" · "mid" · "high" */
     val cheer: String = "low",
+    /** 1.2.3: 대회 러닝 바퀴 수 (바퀴 안내 꺼짐 · 모름 = 0). 레이스 모드에서만 씀 */
+    val laps: Int = 0,
 ) {
     companion object {
         /** 지금은 한국어 조각만 있어서, 앱이 한국어가 아니면 끔 */
         fun of(s: Settings, korean: Boolean) = VoicePrefs(
             on = s.voice && korean, everyM = s.voiceEvery,
             dist = s.voiceDist, time = s.voiceTime, pace = s.voicePace, hr = s.voiceHr, cheer = s.voiceCheer,
+            laps = if (s.voiceLap) s.event.lapsPerRun else 0,
         )
     }
 }
@@ -183,6 +186,10 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
     private val cheerDone = HashMap<Int, Int>()
     private val nearDone = HashSet<Int>()
     private val paceChecked = HashSet<Int>()
+    /** 1.2.3 바퀴 안내: 레이스(대회) 모드 + 바퀴 수를 알 때만. 안내한(또는 건너뛴) 러닝 · 바로 앞 문장 */
+    private var lapCount = 0
+    private val lapDone = HashSet<Int>()
+    private var lastLap: String? = null
 
     /**
      * 18번: 타이머 운동(타바타 · EMOM · AMRAP) 시작 전 세기. n = 3 · 2 · 1, 0 = 시작.
@@ -210,6 +217,8 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
             lastRunning = o.running
             nextMark = nextMarkAbove(o.dist ?: 0.0)
             race = o.kind == null && (o.mode == Mode.Race || o.mode == Mode.Sim) && RaceVoice.isRace(o.seq)
+            // 1.2.3: 바퀴 안내는 레이스(대회) 모드만 — 풀 시뮬 · 트레이닝은 어디서 뛸지 몰라서 안 함
+            lapCount = if (race && o.mode == Mode.Race) prefs.laps else 0
             // 앱을 다시 열어 이어 받은 운동이면 시작 안내는 안 함
             if (o.total > 5) return null
             // 1.2.2 레이스: "자, 첫 번째 러닝입니다 …" 한 문장 (go_start · ph_start 는 같은 말이라 안 함)
@@ -286,6 +295,25 @@ class VoiceCoach(private val prefs: VoicePrefs, private val rnd: Random = Random
         if (plannedIdx != i) {
             plannedIdx = i
             cheerTimes = RaceVoice.cheerTimes(seq, i, prefs.cheer) { rnd.nextDouble(-0.1, 0.1) }
+        }
+        // 1.2.3 바퀴 안내 (전환 다음으로 먼저): 러닝 목표의 40 %. 다른 말을 하고 있으면 끝난 뒤 바로 — 5초 넘게 밀리면 건너뜀
+        if (lapCount > 0 && seg.kind == SegKind.Run && i !in lapDone) {
+            val due = (t * RaceVoice.LAP_AT).toInt()
+            if (o.segEl >= due) {
+                when {
+                    o.segEl > due + 5 -> lapDone.add(i)
+                    now >= quietFrom -> {
+                        lapDone.add(i)
+                        val opts = RaceVoice.lapOptions(seq, i, lapCount, lastLap)
+                        if (opts.isNotEmpty()) {
+                            val c = opts[rnd.nextInt(opts.size)]
+                            lastLap = c
+                            return say(Line(listOf(c)), now)
+                        }
+                    }
+                    else -> return null      // 말이 끝나길 기다림 (거의 끝 · 응원은 그 뒤에)
+                }
+            }
         }
         // 초반 과속 (러닝 1 · 2, 목표의 60 % 지점, 잰 거리가 있을 때만, 레이스당 1번)
         if (!paceWarned && i !in paceChecked && RaceVoice.paceCheckSeg(seq, i) && o.segEl >= (t * 0.6).toInt()) {
@@ -584,12 +612,29 @@ object RaceVoice {
         return compare(mine - goal)
     }
 
-    /** 차이(초, + = 늦음) → 조각. 3초 안 = goal_on, 1시간 넘으면 숫자 없이 */
+    /**
+     * 차이(초, + = 늦음) → 통문장 하나 (1.2.3: 조각을 이어 붙이면 버벅여서 — 대표님 11-10).
+     * 15초 안 = goal_on / 1분 안 = "조금" / 1~10분 = 반올림한 분 / 그 넘으면 "훨씬 · 많이"
+     */
     fun compare(diff: Int): List<String> {
         val a = abs(diff)
-        if (a <= 3) return listOf("goal_on")
-        if (a >= 3600) return listOf(if (diff < 0) "goal_ahead" else "goal_behind")
-        return listOf("goal_pre") + VoiceClips.duration(a) + listOf(if (diff < 0) "goal_fast" else "goal_slow")
+        val w = if (diff < 0) "fast" else "slow"
+        if (a < 15) return listOf("goal_on")
+        if (a < 60) return listOf("goal_${w}_s")
+        val m = Math.round(a / 60.0).toInt()
+        if (m <= 10) return listOf("goal_${w}_${maxOf(1, m)}")
+        return listOf("goal_${w}_far")
+    }
+
+    // 1.2.3 · 바퀴 안내 (레이스 모드 + 대회 바퀴 수를 알 때만)
+
+    /** 러닝 목표의 이 비율 지점에서 한 번 */
+    const val LAP_AT = 0.4
+
+    /** 바퀴 안내 후보: 러닝 1~8 모두 lap2_1 · lap2_2 · lap2_3 (바로 앞과 같은 문장은 빼고). 지금 문장은 두 바퀴용뿐 */
+    fun lapOptions(seq: List<Seg>, i: Int, laps: Int, last: String?): List<String> {
+        if (laps != 2 || seq.getOrNull(i)?.kind != SegKind.Run) return emptyList()
+        return listOf("lap2_1", "lap2_2", "lap2_3").filter { it != last }
     }
 
     /** 이 구간 예상 시간(초): 목표, 없으면 기본 목표 */

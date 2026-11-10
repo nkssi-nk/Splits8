@@ -230,7 +230,8 @@ fun PhoneLiveView() {
     // GPS 러닝이 총거리를 다 뛰어서 저절로 끝남
     LaunchedEffect(eng.autoDone) { eng.autoDone?.let { success(); done(it) } }
     LaunchedEffect(eng.autoSplits) {
-        if (eng.autoSplits > 0) { buzz(true); flashNow(); if (Kinds.isNew(eng.kind)) beep(true) }
+        // 1.2.3: 러닝 카드는 1 km 마다 진동 · 반짝임 없음 (구간을 넘기는 운동이 아님 — 대표님 11-10). 인터벌 러닝은 그대로
+        if (eng.autoSplits > 0 && !eng.isRunKind) { buzz(true); flashNow(); if (Kinds.isNew(eng.kind)) beep(true) }
     }
 
     Sensors(eng, ctx)
@@ -248,6 +249,9 @@ fun PhoneLiveView() {
                 if (Kinds.isNew(eng.kind)) {
                     BonusLiveBody(eng, now, m, Modifier.padding(top = (m.top * 0.6f).dp))
                     LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
+                } else if (eng.isRunKind) {
+                    // 1.2.3: 러닝 카드는 구간(KM 1 · KM 2) 목록 페이지 없이 한 화면
+                    LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
                 } else {
                     // 1.2.2: 워치처럼 왼쪽으로 넘기면 구간 목록 (끝난 구간 = 내 시간 + 비교 기준과 차이, 남은 구간 = 기준 시간)
                     val pager = rememberPagerState(pageCount = { 2 })
@@ -274,7 +278,8 @@ fun PhoneLiveView() {
             val enabled = eng.running && !gpsRun && !emomDone && liftAsk == null
             // 1.1.2: Finish 를 누른 뒤 기록 화면으로 넘어가는 0.25초 동안 버튼이 회색으로 바뀌어 "사라진 것처럼" 보이던 것 → 끝난 뒤에도 노란색 유지 (누를 수는 없음)
             val looksOn = enabled || eng.finished
-            Row(
+            // 1.2.3: GPS 러닝 카드는 넘기기 버튼 없음 ("1 km 마다 자동 넘김" 글씨도 없앰)
+            if (!gpsRun) Row(
                 Modifier.fillMaxWidth().height(m.buttonH.dp).yellowFill(RoundedCornerShape(50), on = looksOn)
                     .press(enabled = enabled, tag = "phone.next") {
                         // 18번 기능성 운동: 세트 끝 → 횟수 · 무게 확인 칸 먼저
@@ -284,14 +289,13 @@ fun PhoneLiveView() {
                     },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
             ) {
-                val label = if (gpsRun) "Auto split every 1 km"
-                    else if (Kinds.isNew(eng.kind)) (if (!eng.hasNext && !eng.growsOpen && eng.kind != Kinds.EMOM && !(eng.kind == Kinds.LIFT && !eng.isLiftSet)) "Finish" else bonusNextLabel(eng))
+                val label = if (Kinds.isNew(eng.kind)) (if (!eng.hasNext && !eng.growsOpen && eng.kind != Kinds.EMOM && !(eng.kind == Kinds.LIFT && !eng.isLiftSet)) "Finish" else bonusNextLabel(eng))
                     else if (eng.hasNext || eng.growsOpen) "Next" else "Finish"
                 T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (looksOn) Color.Black else C.text3), maxLines = 1, translate = false)
             }
             Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill(R.drawable.sym_stop, "End", C.bad, hex(0xFF453A, 0.22f), m.pillH, "phone.end") { askEnd() }
-                Pill(R.drawable.sym_undo, "Undo", if (eng.canUndo) Color.White else C.text3,
+                if (!eng.isRunKind) Pill(R.drawable.sym_undo, "Undo", if (eng.canUndo) Color.White else C.text3,
                     Color.White.copy(alpha = if (eng.canUndo) 0.12f else 0.05f), m.pillH, "phone.undo", eng.canUndo) { buzz(); eng.undo() }
                 // 1.2.2: 지금 구간 건너뛰기 (시간 0 · 기록에 "건너뜀"). 스테이션 · 러닝만, Roxzone 은 흐리게
                 if (!Kinds.isNew(eng.kind) && !eng.isRunKind && !eng.growsOpen) {

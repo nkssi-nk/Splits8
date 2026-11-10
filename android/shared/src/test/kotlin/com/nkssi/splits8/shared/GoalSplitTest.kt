@@ -53,4 +53,30 @@ class GoalSplitTest {
         val run = GoalSplit.split(80 * 60, "runner", Defaults.goals, null)
         assertTrue(run.filterIndexed { i, _ -> i % 2 == 0 }.sum() < bal.filterIndexed { i, _ -> i % 2 == 0 }.sum())
     }
+
+    @Test fun byPace() {
+        // 1.2.3: 목표 1:20 · 페이스 5:00 → 러닝 8 × 300 = 40:00, 남은 40:00 을 스테이션 · Roxzone 에 나눔
+        val total = 80 * 60
+        for (d in Division.all) for (style in GoalSplit.styles) {
+            val rox = HyroxBench.roxEach(total, d.key)
+            val r = GoalSplit.byPace(total, 300, style, Defaults.goals, null, d.key, rox)!!
+            assertEquals(16, r.goals.size)
+            assertTrue(r.goals.filterIndexed { i, _ -> i % 2 == 0 }.all { it == 300 })
+            assertEquals(2400, r.runSum)
+            assertTrue(r.goals.filterIndexed { i, _ -> i % 2 == 1 }.all { it >= 30 && it % 5 == 0 })
+            assertTrue(r.rox in 20..120)
+            // 합계는 5초 반올림 안
+            assertTrue("${d.key} $style ${r.runSum + r.stSum + r.roxSum}", kotlin.math.abs(r.runSum + r.stSum + r.roxSum - total) <= 5)
+        }
+        // 러닝만으로 목표를 넘으면 null
+        assertEquals(null, GoalSplit.byPace(40 * 60, 300, "balanced", Defaults.goals, null, "openM", 30))
+        assertEquals(null, GoalSplit.byPace(46 * 60, 300, "balanced", Defaults.goals, null, "openM", 30))      // 남은 6분 < 최소 6:40
+        // 기본 페이스 = 지금 방식의 러닝 평균 (5초 단위)
+        val p = GoalSplit.defaultPace(total, "balanced", Defaults.goals, null, "openM", HyroxBench.roxEach(total, "openM"))
+        assertEquals(0, p % 5)
+        assertEquals(GoalSplit.roundPace(GoalSplit.runAvg(GoalSplit.split(total, "balanced", Defaults.goals, null, "openM", HyroxBench.roxEach(total, "openM")))!!), p)
+        // 저장된 목표 평균 (예전 저장값)
+        assertEquals(270, GoalSplit.runAvg(Defaults.goals))
+        assertEquals(null, GoalSplit.runAvg(listOf(1, 2, 3)))
+    }
 }

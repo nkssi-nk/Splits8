@@ -559,7 +559,7 @@ class WorkoutEngine(
             segDistStart = distance
             segStepStart = steps
             advanceCount++
-            buzz(BuzzKind.Next)
+            // 1.2.3: 러닝 카드는 1 km 마다 진동하지 않음 (구간을 넘기는 운동이 아님 — 대표님 11-10)
             pushLive()
             voiceCheck()
         }

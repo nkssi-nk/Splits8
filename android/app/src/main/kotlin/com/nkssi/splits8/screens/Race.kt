@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -228,29 +230,70 @@ fun GoalTimeSheet() {
     val styles = GoalSplit.styles.filter { it != "best" || best != null }
     // 이동 목표: 그 시간대 실제 중간값 (2026-10-12 결정 — 30초 고정 대신)
     val roxEach = HyroxBench.roxEach(maxOf(600, total), s.division)
-    val preview = GoalSplit.split(maxOf(600, total), style, s.goals, best, s.division, roxEach)
+    // 1.2.3: 러닝 평균 페이스 먼저 (저장된 러닝 목표 평균 → 없으면 지금 방식으로 계산한 값). 손으로 바꾸기 전에는 목표 · 방식을 따라감
+    val autoPace = GoalSplit.defaultPace(maxOf(600, total), style, s.goals, best, s.division, roxEach)
+    var pace by remember { mutableIntStateOf(GoalSplit.runAvg(s.goals)?.let(GoalSplit::roundPace)
+        ?: GoalSplit.defaultPace(maxOf(600, s.goalTime), "keep", s.goals, best, s.division, HyroxBench.roxEach(maxOf(600, s.goalTime), s.division))) }
+    var paceTouched by remember { mutableStateOf(false) }
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(total, style) {
+        if (first) { first = false; return@LaunchedEffect }
+        if (!paceTouched) pace = autoPace
+    }
+    // 남은 시간을 스테이션 · Roxzone 에 나눈 결과. null = 러닝만으로 목표를 넘음
+    val result = GoalSplit.byPace(maxOf(600, total), pace, style, s.goals, best, s.division, roxEach)
+
+    fun bump(d: Int) {
+        paceTouched = true
+        pace = (pace + d).coerceIn(GoalSplit.paceRange.first, GoalSplit.paceRange.last)
+    }
 
     fun save() {
         if (total > 600) {
-            Store.update { it.copy(roxGoal = roxEach, goals = GoalSplit.split(total, style, it.goals, best, it.division, roxEach), goalTime = total) }
+            val r = result ?: return            // 러닝만으로 목표를 넘으면 저장 안 함 (화면에 경고)
+            Store.update { it.copy(roxGoal = r.rox, goals = r.goals, goalTime = total) }
         }
         Router.raceSheet = null
     }
 
-    Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         NavBar3("Cancel", "Goal time", right = "Save", edgeBack = false, onLeft = { Router.raceSheet = null }, onRight = { save() })
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Wheel8((0..2).toList(), h, Modifier.weight(1f), { "$it " + unit("unit.h", "h") }, "goal.h") { h = it }
             Wheel8((0..59).toList(), m, Modifier.weight(1f), { "$it " + unit("unit.m", "m") }, "goal.m") { m = it }
             Wheel8((0..59).toList(), sec, Modifier.weight(1f), { "$it " + unit("unit.s", "s") }, "goal.s") { sec = it }
         }
-        // 구간으로 나누는 방식: 지금 비율 · 균형형 · 러너형 · 근력형 · 내 최고 기록 비율
+        // 1.2.3: Run Pace  [−] 5:00 /km [+]  (5초씩)
+        Row(Modifier.fillMaxWidth().card8(14.dp).padding(vertical = 10.dp, horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            T("Run Pace", F.t(17), Modifier.weight(1f), maxLines = 1, translate = false)
+            PaceStep("−", "goal.paceDown") { bump(-5) }
+            T(Fm.t(pace) + " /km", F.num(20), Modifier.widthIn(min = 96.dp).testTag("goal.pace"), maxLines = 1, align = TextAlign.Center, translate = false)
+            PaceStep("+", "goal.paceUp") { bump(5) }
+        }
+        // 구간으로 나누는 방식: 지금 비율 · 균형형 · 러너형 · 근력형 · 내 최고 기록 비율 (스테이션 · Roxzone 나누기)
         Seg8(styles.map { it to GoalSplit.name(it) }, style, Modifier.fillMaxWidth().testTag("goal.style"), height = 34.dp, radius = 11.dp) { style = it }
-        val mx = maxOf(1, preview.maxOrNull() ?: 1).toFloat()
-        Box(Modifier.fillMaxWidth().card8(14.dp).padding(vertical = 12.dp, horizontal = 14.dp).testTag("goal.preview")) {
-            SplitBars(preview, 44) { maxOf(0.08f, it / mx) }
+        val g = result?.goals ?: List(16) { 0 }
+        val mx = maxOf(1, g.maxOrNull() ?: 1).toFloat()
+        Box(Modifier.fillMaxWidth().alpha(if (result == null) 0.35f else 1f).card8(14.dp).padding(vertical = 12.dp, horizontal = 14.dp).testTag("goal.preview")) {
+            SplitBars(g, 44) { maxOf(0.08f, it / mx) }
+        }
+        if (result != null) {
+            T(L10n.t("Runs %@ · Stations %@ · Roxzone %@", Fm.t(result.runSum), Fm.t(result.stSum), Fm.t(result.roxSum)),
+                F.num(14, color = C.text2), Modifier.testTag("goal.sum"), translate = false)
+        } else {
+            T("Runs alone go over the goal. Set the pace again.", F.t(14, W600, color = C.bad), Modifier.testTag("goal.paceOver"))
         }
         T(GoalSplit.note(style), F.t(13, color = C.text3))
+    }
+}
+
+/** 1.2.3: 페이스 − / + 동그란 버튼 */
+@Composable
+private fun PaceStep(label: String, tag: String, onClick: () -> Unit) {
+    Box(Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)).press(tag = tag, onClick = onClick),
+        contentAlignment = Alignment.Center) {
+        T(label, F.t(18, W600), maxLines = 1, translate = false)
     }
 }
 
@@ -297,7 +340,7 @@ fun SetEventView() {
             }
 
             SectionLabel("EVENT", top = 6.dp)
-            Field8("Event name (e.g. Incheon)", ev.name, Modifier.testTag("ev.name")) { v -> set { it.copy(name = v) } }
+            Field8("Event name (e.g. Incheon)", ev.name, Modifier.testTag("ev.name")) { v -> set { it.copy(name = v, laps = null) } }
             Field8("Venue / City", ev.loc, Modifier.testTag("ev.loc")) { v -> set { it.copy(loc = v) } }
 
             SectionLabel("DATE & WAVE", top = 14.dp)
@@ -305,7 +348,7 @@ fun SetEventView() {
                 PickRow("Date", Fm.wdmy(ev.date), pick == "date") { pick = if (pick == "date") null else "date" }
                 AnimatedVisibility(pick == "date") {
                     EventCalendar(ev.date.atZone(Fm.zone).toLocalDate()) { d ->
-                        set { it.copy(date = d.atStartOfDay(Fm.zone).toInstant()) }; pick = null
+                        set { it.copy(date = d.atStartOfDay(Fm.zone).toInstant(), laps = null) }; pick = null
                     }
                 }
                 PickRow("Start time", timeLabel(ev), pick == "time") { pick = if (pick == "time") null else "time" }
@@ -472,7 +515,7 @@ private fun EventRow(e: EventItem, last: Boolean) {
     Row(
         Modifier.fillMaxWidth().rowLine(!last).tap {
             val d = Router.evDraft ?: Store.settings.event
-            Router.evDraft = d.copy(name = e.city, loc = e.venue, date = st.atStartOfDay(Fm.zone).toInstant(), dateEnd = en.atStartOfDay(Fm.zone).toInstant())
+            Router.evDraft = d.copy(name = e.city, loc = e.venue, date = st.atStartOfDay(Fm.zone).toInstant(), dateEnd = en.atStartOfDay(Fm.zone).toInstant(), laps = e.laps)
             Router.go(Scr.SetEvent)
         }.testTag("ev.item." + e.city).padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),

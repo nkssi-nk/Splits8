@@ -212,8 +212,8 @@ class VoiceTest {
     // MARK: 1.2.2 · 레이스 · 풀 시뮬 코치 (코치 음성 v8)
 
     private fun race(idx: Int, segEl: Int = 0, total: Int = 0, splits: List<Int> = emptyList(), segDist: Double? = null,
-                     finished: Boolean = false, running: Boolean = true, seq: List<Seg> = sim) =
-        VoiceCoach.Obs(true, finished, running, Mode.Sim, null, seq, idx, segEl, total, null, null, null, null, splits, segDist)
+                     finished: Boolean = false, running: Boolean = true, seq: List<Seg> = sim, mode: Mode = Mode.Sim) =
+        VoiceCoach.Obs(true, finished, running, mode, null, seq, idx, segEl, total, null, null, null, null, splits, segDist)
 
     @Test fun raceIsOnlyHyroxOrder() {
         assertTrue(RaceVoice.isRace(sim))
@@ -244,16 +244,22 @@ class VoiceTest {
     }
 
     @Test fun raceGoalCompare() {
+        // 1.2.3: 통문장 하나 — 15초 안 · 1분 안 · 1~10분(반올림) · 그 넘으면
         assertEquals(listOf("goal_on"), RaceVoice.compare(2))
-        assertEquals(listOf("goal_pre", "sec_12", "goal_fast"), RaceVoice.compare(-12))
-        assertEquals(listOf("goal_pre", "min_1", "sec_5", "goal_slow"), RaceVoice.compare(65))
-        assertEquals(listOf("goal_behind"), RaceVoice.compare(4000))
+        assertEquals(listOf("goal_on"), RaceVoice.compare(-12))
+        assertEquals(listOf("goal_fast_s"), RaceVoice.compare(-15))
+        assertEquals(listOf("goal_slow_s"), RaceVoice.compare(59))
+        assertEquals(listOf("goal_slow_1"), RaceVoice.compare(65))
+        assertEquals(listOf("goal_fast_2"), RaceVoice.compare(-90))
+        assertEquals(listOf("goal_slow_10"), RaceVoice.compare(629))
+        assertEquals(listOf("goal_slow_far"), RaceVoice.compare(631))
+        assertEquals(listOf("goal_fast_far"), RaceVoice.compare(-4000))
         // 스키(목표 255) 끝 → 록스존(3)에 들어올 때 누적 비교. 러닝1 270 · 록스존 30 · 스키 255 = 555, 내 기록 540 → 15초 빠름
         val sp = listOf(260, 25, 255)
-        assertEquals(listOf("goal_pre", "sec_15", "goal_fast"), RaceVoice.goalLine(sim, 3, sp, "low"))
+        assertEquals(listOf("goal_fast_s"), RaceVoice.goalLine(sim, 3, sp, "low"))
         // 적게: 러닝 끝(록스존 IN)에는 안 함, 보통이면 함
         assertTrue(RaceVoice.goalLine(sim, 1, listOf(260), "low").isEmpty())
-        assertEquals(listOf("goal_pre", "sec_10", "goal_fast"), RaceVoice.goalLine(sim, 1, listOf(260), "mid"))
+        assertEquals(listOf("goal_on"), RaceVoice.goalLine(sim, 1, listOf(260), "mid"))
         // 록스존이 끝난 자리 · 건너뛴 구간(0초)은 안 함
         assertTrue(RaceVoice.goalLine(sim, 2, listOf(260, 25), "mid").isEmpty())
         assertTrue(RaceVoice.goalLine(sim, 3, listOf(260, 25, 0), "mid").isEmpty())
@@ -271,13 +277,41 @@ class VoiceTest {
         // 스키 시작 (적게 → 요령 없음)
         assertEquals(listOf("rs_1"), c.update(race(2, 0, 290, listOf(260, 30)), 290_000)!!.clips)
         // 스키 끝 → 록스존 OUT + 목표 비교 (270+30+255 = 555, 내 260+30+250 = 540)
-        assertEquals(listOf("ro_1", "goal_pre", "sec_15", "goal_fast"), c.update(race(3, 0, 540, listOf(260, 30, 250)), 540_000)!!.clips)
+        assertEquals(listOf("ro_1", "goal_fast_s"), c.update(race(3, 0, 540, listOf(260, 30, 250)), 540_000)!!.clips)
         // 일시정지 · 다시
         assertEquals(listOf("go_pause"), c.update(race(3, 5, 545, listOf(260, 30, 250), running = false), 545_000)!!.clips)
         assertEquals(listOf("go_resume"), c.update(race(3, 5, 545, listOf(260, 30, 250)), 550_000)!!.clips)
         // 끝까지 → 완주
         val all = List(sim.size) { 100 }
         assertEquals(listOf("rf_1"), c.update(race(sim.size - 1, 0, 3000, all, finished = true), 3_000_000)!!.clips)
+    }
+
+    @Test fun lapGuideRaceOnly() {
+        // 1.2.3: 레이스 모드 + 바퀴 2 → 러닝마다 목표 40 % (270 × 0.4 = 108초) 에 lap2_1~3, 연달아 같은 문장 X
+        val c = VoiceCoach(VoicePrefs(on = true, laps = 2), Random(3))
+        assertEquals(listOf("rr_1"), c.update(race(0, mode = Mode.Race), 0)!!.clips)
+        assertNull(c.update(race(0, 100, 100, mode = Mode.Race), 100_000))
+        val l1 = c.update(race(0, 108, 108, mode = Mode.Race), 108_000)!!.clips.single()
+        assertTrue(l1 in listOf("lap2_1", "lap2_2", "lap2_3"))
+        // 같은 러닝에서 다시 안 함
+        assertNull(c.update(race(0, 120, 120, mode = Mode.Race), 120_000))
+        // 러닝 2 (seq 4번 칸): 다른 문장
+        c.update(race(1, 0, 270, listOf(270), mode = Mode.Race), 270_000)
+        c.update(race(2, 0, 300, listOf(270, 30), mode = Mode.Race), 300_000)
+        c.update(race(3, 0, 555, listOf(270, 30, 255), mode = Mode.Race), 555_000)
+        c.update(race(4, 0, 585, listOf(270, 30, 255, 30), mode = Mode.Race), 585_000)
+        val l2 = c.update(race(4, 108, 693, listOf(270, 30, 255, 30), mode = Mode.Race), 693_000)!!.clips.single()
+        assertTrue(l2.startsWith("lap2_") && l2 != l1)
+        // 풀 시뮬 · 바퀴 모름(0) 이면 없음
+        for ((mode, laps) in listOf(Mode.Sim to 2, Mode.Race to 0)) {
+            val d = VoiceCoach(VoicePrefs(on = true, laps = laps), Random(3))
+            d.update(race(0, mode = mode), 0)
+            for (t in 100..120) d.update(race(0, t, t, mode = mode), t * 1000L)?.let { assertFalse(it.clips.single().startsWith("lap")) }
+        }
+        // 서울 2026 은 바퀴 2, 다른 대회 0
+        assertEquals(2, RaceEvent(name = "Seoul", date = Fm.ymdParse("2026-11-13")!!).lapsPerRun)
+        assertEquals(0, RaceEvent(name = "Incheon", date = Fm.ymdParse("2027-05-13")!!).lapsPerRun)
+        assertEquals(2, EventItem.bundled.first { it.city == "Seoul" }.lapsPerRun)
     }
 
     @Test fun raceEndEarlySaysGoEnd() {

@@ -165,12 +165,13 @@ private fun Buttons(st: LiveState, m: LiveMetrics, buzz: (Boolean) -> Unit) {
     val on = !WatchMirror.reconnecting
     val nextOn = on && st.running && !st.autoSplit
     Column(Modifier.fillMaxWidth()) {
-        Row(
+        // 1.2.3: 러닝 카드(1 km 자동)는 넘기기 버튼 없음 — "1 km 마다 자동 넘김" 글씨도 없앰 (대표님 11-10)
+        if (!st.autoSplit) Row(
             Modifier.fillMaxWidth().height(m.buttonH.dp).yellowFill(RoundedCornerShape(50), on = nextOn)
                 .press(enabled = nextOn, tag = "watchLive.next") { buzz(true); WatchMirror.send(LiveCommand.Next) },
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
         ) {
-            val label = if (st.autoSplit) "Auto split every 1 km" else if (st.nextSeg != null || st.open) "Next" else "Finish"
+            val label = if (st.nextSeg != null || st.open) "Next" else "Finish"
             T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (nextOn) Color.Black else C.text3), maxLines = 1, translate = false)
         }
         Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

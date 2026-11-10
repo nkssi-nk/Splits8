@@ -365,6 +365,7 @@ object Supabase {
         arr(request("/rest/v1/events?select=city,venue,region,start_date,end_date&order=start_date", auth = false)).mapNotNull { o ->
             com.nkssi.splits8.shared.EventItem(o.str("city") ?: return@mapNotNull null, o.str("venue") ?: "", o.str("region") ?: "",
                 o.str("start_date") ?: return@mapNotNull null, o.str("end_date") ?: o.str("start_date")!!)
+                .let { it.copy(laps = com.nkssi.splits8.shared.EventItem.knownLaps(it.city, it.start)) }
         }
 
     /** 공개 사진 받기 (5 MB 까지, 이 서버 주소만) */

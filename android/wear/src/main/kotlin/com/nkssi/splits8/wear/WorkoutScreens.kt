@@ -101,13 +101,14 @@ private class LiveMetrics(val k: Float) {
 @Composable
 fun WWorkoutPager(buzz: (BuzzKind) -> Unit, startPage: Int = 0, startEnd: Boolean = false) {
     val e = WatchStore.engine
-    val pager = rememberPagerState(initialPage = startPage) { 3 }
+    // 1.2.3: 러닝 카드는 구간(KM 1 · KM 2) 목록 페이지 없음
+    val pager = rememberPagerState(initialPage = startPage) { if (e.isRunKind) 2 else 3 }
     val scope = rememberCoroutineScope()
     var endSheet by remember { mutableStateOf(startEnd) }
     val aod = LocalAod.current
     val flash = remember { Animatable(0f) }
     LaunchedEffect(e.advanceCount) {
-        if (e.advanceCount == 0 || aod) return@LaunchedEffect
+        if (e.advanceCount == 0 || aod || e.isRunKind) return@LaunchedEffect      // 1.2.3: 러닝 카드는 1 km 마다 번쩍이지 않음
         // 구간 전환 반짝: 노랑 0.42, 60ms 켜짐 → 260ms 사라짐
         flash.snapTo(0f)
         flash.animateTo(1f, tween(60, easing = LinearEasing))
@@ -460,12 +461,13 @@ private fun NextLabel(m: LiveMetrics) {
 private fun Controls(m: LiveMetrics) {
     val e = WatchStore.engine
     Row(Modifier.width(m.controlsW.dp), verticalAlignment = Alignment.CenterVertically) {
-        SideButton(m, e.canUndo, "w.undoLive", { c -> Sym(R.drawable.sym_undo, (m.side * 0.42f).dp, c) }) { e.undo() }
+        // 1.2.3: 러닝 카드는 되돌리기 없음 (자리만 둠)
+        if (e.isRunKind) Spacer(Modifier.size(m.side.dp))
+        else SideButton(m, e.canUndo, "w.undoLive", { c -> Sym(R.drawable.sym_undo, (m.side * 0.42f).dp, c) }) { e.undo() }
         Spacer(Modifier.weight(1f))
         if (autoSplitView) {
-            // 러닝은 1 km 마다 자동 → 누를 수 없음, 안내만
-            T("Auto split every 1 km", F.t(10, W600, C.text2), Modifier.width((m.main * 1.6f).dp).height(m.main.dp).testTag("w.autoSplit"),
-                maxLines = 2, align = TextAlign.Center)
+            // 1.2.3: 러닝 카드는 그냥 달림 — "1 km 마다 자동 넘김" 글씨도 없앰 (대표님 11-10, 자리만 둠)
+            Spacer(Modifier.width((m.main * 1.6f).dp).height(m.main.dp).testTag("w.autoSplit"))
         } else {
             val last = e.isLast
             // 18번 EMOM: 가운데 단추 = "끝" (이 라운드 할 일을 끝냄 → 남은 시간은 휴식). 이미 눌렀으면 흐리게

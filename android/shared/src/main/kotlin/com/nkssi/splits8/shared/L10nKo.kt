@@ -878,6 +878,11 @@ internal object L10nKo {
         m["Few"] = "적게"
         m["Some"] = "보통"
         m["Lots"] = "많이"
+        // 1.2.3 · 바퀴 안내 · 러닝 페이스로 목표 나누기
+        m["Lap guide"] = "바퀴 안내"
+        m["Race · when laps per run are known"] = "레이스 · 대회 바퀴 수를 알 때"
+        m["Runs %@ · Stations %@ · Roxzone %@"] = "러닝 %@ · 스테이션 %@ · 록스존 %@"
+        m["Runs alone go over the goal. Set the pace again."] = "러닝만으로 목표를 넘어요. 페이스를 다시 정해 주세요."
         m["Split goals"] = "구간 목표"
         m["Split goals are rescaled evenly to match this time."] = "구간 목표가 이 시간에 맞게 같은 비율로 나뉘어요."
         m["Split targets"] = "구간 목표"

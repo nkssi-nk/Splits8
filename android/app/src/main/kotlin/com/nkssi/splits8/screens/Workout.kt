@@ -121,6 +121,8 @@ private fun VoiceSection(s: Settings) {
                 Seg8(listOf("low" to "Few", "mid" to "Some", "high" to "Lots"), s.voiceCheer, Modifier.width(196.dp).testTag("settings.voiceCheer"),
                     height = 30.dp, radius = 9.dp, fontSize = 13) { k -> Store.update { it.withVoiceCheer(k) } }
             }
+            // 1.2.3: 레이스 바퀴 안내 (대회 바퀴 수를 알 때만 — 지금은 2026 서울)
+            WToggleRow("Lap guide", "Race · when laps per run are known", s.voiceLap, false, "settings.voiceLap") { v -> Store.update { it.withVoiceLap(v) } }
             WToggleRow("Distance", null, s.voiceDist, false, "settings.voiceDist") { v -> Store.update { it.withVoiceDist(v) } }
             WToggleRow("Total time", null, s.voiceTime, false, "settings.voiceTime") { v -> Store.update { it.withVoiceTime(v) } }
             WToggleRow("Average pace", null, s.voicePace, false, "settings.voicePace") { v -> Store.update { it.withVoicePace(v) } }

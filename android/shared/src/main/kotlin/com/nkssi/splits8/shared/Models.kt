@@ -120,9 +120,66 @@ object GoalSplit {
         division: String = "openM", rox: Int = Defaults.roxTarget,
     ): List<Int> {
         val w = weights(style, current, best, total, division, rox)
-        val sumW = maxOf(1.0, w.sum())
         val raw = maxOf(16 * 30, total - 8 * rox)
-        val target = (raw / 5.0).r() * 5
+        return fit(w, (raw / 5.0).r() * 5)
+    }
+
+    // 1.2.3 · 러닝 평균 페이스 먼저 → 남은 시간을 스테이션 · Roxzone 에 나눔 (아이폰 GoalSplit.byPace 와 같음)
+
+    /** 스테이션 한 칸 · Roxzone 한 번 최소(초) */
+    const val MIN_STATION = 30
+    const val MIN_ROX = 20
+    /** 러닝 페이스 고르는 범위(초/km) */
+    val paceRange = 150..720
+
+    /** 나눈 결과: 16칸 목표 · Roxzone 1번 목표 */
+    data class PaceSplit(val goals: List<Int>, val rox: Int) {
+        val runSum: Int get() = goals.filterIndexed { i, _ -> i % 2 == 0 }.sum()
+        val stSum: Int get() = goals.filterIndexed { i, _ -> i % 2 == 1 }.sum()
+        val roxSum: Int get() = rox * 8
+    }
+
+    /** 지금 방식(style)으로 나눴을 때 러닝 1 km 평균(초, 5초 단위) — 페이스 기본값 */
+    fun defaultPace(total: Int, style: String, current: List<Int>, best: List<Int>?, division: String, rox: Int): Int =
+        roundPace(runAvg(split(total, style, current, best, division, rox)) ?: 270)
+
+    /** 저장된 16칸의 러닝 평균(초). 없으면 null */
+    fun runAvg(goals: List<Int>): Int? {
+        if (goals.size != 16) return null
+        val runs = goals.filterIndexed { i, _ -> i % 2 == 0 }
+        if (runs.any { it <= 0 }) return null
+        return (runs.sum() / 8.0).r()
+    }
+
+    fun roundPace(p: Int): Int = ((p / 5.0).r() * 5).coerceIn(paceRange.first, paceRange.last)
+
+    /** 러닝 8칸 = 페이스. 남은 시간을 스테이션 8칸 + Roxzone 에 지금 방식 비율 그대로. 모자라면 null (러닝만으로 목표를 넘음) */
+    fun byPace(
+        total: Int, pace: Int, style: String, current: List<Int>, best: List<Int>?, division: String, rox: Int,
+    ): PaceSplit? {
+        val remain = total - pace * 8
+        if (remain < 8 * (MIN_STATION + MIN_ROX)) return null
+        val w = weights(style, current, best, total, division, rox)
+        if (w.size != 16) return null
+        val stW = (0 until 8).map { maxOf(0.0001, w[it * 2 + 1]) }
+        val base = split(total, style, current, best, division, rox)
+        val baseSt = (0 until 8).sumOf { base[it * 2 + 1] }.toDouble()
+        val baseRox = (8 * rox).toDouble()
+        val roxShare = remain * baseRox / maxOf(1.0, baseSt + baseRox)
+        var roxEach = ((roxShare / 8 / 5).r() * 5).coerceIn(MIN_ROX, 120)
+        var stTotal = ((remain - 8 * roxEach) / 5.0).r() * 5
+        if (stTotal < 8 * MIN_STATION) {
+            roxEach = maxOf(MIN_ROX, (remain - 8 * MIN_STATION) / 8 / 5 * 5)
+            stTotal = ((remain - 8 * roxEach) / 5.0).r() * 5
+        }
+        if (stTotal < 8 * MIN_STATION) return null
+        val st = fit(stW, stTotal)
+        return PaceSplit((0 until 8).flatMap { listOf(pace, st[it]) }, roxEach)
+    }
+
+    /** 비율 w 대로 target 을 5초 단위 칸으로 나눔 (칸마다 최소 30초, 합계 = target) */
+    fun fit(w: List<Double>, target: Int): List<Int> {
+        val sumW = maxOf(0.0001, w.sum())
         val exact = w.map { it / sumW * target }
         val out = exact.map { maxOf(30, (it / 5).r() * 5) }.toMutableList()
         var diff = target - out.sum()
@@ -479,7 +536,11 @@ data class RaceEvent(
     /** 출발 시각 "HH:mm". 비어 있으면 아직 모름 */
     val time: String = "",
     @Serializable(with = InstantIso::class) val dateEnd: Instant? = null,
+    /** 1.2.3: 러닝 한 번에 도는 바퀴 수 (대회 목록에서 고를 때 넣음). null = 예전 저장값 → 대회 목록에서 찾음 */
+    val laps: Int? = null,
 ) {
+    /** 1.2.3: 러닝 바퀴 수 (0 = 모름). 저장값이 없으면 같은 도시 · 같은 시작일의 대회 목록 값 */
+    val lapsPerRun: Int get() = laps ?: EventItem.knownLaps(name, Fm.ymd(date)) ?: 0
     val hasTime: Boolean get() = time.split(":").mapNotNull { it.toIntOrNull() }.size == 2
     val isSet: Boolean get() = name.isNotBlank()
 }
@@ -539,10 +600,16 @@ data class EventItem(
     /** yyyy-MM-dd */
     val start: String,
     val end: String,
+    /** 1.2.3: 러닝 한 번에 도는 바퀴 수. null = 모름. 2026 서울 = 2 (공식 안내 "IN 은 두 번째에"). 서버 목록엔 없어서 knownLaps 로 넣음 */
+    val laps: Int? = null,
 ) {
     val id: String get() = city + start
+    val lapsPerRun: Int get() = laps ?: 0
 
     companion object {
+        /** 1.2.3: 앱 안 목록에 적어 둔 바퀴 수 (도시 + 시작일) */
+        fun knownLaps(city: String, start: String): Int? = if (city == "Seoul" && start == "2026-11-13") 2 else null
+
         val regions = listOf("all" to "All", "korea" to "Korea", "asia" to "Asia-Pacific", "europe" to "Europe", "americas" to "Americas")
         val bundled: List<EventItem> = listOf(
             listOf("Seoul", "KINTEX, Goyang", "korea", "2026-11-13", "2026-11-15"),
@@ -570,7 +637,7 @@ data class EventItem(
             listOf("Dallas", "USA", "americas", "2026-11-18", "2026-11-22"),
             listOf("Anaheim", "USA", "americas", "2026-12-03", "2026-12-06"),
             listOf("Chicago", "USA", "americas", "2027-02-11", "2027-02-15"),
-        ).map { EventItem(it[0], it[1], it[2], it[3], it[4]) }
+        ).map { EventItem(it[0], it[1], it[2], it[3], it[4], knownLaps(it[0], it[3])) }
     }
 }
 
@@ -937,6 +1004,8 @@ data class Settings(
     val voiceHrOpt: Boolean? = null,
     /** 1.2.2: 레이스 · 시뮬 응원 양. null = 적게(기본) · "mid" = 보통 · "high" = 많이 (아이폰 voiceCheerOpt 와 같은 이름) */
     val voiceCheerOpt: String? = null,
+    /** 1.2.3: 레이스 바퀴 안내 (대회 바퀴 수를 알 때). null = 켜기(기본) (아이폰 voiceLapOpt 와 같은 이름) */
+    val voiceLapOpt: Boolean? = null,
 ) {
     /** lb · mi 로 보여 주는지 */
     val imperial: Boolean get() = units == "imperial"
@@ -955,6 +1024,8 @@ data class Settings(
     val voiceHr: Boolean get() = voiceHrOpt ?: true
     /** 1.2.2: 응원 양 "low" · "mid" · "high" */
     val voiceCheer: String get() = voiceCheerOpt ?: "low"
+    /** 1.2.3: 바퀴 안내 (기본 켬) */
+    val voiceLap: Boolean get() = voiceLapOpt ?: true
     val glow: GlowTheme get() = GlowTheme.of(themeOpt)
     /** 워치 운동을 폰에 같이 보여 주기 (기본 켬) */
     val mirror: Boolean get() = mirrorOpt ?: true
@@ -976,6 +1047,7 @@ data class Settings(
     fun withVoicePace(v: Boolean) = copy(voicePaceOpt = if (v) null else false)
     fun withVoiceHr(v: Boolean) = copy(voiceHrOpt = if (v) null else false)
     fun withVoiceCheer(v: String) = copy(voiceCheerOpt = if (v == "low") null else v)
+    fun withVoiceLap(v: Boolean) = copy(voiceLapOpt = if (v) null else false)
     fun withGlow(v: GlowTheme) = copy(themeOpt = if (v == GlowTheme.Yellow) null else v.raw)
     fun withMirror(v: Boolean) = copy(mirrorOpt = if (v) null else false)
 

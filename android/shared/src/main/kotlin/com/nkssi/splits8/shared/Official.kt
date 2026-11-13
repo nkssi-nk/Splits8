@@ -26,7 +26,7 @@ data class OfficialResult(
     val topPct: Double?
         get() {
             val r = rank ?: return null
-            val f = field ?: return null
+            val f = this.field ?: return null   // "field" 만 쓰면 Kotlin 의 뒷받침 필드로 읽힘
             if (f <= 0 || r <= 0 || r > f) return null
             return r.toDouble() / f * 100
         }

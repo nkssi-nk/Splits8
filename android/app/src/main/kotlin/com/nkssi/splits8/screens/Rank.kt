@@ -98,7 +98,7 @@ private fun Stat(v: String, label: String) {
 
 // MARK: 대회 화면 맨 아래: 공식 결과 넣기
 
-const val RESULTS_URL = "https://results.hyrox.com"
+private const val RESULTS_URL = "https://results.hyrox.com"
 
 /** 대회 화면(SetEventView) 맨 아래: 설명 + Add official result + Official results ↗ */
 @Composable

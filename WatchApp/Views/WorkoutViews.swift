@@ -866,6 +866,14 @@ struct WSummary: View {
                 }
                 .padding(.top, r.pftGrade != nil ? 5 : 2)
             }
+            // 1.2.4: 대략의 위치 한 줄 (Open = 상위 %, Pro · 더블 = 단계). 폰 기록 상세와 같은 계산
+            if r.mode == .race || r.mode == .sim, r.splits16 != nil, let rk = HyroxRank.of(division: r.division, total: r.total) {
+                Text(rk.pct.map { String(format: "About top %d%%".l10n, $0) } ?? rk.level.l10n)
+                    .font(F.t(13, .semibold)).foregroundStyle(C.accent)
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                    .padding(.top, 3)
+                    .accessibilityIdentifier("w.rank")
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)

@@ -306,3 +306,14 @@
 "DIST MI" = "거리 MI";
 "Goal %@ km" = "목표 %@ km";
 "Goal %@ mi" = "목표 %@ mi";
+
+/* 1.2.4 · 대략의 위치 */
+"About top %d%%" = "대략 상위 %d%%";
+"Elite 15 level" = "Elite 15 수준";
+"World level" = "세계 수준";
+"Competitive level" = "경쟁 수준";
+"Faster than Pro average" = "Pro 평균보다 빠름";
+"Slower than Pro average" = "Pro 평균보다 느림";
+"Top-end level" = "상위권";
+"Faster than Doubles average" = "더블 평균보다 빠름";
+"Slower than Doubles average" = "더블 평균보다 느림";

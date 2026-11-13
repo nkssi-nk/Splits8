@@ -1145,3 +1145,24 @@
 "Race · when laps per run are known" = "레이스 · 대회 바퀴 수를 알 때";
 "Runs %@ · Stations %@ · Roxzone %@" = "러닝 %@ · 스테이션 %@ · 록스존 %@";
 "Runs alone go over the goal. Set the pace again." = "러닝만으로 목표를 넘어요. 페이스를 다시 정해 주세요.";
+
+/* 1.2.4 · 공식 결과 · 더블 단계 */
+"Top" = "상위";
+"Official ranks are from the race results: Rank (M/W) is within your division and gender, Rank (AG) within your age group." = "공식 결과의 순위예요. Rank (M/W) 는 같은 디비전 · 성별 안, Rank (AG) 는 같은 나이대 안 순위예요.";
+"After the race, take a screenshot of your result on the official results page and add it here. The photo is read only on this device. Your recorded workout stays as it is, and the official result is saved as one more record." = "대회가 끝나면 공식 결과 페이지에서 내 기록을 캡처해 여기 넣어 주세요. 사진은 이 기기 안에서만 읽어요. 앱에서 잰 기록은 그대로 두고, 공식 기록이 하나 더 생겨요.";
+"Reading the screenshot…" = "캡처를 읽는 중…";
+"The photo is read only on this device." = "사진은 이 기기 안에서만 읽어요.";
+"Finishers (optional)" = "참가 인원 (선택)";
+"⚠ The splits add up to %@, %@ off the overall time. Please check the boxes." = "⚠ 구간 합이 %@ 로 완주 시간과 %@ 달라요. 칸을 확인해 주세요.";
+"Only your own result is kept. Names in the screenshot are not saved." = "내 기록 숫자만 저장해요. 캡처에 있는 이름은 저장하지 않아요.";
+"Could not open this image." = "이 사진을 열 수 없어요.";
+"Could not find a result in this image. Try a sharper screenshot, or type the times in." = "이 사진에서 기록을 못 찾았어요. 더 선명한 캡처로 다시 하거나, 직접 넣어 주세요.";
+"Filled %d boxes from the screenshot. Please check them." = "캡처에서 %d칸을 채웠어요. 숫자가 맞는지 확인해 주세요.";
+"Top-end level" = "상위권";
+"Faster than Doubles average" = "더블 평균보다 빠름";
+"Slower than Doubles average" = "더블 평균보다 느림";
+"Running %d" = "러닝 %d";
+"Overall time" = "완주 시간";
+"RESULT" = "결과";
+"OFFICIAL RESULT" = "공식 결과";
+"Official result" = "공식 결과";

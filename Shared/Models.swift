@@ -779,6 +779,8 @@ struct Record: Codable, Hashable, Identifiable {
     var ascent: Double? = nil  // 오른 높이 합계(m)
     /// 94번(빌드 28): 러닝 카드를 실내(GPS 없음)로 뛴 기록. 거리는 손목 움직임 짐작값 → "실내 · 추정 거리", 러닝 PB 에서 뺌. 예전 기록엔 없음
     var indoor: Bool? = nil
+    /// 1.2.4: 대회 공식 결과에서 넣은 기록 (순위 · 공식 시간). 앱에서 잰 기록과 따로 하나 더 생김. 예전 기록엔 없음
+    var official: OfficialResult? = nil
 
     /// 시작–끝
     var end: Date { endDate ?? date.addingTimeInterval(Double(total)) }

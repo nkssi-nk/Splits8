@@ -49,6 +49,15 @@ struct ShareData {
         let v = store.vs(r)
         vsWord = v.word
         vsValue = v.value.map(Fm.d) ?? "--:--"
+        // 1.2.4: 공식 기록은 순위, 비교할 목표가 없는 Open 싱글 기록은 대략 상위 % (카드 그림은 영어)
+        if let o = r.official, let rk = o.rank {
+            vsWord = "RANK"
+            vsValue = "#\(rk)"
+        } else if v.value == nil, r.mode == .race || r.mode == .sim, r.splits16 != nil,
+                  let p = HyroxRank.of(division: r.division, total: r.total)?.pct {
+            vsWord = "TOP ≈"
+            vsValue = "\(p)%"
+        }
         pb = store.isPB(r)
         pbText = store.runPBLabel(r) ?? "PB"
         let runs = r.runs

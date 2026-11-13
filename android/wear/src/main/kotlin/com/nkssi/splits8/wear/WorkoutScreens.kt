@@ -679,6 +679,15 @@ fun WSummary() {
             // 18번: 종류 줄 (EMOM · 12분 / AMRAP 7라운드 / 볼륨)
             bonusSummary(r)?.let { line -> item { T(line, F.t(12, W600, C.accent), Modifier.fillMaxWidth(), maxLines = 2, align = TextAlign.Center, translate = false) } }
             item { Head(r) }
+            // 1.2.4: 대략의 위치 한 줄 (Open = 상위 %, Pro · 더블 = 단계). 폰 기록 상세와 같은 계산
+            if ((r.mode == Mode.Race || r.mode == Mode.Sim) && r.splits16 != null) {
+                com.nkssi.splits8.shared.HyroxRank.of(r.division, r.total)?.let { rk ->
+                    item {
+                        T(rk.pct?.let { com.nkssi.splits8.shared.L10n.t("About top %d%%", it) } ?: com.nkssi.splits8.shared.L10n.t(rk.level),
+                            F.t(13, W600, C.accent), Modifier.fillMaxWidth().testTag("w.rank"), maxLines = 1, align = TextAlign.Center, minScale = 0.75f, translate = false)
+                    }
+                }
+            }
             item { Stats(r) }
             item {
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.wCard).padding(vertical = 4.dp)) {

@@ -83,6 +83,7 @@ fun Overlays() {
     Sheet8(Router.partnerFor, onClose = { Router.partnerFor = null }) { id -> PartnerSheet(id) }
     Sheet8(Router.cheerTo, onClose = { Router.cheerTo = null }, bg = androidx.compose.ui.graphics.Color(0xFF1C1C1E)) { f -> CheerSheet(f) }
     Sheet8(Router.finish, onClose = { Router.finish = null }) { rec -> FinishSheet(rec) }
+    Sheet8(Router.officialFor, onClose = { Router.officialFor = null }, large = true) { ev -> OfficialImportSheet(ev) }
     ToastHost()
     AskHost()
 }

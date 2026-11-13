@@ -174,6 +174,8 @@ object Router {
     var raceSheet by mutableStateOf<String?>(null)
     /** 대회 화면에서 고치는 중인 대회 (Save 전) */
     var evDraft by mutableStateOf<com.nkssi.splits8.shared.RaceEvent?>(null)
+    /** 1.2.4: 공식 결과 넣기 시트 (대회 화면 맨 아래 버튼) */
+    var officialFor by mutableStateOf<com.nkssi.splits8.shared.RaceEvent?>(null)
     /** ··· 메뉴 (신고 · 차단)를 띄울 사람 */
     var userMenu by mutableStateOf<com.nkssi.splits8.shared.BlockedUser?>(null)
     /** 기록 상세의 파트너 고르기 시트 (기록 id) */

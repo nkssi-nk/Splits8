@@ -133,7 +133,13 @@ data class ShareData(
 
         fun of(r: Record): ShareData {
             val div = Division.of(r.division)
-            val (word, v) = Store.book.vs(r)
+            val (word0, v) = Store.book.vs(r)
+            // 1.2.4: 공식 기록은 순위, 비교할 목표가 없는 Open 싱글 기록은 대략 상위 % (카드 그림은 영어)
+            val rk = r.official?.rank
+            val openRank = if (v == null && (r.mode == com.nkssi.splits8.shared.Mode.Race || r.mode == com.nkssi.splits8.shared.Mode.Sim) && r.splits16 != null)
+                com.nkssi.splits8.shared.HyroxRank.of(r.division, r.total)?.pct else null
+            val word = if (rk != null) "RANK" else if (openRank != null) "TOP ≈" else word0
+            val vsText = if (rk != null) "#$rk" else if (openRank != null) "$openRank%" else (v?.let { Fm.d(it) } ?: "--:--")
             val runs = r.runs
             val sts = r.segs.filter { it.kind == SegKind.St }
             val imp = Store.settings.imperial      // 빌드 27: 무게를 lb 로 (설정 > Units)
@@ -145,7 +151,7 @@ data class ShareData(
                 place = r.title, divName = div.name,
                 date = r.date.atZone(Fm.zone).format(cardDate), total = Fm.t(r.total),
                 avgHR = if (r.avgHR > 0) "${r.avgHR}" else "--", rox = Fm.t(r.roxTotal), hasRox = r.roxTotal > 0,
-                kcal = kcalText(r.kcal), vsWord = word, vsValue = v?.let { Fm.d(it) } ?: "--:--", pb = Store.book.isPB(r),
+                kcal = kcalText(r.kcal), vsWord = word, vsValue = vsText, pb = Store.book.isPB(r),
                 pairs = (0 until max(runs.size, sts.size)).map { i ->
                     SharePair(
                         String.format(Locale.US, "%02d", i + 1),

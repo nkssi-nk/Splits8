@@ -311,7 +311,7 @@ class ModelsTest {
         assertEquals(1, HyroxRank.of("Open Women", 60 * 60)!!.pct)
         assertNull(HyroxRank.of("openM", 60 * 60)!!.next)
         assertEquals("Elite", HyroxRank.of("openM", 60 * 60)!!.level)
-        assertNull(HyroxRank.of("dblM", 90 * 60))
+        assertEquals("Slower than Doubles average", HyroxRank.of("dblM", 90 * 60)!!.level)   // 1.2.4: 더블도 단계
         assertNull(HyroxRank.of("relay", 90 * 60))
         assertEquals("World level", HyroxRank.of("proW", 60 * 60)!!.level)
     }

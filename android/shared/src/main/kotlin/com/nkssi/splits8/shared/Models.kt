@@ -758,6 +758,8 @@ data class Record(
     val extra: Int? = null,
     /** 18번 AMRAP: 정한 총 시간(초) · EMOM: 간격(초) · 타바타: 운동 초 */
     val cap: Int? = null,
+    /** 1.2.4: 대회 공식 결과에서 넣은 기록 (순위 · 공식 시간). 앱에서 잰 기록과 따로 하나 더 (아이폰 Record.official) */
+    val official: OfficialResult? = null,
 ) {
     val end: Instant get() = endDate ?: date.plusSeconds(total.toLong())
     val isHIIT: Boolean get() = kind == "hiit"

@@ -269,7 +269,8 @@ data class HomeBest(val time: Int, val tag: String, val sub: String, val star: B
 /**
  * 80번(빌드 28): 상위 몇 % (홈페이지 splits8/hyrox.html 과 같은 숫자 · 같은 계산).
  * Open: HyroxDataLab(2026.3, 전 세계 Open 기록 70만 건+) 상위 10 / 25 / 50 / 75% 경계, 사이는 곧게 이음.
- * Pro: Rox Lyfe 단계(Elite 15 · 세계 수준 · 경쟁 수준 · Pro 평균). 더블 · 릴레이는 자료가 없어 안 보임
+ * Pro: Rox Lyfe 단계(Elite 15 · 세계 수준 · 경쟁 수준 · Pro 평균).
+ * 1.2.4 더블: Rox Lyfe 단계(상위권 · 경쟁 수준 · 더블 평균). 백분위 자료가 없어 % 없음. 릴레이는 자료가 없어 안 보임
  */
 data class HyroxRank(
     val level: String,
@@ -281,6 +282,15 @@ data class HyroxRank(
     companion object {
         val open = mapOf("M" to listOf(75 * 60, 85 * 60, 100 * 60, 114 * 60), "W" to listOf(86 * 60, 98 * 60, 114 * 60, 130 * 60))
         val pro = mapOf("M" to listOf(54 * 60, 58 * 60, 65 * 60, 81 * 60 + 1), "W" to listOf(57 * 60, 62 * 60, 70 * 60, 86 * 60 + 36))
+
+        /** 1.2.4 더블 (Rox Lyfe "What is a good HYROX time" — Pro 와 같은 출처): 상위권 · 경쟁 수준 · 평균 (초). Pro 더블은 평균만 (0 = 없음) */
+        val doubles = mapOf(
+            "dblM" to listOf(52 * 60, 65 * 60, 77 * 60 + 49),
+            "dblW" to listOf(58 * 60, 70 * 60, 89 * 60 + 24),
+            "dblX" to listOf(55 * 60, 68 * 60, 84 * 60 + 4),
+            "dblMP" to listOf(0, 0, 69 * 60 + 53),
+            "dblWP" to listOf(0, 0, 79 * 60 + 49),
+        )
 
         fun of(division: String, total: Int): HyroxRank? {
             // 이름이나 키가 정확히 맞는 디비전만 (릴레이 등 모르는 값이 Open Men 으로 잡히지 않게)
@@ -300,6 +310,13 @@ data class HyroxRank(
                 val i = b.indexOfFirst { total < it }.takeIf { it >= 0 }
                 val level = i?.let { names[it] } ?: "Slower than Pro average"
                 return HyroxRank(level, null, d.name, nextStep(i, names, b), total)
+            }
+            doubles[d.key]?.let { b ->
+                val tiers = listOf("Top-end level", "Competitive level", "Faster than Doubles average").zip(b).filter { it.second > 0 }
+                val i = tiers.indexOfFirst { total < it.second }.takeIf { it >= 0 }
+                val level = i?.let { tiers[it].first } ?: "Slower than Doubles average"
+                val next = if (i == null) tiers.last() else if (i > 0) tiers[i - 1] else null
+                return HyroxRank(level, null, d.name, next, total)
             }
             return null
         }

@@ -360,6 +360,9 @@ fun SetEventView() {
                 }
             }
             Note8("Once saved, the event name, date and division appear on the Race start screen on your watch.", Modifier.padding(top = 4.dp))
+
+            // 1.2.4: 공식 결과 넣기 (날짜와 상관없이 늘 — 대회 당일에도)
+            OfficialEntrySection(ev)
         }
     }
 }

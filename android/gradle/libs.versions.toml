@@ -27,6 +27,8 @@ playAppUpdate = "2.1.0"
 wearRemote = "1.2.0"
 
 [libraries]
+# 1.2.4: 공식 결과 캡처 글자 읽기 (기기 안 모델, 라틴 글자 — 사진은 서버로 안 보냄)
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version = "16.0.1" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }

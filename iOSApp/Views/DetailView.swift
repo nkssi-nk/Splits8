@@ -127,6 +127,8 @@ struct DetailView: View {
             }
             if rec.mode == .pft { pftCard(rec) }
             tilesGrid(rec)
+            // 1.2.4: 공식 기록 (순위). 대략의 위치 · 구간 비교는 아래 BenchSection (80번) 그대로
+            if let o = rec.official { OfficialCard(rec: rec, o: o) }
             // 94번(빌드 28): 실내 러닝 — 거리는 손목 움직임 짐작값이라 빠르게 나올 수 있음 · 러닝 PB 에서 뺌
             if rec.mode == .training && rec.isRunKind && rec.indoor == true {
                 Note8(text: "Indoor run: distance is estimated from arm motion without GPS, so pace can look faster than it was. Indoor runs don't count toward running PBs.")

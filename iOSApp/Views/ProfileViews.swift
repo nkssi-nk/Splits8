@@ -8,7 +8,7 @@ import HealthKit
 /// 건강 앱에서 키 · 몸무게 · 성별 · 생년월일 읽기 (사용자가 허락한 것만 읽힘)
 enum HealthProfile {
     static var readTypes: Set<HKObjectType> {
-        var s: Set<HKObjectType> = [HKQuantityType(.height), HKQuantityType(.bodyMass)]
+        var s: Set<HKObjectType> = [HKQuantityType(.height), HKQuantityType(.bodyMass), HKQuantityType(.restingHeartRate)]   // 1.2.5: 안정 심박
         if let t = HKObjectType.characteristicType(forIdentifier: .biologicalSex) { s.insert(t) }
         if let t = HKObjectType.characteristicType(forIdentifier: .dateOfBirth) { s.insert(t) }
         return s
@@ -34,6 +34,26 @@ enum HealthProfile {
         if let h = await latest(hs, .height, HKUnit.meterUnit(with: .centi)) { v.heightCm = Int(h.rounded()) }
         if let w = await latest(hs, .bodyMass, HKUnit.gramUnit(with: .kilo)) { v.weightKg = w.rounded() }
         return v
+    }
+
+    /// 1.2.5: 안정 심박 — 최근 30일 값 7개의 평균 (애플워치가 잼). 처음이면 건강 앱 허락 창이 뜸 (안정 심박만)
+    static func restingHR() async -> Int? {
+        guard HKHealthStore.isHealthDataAvailable() else { return nil }
+        let hs = HKHealthStore()
+        let t = HKQuantityType(.restingHeartRate)
+        try? await hs.requestAuthorization(toShare: [], read: [t])
+        let unit: HKUnit = HKUnit.count().unitDivided(by: .minute())
+        let vals: [Double] = await withCheckedContinuation { (c: CheckedContinuation<[Double], Never>) in
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+            let from: Date = Date().addingTimeInterval(-30 * 86400)
+            let pred = HKQuery.predicateForSamples(withStart: from, end: nil)
+            let q = HKSampleQuery(sampleType: t, predicate: pred, limit: 7, sortDescriptors: [sort]) { _, samples, _ in
+                c.resume(returning: (samples as? [HKQuantitySample] ?? []).map { $0.quantity.doubleValue(for: unit) })
+            }
+            hs.execute(q)
+        }
+        guard !vals.isEmpty else { return nil }
+        return Int((vals.reduce(0, +) / Double(vals.count)).rounded())
     }
 
     /// 가장 최근 값 하나

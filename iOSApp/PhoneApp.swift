@@ -669,6 +669,10 @@ struct PhoneRoot: View {
             await Store.shared.checkDevice()
             await Store.shared.retryAvatarIfNeeded()   // 15번
             await Store.shared.retryUploadsIfNeeded()  // 1.2.2: 못 올린 기록 다시
+            // 1.2.5: 안정 심박 (심박 영역을 애플워치처럼) — 바뀌었을 때만 저장 (워치로도 감)
+            if Store.shared.settings.hasOnboarded, let rh = await HealthProfile.restingHR(), rh != Store.shared.settings.restHr {
+                Store.shared.settings.restHr = rh
+            }
             await r.askProfileIfNeeded()
             await r.checkNotice()
             await r.checkUpdate()   // 4번

@@ -150,6 +150,10 @@ struct ShareCard: View {
     var dragOffset: CGSize = .zero
     /// Block · Ticket 뒤에 비치는 빛의 색 (노란 로고 · 숫자는 그대로)
     var glowTheme: GlowTheme = .yellow
+    /// 1.2.5: 카드에서 뺄 것 (Poster): "logo" · "badge" · "pb" · "place" · "date" · "partner" · "big" · "hr" · "rox" · "kcal" · "time" · "pace"
+    var hide: Set<String> = []
+    /// 1.2.5: 내 글 (Poster, 큰 시간 위). 빈칸이면 없음
+    var caption = ""
 
     private var smokeOn: Bool { smoke > 0 }
     private var post: Bool { ratio == "post" }
@@ -363,8 +367,11 @@ struct ShareCard: View {
                         .frame(width: 360, height: h)
                         .allowsHitTesting(false)
                 }
-                glow(glowA, rx: 0.9, ry: 0.45, cx: 0.85, cy: 1.0)
-                glow(glowB, rx: 0.7, ry: 0.35, cx: 0, cy: 0.6)
+                // 1.2.5: 노란 빛 번짐도 그라데이션을 켤 때만 (끄면 사진 그대로)
+                if gradient {
+                    glow(glowA, rx: 0.9, ry: 0.45, cx: 0.85, cy: 1.0)
+                    glow(glowB, rx: 0.7, ry: 0.35, cx: 0, cy: 0.6)
+                }
             }
             posterContent
                 .padding(.top, 22).padding(.horizontal, 22).padding(.bottom, 24)
@@ -432,20 +439,22 @@ struct ShareCard: View {
     private var posterHeader: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 3) {
-                mark(black: textBlack)
+                if !hide.contains("logo") { mark(black: textBlack) }
                 if hasNick {
                     Text(nickText).font(F.t(12, .semibold)).foregroundStyle(tc).lineLimit(1)
                 }
             }
             Spacer(minLength: 10)
             HStack(spacing: 6) {
-                if d.pb {
+                if d.pb && !hide.contains("pb") {
                     pbPill(fill: pillBg, ring: tcLine, fg: acc)
                 }
-                Text(d.badge).font(F.t(11, .semibold)).foregroundStyle(acc).lineLimit(1)
-                    .padding(.vertical, 5).padding(.horizontal, 10)
-                    .background(pillBg, in: Capsule())
-                    .overlay(Capsule().strokeBorder(tcLine, lineWidth: 1))
+                if !hide.contains("badge") {
+                    Text(d.badge).font(F.t(11, .semibold)).foregroundStyle(acc).lineLimit(1)
+                        .padding(.vertical, 5).padding(.horizontal, 10)
+                        .background(pillBg, in: Capsule())
+                        .overlay(Capsule().strokeBorder(tcLine, lineWidth: 1))
+                }
             }
         }
     }
@@ -486,25 +495,44 @@ struct ShareCard: View {
         let i: Int = max(0, min(2, layout.timeAlign))
         let ha: HorizontalAlignment = [HorizontalAlignment.leading, .center, .trailing][i]
         let fa: Alignment = [Alignment.leading, .center, .trailing][i]
+        // 1.2.5: 넣을 것을 사람이 고름 (hide) + 내 글 (caption)
+        let placeLine: String = [hide.contains("place") ? "" : d.place, hide.contains("date") ? "" : d.date]
+            .filter { !$0.isEmpty }.joined(separator: " · ")
+        var stats: [(String, String, CGFloat)] = []
+        if d.isRun {
+            if !hide.contains("time") { stats.append(("TIME", d.total, 26)) }
+            if !hide.contains("pace") { stats.append(("AVG PACE", d.avgPace, 26)) }
+        } else {
+            if !hide.contains("hr") { stats.append(("AVG HR", d.avgHR, 18)) }
+            if d.hasRox && !hide.contains("rox") { stats.append(("ROXZONE", d.rox, 18)) }
+            if !hide.contains("kcal") { stats.append(("KCAL", d.kcal, 18)) }
+        }
         return VStack(alignment: ha, spacing: 0) {
-            Text("\(d.place) · \(d.date)").font(F.t(13, .medium))
-                .foregroundStyle(tc).lineLimit(1)
-            if !d.partner.isEmpty {
+            if !caption.isEmpty {
+                Text(caption).font(F.t(22, .bold)).tracking(-0.02 * 22).foregroundStyle(tc)
+                    .multilineTextAlignment([TextAlignment.leading, .center, .trailing][i])
+                    .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 8)
+            }
+            if !placeLine.isEmpty {
+                Text(placeLine).font(F.t(13, .medium))
+                    .foregroundStyle(tc).lineLimit(1)
+            }
+            if !d.partner.isEmpty && !hide.contains("partner") {
                 Text(d.partnerText).font(F.t(12, .medium))
                     .foregroundStyle(tc.opacity(0.75)).lineLimit(1).padding(.top, 2)
             }
-            big(d.isRun ? d.distance : d.total, post ? 64 : 76, track: -0.045, color: tc).padding(.top, 6)
-            HStack(alignment: .top, spacing: 12) {
-                if d.isRun {
-                    posterStat("TIME", d.total, ha, fa, size: 26)
-                    posterStat("AVG PACE", d.avgPace, ha, fa, size: 26)
-                } else {
-                    posterStat("AVG HR", d.avgHR, ha, fa)
-                    if d.hasRox { posterStat("ROXZONE", d.rox, ha, fa) }
-                    posterStat("KCAL", d.kcal, ha, fa)
-                }
+            if !hide.contains("big") {
+                big(d.isRun ? d.distance : d.total, post ? 64 : 76, track: -0.045, color: tc).padding(.top, 6)
             }
-            .padding(.top, 14)
+            if !stats.isEmpty {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(stats.indices, id: \.self) { k in
+                        posterStat(stats[k].0, stats[k].1, ha, fa, size: stats[k].2)
+                    }
+                }
+                .padding(.top, 14)
+            }
         }
         .frame(maxWidth: .infinity, alignment: fa)
     }
@@ -1051,7 +1079,9 @@ struct ShareView: View {
     @State private var splits = true
     @State private var textColor = "white"     // white / black
     @State private var mono = false            // Black & white photo
-    @State private var gradient = true         // Dark gradient
+    @State private var gradient = false        // Dark gradient (1.2.5: 처음엔 꺼짐 — 사진 원래 밝기)
+    @State private var hide: Set<String> = []  // 1.2.5: 카드에서 뺄 것 (Poster)
+    @State private var caption = ""            // 1.2.5: 내 글
     @State private var nickOn = true           // Nickname
     @State private var pick: PhotosPickerItem?
     @State private var showPicker = false      // 미리보기를 누르면 사진 고르기
@@ -1125,6 +1155,7 @@ struct ShareView: View {
                 withAnimation(.easeInOut(duration: 0.2)) { ratio = k }
             }
             variantButtons
+            if variant == "poster" { contentCard }
             optionsCard
             actionButtons
         }
@@ -1295,6 +1326,63 @@ struct ShareView: View {
         .accessibilityIdentifier(l)
     }
 
+    // MARK: 1.2.5 · 카드에 넣을 것 고르기 + 내 글 (Poster)
+
+    /// 고를 수 있는 것: (키, 이름). 이 기록에 없는 것(PB · 파트너 · 록스존)은 안 보임
+    private var contentItems: [(String, String)] {
+        let d: ShareData = data
+        var o: [(String, String)] = [("logo", "Logo"), ("badge", "Division"), ("place", "Event"), ("date", "Date")]
+        if d.pb { o.append(("pb", "PB")) }
+        if !d.partner.isEmpty { o.append(("partner", "Partner")) }
+        if d.isRun {
+            o += [("big", "Distance"), ("time", "Time"), ("pace", "Avg pace")]
+        } else {
+            o.append(("big", "Total time"))
+            o.append(("hr", "Avg HR"))
+            if d.hasRox { o.append(("rox", "Roxzone")) }
+            o.append(("kcal", "Kcal"))
+        }
+        return o
+    }
+
+    private var contentCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("ON THE CARD").font(F.t(11, .semibold)).tracking(0.06 * 11).foregroundStyle(C.text3)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], alignment: .leading, spacing: 8) {
+                let items: [(String, String)] = contentItems
+                ForEach(items.indices, id: \.self) { k in
+                    let it: (String, String) = items[k]
+                    let on: Bool = !hide.contains(it.0)
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            if on { hide.insert(it.0) } else { hide.remove(it.0) }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: on ? "checkmark" : "plus").font(F.t(10, .bold))
+                            Text(verbatim: it.1).font(F.t(13, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                        }
+                        .foregroundStyle(on ? Color.black : C.text2)
+                        .frame(maxWidth: .infinity).frame(height: 32)
+                        .background(on ? C.accent : Color(hex: 0x1C1C1C), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("share.show.\(it.0)")
+                }
+            }
+            TextField("Write something (optional)".l10n, text: $caption, axis: .vertical)
+                .lineLimit(1...3)
+                .font(F.t(15))
+                .padding(.vertical, 10).padding(.horizontal, 12)
+                .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .onChange(of: caption) { _, v in if v.count > 60 { caption = String(v.prefix(60)) } }
+                .accessibilityIdentifier("share.caption")
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card8(14)
+    }
+
     // 옵션 카드 (radius 14, 줄 최소 48 높이, padding 0 16, 15pt, 줄 사이 1px rgba 255 0.08, 토글 50×30)
     private var routeOf: [RoutePt]? {
         guard let rt = r.detail?.route, rt.count >= 2 else { return nil }
@@ -1460,7 +1548,7 @@ struct ShareView: View {
                   placeholder: placeholder, textBlack: textColor == "black", mono: mono,
                   gradient: gradient, nick: shownNick, smoke: smokeValue, layout: layout,
                   dragKey: placeholder ? dragKey : nil, dragOffset: placeholder ? dragOffset : .zero,
-                  glowTheme: glow)
+                  glowTheme: glow, hide: hide, caption: caption)
     }
 
     /// 360pt 너비 시안을 3배로 → 1080 너비

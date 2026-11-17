@@ -748,7 +748,7 @@ final class WorkoutEngine: NSObject {
         let tg = seq.prefix(splits.count).map(\.target).reduce(0, +)
         var r = Record(mode: mode, title: title, sets: sets, date: startDate, total: total, segs: results, hr: hrSamples,
                        kcal: Int(kcal.rounded()), avgHR: bpms.isEmpty ? 0 : bpms.reduce(0, +) / bpms.count,
-                       maxHR: bpms.max() ?? 0, division: settings.div.name,
+                       maxHR: HRStat.robustMax(bpms), division: settings.div.name,   // 1.2.5: 튀는 값 빼기
                        goal: mode == .race ? settings.goalTime : nil,
                        vsWord: deltaWord, vsTarget: (kind == nil && (mode != .pft || hasPFTBest)) ? tg : nil, complete: complete)
         r.endDate = startDate.addingTimeInterval(Double(total))

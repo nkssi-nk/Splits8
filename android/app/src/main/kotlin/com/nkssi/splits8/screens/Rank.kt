@@ -152,7 +152,8 @@ fun OfficialImportSheet(ev: RaceEvent) {
         val t = secs(total) ?: return@run null
         if (!runSecs.all { it != null } || !stSecs.all { it != null }) return@run null
         val sum = runSecs.sumOf { it!! } + stSecs.sumOf { it!! } + (secs(rox) ?: 0)
-        if (abs(sum - t) <= 15) null      // 1.2.5: 결과 사이트가 초를 반올림해서 몇 초 다를 수 있음 else L10n.t("⚠ The splits add up to %@, %@ off the overall time. Please check the boxes.", Fm.t(sum), Fm.t(abs(sum - t)))
+        // 1.2.5: 결과 사이트가 초를 반올림해서 몇 초 다를 수 있음
+        if (abs(sum - t) <= 15) null else L10n.t("⚠ The splits add up to %@, %@ off the overall time. Please check the boxes.", Fm.t(sum), Fm.t(abs(sum - t)))
     }
 
     fun save() {
@@ -173,7 +174,8 @@ fun OfficialImportSheet(ev: RaceEvent) {
         scope.launch {
             val text = runCatching {
                 val img = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { InputImage.fromFilePath(ctx, uri) }
-                val r = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())   // 1.2.5: 한글 + 영어 같이 읽음.process(img).await()
+                // 1.2.5: 한글 + 영어 같이 읽음
+                val r = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build()).process(img).await()
                 joinLines(r.textBlocks.flatMap { b -> b.lines.map { (it.boundingBox ?: android.graphics.Rect()) to it.text } })
             }.getOrDefault("")
             val d = OfficialParse.parse(text)

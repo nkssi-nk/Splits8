@@ -374,7 +374,12 @@ struct SetHrView: View {
                 ForEach(0..<5, id: \.self) { i in zoneRow(i) }
             }
             .card8()
-            Note8(text: "Calculated automatically from your max heart rate. Heart rate colors and Z1–Z5 on your watch follow these ranges.")
+            if let r = store.settings.restUsable {
+                // 1.2.5: 안정 심박도 넣어 계산 (애플워치와 같은 방식)
+                Note8(text: String(format: "Calculated from your max heart rate and your resting heart rate in Health (%d), the same way as Apple Watch. Heart rate colors and Z1–Z5 on your watch follow these ranges.".l10n, r))
+            } else {
+                Note8(text: "Calculated automatically from your max heart rate. Heart rate colors and Z1–Z5 on your watch follow these ranges.")
+            }
         }
         .padding(.horizontal, 16)
     }
@@ -425,12 +430,13 @@ struct SetHrView: View {
 
     /// padding 13×18: 색 막대 4×22 · Z1 (28폭 15/600) · 50–60% (13 회색) · 94–112 (17/500)
     private func zoneRow(_ i: Int) -> some View {
-        let mx = Double(store.settings.maxHR)
+        let s = store.settings
         let p = [50, 60, 70, 80, 90][i]
         let pct = i == 4 ? "90%+" : "\(p)–\(p + 10)%"
-        let lo = Int((mx * Double(p) / 100).rounded())
-        let hi = Int((mx * Double(p + 10) / 100).rounded()) - 1
-        let range = i == 4 ? "\(Int((mx * 0.9).rounded()))+" : "\(lo)–\(hi)"
+        // 1.2.5: 안정 심박을 알면 애플워치와 같은 여유 심박 방식 (Settings.zoneBpm)
+        let lo = i == 0 && s.restUsable != nil ? (s.restUsable ?? 0) : s.zoneBpm(p)
+        let hi = s.zoneBpm(p + 10) - 1
+        let range = i == 4 ? "\(s.zoneBpm(90))+" : "\(lo)–\(hi)"
         return HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2).fill(C.zones[i]).frame(width: 4, height: 22)
             Text("Z\(i + 1)").font(F.t(15, .semibold)).frame(width: 28, alignment: .leading)

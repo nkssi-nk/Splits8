@@ -871,6 +871,8 @@ struct Settings: Codable, Hashable {
     var hrMode = "age"            // age / manual
     var age = 32
     var manualHr = 190
+    /// 1.2.5: 건강 앱의 안정 심박 (최근 값 평균). 있으면 심박 영역을 애플워치처럼 여유 심박 방식으로 계산
+    var restHr: Int? = nil
     var runMode = "treadmill"     // outdoor / treadmill / curved
     var roxAuto = true
     var goals: [Int] = Defaults.goals
@@ -956,9 +958,9 @@ struct Settings: Codable, Hashable {
     /// 91번(빌드 28): 홈 프로필 카드 오른쪽에 보일 것. nil / "auto" = 가장 최근에 세운 최고 기록, sim · race · pft · run · goal
     var homeShow: String? = nil
     /// 19번(빌드 29): 음성 안내 — 예전 저장 파일과 호환되도록 옵셔널 (nil = 기본값). 워치로도 같이 감 (WatchContext.settings)
-    var voiceOpt: Bool? = nil              // 켜기 (기본 끄기)
+    var voiceOpt: Bool? = nil              // 켜기 (기본 끄기 · 1.2.5: 새로 깔면 처음 설정 끝날 때 켬)
     var voiceEveryOpt: Int? = nil          // 러닝 알림 간격(m): 500 · 1000(기본) · 0 = 끄기
-    var voiceDistOpt: Bool? = nil          // 러닝에서 말할 것: 거리 · 총 시간 · 평균 페이스 · 평균 심박 (기본 모두 켬)
+    var voiceDistOpt: Bool? = nil          // 러닝에서 말할 것: 거리 · 총 시간 · 평균 페이스 · 평균 심박 (1.2.5: 총 시간 · 심박은 기본 끔)
     var voiceTimeOpt: Bool? = nil
     var voicePaceOpt: Bool? = nil
     var voiceHrOpt: Bool? = nil
@@ -979,17 +981,18 @@ struct Settings: Codable, Hashable {
         get { voiceDistOpt ?? true }
         set { voiceDistOpt = newValue ? nil : false }
     }
+    /// 1.2.5: km 안내를 짧게 — 총 시간 · 심박은 처음엔 끔 (켜면 true 저장)
     var voiceTime: Bool {
-        get { voiceTimeOpt ?? true }
-        set { voiceTimeOpt = newValue ? nil : false }
+        get { voiceTimeOpt ?? false }
+        set { voiceTimeOpt = newValue ? true : nil }
     }
     var voicePace: Bool {
         get { voicePaceOpt ?? true }
         set { voicePaceOpt = newValue ? nil : false }
     }
     var voiceHr: Bool {
-        get { voiceHrOpt ?? true }
-        set { voiceHrOpt = newValue ? nil : false }
+        get { voiceHrOpt ?? false }
+        set { voiceHrOpt = newValue ? true : nil }
     }
     /// 1.2.2: 응원 양 "low" · "mid" · "high"
     var voiceCheer: String {
@@ -1021,10 +1024,25 @@ struct Settings: Codable, Hashable {
     var div: Division { Division.of(division) }
     var maxHR: Int { hrMode == "age" ? 220 - age : manualHr }
 
-    /// 1~5
+    /// 1.2.5: 쓸 수 있는 안정 심박 (35~100, 최대보다 20 넘게 낮을 때만)
+    var restUsable: Int? {
+        guard let r = restHr, (35...100).contains(r), r + 20 < maxHR else { return nil }
+        return r
+    }
+
+    /// 1~5. 1.2.5: 안정 심박을 알면 애플워치와 같은 여유 심박 방식 (안정 + (최대 − 안정) × 60 · 70 · 80 · 90 %), 모르면 최대 심박의 %
     func zone(_ bpm: Double) -> Int {
-        let p = bpm / Double(max(1, maxHR))
+        let mx: Double = Double(max(1, maxHR))
+        let p: Double
+        if let r = restUsable { p = (bpm - Double(r)) / (mx - Double(r)) } else { p = bpm / mx }
         return p >= 0.9 ? 5 : p >= 0.8 ? 4 : p >= 0.7 ? 3 : p >= 0.6 ? 2 : 1
+    }
+
+    /// 1.2.5: 영역 경계 심박 (pct = 50 · 60 · 70 · 80 · 90 · 100)
+    func zoneBpm(_ pct: Int) -> Int {
+        let mx: Double = Double(maxHR)
+        if let r = restUsable { return Int((Double(r) + (mx - Double(r)) * Double(pct) / 100).rounded()) }
+        return Int((mx * Double(pct) / 100).rounded())
     }
 }
 
@@ -1342,6 +1360,8 @@ extension Record {
     static let minDoubles: Int = 45 * 60
     /// 1km 런 2:30, 스테이션 30초보다 빠르면 확인 필요
     static let minRun: Int = 150
+    /// 1.2.5: 레이스 러닝 1개 (대회장 러닝이 짧을 수 있음)
+    static let minRaceRun: Int = 90
     static let minStation: Int = 30
     static let minPFT: Int = 10 * 60
     static let minPFTStation: Int = 15
@@ -1377,8 +1397,12 @@ extension Record {
             return nil
         }
         if total < (isDoubles ? Self.minDoubles : Self.minSolo) { return .check }
+        // 1.2.5: 공식 기록은 공식 계측을 믿고 구간 검사 안 함 (서울처럼 러닝 1 이 한 바퀴뿐인 대회)
+        if official != nil { return nil }
+        // 1.2.5: 레이스는 대회장마다 러닝 거리가 달라서 러닝 1개 기준을 1:30 으로
+        let minRun: Int = mode == .race ? Self.minRaceRun : Self.minRun
         for s in segs {
-            if s.kind == .run && s.time < Self.minRun { return .check }
+            if s.kind == .run && s.time < minRun { return .check }
             if s.kind == .st && s.time < Self.minStation { return .check }
         }
         return nil
@@ -1386,4 +1410,80 @@ extension Record {
 
     /// PB·최고 기록·비교 기준에 넣어도 되는 기록인지
     var counts: Bool { flag == nil }
+}
+
+// MARK: - 1.2.5 · 최대 심박: 한 번만 튀는 값은 빼기
+
+enum HRStat {
+    /// 앞뒤 2개(5초 간격 점)의 가운데 값보다 10 넘게 높이 튄 점 하나는 최대에서 뺌 (손목 센서가 잠깐 튀는 것)
+    static func robustMax(_ b: [Int]) -> Int {
+        guard b.count >= 3 else { return b.max() ?? 0 }
+        var best: Int = 0
+        for i in b.indices {
+            let nb: [Int] = (max(0, i - 2)...min(b.count - 1, i + 2)).filter { $0 != i }.map { b[$0] }.sorted()
+            let mid: Int = nb[nb.count / 2]
+            if b[i] - mid > 10 { continue }
+            best = max(best, b[i])
+        }
+        return best > 0 ? best : (b.max() ?? 0)
+    }
+}
+
+// MARK: - 1.2.5 · 실내 러닝 거리 고치기 (러닝머신에 나온 거리로)
+
+extension Record {
+    /// 러닝 구간 거리 합 (m) — 워치가 잰 값, 없으면 계획 거리
+    var runMetersTotal: Double {
+        segs.filter { $0.kind == .run }.reduce(0) { $0 + ($1.dist ?? runMeters($1.detail)) }
+    }
+
+    /// 러닝 기록의 거리를 meters 로 고쳐서 1 km 구간을 다시 나눔 (시간 · 총시간은 그대로, 구간 심박은 그 시간의 평균).
+    /// 러닝 카드(자유 · 거리 러닝)만. 거리가 너무 작거나 크면 nil
+    func withRunDistance(_ meters: Double) -> Record? {
+        guard isRunKind else { return nil }
+        let runs: [SegResult] = segs.filter { $0.kind == .run }
+        let measured: Double = runMetersTotal
+        guard !runs.isEmpty, measured > 0, meters >= 100, meters <= measured * 3 else { return nil }
+        let f: Double = meters / measured
+        // 구간 끝마다 (누적 거리, 누적 시간)
+        var pts: [(d: Double, t: Double)] = [(0, 0)]
+        var cd: Double = 0, ct: Double = 0
+        for s in runs {
+            cd += (s.dist ?? runMeters(s.detail)) * f
+            ct += Double(s.time)
+            pts.append((cd, ct))
+        }
+        func timeAt(_ d: Double) -> Double {
+            for i in 1..<pts.count where d <= pts[i].d {
+                let a = pts[i - 1], b = pts[i]
+                return b.d > a.d ? a.t + (b.t - a.t) * (d - a.d) / (b.d - a.d) : b.t
+            }
+            return ct
+        }
+        let hrPts: [HRPoint] = hr.sorted { $0.t < $1.t }
+        func avgHR(_ t0: Int, _ t1: Int) -> Int? {
+            let b: [Int] = hrPts.filter { $0.t >= t0 && $0.t <= t1 }.map(\.b)
+            return b.isEmpty ? nil : Int((Double(b.reduce(0, +)) / Double(b.count)).rounded())
+        }
+        let tpl: SegResult = runs[0]
+        var out: [SegResult] = []
+        var prevT: Int = 0
+        var k: Int = 1
+        while Double(k) * 1000 <= cd + 0.5 {
+            let t: Int = Int(timeAt(Double(k) * 1000).rounded())
+            out.append(SegResult(icon: tpl.icon, name: "KM \(k)", detail: "1KM", kind: .run, time: max(0, t - prevT), target: 0,
+                                 hr: avgHR(prevT, t), dist: 1000))
+            prevT = t
+            k += 1
+        }
+        let rest: Double = cd - Double(k - 1) * 1000
+        let restT: Int = Int(ct.rounded()) - prevT
+        if rest >= 1 && restT > 0 {
+            out.append(SegResult(icon: tpl.icon, name: "KM \(k)", detail: "1KM", kind: .run, time: restT, target: 0,
+                                 hr: avgHR(prevT, Int(ct.rounded())), dist: (rest * 10).rounded() / 10))
+        }
+        var r: Record = self
+        r.segs = out
+        return r
+    }
 }

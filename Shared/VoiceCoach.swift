@@ -22,8 +22,8 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
 
     /// 앱 묶음 안 폴더 (project.yml: Resources/Voice 를 폴더째 → "Voice/ko/…")
     static let folder = "Voice/ko"
-    /// 한 문장 안 조각 사이
-    static let clipGap: Double = 0.12
+    /// 한 문장 안 조각 사이 (1.2.5: 조각 끝 쉼을 잘라서 0.12 → 0.03, 이어 말하듯)
+    static let clipGap: Double = 0.03
     /// 문장과 문장 사이
     static let lineGap: Double = 0.35
     /// 응원은 바로 앞 안내 뒤 이 시간(초) 안에는 안 함
@@ -40,6 +40,8 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
     /// 지금 말하는 문장의 우선순위 (nil = 조용함)
     private var playingPri: Pri? = nil
     private var player: AVAudioPlayer?
+    /// 1.2.5: 같은 문장의 다음 조각 (미리 열어 둠)
+    private var nextPlayer: (id: String, player: AVAudioPlayer)?
     private var stepWork: DispatchWorkItem?
     private var offWork: DispatchWorkItem?
     private var sessionOn = false
@@ -487,6 +489,7 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
         player?.delegate = nil
         player?.stop()
         player = nil
+        nextPlayer = nil
         playingIds = []
         if playingPri != nil { lastLineAt = Date() }
         playingPri = nil
@@ -510,13 +513,26 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
             activate()
         }
         let id: String = playingIds.removeFirst()
-        guard let url = VoiceCoach.url(id), let p = try? AVAudioPlayer(contentsOf: url) else { step(); return }
+        // 1.2.5: 다음 조각은 미리 열어 둔 것을 씀 (조각 사이 끊김 줄이기 · 에어팟에서 앞소리 잘림 줄이기)
+        let p: AVAudioPlayer
+        if let pre = nextPlayer, pre.id == id {
+            p = pre.player
+        } else {
+            guard let url = VoiceCoach.url(id), let q = try? AVAudioPlayer(contentsOf: url) else { nextPlayer = nil; step(); return }
+            q.prepareToPlay()
+            p = q
+        }
+        nextPlayer = nil
         p.delegate = self
-        p.prepareToPlay()
         player = p
         if !p.play() {
             player = nil
             step()
+            return
+        }
+        if let nid = playingIds.first, let url = VoiceCoach.url(nid), let q = try? AVAudioPlayer(contentsOf: url) {
+            q.prepareToPlay()
+            nextPlayer = (nid, q)
         }
     }
 

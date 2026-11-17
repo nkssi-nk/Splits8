@@ -214,7 +214,7 @@ struct OfficialImportView: View {
     private var sumWarning: String? {
         guard let t = secs(total), runSecs.allSatisfy({ $0 != nil }), stSecs.allSatisfy({ $0 != nil }) else { return nil }
         let sum: Int = runSecs.compactMap { $0 }.reduce(0, +) + stSecs.compactMap { $0 }.reduce(0, +) + (secs(rox) ?? 0)
-        guard abs(sum - t) > 3 else { return nil }
+        guard abs(sum - t) > 15 else { return nil }      // 1.2.5: 결과 사이트가 초를 반올림해서 몇 초 다를 수 있음
         return String(format: "⚠ The splits add up to %@, %@ off the overall time. Please check the boxes.".l10n, Fm.t(sum), Fm.t(abs(sum - t)))
     }
 
@@ -251,6 +251,7 @@ struct OfficialImportView: View {
             if let v = d.st[i] { st[i] = Fm.t(v) }
         }
         if let v = d.rox { rox = Fm.t(v) }
+        if let v = d.division { division = v }      // 1.2.5: 화면의 디비전 (Doubles Men 등)
         note = d.found == 0 ? "Could not find a result in this image. Try a sharper screenshot, or type the times in.".l10n
                             : String(format: "Filled %d boxes from the screenshot. Please check them.".l10n, d.found)
     }
@@ -284,5 +285,57 @@ struct OfficialImportView: View {
             }
         }
         return lines.map { $0.sorted { $0.0.minX < $1.0.minX }.map(\.1).joined(separator: "  ") }.joined(separator: "\n")
+    }
+}
+
+// MARK: - 1.2.5 · 실내 러닝 거리 고치기 (러닝머신에 나온 거리로)
+
+/// 실내 러닝 상세 — 러닝머신 거리를 넣으면 km 구간 · 페이스를 다시 계산 (시간은 그대로)
+struct IndoorDistanceCard: View {
+    let rec: Record
+    let store = Store.shared
+    @State private var text: String = ""
+    @FocusState private var focused: Bool
+
+    private var imp: Bool { store.settings.imperial }
+    private var meters: Double? {
+        guard let v = Double(text.replacingOccurrences(of: ",", with: ".")), v > 0 else { return nil }
+        return v / Units.distValue(1, imp)
+    }
+    private var canFix: Bool {
+        guard let m = meters else { return false }
+        return abs(m - rec.runMetersTotal) >= 5 && rec.withRunDistance(m) != nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Treadmill distance").font(F.t(15, .semibold))
+            HStack(spacing: 10) {
+                TextField(Units.dist(rec.runMetersTotal, imp), text: $text)
+                    .keyboardType(.decimalPad)
+                    .focused($focused)
+                    .font(F.num(20))
+                    .padding(.vertical, 8).padding(.horizontal, 12)
+                    .background(C.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .accessibilityIdentifier("detail.indoorDist")
+                Text(verbatim: Units.distUnit(imp)).font(F.t(13, .semibold)).foregroundStyle(C.text2)
+                YellowButton(height: 40, radius: 20, enabled: canFix, action: fix) {
+                    Text("Fix distance")
+                }
+                .frame(width: 130)
+            }
+            Text("Enter the distance shown on the treadmill. Splits and pace are recalculated; your time stays the same.")
+                .font(F.t(12)).foregroundStyle(C.text3).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .card8()
+    }
+
+    private func fix() {
+        guard let m = meters, let x = rec.withRunDistance(m) else { return }
+        focused = false
+        store.updateRecord(x, syncServer: true)
+        Router.shared.detail = x
+        text = ""
     }
 }

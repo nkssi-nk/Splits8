@@ -375,6 +375,8 @@ struct Onboarding3: View {
     private func tap() {
         if granted {
             store.settings.hasOnboarded = true
+            // 1.2.5: 새로 깐 사람은 코치 음성 켜고 시작 (설정에서 끌 수 있음 · 예전 사용자 설정은 그대로)
+            if store.settings.voiceOpt == nil { store.settings.voiceOpt = true }
             r.returning = false
             Router.shared.go(.home)
             return

@@ -114,6 +114,8 @@ enum OfficialParse {
         var runs: [Int?] = Array(repeating: nil, count: 8)
         var st: [Int?] = Array(repeating: nil, count: 8)
         var rox: Int? = nil
+        /// 1.2.5: 화면에서 읽은 디비전 이름 (Division.all 이름, 모르면 nil)
+        var division: String? = nil
         /// 읽은 칸 수 (0 이면 못 읽음)
         var found: Int {
             [total, rank, ageRank, rox].compactMap { $0 }.count + runs.compactMap { $0 }.count + st.compactMap { $0 }.count
@@ -155,60 +157,125 @@ enum OfficialParse {
             .filter { $0 >= 10 }
     }
 
-    /// 줄 안의 순위 숫자 (시간 글자를 뺀 뒤 첫 정수)
-    static func rankNum(_ line: String) -> Int? {
-        let noTime: String = line.replacingOccurrences(of: #"(?:\d{1,2}:)?\d{1,2}:\d{2}(?:\.\d+)?"#, with: " ", options: .regularExpression)
-        let afterLabel: String = noTime.replacingOccurrences(of: #"(?i)rank\s*\((?:m/?w|ag)\)|rank|순위|\(m/?w\)|\(ag\)"#, with: " ", options: .regularExpression)
-        guard let r = afterLabel.range(of: #"\d{1,6}"#, options: .regularExpression), let n = Int(afterLabel[r]), n > 0 else { return nil }
-        return n
-    }
-
     private static func has(_ l: String, _ p: String) -> Bool { l.range(of: p, options: [.regularExpression, .caseInsensitive]) != nil }
 
-    /// 스테이션 이름 → Station.all 순서 (0~7). 결과 페이지 이름: 1000m SkiErg · 50m Sled Push · 50m Sled Pull ·
-    /// 80m Burpee Broad Jump · 1000m Row · 200m Farmers Carry · 100m Sandbag Lunges · Wall Balls
+    /// 정규식의 첫 번째로 잡힌 묶음 (없으면 다음 묶음)
+    private static func group(_ l: String, _ p: String) -> String? {
+        guard let re = try? NSRegularExpression(pattern: p, options: [.caseInsensitive]) else { return nil }
+        let ns = l as NSString
+        guard let m = re.firstMatch(in: l, range: NSRange(location: 0, length: ns.length)), m.numberOfRanges > 1 else { return nil }
+        for i in 1..<m.numberOfRanges where m.range(at: i).location != NSNotFound {
+            return ns.substring(with: m.range(at: i))
+        }
+        return nil
+    }
+
+    /// 스테이션 이름 → Station.all 순서 (0~7). 공식 결과 페이지 (영어) + 1.2.5: 줄임말 · 한국어 (BBJ · Farmers C. · S. Lunges · 스키 · 슬레드 …)
     static let stKeys: [(Int, String)] = [
-        (1, #"sled\s*push"#), (2, #"sled\s*pull"#), (0, #"ski\s*-?\s*erg"#), (3, #"burpee"#),
-        (4, #"\brow(ing)?\b"#), (5, #"farmer"#), (6, #"lunge"#), (7, #"wall\s*-?\s*ball"#),
+        (1, #"sled\s*push|슬레드\s*푸[시쉬]"#), (2, #"sled\s*pull|슬레드\s*풀"#), (0, #"ski\s*-?\s*erg|스키"#),
+        (3, #"burpee|\bbbj\b|버피"#), (4, #"\brow(ing)?\b|로잉"#), (5, #"farmer|파머"#), (6, #"lunge|런지"#),
+        (7, #"wall\s*-?\s*balls?|월\s*볼"#),
     ]
 
+    /// 1.2.5: 요약 머리줄 이름표 (TrainRox: "달리기 · 스테이션 · ROXZONE · 페이스" 아래 줄에 값)
+    private static let headKeys: [(String, String)] = [("run", #"달리기|run\s*total"#), ("st", #"스테이션|stations?"#),
+                                                       ("rox", #"rox\s*zone|록스존"#), ("pace", #"페이스|pace"#)]
+    /// 구간이 아닌 줄 (페이스 · 합계 · 리그 점수)
+    private static let skip: String = #"페이스|pace|/\s*km|best\s*run|run\s*total|league|리그"#
+    private static let rankRe: String = #"(?:rank\s*\(\s*m\s*/?\s*w\s*\)|전체|overall|순위)\s*#?\s*(\d{1,6})"#
+    private static let agRe: String = #"(?:rank\s*\(\s*ag\s*\)|age\s*group|나이대?)\s*#?\s*(\d{1,6})|\bAG\s*#\s*(\d{1,6})"#
+    private static let rankLabel: String = #"rank\s*\(\s*(m\s*/?\s*w|ag)\s*\)|^\s*(전체|순위)\s*$"#
+    private static let runRe: String = #"\brun(?:ning)?\s*([1-8])\b|러닝\s*([1-8])(?!\d)"#
+
+    /// 1.2.5: 화면 글자에서 디비전 (Doubles Men · Pro Women …). 모르면 nil
+    static func division(_ text: String) -> String? {
+        let l: String = text.lowercased()
+        let pro: Bool = has(l, #"\bpro\b"#)
+        let women: Bool = has(l, "women|여자"), men: Bool = has(l, #"\bmen\b|남자"#)
+        if has(l, "doubles?|더블") {
+            if has(l, "mixed|혼성") { return "Doubles Mixed" }
+            if women { return pro ? "Doubles Women Pro" : "Doubles Women" }
+            if men { return pro ? "Doubles Men Pro" : "Doubles Men" }
+            return nil
+        }
+        if has(l, "relay|릴레이") { return nil }
+        if women { return pro ? "Pro Women" : "Open Women" }
+        if men { return pro ? "Pro Men" : "Open Men" }
+        return nil
+    }
+
+    /// 캡처 글자 → 값. 1.2.5: 공식 결과 사이트(영어) + TrainRox 같은 한국어 화면
+    ///  - 이름 있는 줄은 이름으로, 이름을 못 읽은 줄은 위에서부터 시간 16개를 러닝 · 스테이션 번갈아 채움
+    ///  - 요약 줄(달리기 · 스테이션 · ROXZONE · 페이스)은 구간으로 안 잡음 (ROXZONE 만 씀)
     static func parse(_ text: String) -> Draft {
         var d = Draft()
         let lines: [String] = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         var all: [Int] = []
+        var seq: [Int] = []
         for (i, l) in lines.enumerated() {
-            var ts: [Int] = times(l)
-            if ts.isEmpty, i + 1 < lines.count { ts = times(lines[i + 1]) }     // 이름과 시간이 다른 줄로 읽힌 경우
-            all += times(l)
-            // 순위: "Rank (AG) 18" / "Rank (M/W) 90" (숫자가 다음 줄이면 다음 줄)
-            if has(l, #"rank|순위"#) {
-                let n: Int? = rankNum(l) ?? (i + 1 < lines.count && times(lines[i + 1]).isEmpty ? rankNum(lines[i + 1]) : nil)
-                if has(l, #"\(\s*ag\s*\)|age\s*group|나이"#) { if d.ageRank == nil { d.ageRank = n } }
-                else if d.rank == nil { d.rank = n }
+            let ts: [Int] = times(l)
+            all += ts
+            let next: String? = i + 1 < lines.count ? lines[i + 1] : nil
+            // 순위: "Rank (M/W) 90" · "전체 #1141" · "AG #82" (숫자가 다음 줄이면 다음 줄)
+            let r: Int? = group(l, rankRe).flatMap { Int($0) }
+            let a: Int? = group(l, agRe).flatMap { Int($0) }
+            if let r, d.rank == nil { d.rank = r }
+            if let a, d.ageRank == nil { d.ageRank = a }
+            if r == nil, a == nil, ts.isEmpty, let next, has(l, rankLabel) {
+                if let n = group(next, #"^\s*#?\s*(\d{1,6})\s*$"#).flatMap({ Int($0) }), n > 0 {
+                    if has(l, "ag") { if d.ageRank == nil { d.ageRank = n } } else if d.rank == nil { d.rank = n }
+                }
                 continue
             }
-            if let m = l.range(of: #"(?i)\brun(?:ning)?\s*([1-8])\b|러닝\s*([1-8])"#, options: .regularExpression), !ts.isEmpty {
-                let digits = l[m].filter(\.isNumber)
-                if let k = Int(String(digits.last ?? "0")), (1...8).contains(k), d.runs[k - 1] == nil { d.runs[k - 1] = ts[0] }
+            if (r != nil || a != nil) && ts.isEmpty { continue }
+            // 요약 머리줄 (이름표 여럿 · 시간 없음) → 다음 줄 시간과 칸 순서로 맞춤
+            let hk: [(String, Int)] = headKeys.compactMap { (h: (String, String)) -> (String, Int)? in
+                guard let rg = l.range(of: h.1, options: [.regularExpression, .caseInsensitive]) else { return nil }
+                return (h.0, l.distance(from: l.startIndex, to: rg.lowerBound))
+            }.sorted { $0.1 < $1.1 }
+            if hk.count >= 2, ts.isEmpty, let next {
+                let nt: [Int] = times(next)
+                if nt.count >= hk.count {
+                    for (j, h) in hk.enumerated() where h.0 == "rox" && d.rox == nil { d.rox = nt[j] }
+                }
                 continue
             }
-            if has(l, #"\brun(ning)?\b|러닝"#) && !has(l, "rox") { continue }      // Run Total · Best Run Lap
-            if has(l, #"rox\s*zone|록스존"#) { if d.rox == nil, let t = ts.first { d.rox = t }; continue }
+            let tsx: [Int] = ts.isEmpty ? (next.map { times($0) } ?? []) : ts      // 이름과 시간이 다른 줄로 읽힌 경우
+            if let ks = group(l, runRe), let k = Int(ks), !tsx.isEmpty {
+                if (1...8).contains(k), d.runs[k - 1] == nil { d.runs[k - 1] = tsx[0] }
+                if let t = ts.first { seq.append(t) }
+                continue
+            }
+            if has(l, skip) { continue }
+            if has(l, #"\brun(ning)?\b|러닝|달리기"#) && !has(l, "rox") { continue }      // Run Total · Best Run Lap · 표 머리
+            if has(l, #"rox\s*zone|록스존"#) { if d.rox == nil { d.rox = tsx.first }; continue }
             if let k = stKeys.first(where: { has(l, $0.1) }) {
-                if d.st[k.0] == nil, let t = ts.first { d.st[k.0] = t }
+                if d.st[k.0] == nil { d.st[k.0] = tsx.first }
+                if let t = ts.first { seq.append(t) }
                 continue
             }
             if has(l, #"(overall|finish|final|total)\s*time|^total\b|^time\b|완주"#) && !has(l, "rox|run"), let mx = ts.max() {
                 d.total = max(d.total ?? 0, mx)
+                continue
             }
+            // 이름 없는 줄: 구간 시간 하나면 순서 목록에 (완주 시간처럼 큰 값은 빼기)
+            if ts.count == 1, (20...1200).contains(ts[0]) { seq.append(ts[0]) }
         }
         if d.total == nil { d.total = all.filter { $0 >= 40 * 60 && $0 <= 4 * 3600 }.max() }
-        // 말이 안 되는 값 빼기 (러닝 2~20분, 스테이션 30초~20분, Roxzone 1~25분)
+        // 1.2.5: 이름을 다 못 읽었으면 순서로 — 위에서부터 16개 = 러닝 1 · 스테이션 1 · 러닝 2 …
+        let named: Int = d.runs.compactMap { $0 }.count + d.st.compactMap { $0 }.count
+        if named < 16 && seq.count == 16 {
+            for (j, v) in seq.enumerated() {
+                if j % 2 == 0 { if d.runs[j / 2] == nil { d.runs[j / 2] = v } } else { if d.st[j / 2] == nil { d.st[j / 2] = v } }
+            }
+        }
+        // 말이 안 되는 값 빼기 (러닝 1~20분 — 대회장 러닝이 짧을 수 있음, 스테이션 20초~20분, Roxzone 1~25분)
         for i in 0..<8 {
-            if let v = d.runs[i], v < 120 || v > 1200 { d.runs[i] = nil }
-            if let v = d.st[i], v < 30 || v > 1200 { d.st[i] = nil }
+            if let v = d.runs[i], v < 60 || v > 1200 { d.runs[i] = nil }
+            if let v = d.st[i], v < 20 || v > 1200 { d.st[i] = nil }
         }
         if let v = d.rox, v < 60 || v > 1500 { d.rox = nil }
+        d.division = division(text)
         return d
     }
 

@@ -397,15 +397,24 @@ fun SetHrView() {
                     }
                 }
             }
+            // 1.2.5: 안정 심박 (넣으면 영역을 워치처럼 여유 심박 방식으로). 40 아래로 내리면 끔
+            Column(Modifier.fillMaxWidth().card8().padding(vertical = 10.dp, horizontal = 18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    T("Resting heart rate", F.t(15), Modifier.weight(1f), maxLines = 1)
+                    Stepper8(s.restHr?.toString() ?: "Off".l10n, Modifier.testTag("hr.rest"), minWidth = 40.dp,
+                        down = { Store.update { it.copy(restHr = it.restHr?.let { v -> if (v <= 40) null else v - 1 }) } },
+                        up = { Store.update { it.copy(restHr = ((it.restHr ?: 59) + 1).coerceAtMost(100)) } })
+                }
+            }
             SectionLabel("ZONES")
             Column(Modifier.fillMaxWidth().card8()) {
-                val mx = s.maxHR.toDouble()
                 for (i in 0 until 5) {
                     val p = listOf(50, 60, 70, 80, 90)[i]
                     val pct = if (i == 4) "90%+" else "$p–${p + 10}%"
-                    val lo = kotlin.math.round(mx * p / 100).toInt()
-                    val hi = kotlin.math.round(mx * (p + 10) / 100).toInt() - 1
-                    val range = if (i == 4) "${kotlin.math.round(mx * 0.9).toInt()}+" else "$lo–$hi"
+                    // 1.2.5: 안정 심박을 넣었으면 여유 심박 방식 (Settings.zoneBpm)
+                    val lo = if (i == 0 && s.restUsable != null) s.restUsable!! else s.zoneBpm(p)
+                    val hi = s.zoneBpm(p + 10) - 1
+                    val range = if (i == 4) "${s.zoneBpm(90)}+" else "$lo–$hi"
                     Row(Modifier.fillMaxWidth().rowLine(i < 4).padding(vertical = 13.dp, horizontal = 18.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Box(Modifier.size(4.dp, 22.dp).clip(RoundedCornerShape(2.dp)).background(C.zones[i]))
@@ -415,7 +424,8 @@ fun SetHrView() {
                     }
                 }
             }
-            Note8("Calculated automatically from your max heart rate. Heart rate colors and Z1–Z5 on your watch follow these ranges.")
+            Note8(if (s.restUsable != null) "Calculated from your max heart rate and resting heart rate, the same way as most sports watches. Heart rate colors and Z1–Z5 on your watch follow these ranges."
+                  else "Calculated automatically from your max heart rate. Heart rate colors and Z1–Z5 on your watch follow these ranges.")
         }
     }
 }

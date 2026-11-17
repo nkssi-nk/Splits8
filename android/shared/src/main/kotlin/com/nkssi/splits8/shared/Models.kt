@@ -831,8 +831,12 @@ data class Record(
                 return null
             }
             if (total < (if (isDoubles) MIN_DOUBLES else MIN_SOLO)) return RecordFlag.Check
+            // 1.2.5: 공식 기록은 공식 계측을 믿고 구간 검사 안 함 (서울처럼 러닝 1 이 한 바퀴뿐인 대회)
+            if (official != null) return null
+            // 1.2.5: 레이스는 대회장마다 러닝 거리가 달라서 러닝 1개 기준을 1:30 으로
+            val minRun = if (mode == Mode.Race) MIN_RACE_RUN else MIN_RUN
             for (s in segs) {
-                if (s.kind == SegKind.Run && s.time < MIN_RUN) return RecordFlag.Check
+                if (s.kind == SegKind.Run && s.time < minRun) return RecordFlag.Check
                 if (s.kind == SegKind.St && s.time < MIN_STATION) return RecordFlag.Check
             }
             return null
@@ -847,6 +851,8 @@ data class Record(
         const val MIN_DOUBLES = 45 * 60
         /** 1km 런 2:30, 스테이션 30초보다 빠르면 확인 필요 */
         const val MIN_RUN = 150
+        /** 1.2.5: 레이스 러닝 1개 (대회장 러닝이 짧을 수 있음) */
+        const val MIN_RACE_RUN = 90
         const val MIN_STATION = 30
         const val MIN_PFT = 10 * 60
         const val MIN_PFT_STATION = 15
@@ -933,6 +939,8 @@ data class Settings(
     val hrMode: String = "age",
     val age: Int = 32,
     val manualHr: Int = 190,
+    /** 1.2.5: 안정 심박 (아이폰은 건강 앱에서 자동, 안드로이드는 손으로). 있으면 심박 영역을 워치처럼 여유 심박 방식으로 */
+    val restHr: Int? = null,
     /** outdoor / treadmill / curved */
     val runMode: String = "treadmill",
     val roxAuto: Boolean = true,
@@ -1021,9 +1029,10 @@ data class Settings(
     /** 19번: 러닝 알림 간격(m). 0 = 끔 */
     val voiceEvery: Int get() = voiceEveryOpt ?: 1000
     val voiceDist: Boolean get() = voiceDistOpt ?: true
-    val voiceTime: Boolean get() = voiceTimeOpt ?: true
+    /** 1.2.5: km 안내를 짧게 — 총 시간 · 심박은 처음엔 끔 (켜면 true 저장) */
+    val voiceTime: Boolean get() = voiceTimeOpt ?: false
     val voicePace: Boolean get() = voicePaceOpt ?: true
-    val voiceHr: Boolean get() = voiceHrOpt ?: true
+    val voiceHr: Boolean get() = voiceHrOpt ?: false
     /** 1.2.2: 응원 양 "low" · "mid" · "high" */
     val voiceCheer: String get() = voiceCheerOpt ?: "low"
     /** 1.2.3: 바퀴 안내 (기본 켬) */
@@ -1045,17 +1054,29 @@ data class Settings(
     fun withVoice(v: Boolean) = copy(voiceOpt = if (v) true else null)
     fun withVoiceEvery(m: Int) = copy(voiceEveryOpt = if (m == 1000) null else m)
     fun withVoiceDist(v: Boolean) = copy(voiceDistOpt = if (v) null else false)
-    fun withVoiceTime(v: Boolean) = copy(voiceTimeOpt = if (v) null else false)
+    fun withVoiceTime(v: Boolean) = copy(voiceTimeOpt = if (v) true else null)
     fun withVoicePace(v: Boolean) = copy(voicePaceOpt = if (v) null else false)
-    fun withVoiceHr(v: Boolean) = copy(voiceHrOpt = if (v) null else false)
+    fun withVoiceHr(v: Boolean) = copy(voiceHrOpt = if (v) true else null)
     fun withVoiceCheer(v: String) = copy(voiceCheerOpt = if (v == "low") null else v)
     fun withVoiceLap(v: Boolean) = copy(voiceLapOpt = if (v) null else false)
     fun withGlow(v: GlowTheme) = copy(themeOpt = if (v == GlowTheme.Yellow) null else v.raw)
     fun withMirror(v: Boolean) = copy(mirrorOpt = if (v) null else false)
 
-    /** 1~5 */
+    /** 1.2.5: 쓸 수 있는 안정 심박 (35~100, 최대보다 20 넘게 낮을 때만) */
+    val restUsable: Int? get() = restHr?.takeIf { it in 35..100 && it + 20 < maxHR }
+
+    /** 1.2.5: 영역 경계 심박 (pct = 50 · 60 · 70 · 80 · 90 · 100). 안정 심박을 알면 안정 + (최대 − 안정) × % */
+    fun zoneBpm(pct: Int): Int {
+        val mx = maxHR.toDouble()
+        val r = restUsable ?: return Math.round(mx * pct / 100).toInt()
+        return Math.round(r + (mx - r) * pct / 100).toInt()
+    }
+
+    /** 1~5. 1.2.5: 안정 심박을 알면 애플워치 · 갤럭시 워치처럼 여유 심박 방식, 모르면 최대 심박의 % */
     fun zone(bpm: Double): Int {
-        val p = bpm / maxOf(1, maxHR)
+        val mx = maxOf(1, maxHR).toDouble()
+        val r = restUsable
+        val p = if (r != null) (bpm - r) / (mx - r) else bpm / mx
         return when {
             p >= 0.9 -> 5
             p >= 0.8 -> 4
@@ -1300,3 +1321,71 @@ data class PlannedWorkout(
     @Serializable(with = InstantIso::class) val date: Instant,
     val reminder: PlanReminder = PlanReminder.DayBefore,
 )
+
+// MARK: 1.2.5 · 최대 심박: 한 번만 튀는 값은 빼기 (아이폰 HRStat 와 같음)
+
+object HRStat {
+    /** 앞뒤 2개(5초 간격 점)의 가운데 값보다 10 넘게 높이 튄 점 하나는 최대에서 뺌 (손목 센서가 잠깐 튀는 것) */
+    fun robustMax(b: List<Int>): Int {
+        if (b.size < 3) return b.maxOrNull() ?: 0
+        var best = 0
+        for (i in b.indices) {
+            val nb = (maxOf(0, i - 2)..minOf(b.size - 1, i + 2)).filter { it != i }.map { b[it] }.sorted()
+            val mid = nb[nb.size / 2]
+            if (b[i] - mid > 10) continue
+            best = maxOf(best, b[i])
+        }
+        return if (best > 0) best else (b.maxOrNull() ?: 0)
+    }
+}
+
+// MARK: 1.2.5 · 실내 러닝 거리 고치기 (러닝머신에 나온 거리로) — 아이폰 Record.withRunDistance 와 같음
+
+/** 러닝 구간 거리 합 (m) — 워치가 잰 값, 없으면 계획 거리 */
+val Record.runMetersTotal: Double get() = segs.filter { it.kind == SegKind.Run }.sumOf { it.dist ?: runMeters(it.detail) }
+
+/** 러닝 기록의 거리를 meters 로 고쳐서 1 km 구간을 다시 나눔 (시간 · 총시간은 그대로, 구간 심박은 그 시간의 평균). 러닝 카드만 */
+fun Record.withRunDistance(meters: Double): Record? {
+    if (!isRunKind) return null
+    val runs = segs.filter { it.kind == SegKind.Run }
+    val measured = runMetersTotal
+    if (runs.isEmpty() || measured <= 0 || meters < 100 || meters > measured * 3) return null
+    val f = meters / measured
+    val pts = ArrayList<Pair<Double, Double>>().apply { add(0.0 to 0.0) }
+    var cd = 0.0
+    var ct = 0.0
+    for (s in runs) {
+        cd += (s.dist ?: runMeters(s.detail)) * f
+        ct += s.time.toDouble()
+        pts.add(cd to ct)
+    }
+    fun timeAt(d: Double): Double {
+        for (i in 1 until pts.size) if (d <= pts[i].first) {
+            val (ad, at) = pts[i - 1]
+            val (bd, bt) = pts[i]
+            return if (bd > ad) at + (bt - at) * (d - ad) / (bd - ad) else bt
+        }
+        return ct
+    }
+    val hrPts = hr.sortedBy { it.t }
+    fun avgHR(t0: Int, t1: Int): Int? {
+        val b = hrPts.filter { it.t in t0..t1 }.map { it.b }
+        return if (b.isEmpty()) null else Math.round(b.sum().toDouble() / b.size).toInt()
+    }
+    val tpl = runs[0]
+    val out = ArrayList<SegResult>()
+    var prevT = 0
+    var k = 1
+    while (k * 1000.0 <= cd + 0.5) {
+        val t = Math.round(timeAt(k * 1000.0)).toInt()
+        out.add(SegResult(tpl.icon, "KM $k", "1KM", SegKind.Run, maxOf(0, t - prevT), 0, hr = avgHR(prevT, t), dist = 1000.0))
+        prevT = t
+        k++
+    }
+    val rest = cd - (k - 1) * 1000.0
+    val restT = Math.round(ct).toInt() - prevT
+    if (rest >= 1 && restT > 0) {
+        out.add(SegResult(tpl.icon, "KM $k", "1KM", SegKind.Run, restT, 0, hr = avgHR(prevT, Math.round(ct).toInt()), dist = Math.round(rest * 10) / 10.0))
+    }
+    return copy(segs = out)
+}

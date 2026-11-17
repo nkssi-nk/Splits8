@@ -1182,5 +1182,13 @@ internal object L10nKo {
         m["OFFICIAL RESULT"] = "공식 결과"
         m["Official result"] = "공식 결과"
         m["About top %d%%"] = "대략 상위 %d%%"
+        // 1.2.5
+        m["Calculated from your max heart rate and resting heart rate, the same way as most sports watches. Heart rate colors and Z1–Z5 on your watch follow these ranges."] = "최대 심박과 안정 심박으로 운동 시계들과 같은 방식으로 계산해요. 워치의 심박 색과 Z1–Z5 표시가 이 범위를 따라요."
+        m["Resting heart rate"] = "안정 심박"
+        m["Official time"] = "공식 기록"
+        m["Treadmill distance"] = "러닝머신 거리"
+        m["Enter the distance shown on the treadmill. Splits and pace are recalculated; your time stays the same."] = "러닝머신에 나온 거리를 넣으면 구간과 페이스를 다시 계산해요. 시간은 그대로예요."
+        m["ON THE CARD"] = "카드에 넣을 것"
+        m["Write something (optional)"] = "글 쓰기 (선택)"
     }
 }

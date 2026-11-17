@@ -75,4 +75,84 @@ class OfficialTest {
         val back = SplitsJson.decodeFromString(Record.serializer(), SplitsJson.encodeToString(Record.serializer(), r))
         assertEquals(o, back.official)
     }
+    // 1.2.5 · TrainRox 한국어 화면 (서울 2026 더블 남자 — 대표님 캡처를 기기가 읽었을 모양)
+    private val koSheet = """
+이재성  김내균
+HYROX Seoul 2026
+HYROX DOUBLES MEN • AG 40-44
+1:12:46
+전체 #1141  AG #82
+달리기  스테이션  ROXZONE  페이스
+38:38  24:56  9:20  5:30/km
+35.01점  만렙형
+TRAINROX LEAGUE · 실버 #=77,518
+요약  레이스 분석  타임라인  비교
+비교  전체  AG 40-44
+스플릿  전체  러닝  스테이션
+시간  순위
+평균 페이스 /km  5:30
+러닝 1  2:52  #1496
+SkiErg  4:13  #1034
+러닝 2  4:48  #1442
+Sled Push  1:42  #380
+러닝 3  4:54  #1148
+Sled Pull  3:25  #936
+러닝 4  4:49  #1049
+BBJ  3:02  #1860
+러닝 5  5:11  #1301
+Row  4:34  #1042
+러닝 6  4:56  #1096
+Farmers C.  2:05  #2126
+러닝 7  4:47  #795
+S. Lunges  1:54  #178
+러닝 8  6:21  #1358
+Wall Balls  4:01  #1235
+    """.trimIndent()
+
+    @Test fun parseKoreanSheet() {
+        val d = OfficialParse.parse(koSheet)
+        assertEquals(72 * 60 + 46, d.total)
+        assertEquals(1141, d.rank)
+        assertEquals(82, d.ageRank)                       // "AG 40-44" 는 나이대라 순위가 아님
+        assertEquals(listOf(172, 288, 294, 289, 311, 296, 287, 381), d.runs)
+        assertEquals(listOf(253, 102, 205, 182, 274, 125, 114, 241), d.st)
+        assertEquals(560, d.rox)                          // 요약 줄의 ROXZONE 9:20
+        assertEquals("Doubles Men", d.division)
+    }
+
+    @Test fun parseByOrderWhenNamesMissing() {
+        // 막대 위 이름을 못 읽은 경우: 시간만 위에서부터 16개 → 러닝 · 스테이션 번갈아
+        val names = listOf("러닝 ", "SkiErg", "Sled", "BBJ", "Row ", "Farmers", "S. L", "Wall")
+        val noName = koSheet.lines().joinToString("\n") { l -> if (names.any { l.startsWith(it) }) l.split("  ").drop(1).joinToString("  ") else l }
+        val d = OfficialParse.parse(noName)
+        assertEquals(listOf(172, 288, 294, 289, 311, 296, 287, 381), d.runs)
+        assertEquals(listOf(253, 102, 205, 182, 274, 125, 114, 241), d.st)
+    }
+
+    @Test fun officialSkipsSegmentChecks() {
+        // 서울처럼 러닝 1 이 짧아도 공식 기록은 "확인 필요" 아님. 앱 레이스 기록도 러닝 1:30 까지는 정상
+        val d = OfficialParse.parse(koSheet)
+        val runs = d.runs.map { it!! }.toMutableList().also { it[0] = 135 }
+        val o = OfficialResult(rank = 1141, ageRank = 82, time = d.total!!, event = "Seoul 2026", division = "Doubles Men")
+        val r = OfficialParse.record(runs, d.st.map { it!! }, d.rox!!, o, Instant.parse("2026-11-15T00:00:00Z"))
+        assertNull(r.flag)
+        assertTrue(r.counts)
+        assertNull(r.copy(official = null).flag)              // 레이스: 2:15 ≥ 1:30
+        assertEquals(RecordFlag.Check, r.copy(official = null, segs = r.segs.mapIndexed { i, s -> if (i == 0) s.copy(time = 80) else s }).flag)
+    }
+
+    @Test fun robustMaxHr() {
+        assertEquals(172, HRStat.robustMax(listOf(165, 168, 170, 172, 171, 190, 170, 169)))   // 한 번 튄 190 빼기
+        assertEquals(180, HRStat.robustMax(listOf(170, 174, 177, 180, 179, 176)))             // 꾸준히 오른 180 은 그대로
+        assertEquals(150, HRStat.robustMax(listOf(150)))
+    }
+
+    @Test fun zonesWithRestingHr() {
+        val s = Settings(hrMode = "manual", manualHr = 175, restHr = 62)
+        assertEquals(listOf(130, 141, 152, 164), listOf(60, 70, 80, 90).map { s.zoneBpm(it) })   // 애플워치 화면 경계와 같음
+        assertEquals(5, s.zone(165.0))
+        assertEquals(4, s.zone(160.0))
+        val old = Settings(hrMode = "manual", manualHr = 175)
+        assertEquals(5, old.zone(160.0))                       // 안정 심박 없으면 예전처럼 최대 심박의 %
+    }
 }

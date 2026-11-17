@@ -62,6 +62,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -86,6 +87,7 @@ import com.nkssi.splits8.ui.Sym
 import com.nkssi.splits8.ui.T
 import com.nkssi.splits8.ui.W500
 import com.nkssi.splits8.ui.W600
+import com.nkssi.splits8.ui.W700
 import com.nkssi.splits8.ui.Wordmark
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -205,6 +207,10 @@ data class ShareOpts(
     /** 끄는 중인 덩어리가 옮겨진 거리 (카드 dp) */
     val dragOffset: Offset = Offset.Zero,
     val glow: GlowTheme = GlowTheme.Yellow,
+    /** 1.2.5: 카드에서 뺄 것 (Poster): "logo" · "badge" · "pb" · "place" · "date" · "partner" · "big" · "hr" · "rox" · "kcal" · "time" · "pace" */
+    val hide: Set<String> = emptySet(),
+    /** 1.2.5: 내 글 (Poster, 큰 시간 위). 빈칸이면 없음 */
+    val caption: String = "",
 ) {
     val post: Boolean get() = ratio == "post"
     val h: Float get() = if (post) 450f else 640f
@@ -494,8 +500,11 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
                     // 아주 옅은 입자: 어두운 그라데이션에 계단 같은 줄이 생기지 않게
                     FilmGrain(0.02, Modifier.fillMaxSize())
                 }
-                Glow(glowA, 0.9f, 0.45f, 0.85f, 1.0f)
-                Glow(glowB, 0.7f, 0.35f, 0f, 0.6f)
+                // 1.2.5: 노란 빛 번짐도 그라데이션을 켤 때만 (끄면 사진 그대로)
+                if (o.gradient) {
+                    Glow(glowA, 0.9f, 0.45f, 0.85f, 1.0f)
+                    Glow(glowB, 0.7f, 0.35f, 0f, 0.6f)
+                }
             }
             // 연기는 글자 덩어리 뒤에 더 짙게 모임 (덩어리를 옮기면 따라감)
             if (smokeOn) HazeBands()
@@ -534,13 +543,13 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
     fun PosterHeader() {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Mark(tb)
+                if ("logo" !in o.hide) Mark(tb)
                 if (hasNick) T(nickText, textShadow(F.t(12, W600, tc)), maxLines = 1, translate = false)
             }
             Spacer(Modifier.weight(1f).width(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (d.pb) PbPill(pillBg, tcLine, acc)
-                Box(Modifier.clip(RoundedCornerShape(50)).background(pillBg).border(1.dp, tcLine, RoundedCornerShape(50))
+                if (d.pb && "pb" !in o.hide) PbPill(pillBg, tcLine, acc)
+                if ("badge" !in o.hide) Box(Modifier.clip(RoundedCornerShape(50)).background(pillBg).border(1.dp, tcLine, RoundedCornerShape(50))
                     .padding(vertical = 5.dp, horizontal = 10.dp)) {
                     T(d.badge, F.t(11, W600, acc), maxLines = 1, translate = false)
                 }
@@ -557,19 +566,26 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
     fun PosterTime() {
         val i = o.layout.timeAlign.coerceIn(0, 2)
         val ha = listOf(Alignment.Start, Alignment.CenterHorizontally, Alignment.End)[i]
+        // 1.2.5: 넣을 것을 사람이 고름 (hide) + 내 글 (caption)
+        val hide = o.hide
+        val placeLine = listOf(if ("place" in hide) "" else d.place, if ("date" in hide) "" else d.date).filter { it.isNotEmpty() }.joinToString(" · ")
+        val stats = ArrayList<Triple<String, String, Int>>()
+        if (d.isRun) {
+            if ("time" !in hide) stats.add(Triple("TIME", d.total, 26))
+            if ("pace" !in hide) stats.add(Triple("AVG PACE", d.avgPace, 26))
+        } else {
+            if ("hr" !in hide) stats.add(Triple("AVG HR", d.avgHR, 18))
+            if (d.hasRox && "rox" !in hide) stats.add(Triple("ROXZONE", d.rox, 18))
+            if ("kcal" !in hide) stats.add(Triple("KCAL", d.kcal, 18))
+        }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = ha) {
-            T("${d.place} · ${d.date}", textShadow(F.t(13, W500, tc)), maxLines = 1, translate = false)
-            if (d.partner.isNotEmpty()) T(d.partnerText, textShadow(F.t(12, W500, tc.copy(alpha = 0.75f))), Modifier.padding(top = 2.dp), maxLines = 1, translate = false)
-            Big(if (d.isRun) d.distance else d.total, if (post) 64f else 76f, -0.045f, tc, Modifier.padding(top = 6.dp))
-            Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (d.isRun) {
-                    PosterStat("TIME", d.total, ha, 26)
-                    PosterStat("AVG PACE", d.avgPace, ha, 26)
-                } else {
-                    PosterStat("AVG HR", d.avgHR, ha)
-                    if (d.hasRox) PosterStat("ROXZONE", d.rox, ha)
-                    PosterStat("KCAL", d.kcal, ha)
-                }
+            if (o.caption.isNotEmpty()) T(o.caption, textShadow(F.t(22, W700, tc, tracking = -0.44f)), Modifier.padding(bottom = 8.dp), maxLines = 3,
+                align = listOf(TextAlign.Start, TextAlign.Center, TextAlign.End)[i], translate = false)
+            if (placeLine.isNotEmpty()) T(placeLine, textShadow(F.t(13, W500, tc)), maxLines = 1, translate = false)
+            if (d.partner.isNotEmpty() && "partner" !in hide) T(d.partnerText, textShadow(F.t(12, W500, tc.copy(alpha = 0.75f))), Modifier.padding(top = 2.dp), maxLines = 1, translate = false)
+            if ("big" !in hide) Big(if (d.isRun) d.distance else d.total, if (post) 64f else 76f, -0.045f, tc, Modifier.padding(top = 6.dp))
+            if (stats.isNotEmpty()) Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                for ((label, value, size) in stats) PosterStat(label, value, ha, size)
             }
         }
     }

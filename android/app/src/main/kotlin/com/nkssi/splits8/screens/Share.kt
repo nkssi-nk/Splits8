@@ -108,7 +108,9 @@ fun ShareView() {
     var splits by remember { mutableStateOf(true) }
     var textColor by remember { mutableStateOf("white") }
     var mono by remember { mutableStateOf(false) }   // 빌드 24: 흑백 사진은 기본 꺼짐
-    var gradient by remember { mutableStateOf(true) }
+    var gradient by remember { mutableStateOf(false) }   // 1.2.5: 처음엔 꺼짐 — 사진 원래 밝기
+    var hide by remember { mutableStateOf(emptySet<String>()) }   // 1.2.5: 카드에서 뺄 것 (Poster)
+    var caption by remember { mutableStateOf("") }                // 1.2.5: 내 글
     var nickOn by remember { mutableStateOf(true) }
     var glow by remember { mutableStateOf(Store.settings.glow) }
     var photo by remember { mutableStateOf(ShareDemo.photo) }
@@ -141,6 +143,7 @@ fun ShareView() {
     fun opts(placeholder: Boolean) = ShareOpts(
         variant, ratio, splits, photo, placeholder, textColor == "black", mono, gradient, shownNick, smokeValue, layout,
         if (placeholder) dragKey else null, if (placeholder) dragOffset else Offset.Zero, glow,
+        hide = hide, caption = caption,
     )
 
     // 저장용 그림: 화면에 보이지 않는 곳에서 3배 크기로 (1080 너비) 그려 둠
@@ -217,6 +220,8 @@ fun ShareView() {
             if (variant == "poster") MoveHint(layout != PosterLayout()) { layout = PosterLayout() }
             Seg8(listOf("story" to "Story 9:16", "post" to "Post 4:5"), ratio, track = Color(0xFF141414)) { ratio = it }
             VariantButtons(variant) { variant = it }
+            // 1.2.5: 카드에 넣을 것 고르기 + 내 글 (Poster)
+            if (variant == "poster") ShareContentCard(data, hide, caption, { k -> hide = if (k in hide) hide - k else hide + k }) { caption = it.take(60) }
             // 옵션 카드 (모서리 14, 줄 최소 48, 15pt)
             Column(Modifier.fillMaxWidth().card8(14.dp)) {
                 if (route != null) OptionRow("Route map") {
@@ -444,5 +449,46 @@ fun shareImage(ctx: Context, bmp: Bitmap, text: String? = null) {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         ctx.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}
+
+// MARK: 1.2.5 · 카드에 넣을 것 고르기 + 내 글 (아이폰 ShareView.contentCard 와 같음)
+
+/** 고를 수 있는 것: (키, 이름). 이 기록에 없는 것(PB · 파트너 · 록스존)은 안 보임 */
+private fun contentItems(d: ShareData): List<Pair<String, String>> {
+    val o = mutableListOf("logo" to "Logo", "badge" to "Division", "place" to "Event", "date" to "Date")
+    if (d.pb) o.add("pb" to "PB")
+    if (d.partner.isNotEmpty()) o.add("partner" to "Partner")
+    if (d.isRun) o += listOf("big" to "Distance", "time" to "Time", "pace" to "Avg pace")
+    else {
+        o.add("big" to "Total time")
+        o.add("hr" to "Avg HR")
+        if (d.hasRox) o.add("rox" to "Roxzone")
+        o.add("kcal" to "Kcal")
+    }
+    return o
+}
+
+@Composable
+private fun ShareContentCard(d: ShareData, hide: Set<String>, caption: String, onToggle: (String) -> Unit, onCaption: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().card8(14.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        T("ON THE CARD", F.t(11, W600, C.text3, tracking = 0.66f), maxLines = 1)
+        for (row in contentItems(d).chunked(3)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((k, name) in row) {
+                    val on = k !in hide
+                    Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(50)).background(if (on) C.accent else Color(0xFF1C1C1C))
+                        .tap { onToggle(k) }.testTag("share.show.$k"), contentAlignment = Alignment.Center) {
+                        T((if (on) "✓ " else "+ ") + name, F.t(13, W600, if (on) Color.Black else C.text2), maxLines = 1, translate = false)
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF1C1C1C)).padding(vertical = 10.dp, horizontal = 12.dp)) {
+            if (caption.isEmpty()) T("Write something (optional)", F.t(15, color = C.text3), maxLines = 1)
+            androidx.compose.foundation.text.BasicTextField(caption, onCaption, Modifier.fillMaxWidth().testTag("share.caption"), maxLines = 3,
+                textStyle = F.t(15), cursorBrush = androidx.compose.ui.graphics.SolidColor(C.accent))
+        }
     }
 }

@@ -40,7 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.nkssi.splits8.Router
 import com.nkssi.splits8.Scr
 import com.nkssi.splits8.Store
@@ -52,6 +52,8 @@ import com.nkssi.splits8.shared.OfficialResult
 import com.nkssi.splits8.shared.RaceEvent
 import com.nkssi.splits8.shared.Station
 import com.nkssi.splits8.shared.l10n
+import com.nkssi.splits8.shared.runMetersTotal
+import com.nkssi.splits8.shared.withRunDistance
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
 import com.nkssi.splits8.ui.NavBar3
@@ -150,7 +152,7 @@ fun OfficialImportSheet(ev: RaceEvent) {
         val t = secs(total) ?: return@run null
         if (!runSecs.all { it != null } || !stSecs.all { it != null }) return@run null
         val sum = runSecs.sumOf { it!! } + stSecs.sumOf { it!! } + (secs(rox) ?: 0)
-        if (abs(sum - t) <= 3) null else L10n.t("⚠ The splits add up to %@, %@ off the overall time. Please check the boxes.", Fm.t(sum), Fm.t(abs(sum - t)))
+        if (abs(sum - t) <= 15) null      // 1.2.5: 결과 사이트가 초를 반올림해서 몇 초 다를 수 있음 else L10n.t("⚠ The splits add up to %@, %@ off the overall time. Please check the boxes.", Fm.t(sum), Fm.t(abs(sum - t)))
     }
 
     fun save() {
@@ -171,7 +173,7 @@ fun OfficialImportSheet(ev: RaceEvent) {
         scope.launch {
             val text = runCatching {
                 val img = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { InputImage.fromFilePath(ctx, uri) }
-                val r = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).process(img).await()
+                val r = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())   // 1.2.5: 한글 + 영어 같이 읽음.process(img).await()
                 joinLines(r.textBlocks.flatMap { b -> b.lines.map { (it.boundingBox ?: android.graphics.Rect()) to it.text } })
             }.getOrDefault("")
             val d = OfficialParse.parse(text)
@@ -183,6 +185,7 @@ fun OfficialImportSheet(ev: RaceEvent) {
                 d.st[i]?.let { st[i] = Fm.t(it) }
             }
             d.rox?.let { rox = Fm.t(it) }
+            d.division?.let { division = it }      // 1.2.5: 화면의 디비전 (Doubles Men 등)
             note = if (d.found == 0) "Could not find a result in this image. Try a sharper screenshot, or type the times in.".l10n
                    else L10n.t("Filled %d boxes from the screenshot. Please check them.", d.found)
             reading = false
@@ -262,4 +265,37 @@ internal fun joinLines(items: List<Pair<android.graphics.Rect, String>>): String
         else lines.add(arrayListOf(it))
     }
     return lines.joinToString("\n") { l -> l.sortedBy { it.first.left }.joinToString("  ") { it.second } }
+}
+
+// MARK: 1.2.5 · 실내 러닝 거리 고치기 (러닝머신에 나온 거리로) — 아이폰 IndoorDistanceCard 와 같음
+
+/** 실내 러닝 상세 — 러닝머신 거리를 넣으면 km 구간 · 페이스를 다시 계산 (시간은 그대로) */
+@Composable
+fun IndoorDistanceCard(rec: com.nkssi.splits8.shared.Record) {
+    val imp = Store.settings.imperial
+    var text by remember(rec.id) { mutableStateOf("") }
+    val meters = text.replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { it / com.nkssi.splits8.shared.Units.distValue(1.0, imp) }
+    val canFix = meters != null && abs(meters - rec.runMetersTotal) >= 5 && rec.withRunDistance(meters) != null
+    Column(Modifier.fillMaxWidth().card8().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        T("Treadmill distance", F.t(15, W600))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(C.control).padding(vertical = 8.dp, horizontal = 12.dp)) {
+                if (text.isEmpty()) T(com.nkssi.splits8.shared.Units.dist(rec.runMetersTotal, imp), F.num(20, color = C.text3), translate = false)
+                BasicTextField(text, { v -> text = v.filter { it.isDigit() || it == '.' || it == ',' }.take(6) },
+                    Modifier.fillMaxWidth().testTag("detail.indoorDist"), singleLine = true, textStyle = F.num(20),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(C.accent))
+            }
+            T(com.nkssi.splits8.shared.Units.distUnit(imp), F.t(13, W600, C.text2), translate = false)
+            Box(Modifier.width(130.dp).height(40.dp).yellowFill(RoundedCornerShape(50), on = canFix)
+                .press(enabled = canFix, tag = "detail.fixDist") {
+                    val x = meters?.let { rec.withRunDistance(it) } ?: return@press
+                    Store.updateRecord(x, syncServer = true)
+                    Router.detail = x
+                    text = ""
+                }, contentAlignment = Alignment.Center) {
+                T("Fix distance", F.t(15, W600, if (canFix) Color.Black else C.text3), maxLines = 1)
+            }
+        }
+        T("Enter the distance shown on the treadmill. Splits and pace are recalculated; your time stays the same.", F.t(12, color = C.text3))
+    }
 }

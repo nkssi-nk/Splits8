@@ -276,7 +276,8 @@ fun Onboarding3() {
         restoreMsg = restoreMessage(text)
     }
     fun finish() {
-        Store.update { it.copy(hasOnboarded = true) }
+        // 1.2.5: 새로 깐 사람은 코치 음성 켜고 시작 (설정에서 끌 수 있음 · 예전 사용자 설정은 그대로)
+        Store.update { it.copy(hasOnboarded = true, voiceOpt = it.voiceOpt ?: true) }
         Router.returning = false
         Router.go(Scr.Home)
     }

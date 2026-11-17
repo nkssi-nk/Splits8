@@ -216,6 +216,7 @@ private fun DetailContent(rec: Record) {
     // 94번(빌드 28): 실내 러닝 — 거리는 손목 움직임 짐작값이라 빠르게 나올 수 있음 · 러닝 PB 에서 뺌
     if (rec.mode == Mode.Training && rec.isRunKind && rec.indoor == true) {
         Note8("Indoor run: distance is estimated from arm motion without GPS, so pace can look faster than it was. Indoor runs don't count toward running PBs.")
+        IndoorDistanceCard(rec)      // 1.2.5: 러닝머신 거리로 고치기
     }
     // 이 기록의 숫자로 고른 분석 2~4줄
     val ins = remember(rec, book) { Insights.make(rec, book) }
@@ -916,7 +917,9 @@ private fun SplitRow(rec: Record, s: SegResult, last: Boolean, prior: Map<String
     }
     // 93번: 무엇과 비교했는지 보이게 — 트레이닝은 이전 최고 시간을 같이 ("BEST 4:15")
     val bestNote = if (priorBest != null && runAvg == null && !partial) " · " + L10n.t("BEST %@", Fm.t(priorBest)) else ""
-    val sub = "$first · $bpm BPM$reps$runExtra$bestNote"
+    // 1.2.5: 공식 기록은 페이스 · 심박 없이 (대회장 러닝이 1 km 가 아닐 수 있음) — 스테이션은 거리 · 무게만
+    val sub = if (rec.official != null) (if (s.kind == SegKind.Run) "Official time".l10n else Units.detail(s.detail, imp))
+              else "$first · $bpm BPM$reps$runExtra$bestNote"
     // 95번: 마지막 덜 뛴 구간은 "KM 7" 대신 실제 거리로 ("마지막 0.42 km")
     val title = if (partial) L10n.t("Last %@ %@", Units.dist(s.dist ?: 0.0, imp), Units.distUnit(imp).lowercase()) else s.name
     // 1.2.2: 건너뛴 구간 — 시간 대신 "건너뜀", 차이 없음. 꾹 누르면 건너뜀 표시 / 되돌리기 (하이록스 구간만)
@@ -945,7 +948,9 @@ private fun SplitRow(rec: Record, s: SegResult, last: Boolean, prior: Map<String
                 T("Skipped", F.t(14, W500, C.text2), maxLines = 1)
             } else {
                 T(Fm.t(s.time), F.num(17, tracking = -0.17f), maxLines = 1, translate = false)
-                T(if (showDelta) Fm.d(d) else "–", F.num(11, color = if (showDelta) deltaColor(d) else C.text3), maxLines = 1, translate = false)
+                // 1.2.5: 공식 기록은 목표가 없어서 차이 칸 비움 (예전엔 "+시간" 이 빨갛게 나옴)
+                if (rec.official == null)
+                    T(if (showDelta) Fm.d(d) else "–", F.num(11, color = if (showDelta) deltaColor(d) else C.text3), maxLines = 1, translate = false)
             }
         }
     }

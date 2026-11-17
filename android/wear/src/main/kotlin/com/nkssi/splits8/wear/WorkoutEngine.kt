@@ -677,7 +677,7 @@ class WorkoutEngine(
         val start = Instant.ofEpochMilli(startMs)
         var r = Record(
             newId(), mode, title, sets, start, total, results, hrSamples.toList(),
-            kcal.roundToInt(), if (bpms.isEmpty()) 0 else bpms.sum() / bpms.size, bpms.maxOrNull() ?: 0, settings.div.name,
+            kcal.roundToInt(), if (bpms.isEmpty()) 0 else bpms.sum() / bpms.size, com.nkssi.splits8.shared.HRStat.robustMax(bpms), settings.div.name,   // 1.2.5: 튀는 값 빼기
             goal = if (mode == Mode.Race) settings.goalTime else null,
             vsWord = deltaWord, vsTarget = if (kind == null && (mode != Mode.Pft || hasPFTBest)) tg else null,
             complete = complete, endDate = start.plusSeconds(total.toLong()), place = place, kind = kind,

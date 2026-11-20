@@ -142,56 +142,76 @@ struct WeekEntryView: View {
 struct Splits8LiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: Splits8Activity.self) { ctx in
+            // 1.2.7: 바탕 = 지금 구간 색 (노랑 · 파랑 · 회색)
             LiveLockView(title: ctx.attributes.title, s: ctx.state)
-                .activityBackgroundTint(Color(hex: 0x111111))
-                .activitySystemActionForegroundColor(.white)
+                .activityBackgroundTint(ctx.state.tone.stops[1])
+                .activitySystemActionForegroundColor(ctx.state.tone.ink)
         } dynamicIsland: { ctx in
             let s = ctx.state
+            let tc: Color = s.tone == .gray ? Color(hex: 0xAEAEB2) : (s.tone == .run ? Color(hex: 0x4A9BFF) : C.accent)
             return DynamicIsland {
+                // 펼침: 아이콘 없음 — 이름(구간 색) / 무게 · 오른쪽 TOTAL 값 / 이름표 → SPLIT · GOAL · ♥ BPM → Next
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 8) {
-                        Icon8(s.segIcon, 24, tint: .yellow)
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(s.segName).font(F.t(15, .semibold)).lineLimit(1)
-                            Text(s.segDetail).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1)
-                        }
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(s.segName).font(F.t(18, .bold)).foregroundStyle(tc).lineLimit(1)
+                        Text(s.segDetail).font(F.t(11, .semibold)).foregroundStyle(C.text2).lineLimit(1)
                     }
+                    .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    LiveClock(start: s.segStart, paused: s.paused, fixed: s.segSec)
-                        .font(F.num(28)).foregroundStyle(C.accent)
-                        .multilineTextAlignment(.trailing).frame(maxWidth: 100, alignment: .trailing)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        LiveClock(start: s.totalStart, paused: s.paused, fixed: s.totalSec)
+                            .font(F.num(18, .semibold)).multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 100, alignment: .trailing)
+                        Text("TOTAL".l10n).font(F.t(10, .bold)).foregroundStyle(C.text2)
+                    }
+                    .padding(.trailing, 4)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 8) {
-                        if s.count > 0 { LiveProgress(idx: s.idx, count: s.count, fraction: s.progress) }
-                        HStack(spacing: 6) {
-                            Text("TOTAL").font(F.t(10, .semibold)).foregroundStyle(C.text2)
-                            LiveClock(start: s.totalStart, paused: s.paused, fixed: s.totalSec)
-                                .font(F.num(14)).frame(maxWidth: 70, alignment: .leading)
-                            if s.hr > 0 {
-                                Image(systemName: "heart.fill").font(.system(size: 10)).foregroundStyle(C.hr)
-                                Text("\(s.hr)").font(F.num(14))
+                        HStack(spacing: 0) {
+                            islandCell("SPLIT".l10n) {
+                                LiveClock(start: s.segStart, paused: s.paused, fixed: s.segSec).foregroundStyle(tc)
                             }
-                            Spacer(minLength: 4)
-                            if let n = s.nextName {
-                                Text("NEXT").font(F.t(10, .semibold)).foregroundStyle(C.text2)
-                                if let i = s.nextIcon { Icon8(i, 13, tint: .white) }
-                                Text(n).font(F.t(13, .semibold)).lineLimit(1)
+                            if let g = s.segTarget, g > 0, s.segIcon != "run", s.segIcon != "rest" {
+                                islandCell((s.goalWord ?? "GOAL").l10n) { Text(Fm.t(g)) }
+                            }
+                            if s.hr > 0 {
+                                islandCell("♥ " + "BPM".l10n) { Text("\(s.hr)") }
+                            }
+                        }
+                        if let n = s.nextName {
+                            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                Text("Next".l10n).font(F.t(11, .semibold)).foregroundStyle(C.text2)
+                                Text(n).font(F.t(13, .bold)).lineLimit(1)
                             }
                         }
                     }
                 }
             } compactLeading: {
-                Icon8(s.segIcon, 18, tint: .yellow)
+                // 접힘: 여기만 아이콘 (구간 색) + SPLIT
+                HStack(spacing: 4) {
+                    Icon8(s.segIcon, 16, tc)
+                    LiveClock(start: s.segStart, paused: s.paused, fixed: s.segSec)
+                        .font(F.num(13, .semibold)).foregroundStyle(tc)
+                        .frame(maxWidth: 46)
+                }
             } compactTrailing: {
-                LiveClock(start: s.segStart, paused: s.paused, fixed: s.segSec)
-                    .font(F.num(14)).foregroundStyle(C.accent)
-                    .frame(maxWidth: 52)
+                LiveClock(start: s.totalStart, paused: s.paused, fixed: s.totalSec)
+                    .font(F.num(13, .semibold))
+                    .frame(maxWidth: 56)
             } minimal: {
-                Icon8(s.segIcon, 16, tint: .yellow)
+                Icon8(s.segIcon, 16, tc)
             }
-            .keylineTint(C.accent)
+            .keylineTint(tc)
         }
+    }
+
+    private func islandCell<V: View>(_ label: String, @ViewBuilder value: () -> V) -> some View {
+        VStack(spacing: 1) {
+            Text(label).font(F.t(10, .bold)).foregroundStyle(C.text2).lineLimit(1)
+            value().font(F.num(24, .semibold)).multilineTextAlignment(.center).lineLimit(1).minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity)
     }
 }

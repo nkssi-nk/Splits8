@@ -11,7 +11,9 @@ enum WatchDemo {
         return nil
     }
     static var enabled: Bool { shot != nil }
-    static var page: Int { shot == "controls" ? 1 : (shot == "segments" ? 2 : 0) }
+    /// 1.2.7: 조작 화면은 오른쪽으로 밀면 덮이는 화면 (페이지 아님). "segments" = 크라운 1칸(목표 대비), "stats" = 2칸
+    static var page: Int { shot == "segments" || shot == "goal" ? 1 : (shot == "stats" ? 2 : 0) }
+    static var controls: Bool { shot == "controls" }
 
     static func apply() {
         guard let name = shot else { return }
@@ -44,7 +46,7 @@ enum WatchDemo {
             // 끝 화면은 PFT 로 확인 (등급 뱃지 + 최고 기록 대비가 같이 나오는 가장 꽉 찬 모양)
             let seq = PFT.seq(div: s.div, targets: ctx.pftBest)
             engine.demoRun(mode: .pft, title: PFT.title, seq: seq, idx: 0, elapsed: 0, hr: 171, done: true, vsBest: true)
-        case "live", "controls", "segments", "end":
+        case "live", "controls", "segments", "goal", "stats", "end":
             let seq = SeqBuilder.full(div: s.div, rox: true, targets16: Defaults.goals)
             engine.demoRun(mode: .race, title: "Incheon", seq: seq, idx: 6, elapsed: 74, hr: 162, done: false)
         case "summary_training":

@@ -78,17 +78,17 @@ struct WRoot: View {
     }
 }
 
-/// 넘어간 화면의 바탕 (워치 기본 내비게이션 바탕 자리에 노란 빛)
+/// 넘어간 화면의 바탕 — 1.2.7: 검정 + 테마 빛 색(아이폰 설정 > Theme) 흐린 덩어리. 화면마다 다른 자리 (seed)
 struct WNavBG: ViewModifier {
-    let a: Ambient
+    let seed: Int
     func body(content: Content) -> some View {
         content.containerBackground(for: .navigation) {
-            ZStack { Color.black; AmbientLayer(a: a) }
+            W8MenuBackground(seed: seed)
         }
     }
 }
 extension View {
-    func wNavBG(_ a: Ambient) -> some View { modifier(WNavBG(a: a)) }
+    func wNavBG(_ seed: Int) -> some View { modifier(WNavBG(seed: seed)) }
 }
 
 // MARK: - 시작 전 3 · 2 · 1
@@ -100,16 +100,21 @@ struct WCountdown: View {
 
     var body: some View {
         ZStack {
-            AmbientLayer(a: Ambient.y(0.30, 1.0, 0.6, 0.5, 0.5))
+            W8MenuBackground(seed: 5)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
+                // 1.2.7: 노란 숫자 + 귀퉁이 표시
                 Text(verbatim: "\(n)")
-                    .font(F.num(96, .bold)).foregroundStyle(C.accent)
+                    .font(F.num(110, .bold)).foregroundStyle(C.accent)
+                    .lineLimit(1).minimumScaleFactor(0.6)
                     .contentTransition(.numericText(countsDown: true))
                     .animation(.snappy(duration: 0.25), value: n)
+                    .frame(width: 150, height: 130)
+                    .overlay(W8Brackets(arm: 11).stroke(Color.white.opacity(0.47), style: StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round)))
+                    .padding(.top, 20)
                     .accessibilityIdentifier("w.count")
                 Spacer(minLength: 0)
-                Text("Tap to cancel").font(F.t(13)).foregroundStyle(C.text3)
+                Text("Tap to cancel").font(F.t(12, .medium)).foregroundStyle(C.text3)
                     .lineLimit(1).minimumScaleFactor(0.8)
                     .padding(.bottom, 14)
             }
@@ -133,7 +138,10 @@ struct WCardBG: ViewModifier {
     }
 }
 extension View {
-    func wCard(_ r: CGFloat = 14) -> some View { modifier(WCardBG(radius: r)) }
+    /// 1.2.7: 워치 카드도 맑은 유리 (흰 12% + 위쪽 옅은 빛 + 그림자)
+    func wCard(_ r: CGFloat = 14) -> some View {
+        background(W8Glass(shape: RoundedRectangle(cornerRadius: r, style: .continuous), fill: Color.white.opacity(0.12), rim: 0.45))
+    }
 }
 
 /// ‹ 제목  (padding 은 부르는 쪽에서)
@@ -234,7 +242,7 @@ struct WHome: View {
                 Wordmark(size: 12)
             }
         }
-        .wNavBG(Ambient.y(0.22, 0.9, 0.4, 0.5, -0.06))
+        .wNavBG(11)
     }
 
     /// 카드 하나 = 위아래 여백 × 2 + 22(아이콘 · 버튼). 기본 여백 9 · 간격 6, 모자라면 여백 4 · 간격 3 까지 줄임
@@ -257,7 +265,7 @@ struct WHome: View {
         VStack(spacing: gap) {
             ForEach(Mode.allCases) { m in
                 Button { open(m) } label: { card(m, pad: pad) }
-                    .buttonStyle(.plain)
+                    .buttonStyle(W8Press())
                     .accessibilityIdentifier("w.mode." + m.rawValue)
             }
         }
@@ -268,7 +276,7 @@ struct WHome: View {
     private func action(_ m: Mode) -> some View {
         if m == .training {
             ZStack {
-                Circle().fill(Color(hex: 0x262626))
+                W8Glass(shape: Circle(), fill: Color.white.opacity(0.14), rim: 0.5)
                 Icon8("i_chevRw", 10, C.accent)
             }
             .frame(width: 22, height: 22)
@@ -276,7 +284,7 @@ struct WHome: View {
         } else {
             // ▶ 는 9 → 12 (동그라미 22 그대로). 세모는 정가운데면 왼쪽으로 쏠려 보여서 오른쪽으로 1pt
             ZStack {
-                Circle().fill(C.accent)
+                W8Glass(shape: Circle(), fill: Color(hex: 0xFFDC14).opacity(0.84), rim: 0.47, gloss: 0.27)
                 Icon8("i_play", 12, .black)
                     .offset(x: 1)
             }
@@ -298,7 +306,7 @@ struct WHome: View {
         }
         .padding(.vertical, pad).padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .wCard(18)
+        .background(W8Glass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous), fill: Color.white.opacity(0.12), rim: 0.45))
     }
 
     private func open(_ m: Mode) {
@@ -317,6 +325,7 @@ struct WPrograms: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 6) {
+                W8MenuTitle(title: "Training").padding(.bottom, 6)
                 quickCard
                 ForEach(store.programs) { p in
                     Button { nav.program = p; nav.screen = .confirm } label: { programCard(p) }
@@ -329,8 +338,7 @@ struct WPrograms: View {
             }
             .padding(.horizontal, 12).padding(.bottom, 8)
         }
-        .navigationTitle(Text("Training".l10n))
-        .wNavBG(Ambient.y(0.16, 0.7, 0.45, 1.0, 0))
+        .wNavBG(23)
     }
 
     private var quickCard: some View {
@@ -342,9 +350,10 @@ struct WPrograms: View {
             }
             .foregroundStyle(.black)
             .padding(.vertical, 10).padding(.horizontal, 12)
-            .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(W8Glass(shape: RoundedRectangle(cornerRadius: 14, style: .continuous),
+                                fill: Color(hex: 0xFFDC14).opacity(0.84), rim: 0.47, gloss: 0.27))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(W8Press())
         .accessibilityIdentifier("w.quick")
     }
 
@@ -379,6 +388,7 @@ struct WQuick: View {
             let stH: CGFloat = ((h - runH - gap * 2) / 2).rounded(.down)
             ScrollView {
                 VStack(spacing: gap) {
+                    W8MenuTitle(title: "Quick training").padding(.bottom, 4)
                     runGrid(runH)
                     stationGrid(stH)
                     below
@@ -388,8 +398,7 @@ struct WQuick: View {
             }
             .overlay(alignment: .bottom) { toastView }
         }
-        .navigationTitle(Text("Quick training".l10n))
-        .wNavBG(Ambient.y(0.16, 0.7, 0.45, 0, 0))
+        .wNavBG(31)
     }
 
     private func add(_ q: ProgItem) {
@@ -493,12 +502,12 @@ struct WQuick: View {
 
     private func smallButton(_ t: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(t.l10n).font(F.t(13, .semibold)).foregroundStyle(C.bad)
+            Text(t.l10n).font(F.t(13, .semibold)).foregroundStyle(.white)
                 .lineLimit(1).minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity).frame(height: 32)
-                .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(W8Glass(shape: Capsule(), fill: Color.white.opacity(0.13), rim: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(W8Press())
     }
 
     private func chip(_ q: ProgItem) -> some View {
@@ -507,22 +516,15 @@ struct WQuick: View {
             Text(chipLabel(q)).font(F.t(12, .semibold)).lineLimit(1).minimumScaleFactor(0.85)
         }
         .padding(.vertical, 2).padding(.horizontal, 5)
-        .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 
     /// 60번: "시작 · 3구간" (16 은 다 찼을 때만 안내)
     private var startButton: some View {
-        Button {
+        W8PrimaryButton(title: String(format: "Start · %lld segments".l10n, nav.quick.count)) {
             let p = store.saveQuick(nav.quick)
             nav.program = p; nav.quick = []; nav.screen = .confirm
-        } label: {
-            Text("Start · \(nav.quick.count) segments")
-                .font(F.t(16, .semibold)).foregroundStyle(.black)
-                .lineLimit(1).minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity).frame(height: 36)
-                .background(C.accent, in: Capsule())
         }
-        .buttonStyle(.plain)
         .accessibilityIdentifier("w.quickStart")
     }
 
@@ -552,6 +554,9 @@ struct WConfirm: View {
 
     var body: some View {
         VStack(spacing: 0) {
+                // 1.2.7: 제목은 시계 줄 아래 가운데 (뒤로 가기 버튼과 떨어지게)
+                W8MenuTitle(title: mode == .training ? program.name : mode.name)
+                    .frame(height: 24).padding(.bottom, 4)
                 if mode == .training && program.isOpen {
                     openInfo
                 } else if mode == .pft {
@@ -572,8 +577,7 @@ struct WConfirm: View {
                 }
         }
         .padding(.bottom, 4)
-        .navigationTitle(Text((mode == .training ? program.name : mode.name).l10n))
-        .wNavBG(Ambient.y(0.22, 1.1, 0.5, 0.5, 1.08))
+        .wNavBG(47)
     }
 
     private var trainingList: some View {
@@ -669,34 +673,29 @@ struct WConfirm: View {
     }
 
     /// 빌드 27 (71-1): Full Sim 은 맨 위 제목과 겹치던 큰 제목을 빼고 목표 시간을 크게. 목표를 누르면 워치에서 바로 바꿈(68-①)
+    /// 1.2.7: 대회 이름(17 Bold) · 날짜 · Division → 14 → 귀퉁이 표시 블록 [GOAL 1:20:00] (Full Sim 은 TAP TO CHANGE)
     private var simple: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 0) {
             if mode == .race {
                 Text(ev.name)
-                    .font(F.t(18, .semibold)).tracking(-0.36)
-                    .multilineTextAlignment(.center).lineLimit(2)
+                    .font(F.t(17, .bold))
+                    .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+                    .padding(.bottom, 8)
             }
-            Text(small).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+            Text(small).font(F.t(12, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+                .padding(.bottom, 14)
             if mode == .sim {
                 Button { goalSheet = true } label: {
-                    VStack(spacing: 2) {
-                        HStack(spacing: 4) {
-                            Text(goal).font(F.num(34)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.85)
-                            Image(systemName: "pencil").font(.system(size: 13, weight: .semibold)).foregroundStyle(C.accent)
-                        }
-                        Text(goalWord.l10n).font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
-                    }
-                    .contentShape(Rectangle())
+                    W8BigBlock(label: goalWord, value: goal, word: "TAP TO CHANGE")
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
+                .buttonStyle(W8Press())
                 .accessibilityIdentifier("w.simGoal")
             } else {
-                Text(goal).font(F.num(30)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.85).padding(.top, 8)
-                Text(goalWord.l10n).font(F.t(12, .semibold)).tracking(0.9).foregroundStyle(C.text2)
+                W8BigBlock(label: goalWord, value: goal)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $goalSheet) { WGoalPicker() }
     }
@@ -709,7 +708,7 @@ struct WConfirm: View {
             runButton(indoor: false, main: !cardIndoor)
             runButton(indoor: true, main: cardIndoor)
         }
-        .padding(.horizontal, 14).padding(.top, 6)
+        .padding(.horizontal, 12).padding(.top, 6)
     }
 
     private func runButton(indoor: Bool, main: Bool) -> some View {
@@ -720,21 +719,18 @@ struct WConfirm: View {
             }
             .foregroundStyle(main ? .black : .white)
             .frame(maxWidth: .infinity).frame(height: 44)
-            .background(main ? C.accent : Color(hex: 0x262626), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(W8Glass(shape: RoundedRectangle(cornerRadius: 22, style: .continuous),
+                                fill: main ? Color(hex: 0xFFDC14).opacity(0.84) : Color.white.opacity(0.13),
+                                rim: main ? 0.47 : 0.5, gloss: main ? 0.27 : 0))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(W8Press())
         .accessibilityIdentifier(indoor ? "w.startIndoor" : "w.startOutdoor")
     }
 
     private var startButton: some View {
-        Button { start() } label: {
-            Text("Start").font(F.t(14, .semibold)).foregroundStyle(.black)
-                .frame(maxWidth: .infinity).frame(height: (mode == .training || mode == .pft) ? 36 : 44)
-                .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 14).padding(.top, 6)
-        .accessibilityIdentifier("w.start")
+        W8PrimaryButton(title: "Start", icon: "play.fill") { start() }
+            .padding(.horizontal, 12).padding(.top, 6)
+            .accessibilityIdentifier("w.start")
     }
 
     private var small: String {
@@ -789,7 +785,7 @@ struct WGoalPicker: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Text("Goal time").font(F.t(13, .semibold)).foregroundStyle(C.text2)
+            W8MenuTitle(title: "Goal time")
             Picker("", selection: $minutes) {
                 ForEach(Self.range, id: \.self) { v in
                     Text(Fm.t(v * 60)).font(F.num(22)).tag(v)
@@ -797,15 +793,10 @@ struct WGoalPicker: View {
             }
             .pickerStyle(.wheel)
             .frame(height: 70)
-            Button {
+            W8PrimaryButton(title: "Set") {
                 store.watchGoal = minutes * 60
                 dismiss()
-            } label: {
-                Text("Set").font(F.t(14, .semibold)).foregroundStyle(.black)
-                    .frame(maxWidth: .infinity).frame(height: 36)
-                    .background(C.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .buttonStyle(.plain)
             if store.watchGoal != nil {
                 Button {
                     store.watchGoal = nil
@@ -817,6 +808,7 @@ struct WGoalPicker: View {
             }
         }
         .padding(.horizontal, 8)
+        .containerBackground(for: .navigation) { W8MenuBackground(seed: 53) }
         .onAppear {
             let cur: Int = store.watchGoal ?? store.simTargets.reduce(0, +) + 8 * store.settings.roxTarget
             minutes = min(180, max(45, Int((Double(cur) / 60).rounded())))

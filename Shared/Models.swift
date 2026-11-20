@@ -397,8 +397,10 @@ struct ProgItem: Codable, Hashable {
 
     /// 1.2.1: 트레이닝에도 Roxzone 을 종목처럼 넣을 수 있음 (대표님 10-30)
     var isRox: Bool { icon == "roxzone" }
-    func name() -> String { icon == "run" ? "Run" : isRox ? "Roxzone" : (Station.of(icon)?.name ?? icon) }
-    func detail(_ d: Division) -> String { icon == "run" ? (run ?? "1KM") : isRox ? "Transition" : (Station.of(icon)?.detail(d) ?? "") }
+    /// 1.2.7: 휴식(Rest) — 정한 시간 없이 재기만 함. 사용자가 다음으로 넘길 때까지 (대표님 11-20)
+    var isRest: Bool { icon == "rest" }
+    func name() -> String { icon == "run" ? "Run" : isRox ? "Roxzone" : isRest ? "Rest" : (Station.of(icon)?.name ?? icon) }
+    func detail(_ d: Division) -> String { icon == "run" ? (run ?? "1KM") : isRox ? "Transition" : isRest ? "" : (Station.of(icon)?.detail(d) ?? "") }
 }
 
 struct Program: Codable, Hashable, Identifiable {
@@ -525,7 +527,8 @@ enum ProgramLink {
                 guard Defaults.runs.contains(label) else { return nil }
                 seq.append(ProgItem(icon: "run", run: label))
             } else {
-                guard Station.of(x) != nil else { return nil }
+                // 1.2.7: Roxzone · Rest 도 받음 (예전엔 Roxzone 이 들어간 트레이닝 링크를 거부했음)
+                guard Station.of(x) != nil || x == "roxzone" || x == "rest" else { return nil }
                 seq.append(ProgItem(icon: x))
             }
         }
@@ -805,7 +808,7 @@ struct Record: Codable, Hashable, Identifiable {
         guard mode == .pft, counts else { return nil }
         return PFT.grade(total)
     }
-    var roxTotal: Int { segs.filter { $0.kind == .rox }.map(\.time).reduce(0, +) }
+    var roxTotal: Int { segs.filter { $0.kind == .rox && $0.icon != "rest" }.map(\.time).reduce(0, +) }   // 1.2.7: 휴식은 Roxzone 합계에서 뺌
     var runs: [SegResult] { segs.filter { $0.kind == .run } }
     var runTotal: Int { runs.map(\.time).reduce(0, +) }
     var stationTotal: Int { segs.filter { $0.kind == .st }.map(\.time).reduce(0, +) }
@@ -1153,11 +1156,14 @@ enum SeqBuilder {
     /// Full Simulation / Race: Run i, Roxzone, Station, Roxzone … (마지막 스테이션 뒤 Roxzone 없음)
     static func full(div: Division, rox: Bool, targets16: [Int], roxTarget: Int = Defaults.roxTarget) -> [Seg] {
         var o: [Seg] = []
+        // 1.2.7: Roxzone 을 끄면 이동 시간은 다음 구간에 들어감 → 목표도 그만큼 더함
+        // (러닝 뒤 이동 → 스테이션, 스테이션 뒤 이동 → 다음 러닝)
+        let add: Int = rox ? 0 : roxTarget
         for i in 0..<8 {
-            o.append(Seg(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, target: targets16[i * 2]))
+            o.append(Seg(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, target: targets16[i * 2] + (i > 0 ? add : 0)))
             if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
             let s = Station.all[i]
-            o.append(Seg(icon: s.key, name: s.name, detail: s.detail(div), kind: .st, target: targets16[i * 2 + 1]))
+            o.append(Seg(icon: s.key, name: s.name, detail: s.detail(div), kind: .st, target: targets16[i * 2 + 1] + add))
             if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
         }
         return o
@@ -1190,6 +1196,11 @@ enum SeqBuilder {
                     o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget))
                     continue
                 }
+                // 1.2.7: 휴식 — 회색 구간, 목표 없음(재기만), 최고 기록에 안 섞임
+                if it.isRest {
+                    o.append(Seg(icon: "rest", name: "Rest", detail: "", kind: .rox, target: 0))
+                    continue
+                }
                 let d = it.detail(div)
                 let key = SegKey.of(icon: it.icon, detail: d)
                 // 최고 기록이 아직 없으면 0 (= 비교 안 함). 예전에는 기본 목표와 비교해서 헷갈렸음
@@ -1208,7 +1219,7 @@ enum SegKey {
     /// 최고 기록으로 써도 되는 시간인지 (너무 빠른 시험용 탭은 빼기)
     /// 러닝: 1KM 2:30 기준으로 거리 비례 · 스테이션: 30초 · 인터벌: 제외
     static func plausible(icon: String, detail: String, time: Int) -> Bool {
-        if icon == "hiit" || icon == WKind.strengthIcon || icon == "roxzone" { return false }
+        if icon == "hiit" || icon == WKind.strengthIcon || icon == "roxzone" || icon == "rest" { return false }
         if icon == "run" {
             let m = runMeters(detail)
             return Double(time) >= Double(Record.minRun) * m / 1000

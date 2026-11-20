@@ -379,6 +379,15 @@ struct LiveCardState: Codable, Hashable {
     var kcal: Int
     var reconnecting: Bool = false
     var finished: Bool = false
+    /// 1.2.7: 지금 구간 목표 (GOAL · BEST 칸, 0 · nil = 없음) · 이름표 ("GOAL" / "BEST")
+    var segTarget: Int? = nil
+    var goalWord: String? = nil
+
+    /// 1.2.7: 구간 색 (워치 · 폰 운동 중 화면과 같은 뜻) — Roxzone · 휴식 회색, 러닝 파랑, 그 외 노랑
+    var tone: W8Tone {
+        if segIcon == "roxzone" || segIcon == "rest" { return .gray }
+        return segIcon == "run" ? .run : .station
+    }
 }
 
 /// 한 줄 막대 + 지금 자리에 빛나는 점 (A안 · 52번 진행 표시)
@@ -419,46 +428,84 @@ struct LiveClock: View {
     }
 }
 
-/// 잠금 화면 카드 (다이내믹 아일랜드를 길게 눌렀을 때도 같은 내용)
+/// 1.2.7 잠금 화면 카드 (B안, 대표님 11-20): 바탕 = 지금 구간 색 + 흐린 덩어리, 종목 아이콘 없음.
+/// 위 줄: 왼쪽 [이름 18 Bold / 무게 · 거리 12] · 오른쪽 [TOTAL 값 18 / "TOTAL" 11] — 좌우 두 줄 대칭.
+/// 가운데: SPLIT · GOAL · ♥ BPM (러닝은 GOAL 대신 없음) 값 32. 아래: 진행 점 (왼쪽) · Next 이름 (오른쪽).
 struct LiveLockView: View {
     let title: String
     let s: LiveCardState
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Wordmark(size: 13)
+        let t: W8Tone = s.tone
+        VStack(spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(s.reconnecting ? "Reconnecting…".l10n : s.segName).font(F.t(18, .bold)).foregroundStyle(t.ink).lineLimit(1)
+                    Text(s.segDetail.isEmpty ? title.l10n : s.segDetail).font(F.t(12, .semibold)).foregroundStyle(t.sub).lineLimit(1)
+                }
                 Spacer(minLength: 8)
-                Text(title.l10n + (s.count > 0 ? " · \(min(s.idx + 1, s.count)) / \(s.count)" : ""))
-                    .font(F.t(11, .medium)).foregroundStyle(C.text2).lineLimit(1)
-            }
-            HStack(alignment: .center, spacing: 10) {
-                Icon8(s.segIcon, 26, tint: .yellow)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(s.reconnecting ? "Reconnecting…".l10n : s.segName).font(F.t(16, .semibold)).foregroundStyle(.white).lineLimit(1)
-                    Text(s.segDetail).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1)
+                VStack(alignment: .trailing, spacing: 2) {
+                    LiveClock(start: s.totalStart, paused: s.paused, fixed: s.totalSec)
+                        .font(F.num(18, .semibold)).foregroundStyle(t.ink)
+                        .multilineTextAlignment(.trailing).frame(maxWidth: 110, alignment: .trailing)
+                    Text("TOTAL".l10n).font(F.t(11, .bold)).tracking(0.8).foregroundStyle(t.label)
                 }
-                Spacer(minLength: 4)
-                LiveClock(start: s.segStart, paused: s.paused, fixed: s.segSec)
-                    .font(F.num(32)).foregroundStyle(s.paused ? C.text2 : C.accent)
-                    .multilineTextAlignment(.trailing).frame(maxWidth: 120, alignment: .trailing)
             }
-            if s.count > 0 { LiveProgress(idx: s.idx, count: s.count, fraction: s.progress) }
-            HStack(spacing: 6) {
-                Text("TOTAL".l10n).font(F.t(10, .semibold)).foregroundStyle(C.text2)
-                LiveClock(start: s.totalStart, paused: s.paused, fixed: s.totalSec)
-                    .font(F.num(14)).foregroundStyle(.white).frame(maxWidth: 70, alignment: .leading)
+            Spacer(minLength: 6)
+            HStack(spacing: 0) {
+                cell("SPLIT".l10n, t) {
+                    LiveClock(start: s.segStart, paused: s.paused, fixed: s.segSec)
+                }
+                if let g = s.segTarget, g > 0, s.segIcon != "run", s.segIcon != "rest" {
+                    cell((s.goalWord ?? "GOAL").l10n, t) { Text(Fm.t(g)) }
+                }
                 if s.hr > 0 {
-                    Image(systemName: "heart.fill").font(.system(size: 10)).foregroundStyle(C.hr)
-                    Text("\(s.hr)").font(F.num(14)).foregroundStyle(.white)
+                    cell("♥ " + "BPM".l10n, t) { Text("\(s.hr)") }
                 }
+            }
+            Spacer(minLength: 6)
+            HStack(spacing: 8) {
+                if s.count > 1 { dots(t) }
                 Spacer(minLength: 4)
                 if let n = s.nextName {
-                    Text("NEXT".l10n).font(F.t(10, .semibold)).foregroundStyle(C.text2)
-                    if let i = s.nextIcon { Icon8(i, 13, tint: .white) }
-                    Text(n).font(F.t(13, .semibold)).foregroundStyle(.white).lineLimit(1)
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text("Next".l10n).font(F.t(12, .semibold)).foregroundStyle(t.label)
+                        Text(n).font(F.t(14, .bold)).foregroundStyle(t.ink).lineLimit(1)
+                    }
                 }
             }
         }
-        .padding(16)
+        .padding(.horizontal, 18).padding(.vertical, 14)
+        .background {
+            ZStack {
+                LinearGradient(colors: t.stops, startPoint: .top, endPoint: .bottom)
+                W8Blobs(seed: s.idx &+ 7, color: t.blob, alpha: t == .station ? 0.38 : 0.22, blurPt: 22)
+            }
+        }
+    }
+
+    private func cell<V: View>(_ label: String, _ t: W8Tone, @ViewBuilder value: () -> V) -> some View {
+        VStack(spacing: 2) {
+            Text(label).font(F.t(11, .bold)).tracking(0.6).foregroundStyle(t.label).lineLimit(1)
+            value()
+                .font(F.num(32, .semibold)).foregroundStyle(t.ink)
+                .multilineTextAlignment(.center)
+                .lineLimit(1).minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func dots(_ t: W8Tone) -> some View {
+        let n: Int = min(s.count, 24)
+        let cur: Int = min(max(0, s.idx), n - 1)
+        return HStack(spacing: n > 10 ? 3.5 : 6) {
+            ForEach(0..<n, id: \.self) { i in
+                if i == cur {
+                    Capsule().fill(t.ink).frame(width: 11, height: 4)
+                } else {
+                    Circle().fill(i < cur ? t.ink : t.dotOff).frame(width: 4, height: 4)
+                }
+            }
+        }
     }
 }

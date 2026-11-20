@@ -825,12 +825,12 @@ struct PhoneLiveView: View {
 
     var body: some View {
         GeometryReader { g in
-            let m = PhoneLiveMetrics(height: g.size.height)
-            content(m)
+            content(PL(w: g.size.width, h: g.size.height))
                 .frame(width: g.size.width, height: g.size.height)
         }
+        .ignoresSafeArea()
         .overlay {
-            C.accent.opacity(flash * 0.22)
+            Color.white.opacity(flash * 0.32)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
         }
@@ -867,60 +867,58 @@ struct PhoneLiveView: View {
         }
     }
 
-    private func content(_ m: PhoneLiveMetrics) -> some View {
-        VStack(spacing: 0) {
-            // 빌드 24: 제목 / ● iPhone · No HR / n / 16 / 막대 (워치 같이 보기 화면과 같은 머리)
-            LiveHeader(f: frame(Date()), status: "iPhone · No HR", live: false, idPrefix: "phone")
-            if eng.isNewKind {
-                // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 — 큰 남은 시간 화면
-                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-                    TimerLiveBody(f: timerFace(ctx.date), total: eng.total(ctx.date), m: m,
-                                  pace: eng.runLike && eng.useGPS ? LivePace.text(el: eng.segEl(ctx.date), dist: eng.segDist,
-                                                                                  imperial: false, speed: eng.speedNow(ctx.date)) : nil,
-                                  paceColor: paceColor(ctx.date))
-                }
-                .padding(.top, m.top * 0.6)
-            } else if eng.isRunKind {
-                // 1.2.3: 러닝 카드는 구간 목록 페이지 없이 한 화면 (KM 1 · KM 2 목록 = 구간 넘김 흔적 — 대표님 11-10)
-                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-                    LiveBody(f: frame(ctx.date), m: m, idPrefix: "phone")
-                }
-                .padding(.top, m.top * 0.6)
-            } else {
-                // 1.2.2: 워치처럼 왼쪽으로 넘기면 구간 목록 (끝난 구간 = 내 시간 + 비교 기준과 차이, 남은 구간 = 기준 시간)
+    /// 1.2.7: 3장 (운동 · 목표 대비 · 구간 목록) — 맨 위 · 아래 버튼은 세 장 모두 같은 자리
+    private func content(_ L: PL) -> some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+            let f: LiveFrame = frame(ctx.date)
+            let tf: TimerFace? = eng.isNewKind ? timerFace(ctx.date) : nil
+            let tone: W8Tone = tf.map { TimerLiveBody.tone($0, kind: eng.kind ?? "") } ?? f.tone
+            ZStack {
+                LiveBackground(tone: tone, zone: 0, seed: eng.isRunKind ? 1 : eng.idx)
                 TabView(selection: $page) {
-                    VStack(spacing: 0) {
-                        TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-                            LiveBody(f: frame(ctx.date), m: m, idPrefix: "phone")
+                    Group {
+                        if let tf {
+                            TimerLiveBody(f: tf, L: L, kind: eng.kind ?? "", seq: eng.seq, idx: eng.idx,
+                                          pace: eng.runLike && eng.useGPS ? LivePace.text(el: eng.segEl(ctx.date), dist: eng.segDist,
+                                                                                          imperial: false, speed: eng.speedNow(ctx.date)) : nil)
+                        } else {
+                            LiveMain(f: f, L: L, idPrefix: "phone")
                         }
-                        .padding(.top, m.top * 0.6)
-                        if !eng.isRunKind { LiveNextRow(next: eng.nextSeg, m: m) }     // 1.2.2: 러닝 카드는 "NEXT KM 10" 안 보여 줌
-                        Spacer(minLength: 0)
                     }
+                    .frame(width: L.w, height: L.h)
                     .tag(0)
-                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                        PhoneSegmentList(seq: eng.seq, idx: eng.idx, splits: eng.splits, skipped: eng.skippedIdx,
-                                         segEl: eng.segEl(ctx.date), word: eng.deltaWord, m: m)
+                    if !eng.isNewKind {
+                        LiveGoalPage(f: f, L: L)
+                            .frame(width: L.w, height: L.h)
+                            .tag(1)
                     }
-                    .tag(1)
+                    if !eng.isNewKind && !eng.isRunKind {
+                        LiveSegmentList(L: L, tone: tone, seq: eng.seq, idx: eng.idx, splits: eng.splits, skipped: eng.skippedIdx,
+                                        segEl: eng.segEl(ctx.date), word: eng.deltaWord)
+                            .frame(width: L.w, height: L.h)
+                            .tag(2)
+                    }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .always))
-                .indexViewStyle(.page(backgroundDisplayMode: .never))
+                .tabViewStyle(.page(indexDisplayMode: .never))
                 .accessibilityIdentifier("phone.pages")
+                LiveTop(f: f, L: L, status: "iPhone · No HR", live: false, idPrefix: "phone")
+                    .allowsHitTesting(false)
+                if !eng.isNewKind {
+                    LivePageDots(L: L, count: eng.isRunKind ? 2 : 3, page: page, tone: tone)
+                }
+                LiveButtons(L: L, tone: tone, idPrefix: "phone",
+                            nextTitle: (eng.isRunKind && eng.useGPS) ? nil : nextLabel,
+                            nextOn: nextOn,
+                            showUndo: !eng.isRunKind, undoOn: eng.canUndo,
+                            showSkip: !eng.isNewKind && !eng.isRunKind && !eng.growsOpen, skipOn: eng.canSkip,
+                            running: eng.running,
+                            onNext: { next() },
+                            onEnd: { askEnd = true },
+                            onUndo: { undo() },
+                            onSkip: { skipNow() },
+                            onPause: { eng.togglePause() })
             }
-            Spacer(minLength: 16)
-            // 1.2.3: 러닝 카드(GPS)는 1 km 마다 넘기는 것이 아니라 그냥 달림 — 넘기기 버튼 · 되돌리기 없음 (대표님 11-10)
-            if !(eng.isRunKind && eng.useGPS) { nextButton(m) }
-            HStack(spacing: 8) {
-                endPill(m)
-                if !eng.isRunKind { undoPill(m) }
-                if !eng.isNewKind && !eng.isRunKind && !eng.growsOpen { skipPill(m) }     // 1.2.2
-                pausePill(m)
-            }
-            .padding(.top, m.pillGap)
-            .padding(.bottom, m.bottom)
         }
-        .padding(.horizontal, 20)
     }
 
     // MARK: 위
@@ -932,7 +930,8 @@ struct PhoneLiveView: View {
                   segDist: eng.useGPS ? eng.segDist : nil, totalDist: eng.useGPS ? eng.totalDist : nil,
                   runKind: eng.isRunKind,
                   speed: eng.useGPS ? eng.speedNow(now) : nil,
-                  runCard: eng.isRunKind, runGoalKm: eng.runGoalKm)
+                  runCard: eng.isRunKind, runGoalKm: eng.runGoalKm,
+                  splits: eng.splits)
     }
 
     /// 18번: 새 종류 화면 한 장
@@ -966,91 +965,14 @@ struct PhoneLiveView: View {
         eng.running && !(eng.isRunKind && eng.useGPS) && !(eng.kind == WKind.emom && eng.doneAt != nil)
     }
 
-    private func nextButton(_ m: PhoneLiveMetrics) -> some View {
-        YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: nextOn,
-                     action: { next() }) {
-            HStack(spacing: 10) {
-                Text(nextLabel.l10n)
-                Text("›")
-            }
-            .font(F.t(m.buttonFont, .semibold))
-        }
-        .accessibilityIdentifier("phone.next")
-    }
-
-    /// ■ End (빨강 글자, 빨강 22% 바탕)
-    private func endPill(_ m: PhoneLiveMetrics) -> some View {
-        Button { askEnd = true } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "stop.fill").font(.system(size: 13, weight: .semibold))
-                Text("End").font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(C.bad)
-            .frame(maxWidth: .infinity).frame(height: m.pillH)
-            .background(Color(hex: 0xFF453A, alpha: 0.22), in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(Press(scale: 0.97))
-        .accessibilityIdentifier("phone.end")
-    }
-
-    /// ❚❚ Pause / ▶ Resume (회색 12%)
-    private func pausePill(_ m: PhoneLiveMetrics) -> some View {
-        Button { eng.togglePause() } label: {
-            HStack(spacing: 7) {
-                Image(systemName: eng.running ? "pause.fill" : "play.fill").font(.system(size: 13, weight: .semibold))
-                Text(eng.running ? "Pause" : "Resume").font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(eng.running ? Color.white : C.accent)
-            .frame(maxWidth: .infinity).frame(height: m.pillH)
-            .background(Color.white.opacity(0.12), in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(Press(scale: 0.97))
-        .accessibilityIdentifier("phone.pause")
-    }
-
-    /// ↩ Undo (회색 12%, 되돌릴 것이 없으면 흐리게): 방금 넘긴 것을 한 번 되돌림
-    private func undoPill(_ m: PhoneLiveMetrics) -> some View {
-        let on: Bool = eng.canUndo
-        return Button { undo() } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "arrow.uturn.backward").font(.system(size: 13, weight: .semibold))
-                Text("Undo").font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(on ? Color.white : C.text3)
-            .frame(maxWidth: .infinity).frame(height: m.pillH)
-            .background(Color.white.opacity(on ? 0.12 : 0.05), in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(Press(scale: 0.97))
-        .disabled(!on)
-        .accessibilityIdentifier("phone.undo")
-    }
-
     /// 1.2.2: 지금 구간 건너뛰기 (시간 0 · 기록에 "건너뜀"). 스테이션 · 러닝만, Roxzone 은 흐리게
-    private func skipPill(_ m: PhoneLiveMetrics) -> some View {
-        let on: Bool = eng.canSkip
-        return Button {
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-            flashNow()
-            if let rec = eng.skip() {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                done(rec)
-            }
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "forward.end.fill").font(.system(size: 13, weight: .semibold))
-                Text("Skip").font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(on ? Color.white : C.text3)
-            .frame(maxWidth: .infinity).frame(height: m.pillH)
-            .background(Color.white.opacity(on ? 0.12 : 0.05), in: Capsule())
-            .contentShape(Capsule())
+    private func skipNow() {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        flashNow()
+        if let rec = eng.skip() {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            done(rec)
         }
-        .buttonStyle(Press(scale: 0.97))
-        .disabled(!on)
-        .accessibilityIdentifier("phone.skip")
     }
 
     // MARK: 시작 전 3 · 2 · 1

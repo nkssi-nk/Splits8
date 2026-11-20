@@ -2,60 +2,97 @@ import SwiftUI
 
 // MARK: - 18번 · 아이폰 운동 중 화면 (타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성)
 
-/// 큰 남은 시간 (운동 = 노랑, 휴식 · 천천히 = 회색) + 몇 번째 + 아래 한 줄 + 전체 시간 + 다음 안내
+/// 1.2.7: 귀퉁이 표시 안 [단계 이름 17 · 큰 숫자 84 · 단위나 할 일 15] → 칸 (횟수 · 페이스 · ♥ BPM) → 점 → Next (워치와 같은 틀)
+/// 운동 = 노랑, 인터벌 빠르게 = 파랑, 휴식 · 천천히 = 회색
 struct TimerLiveBody: View {
     let f: TimerFace
-    let total: Int
-    let m: PhoneLiveMetrics
+    let L: PL
+    let kind: String
+    let seq: [Seg]
+    let idx: Int
+    /// 워치 같이 보기 심박 (폰만이면 nil)
+    var hr: Int? = nil
     /// 인터벌 러닝 (GPS): 지금 페이스
     var pace: String? = nil
-    var paceColor: Color = C.text2
+
+    static func tone(_ f: TimerFace, kind: String) -> W8Tone {
+        if f.rest { return .gray }
+        return kind == WKind.interval ? .run : .station
+    }
+
+    private var cur: Seg { seq.indices.contains(idx) ? seq[idx] : (seq.last ?? SeqBuilder.hiitRound(1)) }
+
+    /// 인터벌은 "FAST · 20 s" / "FAST · 400 m"
+    private var top: String {
+        guard kind == WKind.interval, cur.no != nil else { return f.label.l10n }
+        if let m = cur.autoM { return f.label.l10n + " · \(m) m" }
+        if let a = cur.auto { return f.label.l10n + " · \(a) s" }
+        return f.label.l10n
+    }
+
+    private var countLabel: String {
+        switch kind {
+        case WKind.amrap: return "ROUNDS"
+        case WKind.interval: return "REP"
+        case WKind.strength: return "SET"
+        default: return "ROUND"
+        }
+    }
 
     var body: some View {
-        let tint: Color = f.rest ? C.text2 : C.accent
-        return VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(f.label.l10n).font(F.t(m.nameFont, .bold)).tracking(0.12 * m.nameFont).foregroundStyle(tint)
+        let t: W8Tone = Self.tone(f, kind: kind)
+        let big: String = f.main.hasSuffix(" m") ? String(f.main.dropLast(2)) : f.main
+        let small: String = f.main.hasSuffix(" m") ? "M" : (kind == WKind.interval ? "" : f.line)
+        let what: String? = TimerFaces.nextWhat(kind: kind, seq: seq, idx: idx)
+        ZStack {
+            LiveBrackets(L: L, tone: t)
+            VStack(spacing: L.v(4)) {
+                Text(verbatim: top).font(F.t(L.v(17), .bold)).tracking(1).foregroundStyle(t.sub)
                     .lineLimit(1).minimumScaleFactor(0.7)
-                if !f.count.isEmpty {
-                    Text(verbatim: f.count).font(F.num(m.nameFont)).foregroundStyle(.white).lineLimit(1)
+                    .accessibilityIdentifier("timer.label")
+                Text(verbatim: big).font(F.num(L.v(84), .bold)).foregroundStyle(t.ink)
+                    .lineLimit(1).minimumScaleFactor(0.45)
+                    .contentTransition(.numericText(countsDown: true))
+                    .accessibilityIdentifier("timer.main")
+                if !small.isEmpty {
+                    Text(verbatim: small).font(F.t(L.v(15), .bold)).foregroundStyle(t.sub)
+                        .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
                 }
             }
-            .accessibilityIdentifier("timer.label")
-            Text(verbatim: f.main)
-                .font(F.num(m.totalFont * 1.6)).tracking(-0.03 * m.totalFont * 1.6)
-                .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.4)
-                .contentTransition(.numericText(countsDown: true))
-                .padding(.top, 4)
-                .accessibilityIdentifier("timer.main")
-            if !f.line.isEmpty {
-                Text(verbatim: f.line).font(F.t(m.detailFont + 1, .medium)).foregroundStyle(C.aeb)
-                    .multilineTextAlignment(.center).lineLimit(3).minimumScaleFactor(0.8)
-                    .padding(.top, 4)
+            .frame(width: L.w - 80)
+            .shadow(color: t.shadow, radius: 7, y: 2)
+            .position(x: L.w / 2, y: L.y(244))
+            HStack(spacing: 0) {
+                LiveCell(L: L, label: countLabel.l10n, value: f.count.isEmpty ? "--" : f.count, tone: t)
+                if let pace { LiveCell(L: L, label: "PACE".l10n, value: pace, tone: t) }
+                if let hr { LiveCell(L: L, label: "♥ " + "BPM".l10n, value: hr > 0 ? "\(hr)" : "--", tone: t) }
             }
-            HStack(spacing: 18) {
-                VStack(spacing: 2) {
-                    Text("TOTAL").font(F.t(12, .semibold)).tracking(1.4).foregroundStyle(C.text2)
-                    Text(Fm.t(total)).font(F.num(m.detailFont * 1.6)).foregroundStyle(.white).lineLimit(1)
-                }
-                if let pace {
-                    VStack(spacing: 2) {
-                        Text("PACE /KM").font(F.t(12, .semibold)).tracking(1.4).foregroundStyle(C.text2)
-                        Text(verbatim: pace).font(F.num(m.detailFont * 1.6)).foregroundStyle(paceColor).lineLimit(1)
-                    }
-                }
+            .frame(width: L.w - 40)
+            .shadow(color: t.shadow, radius: 7, y: 2)
+            .position(x: L.w / 2, y: L.y(378 + 26))
+            if let d = dots {
+                LiveDots(L: L, total: d.1, current: d.0, tone: t).position(x: L.w / 2, y: L.y(482))
             }
-            .padding(.top, m.segTop * 0.6)
-            if !f.next.isEmpty {
-                Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-                    .padding(.horizontal, 20).padding(.top, m.dividerTop * 0.8).padding(.bottom, 12 * m.k)
-                Text(verbatim: f.next).font(F.t(m.nextFont * 0.85, .semibold)).foregroundStyle(.white)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                    .accessibilityIdentifier("timer.next")
+            if kind != WKind.amrap {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text("Next").font(F.t(L.v(18), .semibold)).foregroundStyle(t.label)
+                    Text(verbatim: what ?? "Finish".l10n).font(F.t(L.v(26), .bold)).foregroundStyle(t.ink)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                        .accessibilityIdentifier("timer.next")
+                }
+                .frame(maxWidth: L.w - 48)
+                .shadow(color: t.shadow, radius: 7, y: 2)
+                .position(x: L.w / 2, y: L.y(534))
             }
         }
-        .frame(maxWidth: .infinity)
         .animation(.easeInOut(duration: 0.25), value: f.rest)
+    }
+
+    /// "3/8" → (2, 8)
+    private var dots: (Int, Int)? {
+        let p: [Substring] = f.count.split(separator: "/")
+        guard p.count == 2, let a = Int(p[0]), let b = Int(p[1]), b > 1, b <= 30 else { return nil }
+        return (max(0, a - 1), b)
     }
 }
 

@@ -511,6 +511,15 @@ struct RaceView: View {
             }
             row("Goal time", value: Fm.t(store.settings.goalTime) + " ›", numeric: true) { goalSheet = true }
             splitTargets
+                .rowLine(true)
+            // 1.2.7: Race 에도 Roxzone 켜고 끄기 (Full Sim 과 같은 설정 roxAuto). 끄면 이동 시간은 다음 구간에 들어감
+            HStack(spacing: 12) {
+                Text("Add Roxzone").font(F.t(17))
+                Spacer()
+                Toggle8(on: Binding(get: { store.settings.roxAuto }, set: { store.settings.roxAuto = $0 }))
+            }
+            .padding(.vertical, 14).padding(.horizontal, 18)
+            .accessibilityIdentifier("race.roxzone")
         }
         .card8()
     }

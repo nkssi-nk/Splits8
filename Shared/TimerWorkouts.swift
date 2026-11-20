@@ -343,11 +343,11 @@ enum TimerFaces {
             let works: Int = seq.filter { $0.tag == "work" }.count
             let isRest: Bool = cur.tag == "rest"
             return TimerFace(label: isRest ? "REST" : "WORK", main: Fm.t(remain ?? 0), rest: isRest,
-                             count: "\(cur.no ?? 1) / \(works)", line: "", next: nx, remain: remain)
+                             count: "\(cur.no ?? 1)/\(works)", line: "", next: nx, remain: remain)
         case WKind.emom:
             let line: String = done.map { String(format: "Done in %@ · rest".l10n, Fm.t($0)) } ?? tasks
             return TimerFace(label: done == nil ? "ROUND" : "REST", main: Fm.t(remain ?? 0), rest: done != nil,
-                             count: "\(idx + 1) / \(seq.count)", line: line, next: nx, remain: remain)
+                             count: "\(idx + 1)/\(seq.count)", line: line, next: nx, remain: remain)
         case WKind.amrap:
             let left: Int = max(0, (cap ?? 0) - total)
             let line: String = String(format: "Round %lld · %@".l10n, idx + 1, Fm.t(segEl)) + (tasks.isEmpty ? "" : " · " + tasks)
@@ -363,7 +363,7 @@ enum TimerFaces {
                 main = segDist == nil ? "\(m) m" : "\(left) m"
             }
             let line: String = cur.tp.map { String(format: "Target %@ /km".l10n, Fm.t($0)) } ?? ""
-            return TimerFace(label: label, main: main, rest: cur.tag != "fast", count: cur.no.map { "\($0) / \(reps)" } ?? "",
+            return TimerFace(label: label, main: main, rest: cur.tag != "fast", count: cur.no.map { "\($0)/\(reps)" } ?? "",
                              line: line, next: nx, remain: remain)
         case WKind.strength:
             if cur.tag == "rest" {
@@ -371,7 +371,7 @@ enum TimerFaces {
             }
             let sets: Int = seq.filter { $0.tag == "set" && $0.name == cur.name }.count
             let line: String = String(format: "%lld reps × %@".l10n, cur.reps ?? 0, StrengthMove.kgText(cur.kg ?? 0))
-            return TimerFace(label: "SET", main: Fm.t(segEl), rest: false, count: "\(cur.no ?? 1) / \(sets)",
+            return TimerFace(label: "SET", main: Fm.t(segEl), rest: false, count: "\(cur.no ?? 1)/\(sets)",
                              line: line, next: nx, remain: nil)
         default:
             return TimerFace(label: "ROUND", main: Fm.t(segEl), rest: false, count: "\(idx + 1)", line: "", next: nx, remain: nil)
@@ -380,25 +380,31 @@ enum TimerFaces {
 
     /// "Next: 300 m easy" / "Next: Rest" / "Next: Squat · set 2" (번역됨). 마지막이면 "Last one" 계열
     static func nextText(kind: String, seq: [Seg], idx: Int) -> String {
-        guard seq.indices.contains(idx + 1) else {
+        guard let what = nextWhat(kind: kind, seq: seq, idx: idx) else {
             return kind == WKind.amrap ? "" : "Last one".l10n
         }
+        return String(format: "Next: %@".l10n, what)
+    }
+
+    /// 1.2.7: 다음 단계 이름만 ("Easy 0:40" · "Rest 10 s" · "Round 5"). 마지막이면 nil — 새 워치 · 폰 화면의 "Next ○○" 줄
+    static func nextWhat(kind: String, seq: [Seg], idx: Int) -> String? {
+        guard seq.indices.contains(idx + 1) else { return nil }
         let n: Seg = seq[idx + 1]
         let what: String
         switch kind {
         case WKind.interval:
             let amount: String = n.autoM.map { m in IntervalStep(type: n.tag ?? "easy", meters: m).amount } ?? Fm.t(n.auto ?? 0)
-            what = amount + " " + IntervalStep.typeName(n.tag ?? "easy").l10n.lowercased()
+            what = IntervalStep.typeName(n.tag ?? "easy").l10n + " " + amount     // 1.2.7: Easy 0:40
         case WKind.strength:
             what = n.tag == "rest" ? "Rest".l10n + " " + Fm.t(n.auto ?? 0)
                                     : n.name.l10n + " · " + String(format: "set %lld".l10n, n.no ?? 1)
         default:
-            if n.tag == "rest" { what = "Rest".l10n }
-            else if n.tag == "work" { what = "Work".l10n }
+            if n.tag == "rest" { what = "Rest".l10n + (n.auto.map { " \($0) s" } ?? "") }
+            else if n.tag == "work" { what = "Work".l10n + (n.auto.map { " \($0) s" } ?? "") }
             else if let k = n.no { what = String(format: "Round %lld".l10n, k) }
             else { what = n.name.l10n }
         }
-        return String(format: "Next: %@".l10n, what)
+        return what
     }
 }
 

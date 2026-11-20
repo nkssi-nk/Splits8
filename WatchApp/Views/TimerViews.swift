@@ -1,21 +1,22 @@
 import SwiftUI
 import WatchKit
 
-// MARK: - 18번 · 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동 — 운동 중 첫 화면
-// 큰 남은 시간(또는 남은 거리 · 세트 시간) + 지금 단계 이름 + 몇 번째 + 다음 안내 + 버튼 하나.
-// 운동 = 노랑, 휴식 · 천천히 = 회색. 왼쪽 스와이프 = 가운데 버튼과 같음, 오른쪽 스와이프 = 조작 화면.
-// 무게 · 횟수 고치기는 아이폰에서 (워치는 세트 끝 · 휴식 · 다음만).
+// MARK: - 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동 — 운동 중 첫 화면 (1.2.7 새 디자인)
+// 귀퉁이 표시 안: 위 단계 이름(13) · 큰 숫자(40) · 단위나 할 일 한 줄(10, 꼭 필요할 때만).
+// 두 칸 · 점(라운드/세트/반복) · Next 줄 · 버튼 3개 (되돌리기 · 다음 · 일시정지) — 구간 화면과 같은 자리.
+// 운동 = 노랑, 인터벌 빠르게 = 파랑, 휴식 · 천천히 = 회색. 왼쪽으로 밀기 = 다음, 오른쪽으로 밀기 = 조작 화면.
 
 struct WTimerLive: View {
     let engine = WorkoutEngine.shared
+    var zone: Int = 0
     let onControls: () -> Void
     @Environment(\.isLuminanceReduced) private var aod
 
-    private let m = WLiveMetrics.current
-
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            screen(now: ctx.date)
+        GeometryReader { geo in
+            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                screen(now: ctx.date, L: W8Scale(w: geo.size.width, h: geo.size.height))
+            }
         }
         .ignoresSafeArea()
     }
@@ -28,51 +29,79 @@ struct WTimerLive: View {
                         done: engine.doneAt, task: engine.program?.task)
     }
 
-    private func screen(now: Date) -> some View {
+    private func tone(_ f: TimerFace) -> W8Tone {
+        if f.rest { return .gray }
+        if kind == WKind.interval { return .run }
+        return .station
+    }
+
+    /// 위 단계 이름: 인터벌은 "FAST · 20 s" / "FAST · 400 m"
+    private func top(_ f: TimerFace) -> String {
+        let c: Seg = engine.cur
+        guard kind == WKind.interval, c.no != nil else { return f.label.l10n }
+        if let m = c.autoM { return f.label.l10n + " · \(m) m" }
+        if let a = c.auto { return f.label.l10n + " · \(a) s" }
+        return f.label.l10n
+    }
+
+    /// 큰 숫자와 아래 단위 ("240" + "M")
+    private func mainParts(_ f: TimerFace) -> (String, String) {
+        if f.main.hasSuffix(" m") { return (String(f.main.dropLast(2)), "M") }
+        return (f.main, "")
+    }
+
+    /// 아래 한 줄 (EMOM 할 일 · AMRAP 라운드 · 기능성 무게). 인터벌은 목표 페이스 줄 뺌
+    private func line(_ f: TimerFace) -> String {
+        kind == WKind.interval ? "" : f.line
+    }
+
+    private func screen(now: Date, L: W8Scale) -> some View {
         let f: TimerFace = face(now)
-        let tint: Color = aod ? C.text2 : (f.rest ? C.text2 : C.accent)
+        let t: W8Tone = tone(f)
+        let ink: Color = aod ? W8.aodText : t.ink
+        let sub: Color = aod ? W8.aodText : t.sub
+        let mp: (String, String) = mainParts(f)
+        let small: String = mp.1.isEmpty ? line(f) : mp.1
         return ZStack {
-            if !aod {
-                AmbientLayer(a: Ambient(hex: f.rest ? 0xFFFFFF : 0xFFE600, alpha: f.rest ? 0.08 : 0.24,
-                                        rx: 1.2, ry: 0.6, cx: 0.5, cy: -0.1))
-                    .animation(.easeInOut(duration: 0.4), value: f.rest)
-            }
+            W8Background(tone: t, zone: zone, seed: engine.idx, dim: aod)
+            W8TotalRow(L: L, label: "TOTAL", value: Fm.t(engine.total(now)), tone: t, aod: aod)
+            W8Brackets(arm: 9 * L.s)
+                .stroke(aod ? W8.aodMark : t.mark, style: StrokeStyle(lineWidth: 2.6 * L.s, lineCap: .round, lineJoin: .round))
+                .frame(width: L.v(176), height: L.v(66))
+                .position(x: L.x(104), y: L.y(65))
             VStack(spacing: 0) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(f.label.l10n).font(F.t(14, .bold)).tracking(1).foregroundStyle(tint)
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                    if !f.count.isEmpty {
-                        Text(verbatim: f.count).font(F.num(14, .medium)).foregroundStyle(.white).lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.trailing, WClock.reserve)
-                .frame(height: 20)
-                Text(verbatim: f.main)
-                    .font(F.num(m.totalFont * 1.75)).tracking(-0.03 * m.totalFont * 1.75)
-                    .foregroundStyle(tint)
-                    .lineLimit(1).minimumScaleFactor(0.5)
+                Text(verbatim: top(f)).font(F.t(13 * L.s, .bold)).tracking(0.8).foregroundStyle(sub)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Text(verbatim: mp.0).font(F.num(40 * L.s, .bold)).foregroundStyle(ink)
+                    .lineLimit(1).minimumScaleFactor(0.55)
                     .contentTransition(.numericText(countsDown: true))
                     .accessibilityIdentifier("w.timerMain")
-                if !f.line.isEmpty {
-                    Text(verbatim: f.line).font(F.t(12, .medium)).foregroundStyle(C.text2)
-                        .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.75)
-                }
-                infoRow(now: now)
-                    .padding(.top, 3)
-                Spacer(minLength: 2)
-                if !aod {
-                    if !f.next.isEmpty {
-                        Text(verbatim: f.next).font(F.t(12, .semibold)).foregroundStyle(.white)
-                            .lineLimit(1).minimumScaleFactor(0.7)
-                            .padding(.bottom, 4)
-                    }
-                    controls
+                if !small.isEmpty {
+                    Text(verbatim: small).font(F.t(10 * L.s, .bold)).foregroundStyle(sub)
+                        .lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
-            .padding(.top, 10).padding(.horizontal, 14).padding(.bottom, 6)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: L.v(164))
+            .w8Shadow(t, L, aod)
+            .position(x: L.x(104), y: L.y(65))
+            HStack(spacing: 0) {
+                W8Column(L: L, label: countLabel.l10n, value: f.count.isEmpty ? "--" : f.count, tone: t, aod: aod, valueSize: 20)
+                W8Column(L: L, label: "♥ " + "BPM".l10n, value: engine.hr > 0 ? String(Int(engine.hr.rounded())) : "--",
+                         tone: t, aod: aod, valueSize: 20)
+            }
+            .frame(width: L.v(160))
+            .w8Shadow(t, L, aod)
+            .position(x: L.x(104), y: L.y(122))
+            if let d = dots(f) {
+                W8Dots(L: L, total: d.1, current: d.0, tone: t, aod: aod)
+                    .position(x: L.x(104), y: L.y(146))
+            }
+            nextLine(L: L, t: t)
+                .w8Shadow(t, L, aod)
+                .position(x: L.x(104), y: L.y(160))
+            buttons(L: L, t: t)
         }
+        .frame(width: L.w, height: L.h)
         .contentShape(Rectangle())
         .gesture(DragGesture(minimumDistance: 20).onEnded { v in
             let dx = v.translation.width
@@ -81,43 +110,37 @@ struct WTimerLive: View {
         })
     }
 
-    /// TOTAL · 심박 · (인터벌 러닝) 페이스
-    private func infoRow(now: Date) -> some View {
-        HStack(spacing: 8) {
-            Text(Fm.t(engine.total(now))).font(F.num(13, .medium)).foregroundStyle(.white)
-            if engine.hr > 0 {
-                HStack(spacing: 2) {
-                    Image(systemName: "heart.fill").font(.system(size: 9)).foregroundStyle(C.hr)
-                    Text("\(Int(engine.hr.rounded()))").font(F.num(13, .medium)).foregroundStyle(.white)
-                }
-            }
-            if engine.runLike {
-                Text(engine.paceText(el: engine.segEl(now), dist: engine.segDist, imperial: false) ?? "Measuring".l10n)
-                    .font(F.num(13, .medium)).foregroundStyle(paceColor(now))
-            }
+    private var countLabel: String {
+        switch kind {
+        case WKind.amrap: return "ROUNDS"
+        case WKind.interval: return "REP"
+        case WKind.strength: return "SET"
+        default: return "ROUND"
         }
-        .lineLimit(1).minimumScaleFactor(0.7)
     }
 
-    /// 인터벌 러닝: 목표 페이스보다 빠르면 초록, 느리면 빨강
-    private func paceColor(_ now: Date) -> Color {
-        guard let tp = engine.cur.tp, let p = engine.livePaceSec else { return C.text2 }
-        return p <= tp ? C.good : C.bad
+    /// "3/8" → (2, 8). 끝이 없는 AMRAP · 너무 많으면 점 없음
+    private func dots(_ f: TimerFace) -> (Int, Int)? {
+        let p: [Substring] = f.count.split(separator: "/")
+        guard p.count == 2, let a = Int(p[0]), let b = Int(p[1]), b > 1, b <= 30 else { return nil }
+        return (max(0, a - 1), b)
+    }
+
+    private func nextLine(L: W8Scale, t: W8Tone) -> some View {
+        let what: String? = TimerFaces.nextWhat(kind: kind, seq: engine.seq, idx: engine.idx)
+        return HStack(alignment: .firstTextBaseline, spacing: 5 * L.s) {
+            if kind != WKind.amrap {
+                Text("Next").font(F.t(13 * L.s, .semibold))
+                    .foregroundStyle(aod ? W8.aodText : t.label)
+                Text(verbatim: what ?? "Finish".l10n).font(F.t(17 * L.s, .bold))
+                    .foregroundStyle(aod ? W8.aodText : t.ink)
+                    .lineLimit(1).minimumScaleFactor(12 / 17)
+            }
+        }
+        .frame(maxWidth: L.v(172))
     }
 
     // MARK: 버튼
-
-    /// 가운데 버튼 글자
-    private var mainLabel: String {
-        let c: Seg = engine.cur
-        switch kind {
-        case WKind.emom: return engine.doneAt == nil ? "Done" : "Resting"
-        case WKind.amrap: return "Round done"
-        case WKind.strength: return c.tag == "rest" ? "Skip rest" : "Set done"
-        case WKind.interval: return "Next step"
-        default: return "Skip"
-        }
-    }
 
     private var mainOn: Bool {
         engine.running && !(kind == WKind.emom && engine.doneAt != nil)
@@ -128,27 +151,25 @@ struct WTimerLive: View {
         withAnimation(WLive.slideCurve) { engine.advance() }
     }
 
-    private var controls: some View {
-        HStack(spacing: 6) {
-            Button(action: main) {
-                Text(mainLabel.l10n).font(F.t(15, .semibold)).foregroundStyle(.black)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                    .frame(maxWidth: .infinity).frame(height: m.main * 0.82)
-                    .background(mainOn ? C.accent : C.text3, in: Capsule())
-                    .contentShape(Capsule())
+    private func buttons(L: W8Scale, t: W8Tone) -> some View {
+        let cy: CGFloat = L.h - 32 * L.s
+        let ic: Color = aod ? W8.aodText : t.ink
+        let mainIc: Color = aod ? W8.aodText : (t.dark ? C.accent : Color(hex: 0x1E78FA))
+        return ZStack {
+            W8CircleButton(L: L, r: 18, tone: t, aod: aod, on: engine.canUndo, id: "w.timerUndo",
+                           action: { withAnimation(WLive.slideCurve) { engine.undo() } }) {
+                W8UndoIcon(size: 19 * L.s, color: ic)
             }
-            .buttonStyle(.plain)
-            .disabled(!mainOn)
-            .accessibilityIdentifier("w.timerMainButton")
-            Button { engine.togglePause() } label: {
-                Image(systemName: engine.running ? "pause.fill" : "play.fill")
-                    .font(.system(size: m.side * 0.42, weight: .semibold)).foregroundStyle(.white)
-                    .frame(width: m.main * 0.82, height: m.main * 0.82)
-                    .background(Circle().fill(Color.white.opacity(0.16)))
-                    .contentShape(Circle())
+            .position(x: L.w / 2 - 54 * L.s, y: cy)
+            W8CircleButton(L: L, r: 25, tone: t, aod: aod, main: true, on: mainOn, id: "w.timerMainButton", action: main) {
+                W8NextArrow().fill(mainIc).frame(width: 20 * L.s, height: 17 * L.s)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("w.timerPause")
+            .accessibilityLabel(Text("Next"))
+            .position(x: L.w / 2, y: cy)
+            W8CircleButton(L: L, r: 18, tone: t, aod: aod, id: "w.timerPause", action: { engine.togglePause() }) {
+                W8PauseIcon(size: 14 * L.s, color: ic, paused: !engine.running)
+            }
+            .position(x: L.w / 2 + 54 * L.s, y: cy)
         }
     }
 }

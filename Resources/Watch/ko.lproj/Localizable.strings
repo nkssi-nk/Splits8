@@ -154,7 +154,7 @@
 "Measuring" = "측정 중";
 
 /* 빌드 27 · 워치 운동 화면 새 배치 */
-"FINISH" = "마지막";
+"FINISH" = "예상 완주";
 "End workout" = "운동 끝내기";
 "Auto split every 1 km" = "1km마다 자동으로 넘어가요";
 
@@ -317,3 +317,26 @@
 "Top-end level" = "상위권";
 "Faster than Doubles average" = "더블 평균보다 빠름";
 "Slower than Doubles average" = "더블 평균보다 느림";
+
+/* 1.2.7 워치 새 운동 화면 · 크라운 칸 · End 창 */
+"Transition" = "이동 구간";
+"%lld rounds done" = "%lld라운드 완료";
+"to %@" = "다음 %@";
+"OVER" = "초과";
+"AHEAD" = "빠름";
+"BEHIND" = "느림";
+"ON PACE" = "목표대로";
+"EST" = "예상";
+"ENERGY" = "칼로리";
+"KCAL" = "KCAL";
+"BPM" = "BPM";
+"MAX HR" = "최대 심박";
+"AVG BPM" = "평균 심박";
+"CADENCE" = "케이던스";
+"SPM" = "걸음/분";
+"REP" = "반복";
+"SEGMENTS DONE" = "끝낸 구간";
+"REST WON'T BE SAVED" = "나머지는 기록 안 됨";
+"EVERYTHING WILL BE SAVED" = "지금까지 모두 저장";
+"NOTHING WILL BE SAVED" = "저장하지 않음";
+"TAP TO CHANGE" = "눌러서 바꾸기";

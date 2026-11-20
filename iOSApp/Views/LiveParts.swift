@@ -170,16 +170,19 @@ struct LiveTop: View {
 
     var body: some View {
         let t: W8Tone = f.tone
-        VStack(spacing: L.v(8)) {
+        // 시안: 상태 줄 13 (대문자 가운데 70) · TOTAL 13 + 값 30 (104)
+        ZStack {
             HStack(spacing: 6) {
                 Text((f.mode == .training ? f.title : f.mode.name).l10n).font(F.t(L.v(13), .semibold))
                 Text(verbatim: "·")
-                Circle().fill(live ? Color(hex: 0x34C759) : t.sub).frame(width: 6, height: 6)
+                Circle().fill(live ? Color(hex: 0x34C759) : t.sub).frame(width: 7, height: 7)
                 Text(status.l10n).font(F.t(L.v(13), .semibold))
                     .accessibilityIdentifier("\(idPrefix).status")
             }
-            .foregroundStyle(t.sub)
+            .foregroundStyle(t.label)
             .lineLimit(1).minimumScaleFactor(0.7)
+            .padding(.horizontal, 24)
+            .position(x: L.w / 2, y: L.y(70))
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(f.runCard ? "TIME" : "TOTAL").font(F.t(L.v(13), .bold)).tracking(1).foregroundStyle(t.label)
                 Text(Fm.t(f.total)).font(F.num(L.v(30), .semibold)).foregroundStyle(f.running ? t.ink : t.sub)
@@ -187,10 +190,9 @@ struct LiveTop: View {
                     .accessibilityIdentifier("\(idPrefix).total")
             }
             .lineLimit(1)
+            .position(x: L.w / 2, y: L.y(104))
         }
-        .padding(.horizontal, 24)
         .shadow(color: t.shadow, radius: 7, y: 2)
-        .position(x: L.w / 2, y: L.y(96))
     }
 }
 
@@ -205,13 +207,16 @@ struct LiveCell: View {
     var size: CGFloat = 40
 
     var body: some View {
-        VStack(spacing: L.v(6)) {
-            Text(verbatim: label).font(F.t(L.v(13), .bold)).tracking(0.8)
+        // 시안: 이름표 14 (대문자 가운데) 와 값 40 사이 40 → 줄 가운데에서 위아래 20
+        ZStack {
+            Text(verbatim: label).font(F.t(L.v(14), .bold)).tracking(0.8)
                 .foregroundStyle(strong ? tone.ink : tone.label)
                 .lineLimit(1).minimumScaleFactor(0.6)
+                .offset(y: -L.y(20))
             Text(verbatim: value).font(F.num(L.v(size), .semibold)).foregroundStyle(tone.ink)
                 .lineLimit(1).minimumScaleFactor(0.5)
                 .contentTransition(.numericText())
+                .offset(y: L.y(20))
         }
         .frame(maxWidth: .infinity)
     }
@@ -275,6 +280,35 @@ struct LivePageDots: View {
     }
 }
 
+/// 큰 숫자 블록 (시안: 이름표 17 · 16 · 숫자 84 · 16 · 단위 15 — 대문자 높이로 재서 148~340 가운데)
+struct LiveBigBlock: View {
+    let L: PL
+    let label: String
+    let main: String
+    var unit: String = ""
+    let tone: W8Tone
+    var labelColor: Color? = nil
+
+    var body: some View {
+        let hasUnit: Bool = !unit.isEmpty
+        ZStack {
+            Text(verbatim: label).font(F.t(L.v(17), .bold)).tracking(1).foregroundStyle(labelColor ?? tone.sub)
+                .lineLimit(1).minimumScaleFactor(0.7).frame(width: L.w - 80)
+                .position(x: L.w / 2, y: L.y(hasUnit ? 192.9 : 206.2))
+            Text(verbatim: main).font(F.num(L.v(84), .bold)).foregroundStyle(tone.ink)
+                .lineLimit(1).minimumScaleFactor(0.45).frame(width: L.w - 80)
+                .contentTransition(.numericText())
+                .position(x: L.w / 2, y: L.y(hasUnit ? 244.7 : 258))
+            if hasUnit {
+                Text(verbatim: unit).font(F.t(L.v(15), .bold)).tracking(1).foregroundStyle(tone.label)
+                    .lineLimit(2).minimumScaleFactor(0.7).multilineTextAlignment(.center).frame(width: L.w - 80)
+                    .position(x: L.w / 2, y: L.y(295.9))
+            }
+        }
+        .shadow(color: tone.shadow, radius: 7, y: 2)
+    }
+}
+
 // MARK: 1장: 운동 (구간 · 러닝 카드)
 
 struct LiveMain: View {
@@ -288,9 +322,9 @@ struct LiveMain: View {
             LiveBrackets(L: L, tone: t)
             if f.runCard { runBlock(t) } else { segBlock(t) }
             cells(t)
-                .frame(width: L.w - 40)
+                .frame(width: L.w - 48)
                 .shadow(color: t.shadow, radius: 7, y: 2)
-                .position(x: L.w / 2, y: L.y(378 + 26))
+                .position(x: L.w / 2, y: L.y(398))
             if f.runCard {
                 runBar(t).position(x: L.w / 2, y: L.y(482))
             } else if !f.open {
@@ -305,33 +339,29 @@ struct LiveMain: View {
         }
     }
 
+    /// 시안: 이름 52 (폭 300 넘으면 30 까지) · 18 · 무게/거리 22 — 대문자 높이로 재서 귀퉁이 표시(148~340) 가운데
     private func segBlock(_ t: W8Tone) -> some View {
-        VStack(spacing: L.v(6)) {
+        let one: Bool = f.detailLine.isEmpty
+        return ZStack {
             Text(verbatim: f.cur.name).font(F.t(L.v(52), .bold)).foregroundStyle(t.ink)
                 .lineLimit(1).minimumScaleFactor(30 / 52)
                 .frame(width: min(L.w - 80, L.v(300)))
-            if !f.detailLine.isEmpty {
+                .position(x: L.w / 2, y: L.y(one ? 244 : 227.2))
+            if !one {
                 Text(verbatim: f.detailLine).font(F.t(L.v(22), .semibold)).foregroundStyle(t.sub)
                     .lineLimit(1).minimumScaleFactor(0.6)
                     .frame(width: L.w - 80)
+                    .position(x: L.w / 2, y: L.y(271.4))
             }
         }
         .shadow(color: t.shadow, radius: 7, y: 2)
-        .position(x: L.w / 2, y: L.y(244))
         .accessibilityIdentifier("\(idPrefix).name")
     }
 
     private func runBlock(_ t: W8Tone) -> some View {
-        VStack(spacing: L.v(2)) {
-            Text(verbatim: f.title.isEmpty ? "Run".l10n : f.title.l10n).font(F.t(L.v(17), .semibold)).foregroundStyle(t.sub)
-            Text(verbatim: Units.dist(f.runDist, f.imperial)).font(F.num(L.v(84), .bold)).foregroundStyle(t.ink)
-                .lineLimit(1).minimumScaleFactor(0.5)
-                .contentTransition(.numericText())
-                .accessibilityIdentifier("\(idPrefix).dist")
-            Text(f.imperial ? "MI" : "KM").font(F.t(L.v(15), .bold)).tracking(1).foregroundStyle(t.sub)
-        }
-        .shadow(color: t.shadow, radius: 7, y: 2)
-        .position(x: L.w / 2, y: L.y(244))
+        LiveBigBlock(L: L, label: f.title.isEmpty ? "Run".l10n : f.title.l10n, main: Units.dist(f.runDist, f.imperial),
+                     unit: f.imperial ? "MI" : "KM", tone: t)
+            .accessibilityIdentifier("\(idPrefix).dist")
     }
 
     private struct Cell { let label: String; let value: String; var strong: Bool = false; var id: String? = nil }
@@ -396,7 +426,7 @@ struct LiveMain: View {
         let nx: Seg? = f.nextSeg
         return HStack(alignment: .firstTextBaseline, spacing: 10) {
             if !f.runCard {
-                Text("Next").font(F.t(L.v(18), .semibold)).foregroundStyle(t.label)
+                Text("Next").font(F.t(L.v(26), .semibold)).foregroundStyle(t.sub)
                 Text(verbatim: nx.map { $0.name } ?? "Finish".l10n).font(F.t(L.v(26), .bold)).foregroundStyle(t.ink)
                     .lineLimit(1).minimumScaleFactor(0.6)
                     .accessibilityIdentifier("live.nextName")
@@ -422,30 +452,17 @@ struct LiveGoalPage: View {
         ZStack {
             LiveBrackets(L: L, tone: t)
             if f.hasGoal {
-                VStack(spacing: L.v(12)) {
-                    Text(vsBest ? "VS BEST" : "VS GOAL").font(F.t(L.v(17), .bold)).tracking(1).foregroundStyle(t.label)
-                    Text(verbatim: Fm.d(d)).font(F.num(L.v(84), .bold)).foregroundStyle(t.ink)
-                        .lineLimit(1).minimumScaleFactor(0.5)
-                        .contentTransition(.numericText())
-                    Text(d < 0 ? "AHEAD" : (d > 0 ? "BEHIND" : "ON PACE")).font(F.t(L.v(15), .bold)).tracking(1).foregroundStyle(t.sub)
-                }
-                .shadow(color: t.shadow, radius: 7, y: 2)
-                .position(x: L.w / 2, y: L.y(244))
+                LiveBigBlock(L: L, label: vsBest ? "VS BEST".l10n : "VS GOAL".l10n, main: Fm.d(d),
+                             unit: (d < 0 ? "AHEAD" : (d > 0 ? "BEHIND" : "ON PACE")).l10n, tone: t)
                 HStack(spacing: 0) {
                     LiveCell(L: L, label: "FINISH".l10n, value: Fm.t(f.targetTotal + d), tone: t)
                     LiveCell(L: L, label: (vsBest ? "BEST" : "GOAL").l10n, value: Fm.t(f.targetTotal), tone: t)
                 }
-                .frame(width: L.w - 40)
+                .frame(width: L.w - 48)
                 .shadow(color: t.shadow, radius: 7, y: 2)
-                .position(x: L.w / 2, y: L.y(378 + 26))
+                .position(x: L.w / 2, y: L.y(398))
             } else {
-                VStack(spacing: L.v(12)) {
-                    Text(f.runCard ? "TIME" : "TOTAL").font(F.t(L.v(17), .bold)).tracking(1).foregroundStyle(t.label)
-                    Text(verbatim: Fm.t(f.total)).font(F.num(L.v(84), .bold)).foregroundStyle(t.ink)
-                        .lineLimit(1).minimumScaleFactor(0.5)
-                }
-                .shadow(color: t.shadow, radius: 7, y: 2)
-                .position(x: L.w / 2, y: L.y(244))
+                LiveBigBlock(L: L, label: (f.runCard ? "TIME" : "TOTAL").l10n, main: Fm.t(f.total), tone: t)
             }
             if f.hr != nil {
                 HStack(spacing: 0) {
@@ -453,9 +470,9 @@ struct LiveGoalPage: View {
                     LiveCell(L: L, label: "AVG BPM".l10n, value: (avgHR ?? 0) > 0 ? "\(avgHR ?? 0)" : "--", tone: t)
                     LiveCell(L: L, label: "KCAL".l10n, value: f.kcal.map { "\($0)" } ?? "--", tone: t)
                 }
-                .frame(width: L.w - 40)
+                .frame(width: L.w - 48)
                 .shadow(color: t.shadow, radius: 7, y: 2)
-                .position(x: L.w / 2, y: L.y(f.hasGoal ? 500 : 404))
+                .position(x: L.w / 2, y: L.y(f.hasGoal ? 498 : 398))
             }
         }
         .accessibilityIdentifier("live.goalPage")

@@ -155,11 +155,11 @@ struct W8TotalRow: View {
         }
         .lineLimit(1)
         .fixedSize()
-        .position(x: min(L.w / 2, L.w - WClock.reserve - 8 - totalHalf), y: L.y(19))
+        .position(x: min(L.w / 2, L.w - (WClock.reserve + 12) * L.s - totalHalf), y: L.t(20))
     }
 
-    /// 대략 폭의 반 (시계와 8pt 띄우기용)
-    private var totalHalf: CGFloat { CGFloat(label.count + value.count) * 3.6 * L.s }
+    /// 대략 폭의 반 (시계와 띄우기용): 이름표 9pt 글자 ≈ 6.2, 숫자 14pt ≈ 8.6, 사이 4
+    private var totalHalf: CGFloat { (CGFloat(label.count) * 6.2 + CGFloat(value.count) * 8.6 + 4) / 2 * L.s }
 }
 
 /// 이름표 + 값 한 칸
@@ -183,6 +183,38 @@ struct W8Column: View {
                 .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// 칸 줄 (시안: 칸 폭 = (208 − 28) / 개수, 가운데 x = 14 + 폭 × (i + ½)). 이름표 · 값은 대문자 가운데 y 로 놓음
+struct W8ColsRow: View {
+    let L: W8Scale
+    /// (이름표, 값, 이름표 진하게)
+    let cols: [(String, String, Bool)]
+    let labelY: CGFloat
+    let valueY: CGFloat
+    var valueSize: CGFloat = 22
+    let tone: W8Tone
+    let aod: Bool
+
+    var body: some View {
+        let n: Int = max(1, cols.count)
+        let cw: CGFloat = 180 * L.s / CGFloat(n)
+        ZStack {
+            ForEach(cols.indices, id: \.self) { i in
+                let cx: CGFloat = L.x(14) + cw * (CGFloat(i) + 0.5)
+                Text(verbatim: cols[i].0).font(F.t(10 * L.s, .bold)).tracking(0.6)
+                    .foregroundStyle(aod ? W8.aodText : (cols[i].2 ? tone.ink : tone.label))
+                    .lineLimit(1).minimumScaleFactor(0.6).frame(width: cw - 2)
+                    .position(x: cx, y: L.y(labelY))
+                Text(verbatim: cols[i].1).font(F.num(valueSize * L.s, .semibold))
+                    .foregroundStyle(aod ? W8.aodText : tone.ink)
+                    .lineLimit(1).minimumScaleFactor(0.55).frame(width: cw - 2)
+                    .contentTransition(.numericText())
+                    .position(x: cx, y: L.y(valueY))
+            }
+        }
+        .w8Shadow(tone, L, aod)
     }
 }
 
@@ -330,27 +362,22 @@ struct WLive: View {
                 .stroke(aod ? W8.aodMark : tone.mark, style: StrokeStyle(lineWidth: 2.6 * L.s, lineCap: .round, lineJoin: .round))
                 .frame(width: L.v(176), height: L.v(54))
                 .position(x: L.x(104), y: L.y(59))
-            VStack(spacing: 1 * L.s) {
-                Text(verbatim: cur.name).font(F.t(27 * L.s, .bold)).foregroundStyle(ink)
-                    .lineLimit(1).minimumScaleFactor(16 / 27)
+            // 이름 27 (길면 16 까지) + 무게 · 거리 15 — 대문자 높이로 재서 귀퉁이 표시(32~86) 가운데에, 사이 9.5
+            Text(verbatim: cur.name).font(F.t(27 * L.s, .bold)).foregroundStyle(ink)
+                .lineLimit(1).minimumScaleFactor(16 / 27)
+                .frame(width: L.v(168))
+                .w8Shadow(tone, L, aod)
+                .position(x: L.x(104), y: L.y(info.isEmpty ? 59 : 49))
+            if !info.isEmpty {
+                Text(verbatim: info).font(F.t(15 * L.s, .semibold)).foregroundStyle(sub)
+                    .lineLimit(1).minimumScaleFactor(0.6)
                     .frame(width: L.v(168))
-                if !info.isEmpty {
-                    Text(verbatim: info).font(F.t(15 * L.s, .semibold)).foregroundStyle(sub)
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                        .frame(width: L.v(160))
-                }
+                    .w8Shadow(tone, L, aod)
+                    .position(x: L.x(104), y: L.y(73.3))
             }
-            .w8Shadow(tone, L, aod)
-            .position(x: L.x(104), y: L.y(59))
-            // 칸 (이름표 y94 부터)
-            HStack(spacing: 0) {
-                ForEach(Array(columns(cur: cur, el: el).enumerated()), id: \.offset) { _, c in
-                    W8Column(L: L, label: c.label, value: c.value, tone: tone, aod: aod, strongLabel: c.strong)
-                }
-            }
-            .frame(width: L.v(184))
-            .w8Shadow(tone, L, aod)
-            .position(x: L.x(104), y: L.y(113))
+            // 칸: 이름표 대문자 가운데 100 · 값 120.3
+            W8ColsRow(L: L, cols: columns(cur: cur, el: el).map { ($0.label, $0.value, $0.strong) },
+                      labelY: 100, valueY: 120.3, tone: tone, aod: aod)
             // 진행 점 (HIIT 는 "3 rounds done")
             if engine.isHIIT {
                 Text(String(format: "%lld rounds done".l10n, engine.idx))
@@ -363,7 +390,7 @@ struct WLive: View {
             // Next
             nextLine(L: L)
                 .w8Shadow(tone, L, aod)
-                .position(x: L.x(104), y: L.y(160))
+                .position(x: L.x(104), y: L.y(169.3))
         }
     }
 
@@ -429,9 +456,9 @@ struct WLive: View {
     }
 
     private func nextLine(L: W8Scale) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 5 * L.s) {
-            Text("Next").font(F.t(13 * L.s, .semibold))
-                .foregroundStyle(aod ? W8.aodText : tone.label)
+        HStack(alignment: .firstTextBaseline, spacing: 9 * L.s) {
+            Text("Next").font(F.t(17 * L.s, .semibold))
+                .foregroundStyle(aod ? W8.aodText : tone.sub)
             Text(verbatim: isLast ? "Finish".l10n : nextSeg.name).font(F.t(17 * L.s, .bold))
                 .foregroundStyle(aod ? W8.aodText : tone.ink)
                 .lineLimit(1).minimumScaleFactor(12 / 17)
@@ -455,33 +482,30 @@ struct WLive: View {
                 .stroke(aod ? W8.aodMark : tone.mark, style: StrokeStyle(lineWidth: 2.6 * L.s, lineCap: .round, lineJoin: .round))
                 .frame(width: L.v(176), height: L.v(66))
                 .position(x: L.x(104), y: L.y(65))
-            VStack(spacing: 0) {
-                Text(verbatim: engine.title.isEmpty ? "Run".l10n : engine.title).font(F.t(13 * L.s, .semibold)).foregroundStyle(sub)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                Text(verbatim: Units.dist(d, imp)).font(F.num(40 * L.s, .bold)).foregroundStyle(ink)
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                    .contentTransition(.numericText())
-                Text(imp ? "MI" : "KM").font(F.t(10 * L.s, .bold)).tracking(0.8).foregroundStyle(sub)
-            }
-            .w8Shadow(tone, L, aod)
-            .position(x: L.x(104), y: L.y(65))
-            HStack(spacing: 0) {
-                W8Column(L: L, label: (imp ? "PACE /MI" : "PACE").l10n,
-                         value: engine.paceText(el: total, dist: d, imperial: imp) ?? "--", tone: tone, aod: aod, valueSize: 20)
-                W8Column(L: L, label: "♥ " + "BPM".l10n, value: engine.hr > 0 ? String(Int(engine.hr.rounded())) : "--",
-                         tone: tone, aod: aod, valueSize: 20)
-            }
-            .frame(width: L.v(160))
-            .w8Shadow(tone, L, aod)
-            .position(x: L.x(104), y: L.y(122))
+            // 시안: 이름 13 (39.4) · 거리 40 (68.4) · KM 10 (91.6) — 대문자 가운데
+            Text(verbatim: engine.title.isEmpty ? "Run".l10n : engine.title).font(F.t(13 * L.s, .bold)).foregroundStyle(sub)
+                .lineLimit(1).minimumScaleFactor(0.7).frame(width: L.v(160))
+                .w8Shadow(tone, L, aod)
+                .position(x: L.x(104), y: L.y(39.4))
+            Text(verbatim: Units.dist(d, imp)).font(F.num(40 * L.s, .bold)).foregroundStyle(ink)
+                .lineLimit(1).minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+                .w8Shadow(tone, L, aod)
+                .position(x: L.x(104), y: L.y(68.4))
+            Text(imp ? "MI" : "KM").font(F.t(10 * L.s, .bold)).tracking(0.8).foregroundStyle(aod ? W8.aodText : tone.label)
+                .position(x: L.x(104), y: L.y(91.6))
+            W8ColsRow(L: L, cols: [((imp ? "PACE /MI" : "PACE").l10n, engine.paceText(el: total, dist: d, imperial: imp) ?? "--", false),
+                                   ("♥ " + "BPM".l10n, engine.hr > 0 ? String(Int(engine.hr.rounded())) : "--", false)],
+                      labelY: 109, valueY: 129, tone: tone, aod: aod)
             // 진행 막대 (좌우 40 안쪽, 굵기 4)
             W8RunBar(L: L, frac: goalM > 0 ? min(1, d / goalM) : nil, tone: tone, aod: aod)
                 .frame(width: L.v(128), height: 4 * L.s)
-                .position(x: L.x(104), y: L.y(146))
-            Text(verbatim: runSummary(d: d, total: total)).font(F.num(12 * L.s, .semibold)).foregroundStyle(sub)
+                .position(x: L.x(104), y: L.y(150))
+            Text(verbatim: runSummary(d: d, total: total)).font(F.num(15 * L.s, .semibold)).foregroundStyle(sub)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .frame(width: L.v(172))
-                .position(x: L.x(104), y: L.y(160))
+                .w8Shadow(tone, L, aod)
+                .position(x: L.x(104), y: L.y(169))
         }
     }
 
@@ -585,36 +609,16 @@ struct W8InfoFrame: View {
             ZStack {
                 W8Background(tone: tone, zone: zone, seed: engine.isRunKind ? 1 : engine.idx, dim: aod)
                 W8TotalRow(L: L, label: engine.isRunKind ? "TIME" : "TOTAL", value: Fm.t(engine.total(Date())), tone: tone, aod: aod)
-                VStack(spacing: 14 * L.s) {
-                    Button(action: onTapBig) {
-                        VStack(spacing: 9 * L.s) {
-                            Text(big.label.l10n).font(F.t(12 * L.s, .bold)).tracking(0.8)
-                                .foregroundStyle(aod ? W8.aodText : tone.label)
-                            Text(verbatim: big.value).font(F.num(44 * L.s, .bold))
-                                .foregroundStyle(aod ? W8.aodText : tone.ink)
-                                .lineLimit(1).minimumScaleFactor(30 / 44)
-                                .frame(width: L.v(146))
-                                .contentTransition(.numericText())
-                            if !big.word.isEmpty {
-                                Text(big.word.l10n).font(F.t(11 * L.s, .bold)).tracking(0.8)
-                                    .foregroundStyle(aod ? W8.aodText : tone.sub)
-                            }
-                        }
-                        .padding(.vertical, 11 * L.s)
-                        .frame(width: L.v(176))
-                        .overlay(W8Brackets(arm: 9 * L.s)
-                            .stroke(aod ? W8.aodMark : tone.mark, style: StrokeStyle(lineWidth: 2.6 * L.s, lineCap: .round, lineJoin: .round)))
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    HStack(spacing: 0) {
-                        cell(left, L: L, tone: tone)
-                        cell(right, L: L, tone: tone)
-                    }
-                    .frame(width: L.v(176))
-                }
-                .w8Shadow(tone, L, aod)
-                .position(x: L.w / 2, y: (L.y(30) + L.h - 16 * L.s) / 2)
+                // 시안: [이름표 12 → 9 → 숫자 44 → 9 → 말 11] 안쪽 위아래 11 → 14 → 두 칸 (10 → 6 → 19). 위 줄 아래(30) ~ 아래 16 의 가운데
+                W8Stack(L: L, parts: [
+                    .block(label: big.label, value: big.value, word: big.word.isEmpty ? nil : big.word,
+                           color: aod ? W8.aodText : tone.ink, labelSize: 12, valueSize: 44, wordSize: 11, inner: 9, pad: 11, onTap: onTapBig),
+                    .cols([(left.label, left.value), (right.label, right.value)], labelSize: 10, valueSize: 19, inner: 6, gap: 14,
+                          onTap: { i in onTap(i == 0 ? left.key : right.key) })
+                ], top: L.t(30), bottom: L.b(16),
+                ink: aod ? W8.aodText : tone.ink, label: aod ? W8.aodText : tone.label,
+                word: aod ? W8.aodText : tone.sub, mark: aod ? W8.aodMark : tone.mark,
+                shadow: aod ? .clear : tone.shadow)
             }
             .frame(width: L.w, height: L.h)
         }
@@ -730,8 +734,9 @@ struct WControls: View {
     private func screen(now: Date, L: W8Scale) -> some View {
         let h: CGFloat = 34 * L.s
         let gap: CGFloat = 7 * L.s
-        let top: CGFloat = L.y(30)
-        let bottom: CGFloat = L.h - 30 * L.s
+        // 시안: 버튼 4줄은 위 줄 아래(32) ~ 안내 글 위 10 의 가운데, 안내 글 아래 끝은 화면 아래 16
+        let top: CGFloat = L.t(32)
+        let bottom: CGFloat = L.b(36.5)
         return ZStack {
             W8Background(tone: tone, zone: zone, seed: engine.isRunKind ? 1 : engine.idx, dim: aod, darker: 0.12)
             W8TotalRow(L: L, label: engine.isRunKind ? "TIME" : "TOTAL", value: Fm.t(engine.total(now)), tone: tone, aod: aod)
@@ -767,9 +772,9 @@ struct WControls: View {
             .padding(.horizontal, 16 * L.s)
             .position(x: L.w / 2, y: (top + bottom) / 2)
             Text("‹ Swipe left to go back")
-                .font(F.t(11 * L.s, .medium)).foregroundStyle(tone.sub)
+                .font(F.t(11 * L.s, .semibold)).foregroundStyle(tone.label)
                 .lineLimit(1).minimumScaleFactor(0.8)
-                .position(x: L.w / 2, y: L.h - 22 * L.s)
+                .position(x: L.w / 2, y: L.b(23))
         }
         .frame(width: L.w, height: L.h)
         .contentShape(Rectangle())
@@ -807,64 +812,54 @@ struct WEndSheet: View {
     /// 버리기를 한 번 눌렀음 → 한 번 더 묻는 화면
     @State private var askDiscard = false
 
+    /// 1.2.7 시안: 제목 41 · 블록은 52 ~ 윗 버튼(150) 위 2 의 가운데 · 버튼 40 두 줄 (150 ~ 190 / 196 ~ 236)
     var body: some View {
-        GeometryReader { geo in
-            let s: CGFloat = min(geo.size.width / 208, geo.size.height / 248)
+        W8Canvas { L in
             ZStack {
                 W8MenuBackground(seed: 61)
-                VStack(spacing: 0) {
-                    W8MenuTitle(title: askDiscard ? "Discard this workout?" : "End workout?")
-                        .frame(height: 40 * s)
-                        .padding(.top, 30 * s)
-                    Spacer(minLength: 4)
-                    block
-                        .padding(.horizontal, 16 * s)
-                    Spacer(minLength: 4)
-                    buttons(s: s)
-                        .padding(.horizontal, 12 * s).padding(.bottom, 12 * s)
-                }
+                W8TitleAt(L: L, title: askDiscard ? "Discard this workout?" : "End workout?")
+                W8Stack(L: L, parts: [block], top: L.t(52), bottom: L.btnY(1) - L.btnH / 2 - 2 * L.s)
+                buttons(L)
             }
         }
-        .ignoresSafeArea()
     }
 
     private var doneCount: Int { engine.seq.prefix(engine.idx).filter { $0.kind != .rox }.count }
     private var allCount: Int { engine.seq.filter { $0.kind != .rox }.count }
 
-    @ViewBuilder private var block: some View {
+    private var block: W8Part {
         if askDiscard {
-            W8BigBlock(label: "TOTAL", value: Fm.t(engine.total(Date())), word: "NOTHING WILL BE SAVED", color: Color(hex: 0xFF6B60))
-        } else if engine.growsOpen || engine.isNewKind {
-            W8BigBlock(label: "TOTAL", value: Fm.t(engine.total(Date())), word: "EVERYTHING WILL BE SAVED")
-        } else {
-            W8BigBlock(label: "SEGMENTS DONE", value: "\(doneCount) / \(allCount)",
-                       word: doneCount < allCount ? "REST WON'T BE SAVED" : "")
+            return .block(label: "TOTAL", value: Fm.t(engine.total(Date())), word: "NOTHING WILL BE SAVED", color: Color(hex: 0xFF6B60))
         }
+        if engine.growsOpen || engine.isNewKind {
+            return .block(label: "TOTAL", value: Fm.t(engine.total(Date())), word: "EVERYTHING WILL BE SAVED")
+        }
+        return .block(label: "SEGMENTS DONE", value: "\(doneCount) / \(allCount)",
+                      word: doneCount < allCount ? "REST WON'T BE SAVED" : nil)
     }
 
-    @ViewBuilder private func buttons(s: CGFloat) -> some View {
+    @ViewBuilder private func buttons(_ L: W8Scale) -> some View {
         if askDiscard {
-            VStack(spacing: 6 * s) {
-                W8GlassButton(title: "Discard", red: true, height: 40 * s, action: onDiscard)
-                    .accessibilityIdentifier("w.discardConfirm")
-                W8GlassButton(title: "Cancel", height: 40 * s) {
-                    withAnimation(.easeOut(duration: 0.15)) { askDiscard = false }
-                }
+            W8GlassButton(title: "Discard", red: true, height: L.btnH, action: onDiscard)
+                .frame(width: L.btnW).position(x: L.cx, y: L.btnY(1))
+                .accessibilityIdentifier("w.discardConfirm")
+            W8GlassButton(title: "Cancel", height: L.btnH) {
+                withAnimation(.easeOut(duration: 0.15)) { askDiscard = false }
             }
+            .frame(width: L.btnW).position(x: L.cx, y: L.btnY(0))
         } else {
-            VStack(spacing: 6 * s) {
-                W8PrimaryButton(title: "Save & end", height: 40 * s, action: onEnd)
-                    .accessibilityIdentifier("w.endConfirm")
-                HStack(spacing: 6 * s) {
-                    W8GlassButton(title: "Discard", red: true, height: 40 * s) {
-                        WKInterfaceDevice.current().play(.click)
-                        withAnimation(.easeOut(duration: 0.15)) { askDiscard = true }
-                    }
-                    .accessibilityIdentifier("w.discard")
-                    W8GlassButton(title: "Resume", height: 40 * s, action: onResume)
-                        .accessibilityIdentifier("w.resume")
-                }
+            W8PrimaryButton(title: "Save & end", height: L.btnH, action: onEnd)
+                .frame(width: L.btnW).position(x: L.cx, y: L.btnY(1))
+                .accessibilityIdentifier("w.endConfirm")
+            W8GlassButton(title: "Discard", red: true, height: L.btnH) {
+                WKInterfaceDevice.current().play(.click)
+                withAnimation(.easeOut(duration: 0.15)) { askDiscard = true }
             }
+            .frame(width: L.halfW).position(x: L.cx - (L.halfW + 6 * L.s) / 2, y: L.btnY(0))
+            .accessibilityIdentifier("w.discard")
+            W8GlassButton(title: "Resume", height: L.btnH, action: onResume)
+                .frame(width: L.halfW).position(x: L.cx + (L.halfW + 6 * L.s) / 2, y: L.btnY(0))
+                .accessibilityIdentifier("w.resume")
         }
     }
 }
@@ -874,57 +869,66 @@ struct WEndSheet: View {
 struct WSummary: View {
     let engine = WorkoutEngine.shared
 
+    /// 1.2.7 시안: 첫 화면 = 제목(모드, 41) · [응원 → TOTAL 블록 → 등수] 가운데 · Done 은 아래 큰 버튼 자리.
+    /// 아래로 내리면 AVG · MAX · KCAL · 구간 기록 (지금처럼)
     var body: some View {
-        ZStack {
-            W8MenuBackground(seed: 73)
-            VStack(spacing: 0) {
-                W8MenuTitle(title: engine.lastRecord.map { $0.mode == .training ? $0.title : $0.mode.name } ?? "")
-                    .frame(height: 40).padding(.top, 30)
+        W8Canvas { L in
+            ZStack {
+                W8MenuBackground(seed: 62)
                 ScrollView {
-                    if let r = engine.lastRecord {
-                        VStack(spacing: 12) {
-                            head(r)
-                            doneButton
-                            stats(r)
-                            rows(r)
+                    VStack(spacing: 12 * L.s) {
+                        first(L)
+                            .frame(width: L.w, height: L.h)
+                        if let r = engine.lastRecord {
+                            stats(r).padding(.horizontal, 12 * L.s)
+                            rows(r).padding(.horizontal, 12 * L.s)
+                            Color.clear.frame(height: 16 * L.s)
                         }
-                        .padding(.top, 2).padding(.horizontal, 12).padding(.bottom, 16)
                     }
                 }
-                .clipped()
+                .scrollIndicators(.hidden)
             }
         }
-        .ignoresSafeArea()
     }
 
-    private func head(_ r: Record) -> some View {
-        let tg: Int = r.vsTarget ?? r.total
-        let showVs: Bool = r.vsTarget != nil
-        return VStack(spacing: 10) {
-            Text(cheer(r).line).font(F.t(13, .semibold)).foregroundStyle(C.accent)
-                .multilineTextAlignment(.center).lineLimit(3).minimumScaleFactor(0.8)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("w.cheer")
-            W8BigBlock(label: "TOTAL", value: Fm.t(r.total),
-                       word: showVs ? Fm.d(r.total - tg) + " " + r.vsWord.l10n : nil)
-                .padding(.horizontal, 4)
-            if let g = r.pftGrade {
-                PFTBadge(grade: g, width: 84, height: 24, fontSize: 13)
+    private func first(_ L: W8Scale) -> some View {
+        ZStack {
+            W8TitleAt(L: L, title: engine.lastRecord.map { $0.mode == .training ? $0.title : $0.mode.name } ?? "")
+            if let r = engine.lastRecord {
+                W8Stack(L: L, parts: parts(r, L), top: L.t(52), bottom: L.btnTop)
             }
-            // 18번: "8 rounds" · "12 sets · 4,200 kg" 등
-            if let k = r.kindSummary {
-                Text(verbatim: k).font(F.t(13, .semibold)).foregroundStyle(C.accent)
-                    .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+            W8PrimaryButton(title: "Done", height: L.btnH) {
+                engine.reset()
+                WNav.shared.screen = .home
             }
-            // 1.2.4: 대략의 위치 한 줄
-            if r.mode == .race || r.mode == .sim, r.splits16 != nil, let rk = HyroxRank.of(division: r.division, total: r.total) {
-                Text(rk.pct.map { String(format: "About top %d%%".l10n, $0) } ?? rk.level.l10n)
-                    .font(F.t(13, .semibold)).foregroundStyle(.white)
-                    .lineLimit(1).minimumScaleFactor(0.75)
-                    .accessibilityIdentifier("w.rank")
-            }
+            .frame(width: L.btnW)
+            .position(x: L.cx, y: L.btnY())
+            .accessibilityIdentifier("w.done")
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    private func parts(_ r: Record, _ L: W8Scale) -> [W8Part] {
+        let tg: Int = r.vsTarget ?? r.total
+        var p: [W8Part] = [
+            .view(height: 20, AnyView(
+                Text(cheer(r).line).font(F.t(13 * L.s, .semibold)).foregroundStyle(C.accent)
+                    .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+                    .padding(.horizontal, 14 * L.s)
+                    .accessibilityIdentifier("w.cheer"))),
+            .block(label: "TOTAL", value: Fm.t(r.total),
+                   word: r.vsTarget != nil ? Fm.d(r.total - tg) + " " + r.vsWord.l10n : nil, gap: 10)
+        ]
+        if let g = r.pftGrade {
+            p.append(.view(height: 22, gap: 10, AnyView(PFTBadge(grade: g, width: 78 * L.s, height: 22 * L.s, fontSize: 12 * L.s))))
+        }
+        if let k = r.kindSummary {
+            p.append(.text(k, size: 13, weight: .semibold, color: C.accent, gap: 12))
+        }
+        if r.mode == .race || r.mode == .sim, r.splits16 != nil, let rk = HyroxRank.of(division: r.division, total: r.total) {
+            p.append(.text(rk.pct.map { String(format: "About top %d%%".l10n, $0) } ?? rk.level.l10n, size: 13, weight: .semibold,
+                           color: C.accent, gap: 12))
+        }
+        return p
     }
 
     /// 워치가 아는 것: 내 최고 Full Sim · 최고 PFT · 레이스 목표 · 대회 날짜 · 심박

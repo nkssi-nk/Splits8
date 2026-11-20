@@ -69,36 +69,33 @@ struct WTimerLive: View {
                 .stroke(aod ? W8.aodMark : t.mark, style: StrokeStyle(lineWidth: 2.6 * L.s, lineCap: .round, lineJoin: .round))
                 .frame(width: L.v(176), height: L.v(66))
                 .position(x: L.x(104), y: L.y(65))
-            VStack(spacing: 0) {
-                Text(verbatim: top(f)).font(F.t(13 * L.s, .bold)).tracking(0.8).foregroundStyle(sub)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                Text(verbatim: mp.0).font(F.num(40 * L.s, .bold)).foregroundStyle(ink)
-                    .lineLimit(1).minimumScaleFactor(0.55)
-                    .contentTransition(.numericText(countsDown: true))
-                    .accessibilityIdentifier("w.timerMain")
-                if !small.isEmpty {
-                    Text(verbatim: small).font(F.t(10 * L.s, .bold)).foregroundStyle(sub)
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                }
+            // 시안 (대문자 가운데): 단계 이름 13 → 39.9 · 큰 숫자 40 → 68.9 (단위 · 설명이 없으면 65) · 단위 · 설명 10 → 91.1
+            Text(verbatim: top(f)).font(F.t(13 * L.s, .bold)).tracking(0.8).foregroundStyle(sub)
+                .lineLimit(1).minimumScaleFactor(0.7).frame(width: L.v(164))
+                .w8Shadow(t, L, aod)
+                .position(x: L.x(104), y: L.y(small.isEmpty ? 42 : 39.9))
+            Text(verbatim: mp.0).font(F.num(40 * L.s, .bold)).foregroundStyle(ink)
+                .lineLimit(1).minimumScaleFactor(0.55).frame(width: L.v(164))
+                .contentTransition(.numericText(countsDown: true))
+                .w8Shadow(t, L, aod)
+                .position(x: L.x(104), y: L.y(small.isEmpty ? 73 : 68.9))
+                .accessibilityIdentifier("w.timerMain")
+            if !small.isEmpty {
+                Text(verbatim: small).font(F.t(10 * L.s, .bold)).foregroundStyle(sub)
+                    .lineLimit(1).minimumScaleFactor(0.7).frame(width: L.v(164))
+                    .w8Shadow(t, L, aod)
+                    .position(x: L.x(104), y: L.y(91.1))
             }
-            .frame(width: L.v(164))
-            .w8Shadow(t, L, aod)
-            .position(x: L.x(104), y: L.y(65))
-            HStack(spacing: 0) {
-                W8Column(L: L, label: countLabel.l10n, value: f.count.isEmpty ? "--" : f.count, tone: t, aod: aod, valueSize: 20)
-                W8Column(L: L, label: "♥ " + "BPM".l10n, value: engine.hr > 0 ? String(Int(engine.hr.rounded())) : "--",
-                         tone: t, aod: aod, valueSize: 20)
-            }
-            .frame(width: L.v(160))
-            .w8Shadow(t, L, aod)
-            .position(x: L.x(104), y: L.y(122))
+            W8ColsRow(L: L, cols: [(countLabel.l10n, f.count.isEmpty ? "--" : f.count, false),
+                                   ("♥ " + "BPM".l10n, engine.hr > 0 ? String(Int(engine.hr.rounded())) : "--", false)],
+                      labelY: 109, valueY: 127.9, valueSize: 20, tone: t, aod: aod)
             if let d = dots(f) {
                 W8Dots(L: L, total: d.1, current: d.0, tone: t, aod: aod)
-                    .position(x: L.x(104), y: L.y(146))
+                    .position(x: L.x(104), y: L.y(149))
             }
             nextLine(L: L, t: t)
                 .w8Shadow(t, L, aod)
-                .position(x: L.x(104), y: L.y(160))
+                .position(x: L.x(104), y: L.y(170))
             buttons(L: L, t: t)
         }
         .frame(width: L.w, height: L.h)
@@ -128,10 +125,10 @@ struct WTimerLive: View {
 
     private func nextLine(L: W8Scale, t: W8Tone) -> some View {
         let what: String? = TimerFaces.nextWhat(kind: kind, seq: engine.seq, idx: engine.idx)
-        return HStack(alignment: .firstTextBaseline, spacing: 5 * L.s) {
+        return HStack(alignment: .firstTextBaseline, spacing: 9 * L.s) {
             if kind != WKind.amrap {
-                Text("Next").font(F.t(13 * L.s, .semibold))
-                    .foregroundStyle(aod ? W8.aodText : t.label)
+                Text("Next").font(F.t(17 * L.s, .semibold))
+                    .foregroundStyle(aod ? W8.aodText : t.sub)
                 Text(verbatim: what ?? "Finish".l10n).font(F.t(17 * L.s, .bold))
                     .foregroundStyle(aod ? W8.aodText : t.ink)
                     .lineLimit(1).minimumScaleFactor(12 / 17)

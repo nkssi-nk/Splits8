@@ -46,36 +46,22 @@ struct TimerLiveBody: View {
         let what: String? = TimerFaces.nextWhat(kind: kind, seq: seq, idx: idx)
         ZStack {
             LiveBrackets(L: L, tone: t)
-            VStack(spacing: L.v(4)) {
-                Text(verbatim: top).font(F.t(L.v(17), .bold)).tracking(1).foregroundStyle(t.sub)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                    .accessibilityIdentifier("timer.label")
-                Text(verbatim: big).font(F.num(L.v(84), .bold)).foregroundStyle(t.ink)
-                    .lineLimit(1).minimumScaleFactor(0.45)
-                    .contentTransition(.numericText(countsDown: true))
-                    .accessibilityIdentifier("timer.main")
-                if !small.isEmpty {
-                    Text(verbatim: small).font(F.t(L.v(15), .bold)).foregroundStyle(t.sub)
-                        .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
-                }
-            }
-            .frame(width: L.w - 80)
-            .shadow(color: t.shadow, radius: 7, y: 2)
-            .position(x: L.w / 2, y: L.y(244))
+            LiveBigBlock(L: L, label: top, main: big, unit: small, tone: t)
+                .accessibilityIdentifier("timer.main")
             HStack(spacing: 0) {
                 LiveCell(L: L, label: countLabel.l10n, value: f.count.isEmpty ? "--" : f.count, tone: t)
                 if let pace { LiveCell(L: L, label: "PACE".l10n, value: pace, tone: t) }
                 if let hr { LiveCell(L: L, label: "♥ " + "BPM".l10n, value: hr > 0 ? "\(hr)" : "--", tone: t) }
             }
-            .frame(width: L.w - 40)
+            .frame(width: L.w - 48)
             .shadow(color: t.shadow, radius: 7, y: 2)
-            .position(x: L.w / 2, y: L.y(378 + 26))
+            .position(x: L.w / 2, y: L.y(398))
             if let d = dots {
                 LiveDots(L: L, total: d.1, current: d.0, tone: t).position(x: L.w / 2, y: L.y(482))
             }
             if kind != WKind.amrap {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text("Next").font(F.t(L.v(18), .semibold)).foregroundStyle(t.label)
+                    Text("Next").font(F.t(L.v(26), .semibold)).foregroundStyle(t.sub)
                     Text(verbatim: what ?? "Finish".l10n).font(F.t(L.v(26), .bold)).foregroundStyle(t.ink)
                         .lineLimit(1).minimumScaleFactor(0.6)
                         .accessibilityIdentifier("timer.next")

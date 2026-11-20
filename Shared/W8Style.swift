@@ -119,7 +119,7 @@ struct W8Blobs: View {
     private struct Blob { let x: CGFloat, y: CGFloat, r: CGFloat, a: Double }
 
     private var blobs: [Blob] {
-        var g = SeededRandom(seed: UInt64(seed &* 7919 &+ 17))
+        var g = W8Rand(seed: UInt64(seed &* 7919 &+ 17))
         let n: Int = 2 + Int(g.next() % 3)
         return (0..<n).map { _ in
             Blob(x: 0.05 + 0.9 * g.unit(), y: 0.1 + 0.85 * g.unit(), r: 0.18 + 0.22 * g.unit(), a: 0.6 + 0.4 * g.unit())
@@ -144,7 +144,7 @@ struct W8Blobs: View {
 }
 
 /// 같은 seed → 같은 수 (SplitMix64)
-struct SeededRandom {
+struct W8Rand {
     private var state: UInt64
     init(seed: UInt64) { state = seed &+ 0x9E37_79B9_7F4A_7C15 }
     mutating func next() -> UInt64 {

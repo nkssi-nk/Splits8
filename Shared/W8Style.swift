@@ -9,6 +9,10 @@ import SwiftUI
 enum W8Tone: Equatable {
     case station, run, gray
 
+    /// 11-21 대표님: 빌드 화면(심박 162 = Z4)에서 바탕이 주황으로 변한 것을 보고 "이렇게 해 줘"(시안 '지금 · 덩어리')
+    /// → 심박 존에 따라 바탕색을 바꾸지 않음. 구간 색(노랑 · 파랑 · 회색)만. 다시 켜려면 true
+    static let zoneTint: Bool = false
+
     static func of(_ s: Seg) -> W8Tone {
         if s.kind == .rox { return .gray }
         return s.icon == "run" ? .run : .station
@@ -82,7 +86,7 @@ struct W8Background: View {
             ZStack {
                 LinearGradient(colors: tone.stops, startPoint: .top, endPoint: .bottom)
                 // 심박 Z4 · Z5: 겹쳐 놓고 투명도만 천천히 바꿈 (1초)
-                ForEach([4, 5], id: \.self) { z in
+                ForEach(W8Tone.zoneTint ? [4, 5] : [], id: \.self) { z in
                     if let zs = tone.zoneStops(z) {
                         LinearGradient(stops: [.init(color: zs.colors[0], location: 0),
                                                .init(color: zs.colors[1], location: zs.mid),
@@ -366,19 +370,22 @@ struct W8BigBlock: View {
     let value: String
     var word: String? = nil
     var color: Color = .white
+    /// 큰 숫자 크기 · 안쪽 위아래 여백 (End 창처럼 버튼이 두 줄이면 줄임)
+    var valueSize: CGFloat = 38
+    var pad: CGFloat = 12
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: pad >= 12 ? 8 : 5) {
             Text(label.l10n).font(F.t(11, .bold)).tracking(0.6).foregroundStyle(Color.white.opacity(0.65))
                 .lineLimit(1).minimumScaleFactor(0.7)
-            Text(verbatim: value).font(F.num(38, .bold)).foregroundStyle(color)
+            Text(verbatim: value).font(F.num(valueSize, .bold)).foregroundStyle(color)
                 .lineLimit(1).minimumScaleFactor(0.6)
             if let word, !word.isEmpty {
                 Text(word.l10n).font(F.t(11, .bold)).tracking(0.5).foregroundStyle(Color.white.opacity(0.55))
                     .lineLimit(1).minimumScaleFactor(0.7)
             }
         }
-        .padding(.vertical, 12).padding(.horizontal, 10)
+        .padding(.vertical, pad).padding(.horizontal, 10)
         .frame(maxWidth: .infinity)
         .overlay(W8Brackets(arm: 9).stroke(Color.white.opacity(0.47), style: StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round)))
     }

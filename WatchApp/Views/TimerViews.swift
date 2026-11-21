@@ -151,7 +151,7 @@ struct WTimerLive: View {
     private func buttons(L: W8Scale, t: W8Tone) -> some View {
         let cy: CGFloat = L.h - 32 * L.s
         let ic: Color = aod ? W8.aodText : t.ink
-        let mainIc: Color = aod ? W8.aodText : (t.dark ? C.accent : Color(hex: 0x1E78FA))
+        let mainIc: Color = aod ? W8.aodText : t.ink
         return ZStack {
             W8CircleButton(L: L, r: 18, tone: t, aod: aod, on: engine.canUndo, id: "w.timerUndo",
                            action: { withAnimation(WLive.slideCurve) { engine.undo() } }) {

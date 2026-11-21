@@ -234,6 +234,11 @@ struct WHome: View {
             let tot: CGFloat = 4 * hgt + 3 * gap
             let y0: CGFloat = (L.t(32) + L.b(10)) / 2 - tot / 2
             ZStack {
+                // 시안: 왼쪽 위 로고 (x 16, 높이 11, 가운데 y 20.5 — 시계 줄과 같은 줄)
+                Wordmark(size: 15 * s)
+                    .padding(.leading, 16 * s)
+                    .frame(width: L.w, alignment: .leading)
+                    .position(x: L.cx, y: L.t(20.5))
                 ForEach(Array(Mode.allCases.enumerated()), id: \.offset) { i, m in
                     Button { open(m) } label: { card(m, s: s, cw: L.w - 24 * s) }
                         .buttonStyle(W8Press())
@@ -241,11 +246,6 @@ struct WHome: View {
                         .position(x: L.cx, y: y0 + CGFloat(i) * (hgt + gap) + hgt / 2)
                         .accessibilityIdentifier("w.mode." + m.rawValue)
                 }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Wordmark(size: 11)
             }
         }
         .wNavBG(40)

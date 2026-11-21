@@ -268,11 +268,19 @@ struct W8CircleButton<Label: View>: View {
             ZStack {
                 if aod {
                     Circle().strokeBorder(W8.aodMark, lineWidth: 1.5)
-                } else if main {
-                    // 가운데: 노랑 위 = 어두운 유리, 파랑 · 회색 위 = 흰 유리
-                    W8Glass(shape: Circle(), fill: tone.dark ? Color.black.opacity(0.69) : Color.white.opacity(0.8), rim: 0.22)
                 } else {
-                    W8Glass(shape: Circle(), fill: Color.white.opacity(tone.glass), rim: 0.59)
+                    // 시안 '지금 · 덩어리' (r30): 세 버튼 모두 같은 맑은 유리 (노랑 위 흰 27% · 파랑 · 회색 위 18%)
+                    // + 옅은 둥근 테두리(흰 27%) + 위쪽 밝은 빛 · 아래쪽 옅은 빛. 가운데만 크게 (r25). 아이콘은 글자색(검정 / 흰)
+                    W8Glass(shape: Circle(), fill: Color.white.opacity(tone.glass), rim: 0)
+                    Circle().strokeBorder(Color.white.opacity(0.27), lineWidth: 0.9 * L.s)
+                        .padding(0.7 * L.s)
+                    // 위쪽 빛 (시계 방향 200°~340°) · 아래쪽 옅은 빛 (20°~160°)
+                    Circle().trim(from: 200.0 / 360, to: 340.0 / 360)
+                        .stroke(Color.white.opacity(0.75), style: StrokeStyle(lineWidth: 1.4 * L.s, lineCap: .round))
+                        .padding(1 * L.s)
+                    Circle().trim(from: 20.0 / 360, to: 160.0 / 360)
+                        .stroke(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1 * L.s, lineCap: .round))
+                        .padding(1 * L.s)
                 }
                 label().opacity(on ? 1 : 0.35)
             }
@@ -529,7 +537,7 @@ struct WLive: View {
     private func buttons(L: W8Scale) -> some View {
         let cy: CGFloat = L.h - 32 * L.s
         let ic: Color = aod ? W8.aodText : tone.ink
-        let mainIc: Color = aod ? W8.aodText : (tone.dark ? C.accent : Color(hex: 0x1E78FA))
+        let mainIc: Color = aod ? W8.aodText : tone.ink
         return ZStack {
             if engine.isRunKind {
                 // 러닝 카드: 가운데 큰 일시정지 하나
@@ -609,16 +617,50 @@ struct W8InfoFrame: View {
             ZStack {
                 W8Background(tone: tone, zone: zone, seed: engine.isRunKind ? 1 : engine.idx, dim: aod)
                 W8TotalRow(L: L, label: engine.isRunKind ? "TIME" : "TOTAL", value: Fm.t(engine.total(Date())), tone: tone, aod: aod)
-                // 시안: [이름표 12 → 9 → 숫자 44 → 9 → 말 11] 안쪽 위아래 11 → 14 → 두 칸 (10 → 6 → 19). 위 줄 아래(30) ~ 아래 16 의 가운데
-                W8Stack(L: L, parts: [
-                    .block(label: big.label, value: big.value, word: big.word.isEmpty ? nil : big.word,
-                           color: aod ? W8.aodText : tone.ink, labelSize: 12, valueSize: 44, wordSize: 11, inner: 9, pad: 11, onTap: onTapBig),
-                    .cols([(left.label, left.value), (right.label, right.value)], labelSize: 10, valueSize: 19, inner: 6, gap: 14,
-                          onTap: { i in onTap(i == 0 ? left.key : right.key) })
-                ], top: L.t(30), bottom: L.b(16),
-                ink: aod ? W8.aodText : tone.ink, label: aod ? W8.aodText : tone.label,
-                word: aod ? W8.aodText : tone.sub, mark: aod ? W8.aodMark : tone.mark,
-                shadow: aod ? .clear : tone.shadow)
+                // 시안 그림에서 잰 자리 그대로 (대문자 가운데 y): 귀퉁이 표시 65.8 ~ 157.2 · 이름표 12 → 81.3 · 숫자 44 → 111.8 · 말 11 → 142
+                // 아래 두 칸 (가운데 x 60 / 148): 이름표 10 → 175.5 · 값 19 → 192.8
+                let ink: Color = aod ? W8.aodText : tone.ink
+                let lab: Color = aod ? W8.aodText : tone.label
+                Group {
+                    W8Brackets(arm: 9 * L.s)
+                        .stroke(aod ? W8.aodMark : tone.mark, style: StrokeStyle(lineWidth: 2.6 * L.s, lineCap: .round, lineJoin: .round))
+                        .frame(width: L.v(176), height: L.v(91.4))
+                        .position(x: L.x(104), y: L.y(111.5))
+                    Text(verbatim: big.label.l10n).font(F.t(12 * L.s, .bold)).tracking(0.8).foregroundStyle(aod ? W8.aodText : tone.sub)
+                        .lineLimit(1).minimumScaleFactor(0.6).frame(width: L.v(160))
+                        .position(x: L.x(104), y: L.y(81.3))
+                    Text(verbatim: big.value).font(F.num(44 * L.s, .bold)).foregroundStyle(ink)
+                        .lineLimit(1).minimumScaleFactor(30 / 44).frame(width: L.v(146))
+                        .contentTransition(.numericText())
+                        .position(x: L.x(104), y: L.y(111.8))
+                    if !big.word.isEmpty {
+                        Text(verbatim: big.word.l10n).font(F.t(11 * L.s, .bold)).tracking(0.8).foregroundStyle(lab)
+                            .lineLimit(1).minimumScaleFactor(0.6).frame(width: L.v(160))
+                            .position(x: L.x(104), y: L.y(142))
+                    }
+                    ForEach(0..<2, id: \.self) { i in
+                        let it: Item = i == 0 ? left : right
+                        Text(verbatim: it.label.l10n).font(F.t(10 * L.s, .bold)).tracking(0.6).foregroundStyle(lab)
+                            .lineLimit(1).minimumScaleFactor(0.6).frame(width: L.v(84))
+                            .position(x: L.x(i == 0 ? 60 : 148), y: L.y(175.5))
+                        Text(verbatim: it.value).font(F.num(19 * L.s, .semibold)).foregroundStyle(ink)
+                            .lineLimit(1).minimumScaleFactor(0.6).frame(width: L.v(84))
+                            .contentTransition(.numericText())
+                            .position(x: L.x(i == 0 ? 60 : 148), y: L.y(192.8))
+                    }
+                }
+                .w8Shadow(tone, L, aod)
+                // 누르는 자리
+                Color.clear.contentShape(Rectangle())
+                    .frame(width: L.v(176), height: L.v(92))
+                    .position(x: L.x(104), y: L.y(111.5))
+                    .onTapGesture(perform: onTapBig)
+                ForEach(0..<2, id: \.self) { i in
+                    Color.clear.contentShape(Rectangle())
+                        .frame(width: L.v(88), height: L.v(36))
+                        .position(x: L.x(i == 0 ? 60 : 148), y: L.y(184))
+                        .onTapGesture { onTap(i == 0 ? left.key : right.key) }
+                }
             }
             .frame(width: L.w, height: L.h)
         }
@@ -735,8 +777,8 @@ struct WControls: View {
         let h: CGFloat = 34 * L.s
         let gap: CGFloat = 7 * L.s
         // 시안: 버튼 4줄은 위 줄 아래(32) ~ 안내 글 위 10 의 가운데, 안내 글 아래 끝은 화면 아래 16
-        let top: CGFloat = L.t(32)
-        let bottom: CGFloat = L.b(36.5)
+        let top: CGFloat = L.t(30.5)
+        let bottom: CGFloat = L.b(37.5)
         return ZStack {
             W8Background(tone: tone, zone: zone, seed: engine.isRunKind ? 1 : engine.idx, dim: aod, darker: 0.12)
             W8TotalRow(L: L, label: engine.isRunKind ? "TIME" : "TOTAL", value: Fm.t(engine.total(now)), tone: tone, aod: aod)

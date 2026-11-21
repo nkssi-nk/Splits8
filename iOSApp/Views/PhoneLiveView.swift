@@ -885,21 +885,22 @@ struct PhoneLiveView: View {
                             LiveMain(f: f, L: L, idPrefix: "phone")
                         }
                     }
-                    .frame(width: L.w, height: L.h)
+                    .frame(width: L.w, height: L.h).ignoresSafeArea()
                     .tag(0)
                     if !eng.isNewKind {
                         LiveGoalPage(f: f, L: L)
-                            .frame(width: L.w, height: L.h)
+                            .frame(width: L.w, height: L.h).ignoresSafeArea()
                             .tag(1)
                     }
                     if !eng.isNewKind && !eng.isRunKind {
                         LiveSegmentList(L: L, tone: tone, seq: eng.seq, idx: eng.idx, splits: eng.splits, skipped: eng.skippedIdx,
                                         segEl: eng.segEl(ctx.date), word: eng.deltaWord)
-                            .frame(width: L.w, height: L.h)
+                            .frame(width: L.w, height: L.h).ignoresSafeArea()
                             .tag(2)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                .ignoresSafeArea()     // 1.2.7: 쪽 안 자리를 화면 전체 기준으로 (안 하면 위아래 안전 영역 차이만큼 아래로 밀림)
                 .accessibilityIdentifier("phone.pages")
                 LiveTop(f: f, L: L, status: "iPhone · No HR", live: false, idPrefix: "phone")
                     .allowsHitTesting(false)

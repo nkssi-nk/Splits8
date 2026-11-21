@@ -120,7 +120,7 @@ struct LiveBackground: View {
     var body: some View {
         ZStack {
             LinearGradient(colors: tone.stops, startPoint: .top, endPoint: .bottom)
-            ForEach([4, 5], id: \.self) { z in
+            ForEach(W8Tone.zoneTint ? [4, 5] : [], id: \.self) { z in
                 if let zs = tone.zoneStops(z) {
                     LinearGradient(stops: [.init(color: zs.colors[0], location: 0),
                                            .init(color: zs.colors[1], location: zs.mid),

@@ -76,16 +76,17 @@ struct WatchLiveView: View {
                 } else {
                     TabView(selection: $page) {
                         LiveMain(f: f, L: L, idPrefix: "watchLive")
-                            .frame(width: L.w, height: L.h).tag(0)
+                            .frame(width: L.w, height: L.h).ignoresSafeArea().tag(0)
                         LiveGoalPage(f: f, L: L, maxHR: maxHR, avgHR: hrN > 0 ? hrSum / hrN : nil)
-                            .frame(width: L.w, height: L.h).tag(1)
+                            .frame(width: L.w, height: L.h).ignoresSafeArea().tag(1)
                         if !isRunCard(st) {
                             LiveSegmentList(L: L, tone: f.tone, seq: st.seq, idx: st.idx, splits: st.splits, skipped: [],
                                             segEl: f.segEl, word: st.vsWord)
-                                .frame(width: L.w, height: L.h).tag(2)
+                                .frame(width: L.w, height: L.h).ignoresSafeArea().tag(2)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
+                    .ignoresSafeArea()     // 1.2.7: 쪽 안 자리를 화면 전체 기준으로
                     LivePageDots(L: L, count: isRunCard(st) ? 2 : 3, page: page, tone: f.tone)
                     buttons(st, f, L)
                 }

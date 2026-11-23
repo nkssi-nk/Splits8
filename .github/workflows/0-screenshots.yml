@@ -89,7 +89,7 @@ jobs:
           echo "app: $APP"
           xcrun simctl install "$WUDID" "$APP"
           BID=com.nkssi.splits8.watchkitapp
-          for name in home programs quick confirm_training confirm_race live controls segments end summary; do
+          for name in home programs quick confirm_training confirm_race live controls segments end summary st_z1 st_z2 st_z3 st_z4 st_z5 run_z1 run_z2 run_z3 run_z4 run_z5 rox_z1 rox_z2 rox_z3 rox_z4 rox_z5; do
             xcrun simctl terminate "$WUDID" $BID >/dev/null 2>&1
             xcrun simctl launch "$WUDID" $BID --shot $name
             sleep 5

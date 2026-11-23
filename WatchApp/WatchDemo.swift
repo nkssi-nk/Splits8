@@ -49,6 +49,14 @@ enum WatchDemo {
         case "live", "controls", "segments", "goal", "stats", "end":
             let seq = SeqBuilder.full(div: s.div, rox: true, targets16: Defaults.goals)
             engine.demoRun(mode: .race, title: "Incheon", seq: seq, idx: 6, elapsed: 74, hr: 162, done: false)
+        case let n where n.hasPrefix("st_z") || n.hasPrefix("run_z") || n.hasPrefix("rox_z"):
+            // 1.2.7 화면 확인: 스테이션 · 러닝 · Roxzone × 심박 존 1~5 (레이스 Incheon 구간 6 = Sled Push, 4 = Run 2, 5 = Roxzone)
+            let z: Int = Int(String(n.last ?? "3")) ?? 3
+            let bpm: [Double] = [100, 118, 136, 155, 176]
+            let idx: Int = n.hasPrefix("st") ? 6 : (n.hasPrefix("run") ? 4 : 5)
+            let seq = SeqBuilder.full(div: s.div, rox: true, targets16: Defaults.goals)
+            engine.demoRun(mode: .race, title: "Incheon", seq: seq, idx: idx, elapsed: idx == 5 ? 21 : 74,
+                           hr: bpm[max(0, min(4, z - 1))], done: false)
         case "summary_training":
             let seq = SeqBuilder.training(preset, div: s.div, bests: [:])
             engine.demoRun(mode: .training, title: preset.name, seq: seq, idx: 0, elapsed: 0, hr: 150, done: true)

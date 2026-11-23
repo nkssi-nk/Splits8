@@ -103,8 +103,8 @@ fun PhoneRoot(screen: @Composable (Scr) -> Unit) {
             Crossfade(scr, animationSpec = tween(250), label = "screen") { s -> Box(Modifier.fillMaxSize()) { screen(s) } }
         }
 
-        // 상태 줄 뒤 검은 그라데이션
-        if (scr != Scr.Splash) {
+        // 상태 줄 뒤 검은 그라데이션 (1.2.7: 운동 중 화면은 뺌 — 색 바탕이 위까지)
+        if (scr != Scr.Splash && scr != Scr.PhoneLive && scr != Scr.WatchLive) {
             val top = statusTop()
             if (top > 0.dp) {
                 Box(Modifier.fillMaxWidth().height(top).background(Brush.verticalGradient(0.6f to Color.Black, 1f to Color.Transparent)))

@@ -52,6 +52,7 @@ object WIconRes {
         "qrScan" to R.drawable.qr_scan,
         "row" to R.drawable.row,
         "roxzone" to R.drawable.roxzone,
+        "rest" to R.drawable.rest,
         "run" to R.drawable.run,
         "sandbagLunges" to R.drawable.sandbag_lunges,
         "shareUp" to R.drawable.share_up,

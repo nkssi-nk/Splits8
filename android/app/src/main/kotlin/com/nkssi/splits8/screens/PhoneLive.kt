@@ -237,81 +237,52 @@ fun PhoneLiveView() {
     Sensors(eng, ctx)
 
     Box(Modifier.fillMaxSize()) {
-    // 1.1.2: 아이폰처럼 상태 줄 · 아래 내비게이션 줄을 뺀 안전 영역 안에만 그림 (크기 계산도 안전 영역 높이로)
-    BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
-        val m = LiveMetrics(maxHeight.value)
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-            // 빌드 24: 제목 / ● Phone · No HR / n / 16 / 막대 (워치 같이 보기 화면과 같은 머리)
-            val frame = phoneFrame(eng, now)
-            LiveHeader(frame, "Phone · No HR", live = false, tagPrefix = "phone")
-            // 1.1.2: 가운데는 남는 자리만 씀 → 글자가 커도 아래 버튼(Next/완료 · End · Undo · Pause)은 항상 보임 (아이폰 Spacer(minLength: 16) 와 같음)
-            Column(Modifier.weight(1f).clipToBounds()) {
-                if (Kinds.isNew(eng.kind)) {
-                    BonusLiveBody(eng, now, m, Modifier.padding(top = (m.top * 0.6f).dp))
-                    LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")
-                } else if (eng.isRunKind) {
-                    // 1.2.3: 러닝 카드는 구간(KM 1 · KM 2) 목록 페이지 없이 한 화면
-                    LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
-                } else {
-                    // 1.2.2: 워치처럼 왼쪽으로 넘기면 구간 목록 (끝난 구간 = 내 시간 + 비교 기준과 차이, 남은 구간 = 기준 시간)
-                    val pager = rememberPagerState(pageCount = { 2 })
-                    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth().testTag("phone.pages")) { page ->
-                        if (page == 0) Column(Modifier.fillMaxSize()) {
-                            LiveBody(frame, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "phone", Modifier.padding(top = (m.top * 0.6f).dp))
-                            if (!eng.isRunKind) LiveNextRow(eng.nextSeg, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop, m.k, "phone")     // 1.2.2: 러닝 카드는 NEXT KM 안 보임
-                        } else PhoneSegmentList(eng.seq, eng.idx, eng.splits, eng.skippedIdx, eng.segEl(now), eng.deltaWord, m)
-                    }
-                    // 쪽 표시 점 두 개
-                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.Center) {
-                        repeat(2) { i ->
-                            Box(Modifier.padding(horizontal = 4.dp).size(6.dp).clip(RoundedCornerShape(50))
-                                .background(if (pager.currentPage == i) Color.White else Color.White.copy(alpha = 0.3f)))
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            // Next 버튼 (GPS 러닝은 1 km 마다 저절로)
-            val gpsRun = eng.isRunKind && eng.useGPS
-            // 18번 EMOM: 이 라운드 "끝" 을 이미 눌렀으면 다음 간격까지 못 누름
-            val emomDone = eng.kind == Kinds.EMOM && eng.segWork.getOrNull(eng.idx) != null
-            val enabled = eng.running && !gpsRun && !emomDone && liftAsk == null
-            // 1.1.2: Finish 를 누른 뒤 기록 화면으로 넘어가는 0.25초 동안 버튼이 회색으로 바뀌어 "사라진 것처럼" 보이던 것 → 끝난 뒤에도 노란색 유지 (누를 수는 없음)
-            val looksOn = enabled || eng.finished
-            // 1.2.3: GPS 러닝 카드는 넘기기 버튼 없음 ("1 km 마다 자동 넘김" 글씨도 없앰)
-            if (!gpsRun) Row(
-                Modifier.fillMaxWidth().height(m.buttonH.dp).yellowFill(RoundedCornerShape(50), on = looksOn)
-                    .press(enabled = enabled, tag = "phone.next") {
-                        // 18번 기능성 운동: 세트 끝 → 횟수 · 무게 확인 칸 먼저
-                        if (eng.isLiftSet) { buzz(); liftAsk = eng.liftPrefill(); return@press }
-                        buzz(true); if (eng.kind != Kinds.EMOM) flashNow()
-                        eng.advance()?.let { success(); done(it) }
-                    },
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
-            ) {
-                val label = if (Kinds.isNew(eng.kind)) (if (!eng.hasNext && !eng.growsOpen && eng.kind != Kinds.EMOM && !(eng.kind == Kinds.LIFT && !eng.isLiftSet)) "Finish" else bonusNextLabel(eng))
-                    else if (eng.hasNext || eng.growsOpen) "Next" else "Finish"
-                T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (looksOn) Color.Black else C.text3), maxLines = 1, translate = false)
-            }
-            Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill(R.drawable.sym_stop, "End", C.bad, hex(0xFF453A, 0.22f), m.pillH, "phone.end") { askEnd() }
-                if (!eng.isRunKind) Pill(R.drawable.sym_undo, "Undo", if (eng.canUndo) Color.White else C.text3,
-                    Color.White.copy(alpha = if (eng.canUndo) 0.12f else 0.05f), m.pillH, "phone.undo", eng.canUndo) { buzz(); eng.undo() }
-                // 1.2.2: 지금 구간 건너뛰기 (시간 0 · 기록에 "건너뜀"). 스테이션 · 러닝만, Roxzone 은 흐리게
-                if (!Kinds.isNew(eng.kind) && !eng.isRunKind && !eng.growsOpen) {
-                    Pill(R.drawable.sym_skip, "Skip", if (eng.canSkip) Color.White else C.text3,
-                        Color.White.copy(alpha = if (eng.canSkip) 0.12f else 0.05f), m.pillH, "phone.skip", eng.canSkip) {
-                        buzz(true); flashNow()
-                        eng.skip()?.let { success(); done(it) }
-                    }
-                }
-                Pill(if (eng.running) R.drawable.sym_pause else R.drawable.sym_play, if (eng.running) "Pause" else "Resume",
-                    if (eng.running) Color.White else C.accent, Color.White.copy(alpha = 0.12f), m.pillH, "phone.pause") { eng.togglePause() }
+    // 1.2.7: 3장 (운동 · 목표 대비 · 구간 목록) — 화면 전체 기준 자리 (아이폰과 같은 393 × 852 비율). 맨 위 · 아래 버튼은 세 장 모두 같은 자리
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val L = PL(maxWidth.value, maxHeight.value)
+        val frame = phoneFrame(eng, now)
+        val isNew = Kinds.isNew(eng.kind)
+        val tone = if (isNew) timerTone(eng) else frame.tone
+        LiveBackground8(tone, if (eng.isRunKind) 1 else eng.idx)
+        val pageCount = if (isNew) 1 else if (eng.isRunKind) 2 else 3
+        val pager = rememberPagerState(pageCount = { pageCount })
+        HorizontalPager(pager, Modifier.fillMaxSize().testTag("phone.pages")) { page ->
+            when {
+                page == 0 && isNew -> TimerLive8(eng, now, L)
+                page == 0 -> LiveMain8(frame, L, "phone")
+                page == 1 -> LiveGoalPage8(frame, L)
+                else -> LiveSegmentList8(L, tone, eng.seq, eng.idx, eng.splits, eng.skippedIdx, eng.segEl(now), eng.deltaWord)
             }
         }
+        LiveTop8(frame, L, "Phone · No HR", live = false, tagPrefix = "phone")
+        if (!isNew) LivePageDots8(L, pageCount, pager.currentPage, tone)
+        // Next 버튼 (GPS 러닝은 1 km 마다 저절로)
+        val gpsRun = eng.isRunKind && eng.useGPS
+        // 18번 EMOM: 이 라운드 "끝" 을 이미 눌렀으면 다음 간격까지 못 누름
+        val emomDone = eng.kind == Kinds.EMOM && eng.segWork.getOrNull(eng.idx) != null
+        val enabled = eng.running && !gpsRun && !emomDone && liftAsk == null
+        val label = if (isNew) (if (!eng.hasNext && !eng.growsOpen && eng.kind != Kinds.EMOM && !(eng.kind == Kinds.LIFT && !eng.isLiftSet)) "Finish" else bonusNextLabel(eng))
+            else if (eng.hasNext || eng.growsOpen) "Next" else "Finish"
+        LiveButtons8(L, tone, "phone",
+            nextTitle = if (gpsRun) null else label,
+            nextOn = enabled || eng.finished,
+            showUndo = !eng.isRunKind, undoOn = eng.canUndo,
+            showSkip = !isNew && !eng.isRunKind && !eng.growsOpen, skipOn = eng.canSkip,
+            running = eng.running,
+            onNext = {
+                if (!enabled) return@LiveButtons8
+                // 18번 기능성 운동: 세트 끝 → 횟수 · 무게 확인 칸 먼저
+                if (eng.isLiftSet) { buzz(); liftAsk = eng.liftPrefill(); return@LiveButtons8 }
+                buzz(true); if (eng.kind != Kinds.EMOM) flashNow()
+                eng.advance()?.let { success(); done(it) }
+            },
+            onEnd = { askEnd() },
+            onUndo = { buzz(); eng.undo() },
+            onSkip = { buzz(true); flashNow(); eng.skip()?.let { success(); done(it) } },
+            onPause = { eng.togglePause() })
     }
-        // 넘길 때 노랗게 반짝
-        if (flash.value > 0f) Box(Modifier.fillMaxSize().background(C.accent.copy(alpha = flash.value * 0.22f)))
+        // 넘길 때 흰 번쩍임 (약하게)
+        if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.32f)))
         // 18번 기능성 운동: 세트 끝 확인 (횟수 · 무게)
         liftAsk?.let { (r, k) ->
             LiftSetSheet(eng.cur.name, eng.cur.detail.replace("SET", "Set".l10n), r, k,
@@ -389,14 +360,14 @@ internal fun PhoneSegmentList(seq: List<Seg>, idx: Int, splits: List<Int>, skipp
 }
 
 /** 엔진 → 화면 한 장면 */
-private fun phoneFrame(eng: PhoneRunEngine, now: Long) = LiveFrame(
+private fun phoneFrame(eng: PhoneRunEngine, now: Long) = LiveFrame8(
     mode = eng.mode, title = eng.title, seq = eng.seq, idx = eng.idx, segEl = eng.segEl(now), total = eng.total(now),
-    running = eng.running, open = eng.growsOpen,
+    running = eng.running, open = eng.growsOpen || Kinds.isNew(eng.kind),
     segDist = if (eng.useGPS) eng.segDist else null, totalDist = if (eng.useGPS) eng.totalDist else null,
-    runKind = eng.isRunKind, next = eng.nextSeg,
     speed = if (eng.useGPS) eng.speedNow(now) else null,
     imperial = com.nkssi.splits8.Store.settings.imperial,
     runCard = eng.isRunKind, runGoalKm = eng.runGoalKm,
+    splits = eng.splits,
 )
 
 /** ■ End · ↩ Undo · ❚❚ Pause (둥근 알약) */

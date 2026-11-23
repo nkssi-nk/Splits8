@@ -459,13 +459,16 @@ private fun StationSection() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle("STATIONS")
         // 1.2.1: 마지막 칸 = Roxzone (종목처럼 원하는 자리에 — 대표님 10-30). 모양은 시뮬과 같은 회색
-        Grid4(Station.all.size + 1, 8.dp) { i, m ->
-            if (i == Station.all.size) {
-                AddTile(ProgItem("roxzone"), "roxzone", 16.dp, m.aspectRatio(1f / 1.08f), count = Router.draftSeq.count { it.icon == "roxzone" },
-                    tag = "builder.st.roxzone") {
+        // 1.2.7: 그다음 칸 = Rest (정한 시간 없이 재기만 — 대표님 11-20)
+        Grid4(Station.all.size + 2, 8.dp) { i, m ->
+            if (i >= Station.all.size) {
+                val key: String = if (i == Station.all.size) "roxzone" else "rest"
+                val title: String = if (key == "roxzone") "Roxzone" else "Rest"
+                AddTile(ProgItem(key), key, 16.dp, m.aspectRatio(1f / 1.08f), count = Router.draftSeq.count { it.icon == key },
+                    tag = "builder.st.$key") {
                     Column(Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon8("roxzone", 32.dp, C.text2)
-                        T("Roxzone", F.t(11, W600, C.text2, tracking = 0.11f).copy(lineHeight = 13.sp), align = TextAlign.Center, translate = false)
+                        Icon8(key, 32.dp, C.text2)
+                        T(title, F.t(11, W600, C.text2, tracking = 0.11f).copy(lineHeight = 13.sp), align = TextAlign.Center, translate = key == "rest")
                     }
                 }
                 return@Grid4

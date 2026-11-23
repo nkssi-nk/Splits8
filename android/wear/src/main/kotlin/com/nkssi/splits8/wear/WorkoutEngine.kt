@@ -225,6 +225,26 @@ class WorkoutEngine(
 
     val zone: Int get() = settings.zone(hr)
 
+    // MARK: 1.2.7 베젤 아래 칸 (목표 대비 · 심박 · 칼로리)
+
+    /** 목표 합 (모든 구간) */
+    val targetTotal: Int get() = seq.sumOf { it.target }
+    /** 목표 대비 칸을 보여 줄 수 있는지: 끝이 정해져 있고, 스테이션 · 러닝마다 목표가 있을 때 */
+    val hasGoalTotal: Boolean
+        get() = !growsOpen && !Kinds.isNew(kind) && !isRunKind && targetTotal > 0 && seq.all { it.target > 0 || it.kind == SegKind.Rox }
+    /** 이대로 가면 예상 완주 (목표 합 + 지금까지 차이) */
+    fun projectedFinish(now: Long = clock()): Int = targetTotal + delta(now)
+    /** 지금까지 최고 심박 */
+    val maxHRNow: Int get() = max(hr.roundToInt(), hrSamples.maxOfOrNull { it.b } ?: 0)
+    /** 지금까지 평균 심박 (없으면 지금 심박) */
+    val avgHRLive: Int get() = if (hrSamples.isEmpty()) hr.roundToInt() else hrSamples.map { it.b }.average().roundToInt()
+    /** 분당 걸음 수 (걸음 수를 잴 때만, 30초 지난 뒤부터) */
+    fun cadenceNow(now: Long = clock()): Int? {
+        val t = total(now).toDouble()
+        if (steps <= 0 || t < 30) return null
+        return (steps / t * 60).roundToInt()
+    }
+
     /** 현재 러닝 구간 거리(m) */
     val segDist: Double get() = max(0.0, distance - segDistStart)
     /** 1.2.2: 러닝 카드 목표 거리(km). 0 = 자유 러닝 */

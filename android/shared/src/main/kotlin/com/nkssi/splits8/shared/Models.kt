@@ -361,8 +361,10 @@ data class ProgItem(
 ) {
     /** 1.2.1: 트레이닝에도 Roxzone 을 종목처럼 넣을 수 있음 */
     val isRox: Boolean get() = icon == "roxzone"
-    fun name(): String = if (icon == "run") "Run" else if (isRox) "Roxzone" else (Station.of(icon)?.name ?: icon)
-    fun detail(d: Division): String = if (icon == "run") (run ?: "1KM") else if (isRox) "Transition" else (Station.of(icon)?.detail(d) ?: "")
+    /** 1.2.7: 휴식(Rest) — 정한 시간 없이 재기만 함. 사용자가 다음으로 넘길 때까지 */
+    val isRest: Boolean get() = icon == "rest"
+    fun name(): String = if (icon == "run") "Run" else if (isRox) "Roxzone" else if (isRest) "Rest" else (Station.of(icon)?.name ?: icon)
+    fun detail(d: Division): String = if (icon == "run") (run ?: "1KM") else if (isRox) "Transition" else if (isRest) "" else (Station.of(icon)?.detail(d) ?: "")
 }
 
 @Serializable
@@ -498,7 +500,7 @@ object ProgramLink {
                 if (label !in Defaults.runs) return null
                 seq.add(ProgItem("run", label))
             } else {
-                if (Station.of(x) == null) return null
+                if (Station.of(x) == null && x != "roxzone" && x != "rest") return null   // 1.2.7: Roxzone · Rest 도 받음
                 seq.add(ProgItem(x))
             }
         }
@@ -614,29 +616,81 @@ data class EventItem(
         val bundled: List<EventItem> = listOf(
             listOf("Seoul", "KINTEX, Goyang", "korea", "2026-11-13", "2026-11-15"),
             listOf("Incheon", "Songdo Convensia", "korea", "2027-05-13", "2027-05-16"),
-            listOf("Shanghai", "China", "asia", "2026-10-31", "2026-11-01"),
-            listOf("Guangzhou", "China", "asia", "2026-11-21", "2026-11-22"),
+            listOf("Guangzhou", "China", "asia", "2026-11-20", "2026-11-22"),
             listOf("Singapore", "Singapore", "asia", "2026-11-26", "2026-11-29"),
+            listOf("Gujarat", "India", "asia", "2026-11-26", "2026-11-28"),
+            listOf("Dubai", "UAE", "asia", "2026-11-27", "2026-11-28"),
             listOf("Sanya", "China", "asia", "2026-12-05", "2026-12-06"),
             listOf("Melbourne", "Australia", "asia", "2026-12-09", "2026-12-13"),
             listOf("Kuala Lumpur", "Malaysia", "asia", "2026-12-10", "2026-12-13"),
             listOf("Hong Kong", "Hong Kong", "asia", "2027-01-07", "2027-01-10"),
+            listOf("Noida", "India", "asia", "2027-01-15", "2027-01-17"),
             listOf("Osaka", "Japan", "asia", "2027-01-21", "2027-01-25"),
             listOf("Auckland", "New Zealand", "asia", "2027-02-04", "2027-02-07"),
             listOf("Bangkok", "Thailand", "asia", "2027-02-11", "2027-02-14"),
+            listOf("Hanoi", "Vietnam", "asia", "2027-03-06", "2027-03-07"),
             listOf("Taipei", "Chinese Taipei", "asia", "2027-03-12", "2027-03-14"),
-            listOf("Brisbane", "Australia", "asia", "2027-03-31", "2027-04-04"),
+            listOf("Brisbane", "Australia", "asia", "2027-03-31", "2027-04-05"),
             listOf("Nagoya", "Japan", "asia", "2027-04-16", "2027-04-18"),
+            listOf("Bengaluru", "India", "asia", "2027-05-19", "2027-05-23"),
             listOf("World Championships", "AsiaWorld-Expo, Hong Kong", "asia", "2027-06-10", "2027-06-13"),
-            listOf("Hamburg", "Germany", "europe", "2026-10-28", "2026-11-01"),
-            listOf("Barcelona", "Spain", "europe", "2026-11-11", "2026-11-15"),
+            listOf("Poznań", "Poland", "europe", "2026-11-20", "2026-11-22"),
+            listOf("Johannesburg", "South Africa", "europe", "2026-11-26", "2026-11-29"),
+            listOf("Utrecht", "Netherlands", "europe", "2026-11-26", "2026-11-30"),
             listOf("London", "ExCeL London", "europe", "2026-12-02", "2026-12-06"),
+            listOf("Milan", "Italy", "europe", "2026-12-04", "2026-12-06"),
             listOf("Stockholm", "Sweden", "europe", "2026-12-10", "2026-12-13"),
+            listOf("Frankfurt", "Germany", "europe", "2026-12-10", "2026-12-13"),
             listOf("Paris", "France", "europe", "2026-12-12", "2026-12-20"),
+            listOf("Gent", "Belgium", "europe", "2026-12-17", "2026-12-20"),
+            listOf("Helsinki I", "Finland", "europe", "2026-12-18", "2026-12-20"),
+            listOf("Manchester", "UK", "europe", "2027-01-20", "2027-01-31"),
             listOf("Amsterdam", "Netherlands", "europe", "2027-01-22", "2027-01-31"),
+            listOf("Verona", "Italy", "europe", "2027-01-28", "2027-01-31"),
+            listOf("Toulouse", "France", "europe", "2027-02-03", "2027-02-07"),
+            listOf("Bilbao", "Spain", "europe", "2027-02-05", "2027-02-07"),
+            listOf("Basel", "Switzerland", "europe", "2027-02-12", "2027-02-14"),
+            listOf("Katowice", "Poland", "europe", "2027-02-19", "2027-02-21"),
+            listOf("Vienna", "Austria", "europe", "2027-02-19", "2027-02-21"),
+            listOf("Mechelen", "Belgium", "europe", "2027-03-03", "2027-03-07"),
+            listOf("Glasgow", "UK", "europe", "2027-03-10", "2027-03-14"),
+            listOf("Madrid", "Spain", "europe", "2027-03-17", "2027-03-21"),
+            listOf("Copenhagen", "Denmark", "europe", "2027-03-25", "2027-03-28"),
+            listOf("Cape Town", "South Africa", "europe", "2027-03-25", "2027-03-28"),
+            listOf("Rotterdam", "Netherlands", "europe", "2027-04-01", "2027-04-04"),
+            listOf("Bari", "Italy", "europe", "2027-04-02", "2027-04-04"),
+            listOf("Warsaw", "Poland", "europe", "2027-04-07", "2027-04-11"),
+            listOf("Paris Grand Palais", "France", "europe", "2027-04-08", "2027-04-12"),
+            listOf("Cologne", "Germany", "europe", "2027-04-08", "2027-04-11"),
+            listOf("Málaga", "Spain", "europe", "2027-04-15", "2027-04-18"),
+            listOf("Helsinki II", "Finland", "europe", "2027-04-16", "2027-04-18"),
+            listOf("London Olympia", "Olympia London", "europe", "2027-04-24", "2027-05-02"),
+            listOf("Kraków", "Poland", "europe", "2027-05-07", "2027-05-09"),
+            listOf("Lyon", "France", "europe", "2027-05-12", "2027-05-16"),
+            listOf("Cardiff", "UK", "europe", "2027-05-20", "2027-05-29"),
+            listOf("Rimini", "Italy", "europe", "2027-05-27", "2027-05-30"),
+            listOf("Riga", "Latvia", "europe", "2027-05-28", "2027-05-30"),
             listOf("Dallas", "USA", "americas", "2026-11-18", "2026-11-22"),
+            listOf("Rio de Janeiro", "Brazil", "americas", "2026-11-21", "2026-11-22"),
             listOf("Anaheim", "USA", "americas", "2026-12-03", "2026-12-06"),
+            listOf("Nashville", "USA", "americas", "2026-12-09", "2026-12-13"),
+            listOf("Vancouver", "Canada", "americas", "2026-12-17", "2026-12-20"),
             listOf("Chicago", "USA", "americas", "2027-02-11", "2027-02-15"),
+            listOf("Cancun", "Mexico", "americas", "2027-02-18", "2027-02-21"),
+            listOf("Phoenix", "USA", "americas", "2027-02-25", "2027-02-28"),
+            listOf("Santiago", "Chile", "americas", "2027-03-06", "2027-03-06"),
+            listOf("Las Vegas", "USA", "americas", "2027-03-12", "2027-03-14"),
+            listOf("Guadalajara", "Mexico", "americas", "2027-03-19", "2027-03-21"),
+            listOf("Buenos Aires", "Argentina", "americas", "2027-03-20", "2027-03-21"),
+            listOf("Miami Beach", "USA", "americas", "2027-03-26", "2027-03-28"),
+            listOf("Houston", "USA", "americas", "2027-04-01", "2027-04-04"),
+            listOf("Monterrey", "Mexico", "americas", "2027-04-16", "2027-04-18"),
+            listOf("Ottawa", "Canada", "americas", "2027-04-21", "2027-04-25"),
+            listOf("Atlanta", "USA", "americas", "2027-04-23", "2027-04-25"),
+            listOf("Minneapolis", "USA", "americas", "2027-05-07", "2027-05-09"),
+            listOf("São Paulo", "Brazil", "americas", "2027-05-08", "2027-05-09"),
+            listOf("San Diego", "USA", "americas", "2027-05-13", "2027-05-16"),
+            listOf("Portland", "USA", "americas", "2027-05-21", "2027-05-23"),
         ).map { EventItem(it[0], it[1], it[2], it[3], it[4], knownLaps(it[0], it[3])) }
     }
 }
@@ -779,7 +833,7 @@ data class Record(
     /** PFT 등급 (끝까지 한 정상 기록만) */
     val pftGrade: PFTGrade? get() = if (mode == Mode.Pft && counts) PFT.grade(total) else null
 
-    val roxTotal: Int get() = segs.filter { it.kind == SegKind.Rox }.sumOf { it.time }
+    val roxTotal: Int get() = segs.filter { it.kind == SegKind.Rox && it.icon != "rest" }.sumOf { it.time }   // 1.2.7: 휴식은 Roxzone 합계에서 뺌
     val runs: List<SegResult> get() = segs.filter { it.kind == SegKind.Run }
     val runTotal: Int get() = runs.sumOf { it.time }
     val stationTotal: Int get() = segs.filter { it.kind == SegKind.St }.sumOf { it.time }
@@ -1197,11 +1251,13 @@ object SeqBuilder {
     /** Full Simulation / Race: Run i, Roxzone, Station, Roxzone … (마지막 스테이션 뒤 Roxzone 없음) */
     fun full(div: Division, rox: Boolean, targets16: List<Int>, roxTarget: Int = Defaults.roxTarget): List<Seg> {
         val o = ArrayList<Seg>()
+        // 1.2.7: Roxzone 을 끄면 이동 시간은 다음 구간에 들어감 → 목표도 그만큼 더함
+        val add: Int = if (rox) 0 else roxTarget
         for (i in 0 until 8) {
-            o.add(Seg("run", "Run ${i + 1}", "1KM", SegKind.Run, targets16[i * 2]))
+            o.add(Seg("run", "Run ${i + 1}", "1KM", SegKind.Run, targets16[i * 2] + (if (i > 0) add else 0)))
             if (rox) o.add(Seg("roxzone", "Roxzone", "Transition", SegKind.Rox, roxTarget))
             val s = Station.all[i]
-            o.add(Seg(s.key, s.name, s.detail(div), SegKind.St, targets16[i * 2 + 1]))
+            o.add(Seg(s.key, s.name, s.detail(div), SegKind.St, targets16[i * 2 + 1] + add))
             if (rox && i < 7) o.add(Seg("roxzone", "Roxzone", "Transition", SegKind.Rox, roxTarget))
         }
         return o
@@ -1228,6 +1284,7 @@ object SeqBuilder {
         repeat(maxOf(1, p.sets)) {
             for (it in p.seq) {
                 if (it.isRox) { o.add(Seg("roxzone", "Roxzone", "Transition", SegKind.Rox, roxTarget)); continue }   // 1.2.1
+                if (it.isRest) { o.add(Seg("rest", "Rest", "", SegKind.Rox, 0)); continue }   // 1.2.7: 휴식 — 회색, 목표 없음
                 val d = it.detail(div)
                 o.add(Seg(it.icon, it.name(), d, if (it.icon == "run") SegKind.Run else SegKind.St, bests[SegKey.of(it.icon, d)] ?: 0))
             }
@@ -1242,7 +1299,7 @@ object SegKey {
 
     /** 최고 기록으로 써도 되는 시간인지 (너무 빠른 시험용 탭은 빼기) */
     fun plausible(icon: String, detail: String, time: Int): Boolean {
-        if (icon == "hiit" || icon == "rest" || icon == "lift") return false
+        if (icon == "hiit" || icon == "rest" || icon == "lift" || icon == "roxzone") return false
         if (icon == "run") return time.toDouble() >= Record.MIN_RUN * runMeters(detail) / 1000
         return time >= Record.MIN_STATION
     }

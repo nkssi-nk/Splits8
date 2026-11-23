@@ -76,6 +76,7 @@ import com.nkssi.splits8.ui.Seg8
 import com.nkssi.splits8.ui.SettingRow
 import com.nkssi.splits8.ui.Stepper8
 import com.nkssi.splits8.ui.T
+import com.nkssi.splits8.ui.Toggle8
 import com.nkssi.splits8.ui.W400
 import com.nkssi.splits8.ui.W500
 import com.nkssi.splits8.ui.W600
@@ -192,6 +193,12 @@ private fun RaceRowsCard() {
                 T("Edit".l10n + " ›", F.t(17, color = C.text2), maxLines = 1, translate = false)
             }
             SplitBars(s.goals, 40) { minOf(1f, maxOf(0f, it / 335f)) }
+        }
+        // 1.2.7: Race 에도 Roxzone 켜고 끄기 (Full Sim 과 같은 설정 roxAuto). 끄면 이동 시간은 다음 구간에 들어감
+        Row(Modifier.fillMaxWidth().rowLine(true).padding(vertical = 14.dp, horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            T("Add Roxzone", F.t(17), Modifier.weight(1f), maxLines = 1)
+            Toggle8(s.roxAuto, Modifier.testTag("race.roxzone")) { on -> Store.update { it.copy(roxAuto = on) } }
         }
     }
 }

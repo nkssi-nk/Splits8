@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -66,25 +68,27 @@ import kotlinx.coroutines.delay
 // 폰에서 누른 Next · Undo · Pause · End 는 워치로 보냄. 기록의 기준은 워치.
 
 /** 워치에서 받은 상태 → 화면 한 장면 */
-fun watchFrame(st: LiveState, nowMs: Long, receivedMs: Long): LiveFrame {
-    val next = st.nextSeg ?: if (st.open) {
-        val n = st.seq.size + 1
-        if (st.cur?.icon == "hiit") SeqBuilder.hiitRound(n) else SeqBuilder.runKm(n)
-    } else null
-    return LiveFrame(
-        mode = st.mode, title = st.title, seq = st.seq, idx = st.idx,
-        segEl = st.segEl(nowMs, receivedMs), total = st.total(nowMs, receivedMs), running = st.running, open = st.open,
-        segDist = st.segDist, totalDist = st.dist, runKind = st.cur?.icon == "run" && st.mode == com.nkssi.splits8.shared.Mode.Training,
-        next = next,
-        speed = if (st.running) st.spd else null,
-        imperial = com.nkssi.splits8.Store.settings.imperial,
-        runCard = isRunCard(st), runGoalKm = if (isRunCard(st) && !st.open) st.seq.size else 0,
-    )
-}
+fun watchFrame(st: LiveState, nowMs: Long, receivedMs: Long): LiveFrame8 = LiveFrame8(
+    mode = st.mode, title = st.title, seq = st.seq, idx = st.idx,
+    segEl = st.segEl(nowMs, receivedMs), total = st.total(nowMs, receivedMs), running = st.running, open = st.open,
+    segDist = st.segDist, totalDist = st.dist,
+    speed = if (st.running) st.spd else null,
+    imperial = com.nkssi.splits8.Store.settings.imperial,
+    runCard = isRunCard(st), runGoalKm = if (isRunCard(st) && !st.open) st.seq.size else 0,
+    splits = st.splits, hr = st.hr, zone = st.zone, kcal = st.kcal,
+)
 
 /** 1.2.2: 워치의 러닝 카드인지 (구간이 모두 "KM n" 러닝) */
 private fun isRunCard(st: com.nkssi.splits8.shared.LiveState): Boolean =
     st.mode == com.nkssi.splits8.shared.Mode.Training && st.seq.isNotEmpty() && st.seq.all { it.icon == "run" && it.name.startsWith("KM ") }
+
+/** 받은 심박으로 세는 최고 · 평균 (워치가 보내는 상태에는 없음) */
+private object WatchHR {
+    var max by androidx.compose.runtime.mutableIntStateOf(0)
+    var sum = 0L
+    var n = 0
+    var lastAt = 0L
+}
 
 @Composable
 fun WatchLiveView() {
@@ -97,43 +101,46 @@ fun WatchLiveView() {
         onDispose { view.keepScreenOn = false }
     }
     BackAction { Router.go(Scr.Home) }
-
-    // 위쪽 빛 = 지금 심박 구간 색 (심박이 없으면 테마 색)
-    val z = st?.zone ?: 0
-    val glow by animateColorAsState(if (z in 1..5) C.zone(z) else hex(Store.settings.glow.hex), tween(800), label = "zone")
+    // 최고 · 평균 심박 (1초에 한 번 셈)
+    LaunchedEffect(st?.hr, now / 1000) {
+        val hr = st?.hr ?: 0
+        if (hr > 0 && now / 1000 != WatchHR.lastAt) { WatchHR.lastAt = now / 1000; WatchHR.max = maxOf(WatchHR.max, hr); WatchHR.sum += hr; WatchHR.n++ }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val bars = WindowInsets.systemBars.asPaddingValues()
-        val m = LiveMetrics(maxHeight.value - bars.calculateTopPadding().value - bars.calculateBottomPadding().value)
-        Canvas(Modifier.fillMaxWidth().height(maxHeight * 0.5f)) {
-            drawRect(Brush.radialGradient(listOf(glow.copy(alpha = 0.30f), glow.copy(alpha = 0f)), Offset(size.width / 2, 0f), 420.dp.toPx()))
-        }
+        val L = PL(maxWidth.value, maxHeight.value)
         if (st == null) {
+            Box(Modifier.fillMaxSize().background(Color.Black))
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 T("Connecting to your watch…", F.t(15, color = C.text2), maxLines = 1)
             }
             return@BoxWithConstraints
         }
-        // 1.1.2: 아이폰처럼 상태 줄 · 내비게이션 줄을 뺀 안전 영역 안에만 그림
-        Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 20.dp)) {
-            val f = watchFrame(st, now, WatchMirror.received)
-            LiveHeader(f, if (WatchMirror.reconnecting) "Watch · Reconnecting…" else "Watch · Live", !WatchMirror.reconnecting, "watchLive")
-            when {
-                // 워치에서 버림: 기록이 안 오니 잠시 뒤 홈으로
-                WatchMirror.discarded -> Spacer(Modifier.weight(1f))
-                st.finished || WatchMirror.ended -> Saving(Modifier.weight(1f))
-                else -> {
-                    // 1.1.2: 가운데는 남는 자리만 → 아래 버튼은 항상 보임
-                    Column(Modifier.weight(1f).clipToBounds()) {
-                        LiveBody(f, m.totalFont, m.segFont, m.icon, m.nameFont, m.detailFont, m.segTop, m.nameTop, "watchLive",
-                            Modifier.padding(top = (m.top * 0.6f).dp))
-                        Chips(st, Modifier.padding(top = (14 * m.k).dp))
-                        if (!f.runCard) LiveNextRow(f.next, m.nextLabel, m.nextFont, m.nextIcon, m.dividerTop * 0.7f, m.k, "watchLive")
+        val f = watchFrame(st, now, WatchMirror.received)
+        val status = if (WatchMirror.reconnecting) "Watch · Reconnecting…"
+            else if (st.hr > 0) "Watch".l10n + " · ${st.hr} " + "BPM".l10n else "Watch · Live"
+        LiveBackground8(f.tone, if (isRunCard(st)) 1 else st.idx)
+        when {
+            // 워치에서 버림: 기록이 안 오니 잠시 뒤 홈으로
+            WatchMirror.discarded -> {}
+            st.finished || WatchMirror.ended -> {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
+                Saving(Modifier.fillMaxSize().padding(top = L.dy(150f)))
+            }
+            else -> {
+                val count = if (isRunCard(st)) 2 else 3
+                val pager = rememberPagerState(pageCount = { count })
+                HorizontalPager(pager, Modifier.fillMaxSize().testTag("watchLive.pages")) { page ->
+                    when (page) {
+                        0 -> LiveMain8(f, L, "watchLive")
+                        1 -> LiveGoalPage8(f, L, WatchHR.max, if (WatchHR.n > 0) (WatchHR.sum / WatchHR.n).toInt() else null)
+                        else -> LiveSegmentList8(L, f.tone, st.seq, st.idx, st.splits, emptySet(), f.segEl, st.vsWord)
                     }
-                    Spacer(Modifier.height(16.dp))
-                    Buttons(st, m) { strong -> view.performHapticFeedback(if (strong) HapticFeedbackConstants.LONG_PRESS else HapticFeedbackConstants.VIRTUAL_KEY) }
                 }
+                LivePageDots8(L, count, pager.currentPage, f.tone)
+                Buttons(st, f, L) { strong -> view.performHapticFeedback(if (strong) HapticFeedbackConstants.LONG_PRESS else HapticFeedbackConstants.VIRTUAL_KEY) }
             }
         }
+        LiveTop8(f, L, status, !WatchMirror.reconnecting, "watchLive")
     }
 }
 
@@ -161,34 +168,20 @@ private fun Chips(st: LiveState, modifier: Modifier) {
 
 /** 아래 단추 (누르면 워치로 보냄). 끊겼으면 흐리게 · 못 누름 */
 @Composable
-private fun Buttons(st: LiveState, m: LiveMetrics, buzz: (Boolean) -> Unit) {
+private fun Buttons(st: LiveState, f: LiveFrame8, L: PL, buzz: (Boolean) -> Unit) {
     val on = !WatchMirror.reconnecting
-    val nextOn = on && st.running && !st.autoSplit
-    Column(Modifier.fillMaxWidth()) {
-        // 1.2.3: 러닝 카드(1 km 자동)는 넘기기 버튼 없음 — "1 km 마다 자동 넘김" 글씨도 없앰 (대표님 11-10)
-        if (!st.autoSplit) Row(
-            Modifier.fillMaxWidth().height(m.buttonH.dp).yellowFill(RoundedCornerShape(50), on = nextOn)
-                .press(enabled = nextOn, tag = "watchLive.next") { buzz(true); WatchMirror.send(LiveCommand.Next) },
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
-        ) {
-            val label = if (st.nextSeg != null || st.open) "Next" else "Finish"
-            T(label.l10n + "  ›", F.t(m.buttonFont, W600, if (nextOn) Color.Black else C.text3), maxLines = 1, translate = false)
-        }
-        Row(Modifier.padding(top = m.pillGap.dp, bottom = m.bottom.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Pill(R.drawable.sym_stop, "End", C.bad, hex(0xFF453A, 0.22f), m.pillH, "watchLive.end", on) {
-                Router.ask = Ask("End workout?", "The workout ends on your watch and is saved there.", ok = "End", cancel = "Cancel", destructive = true,
-                    onOk = { WatchMirror.send(LiveCommand.End) })
-            }
-            Pill(R.drawable.sym_undo, "Undo", if (st.canUndo) Color.White else C.text3,
-                Color.White.copy(alpha = if (st.canUndo) 0.12f else 0.05f), m.pillH, "watchLive.undo", on && st.canUndo) {
-                buzz(false); WatchMirror.send(LiveCommand.Undo)
-            }
-            Pill(if (st.running) R.drawable.sym_pause else R.drawable.sym_play, if (st.running) "Pause" else "Resume",
-                if (st.running) Color.White else C.accent, Color.White.copy(alpha = 0.12f), m.pillH, "watchLive.pause", on) {
-                WatchMirror.send(if (st.running) LiveCommand.Pause else LiveCommand.Resume)
-            }
-        }
-    }
+    LiveButtons8(L, f.tone, "watchLive",
+        nextTitle = if (st.autoSplit) null else (if (st.nextSeg != null || st.open) "Next" else "Finish"),
+        nextOn = on && st.running,
+        showUndo = !isRunCard(st), undoOn = st.canUndo,
+        showSkip = false, running = st.running, enabled = on,
+        onNext = { buzz(true); WatchMirror.send(LiveCommand.Next) },
+        onEnd = {
+            Router.ask = Ask("End workout?", "The workout ends on your watch and is saved there.", ok = "End", cancel = "Cancel", destructive = true,
+                onOk = { WatchMirror.send(LiveCommand.End) })
+        },
+        onUndo = { buzz(false); WatchMirror.send(LiveCommand.Undo) },
+        onPause = { WatchMirror.send(if (st.running) LiveCommand.Pause else LiveCommand.Resume) })
 }
 
 /** 워치가 끝냄: 기록이 도착하면 기록 화면 + 카드 */

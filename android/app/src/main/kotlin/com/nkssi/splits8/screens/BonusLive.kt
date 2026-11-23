@@ -183,3 +183,91 @@ internal fun LiftSetSheet(name: String, setLabel: String, reps: Int, kg: Double,
         }
     }
 }
+
+// MARK: 1.2.7 새 화면 (귀퉁이 표시 안 [단계 · 큰 숫자 · 단위나 할 일] → 칸 → 점 → Next — 아이폰 TimerLiveBody)
+
+/** 운동 = 노랑, 인터벌 빠르게 = 파랑, 휴식 · 천천히 · 걷기 = 회색 */
+internal fun timerTone(eng: PhoneRunEngine): LTone {
+    val cur = eng.cur
+    if (cur.kind == SegKind.Rox) return LTone.Gray
+    if (eng.kind == Kinds.IVRUN) return if (cur.name == com.nkssi.splits8.shared.IvStep.typeName(com.nkssi.splits8.shared.IvStep.FAST)) LTone.Run else LTone.Gray
+    if (eng.kind == Kinds.EMOM && eng.segWork.getOrNull(eng.idx) != null) return LTone.Gray
+    return LTone.Station
+}
+
+@Composable
+internal fun TimerLive8(eng: PhoneRunEngine, now: Long, L: PL) {
+    val cur = eng.cur
+    val rest = cur.kind == SegKind.Rox
+    val t = timerTone(eng)
+    val el = eng.segEl(now)
+    var label: String
+    var big: String
+    var unit = ""
+    var count = ""
+    var countLabel = "ROUND"
+    when (eng.kind) {
+        Kinds.AMRAP -> {
+            label = "TIME LEFT".l10n; big = Fm.t(eng.capLeft(now) ?: 0)
+            unit = L10n.t("Round %lld", eng.idx + 1) + " · " + Fm.t(el) + (if (eng.tasks.isEmpty()) "" else " · " + eng.tasks.joinToString(" · "))
+            count = "${eng.idx}"; countLabel = "ROUNDS"
+        }
+        Kinds.EMOM -> {
+            val w = eng.segWork.getOrNull(eng.idx)
+            label = (if (w != null) "REST" else "ROUND").l10n; big = Fm.t(eng.segLeft(now) ?: 0)
+            unit = if (w != null) L10n.t("Done in %@", Fm.t(w)) else eng.tasks.joinToString(" · ")
+            count = "${cur.rep ?: (eng.idx + 1)}/${eng.seq.size}"
+        }
+        Kinds.TABATA -> {
+            label = (if (rest) "REST" else "WORK").l10n; big = Fm.t(eng.segLeft(now) ?: 0)
+            count = "${cur.rep ?: 1}/${eng.seq.count { it.icon == "hiit" }}"
+        }
+        Kinds.LIFT -> {
+            label = if (rest) "REST".l10n else cur.name.l10n.uppercase(java.util.Locale.getDefault())
+            big = Fm.t(if (rest) (eng.segLeft(now) ?: 0) else el)
+            unit = if (rest) "" else liftText(cur.reps, cur.kg)
+            count = if (rest) "" else cur.detail.removePrefix("SET "); countLabel = "SET"
+        }
+        else -> {
+            val len = Bonus.distLen(eng.kind, cur)
+            val nm = cur.name.l10n.uppercase(java.util.Locale.getDefault())
+            if (len != null) {
+                label = nm + " · " + len.roundToInt() + " m"
+                big = if (eng.useGPS) "${maxOf(0.0, len - eng.segDist).roundToInt()}" else "${len.roundToInt()}"
+                unit = "M"
+            } else {
+                label = nm + (Bonus.timedLen(eng.kind, cur)?.let { " · $it s" } ?: "")
+                big = Fm.t(eng.segLeft(now) ?: 0)
+            }
+            count = cur.rep?.let { "$it/${eng.seq.mapNotNull { s -> s.rep }.maxOrNull() ?: it}" } ?: ""
+            countLabel = "REP"
+        }
+    }
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        LiveBrackets8(L, t)
+        LiveBigBlock8(L, label, big, unit, t, tag = "timer.main")
+        val cells = ArrayList<Cell8>()
+        cells.add(Cell8(countLabel.l10n, count.ifEmpty { "--" }))
+        if (eng.kind == Kinds.IVRUN && eng.useGPS && cur.kind != SegKind.Rox) cells.add(Cell8("PACE".l10n, LivePace.text(el, eng.segDist, false, eng.speedNow(now))))
+        LiveCells(L, 398f, cells, t, "timer")
+        val p = count.split("/")
+        val a = p.getOrNull(0)?.toIntOrNull()
+        val b = p.getOrNull(1)?.toIntOrNull()
+        if (p.size == 2 && a != null && b != null && b in 2..30) LiveDots8(L, 482f, b, maxOf(0, a - 1), t)
+        if (eng.kind != Kinds.AMRAP) LiveNext8(L, timerNextWhat(eng) ?: "Finish".l10n, t, "timer.next")
+    }
+}
+
+/** 다음 단계 이름 ("Rest 10 s" · "Easy 0:40" · "Round 5" · "Squat · set 2"). 마지막이면 null */
+internal fun timerNextWhat(eng: PhoneRunEngine): String? {
+    val n = eng.seq.getOrNull(eng.idx + 1) ?: return null
+    return when (eng.kind) {
+        Kinds.IVRUN -> {
+            val dl = Bonus.distLen(eng.kind, n)
+            n.name.l10n + " " + (if (dl != null) "${dl.roundToInt()} m" else Fm.t(Bonus.timedLen(eng.kind, n) ?: n.target))
+        }
+        Kinds.LIFT -> if (n.kind == SegKind.Rox) "Rest".l10n + " " + Fm.t(n.target) else n.name.l10n + " · " + L10n.t("set %lld", n.rep ?: 1)
+        Kinds.TABATA -> if (n.kind == SegKind.Rox) "Rest".l10n + " ${n.target} s" else "Work".l10n + " ${n.target} s"
+        else -> L10n.t("Round %lld", n.rep ?: (eng.idx + 2))
+    }
+}

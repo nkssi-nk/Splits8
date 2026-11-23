@@ -1,6 +1,11 @@
 package com.nkssi.splits8.wear
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -109,129 +114,138 @@ fun RoundList(tag: String, modifier: Modifier = Modifier, center: Int = 1, offse
     )
 }
 
+// MARK: - 1.2.7 메뉴 공통 (검정 + 테마 빛 덩어리, 유리 카드 · 버튼)
+
+/** 유리 바탕 (목록 줄 · 카드) */
+fun Modifier.glassBg(radius: androidx.compose.ui.unit.Dp, fill: Color, rim: Float = 0.55f, gloss: Float = 0f): Modifier =
+    this.drawBehind { wGlass(Offset.Zero, size, radius.toPx(), fill, rim, gloss) }
+
+/** 맑은 유리 (흰 12%) */
+val GlassClear = Color.White.copy(alpha = 0.12f)
+/** 노란 유리 (84%) */
+val GlassYellow = hex(0xFFDC14, 0.84f)
+
+/** 메뉴 화면 틀: 바탕 · 시계 · 노란 제목 (높이 34) */
+@Composable
+fun WMenuFrame(seed: Int, title: String?, tag: String, translate: Boolean = true, content: @Composable BoxWithConstraintsScope.(WScale) -> Unit) {
+    Box(Modifier.fillMaxSize().testTag(tag)) {
+        WMenuBackground(seed)
+        WCanvas { L ->
+            WClock(L, Color.White)
+            if (title != null) WMenuTitle(L, title, translate)
+            content(L)
+        }
+    }
+}
+
 // MARK: - 홈
 
 /**
- * 첫 화면: 모드 카드 4개 (설명 줄 없음 — 아이콘 · 이름 · 단추만). 맨 위는 시계 자리라 로고는 뺌.
- * 96번(빌드 28): 늘 화면 가운데 고정 — 끌면 따라오고 놓으면 제자리(스프링). 높이가 모자라면 카드 여백 · 간격만 줄임
+ * 1.2.7 첫 화면: 시계 → SPLITS8 로고(높이 10, 위 30) → 카드 4개 모두 같은 폭 (높이 30 · 간격 5, 로고 + 카드 묶음이 동그라미 가운데).
+ * 아이콘 15 · 이름 시작 34 · 오른쪽 버튼 r9 (Training = 맑은 유리 ›, 그 밖 = 노란 유리 ▶)
  */
 @Composable
 fun WHome() {
-    val k = wk()
-    val h = LocalConfiguration.current.screenHeightDp
-    // 동그란 화면: 위아래 가장자리는 좁아서 카드가 잘림 → 위아래 33(× 크기) 씩 뺀 높이에 맞춤
-    val fit = homeFit(h - 2 * 33f * k)
-    val drag = remember { androidx.compose.animation.core.Animatable(0f) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var raw by remember { mutableStateOf(0f) }
-    Box(Modifier.fillMaxSize().testTag("w.home")
-        .pointerInput(Unit) {
-            detectVerticalDragGestures(
-                onDragStart = { raw = 0f },
-                onDragEnd = { scope.launch { drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 320f)) } },
-                onDragCancel = { scope.launch { drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 320f)) } },
-            ) { _, d ->
-                raw += d / density
-                // 멀리 끌수록 덜 따라옴
-                scope.launch { drag.snapTo(raw / (1 + kotlin.math.abs(raw) / 60) * 0.6f) }
-            }
-        }) {
-        AmbientLayer(Ambient.y(0.22f, 0.9f, 0.4f, 0.5f, -0.06f, WatchStore.settings.glow))
-        // 2026-10-21: 동그란 화면이라 위 · 아래 카드는 원 안에 들어오게 폭을 줄임 (가운데 두 장은 넓게 — 워치 기본 목록과 같은 모양)
-        val cardH = 22f + 2 * fit.first
-        val total = 4 * cardH + 3 * fit.second
-        val top0 = (h - total) / 2f
-        val maxW = (LocalConfiguration.current.screenWidthDp - 2 * 14f * k).dp
-        Column(Modifier.fillMaxWidth().align(Alignment.Center).offset(y = drag.value.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(fit.second.dp)) {
-            listOf(Mode.Training, Mode.Pft, Mode.Sim, Mode.Race).forEachIndexed { i, m ->
-                val top = top0 + i * (cardH + fit.second)
-                val fromEdge = minOf(top, h - (top + cardH))
-                ModeCard(m, fit.first, minOf(roundWidth(fromEdge, 3f), maxW))
+    WMenuFrame(40, null, "w.home") { L ->
+        Box(Modifier.at(L.dx(WScale.D / 2), L.dy(35f))) { Wordmark(10f * L.s / 0.83f) }
+        val hgt = 30f
+        val g = 5f
+        val tot = 4 * hgt + 3 * g
+        val y0 = WScale.D / 2 + 10f - tot / 2
+        val w = L.rowW(y0, y0 + tot, 10f, 156f)
+        val x0 = WScale.D / 2 - w / 2
+        val modes = listOf(Mode.Training, Mode.Pft, Mode.Sim, Mode.Race)
+        // 모든 이름 같은 크기 (가장 긴 이름이 들어가게)
+        val lim = w - 34f - 6f - 18f - 6f
+        val m = androidx.compose.ui.text.rememberTextMeasurer()
+        val density = LocalDensity.current
+        val fs = remember(L.s, lim) {
+            var sz = 14f
+            while (sz > 10f && modes.maxOf { md -> with(density) { m.measure(wt(md.title), wf(L, sz, W600)).size.width.toDp().value } } > lim * L.s) sz -= 0.5f
+            sz
+        }
+        modes.forEachIndexed { i, md ->
+            val y = y0 + i * (hgt + g)
+            WPill(L, x0, y, w, hgt, GlassClear, 0.55f, "w.mode." + md.raw, onClick = { WNav.openMode(md) }) {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.align(Alignment.CenterStart).padding(start = L.dv(19f - 7.5f))) { ModeIcon(md, C.accent, L.dv(15f)) }
+                    T(md.title, wf(L, fs, W600), Modifier.align(Alignment.CenterStart).padding(start = L.dv(34f)).width(L.dv(lim)), align = TextAlign.Start)
+                    // 오른쪽 버튼 r9
+                    Box(Modifier.align(Alignment.CenterEnd).padding(end = L.dv(6f)).size(L.dv(18f))
+                        .glassBg(L.dv(9f), if (md == Mode.Training) Color.White.copy(alpha = 0.16f) else GlassYellow, if (md == Mode.Training) 0.55f else 0.47f,
+                            if (md == Mode.Training) 0f else 0.27f), contentAlignment = Alignment.Center) {
+                        Canvas(Modifier.size(L.dv(9f))) {
+                            if (md == Mode.Training) {
+                                val p = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(size.width * 0.35f, size.height * 0.15f); lineTo(size.width * 0.7f, size.height / 2); lineTo(size.width * 0.35f, size.height * 0.85f)
+                                }
+                                drawPath(p, Color.White, style = androidx.compose.ui.graphics.drawscope.Stroke(1.8f * density.density,
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                            } else wPlay(center + Offset(0.6f * density.density, 0f), size.width, Color.Black)
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-/** 카드 하나 = 위아래 여백 × 2 + 22(아이콘 · 단추). 기본 여백 9 · 간격 6, 모자라면 여백 4 · 간격 3 까지 줄임 (아이폰 WHome.fit) */
-fun homeFit(h: Float): Pair<Float, Float> {
-    val need = 186f                                   // 4 × (22 + 9 × 2) + 3 × 6 + 8
-    if (h >= need) return 9f to 6f
-    val room = maxOf(0f, h - 96f)                      // 아이콘 4개(88) + 위아래 4 를 뺀 높이
-    val gap = (room / 10).coerceIn(3f, 6f)
-    val pad = ((room - gap * 3) / 8).coerceIn(4f, 9f)
-    return pad to gap
-}
-
+/** Training = modeTraining, PFT = modePFT, Full Sim = i_sim, Race = i_race (노랑) */
 @Composable
-private fun ModeCard(m: Mode, pad: Float, width: androidx.compose.ui.unit.Dp) {
-    Row(
-        Modifier.width(width).wCard(18.dp).press { WNav.openMode(m) }.padding(vertical = pad.dp, horizontal = 12.dp)
-            .testTag("w.mode." + m.raw),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        ModeIcon(m)
-        T(m.title, F.t(15, W600, tracking = -0.24f), Modifier.weight(1f), align = TextAlign.Start)
-        Box(Modifier.size(22.dp).clip(CircleShape).background(if (m == Mode.Training) hex(0x262626) else C.accent), contentAlignment = Alignment.Center) {
-            // ▶ 는 정가운데면 왼쪽으로 쏠려 보여서 오른쪽으로 1
-            if (m == Mode.Training) Icon8("i_chevRw", 10.dp, C.accent) else Icon8("i_play", 12.dp, Color.Black, Modifier.offset(x = 1.dp))
-        }
-    }
-}
-
-/** Training = modeTraining 22, PFT = modePFT 22, Full Sim = i_sim 20, Race = i_race 20 (노랑) */
-@Composable
-fun ModeIcon(m: Mode, color: Color = C.accent) {
-    Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+fun ModeIcon(m: Mode, color: Color = C.accent, size: androidx.compose.ui.unit.Dp = 22.dp) {
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
         when (m) {
-            Mode.Training -> Icon8("modeTraining", 22.dp, color)
-            Mode.Pft -> Icon8("modePFT", 22.dp, color)
-            Mode.Sim -> Icon8("i_sim", 20.dp, color)
-            Mode.Race -> Icon8("i_race", 20.dp, color)
+            Mode.Training -> Icon8("modeTraining", size, color)
+            Mode.Pft -> Icon8("modePFT", size, color)
+            Mode.Sim -> Icon8("i_sim", size * 0.91f, color)
+            Mode.Race -> Icon8("i_race", size * 0.91f, color)
         }
     }
 }
 
-/** 화면 제목 (시계 아래 가운데) */
+/** 목록 안 제목 (노랑 13) */
 @Composable
 fun WTitle(text: String, translate: Boolean = true) {
-    T(text, F.t(15, W600, C.accent), Modifier.fillMaxWidth().padding(bottom = 2.dp), align = TextAlign.Center, translate = translate)
+    T(text, F.t(13 * wk(), W600, C.accent), Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), align = TextAlign.Center, translate = translate)
 }
 
 // MARK: - 트레이닝 목록
 
+/** 제목 → Quick training (노란 유리 30 + ＋) · 트레이닝 카드 (36, 이름 13 + 설명 10 + ›). 같은 폭, 가운데 */
 @Composable
 fun WPrograms() {
+    val k = wk()
     Box(Modifier.fillMaxSize()) {
-        AmbientLayer(Ambient.y(0.16f, 0.7f, 0.45f, 1.0f, 0f, WatchStore.settings.glow))
-        RoundList("w.programs") {
+        WMenuBackground(51)
+        RoundList("w.programs", side = 0f) {
             item { WTitle("Training") }
             item {
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.accent)
-                        .press { WNav.quick = emptyList(); WNav.open(WScreen.Quick) }.padding(vertical = 10.dp, horizontal = 12.dp).testTag("w.quick"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    T("Quick training", F.t(15, W600, Color.Black), Modifier.weight(1f), align = TextAlign.Start)
-                    Icon8("i_plus", 14.dp, Color.Black)
+                Row(Modifier.width(screenFrac(0.72f)).height((30 * k).dp).glassBg((15 * k).dp, GlassYellow, 0.47f, 0.27f)
+                    .press { WNav.quick = emptyList(); WNav.open(WScreen.Quick) }.padding(horizontal = (14 * k).dp).testTag("w.quick"),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    T("Quick training", F.t(14 * k, W600, Color.Black), Modifier.weight(1f), align = TextAlign.Start)
+                    Icon8("i_plus", (11 * k).dp, Color.Black)
                 }
             }
             for (p in WatchStore.programs) item {
-                Column(Modifier.fillMaxWidth().wCard(14.dp).press { WNav.program = p; WNav.open(WScreen.Confirm) }.padding(vertical = 9.dp, horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    T(p.name, F.t(15, W600), Modifier.fillMaxWidth(), align = TextAlign.Start, minScale = 0.85f)
-                    T(p.watchMeta, F.t(13, color = C.text2), Modifier.fillMaxWidth(), align = TextAlign.Start, minScale = 0.85f, translate = false)
+                Row(Modifier.width(screenFrac(0.72f)).heightIn(min = (36 * k).dp).glassBg((18 * k).dp, GlassClear)
+                    .press { WNav.program = p; WNav.open(WScreen.Confirm) }.padding(horizontal = (14 * k).dp, vertical = (5 * k).dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        T(p.name, F.t(13 * k, W600), Modifier.fillMaxWidth(), align = TextAlign.Start, minScale = 0.8f, translate = false)
+                        T(p.watchMeta, F.t(10 * k, W500, Color.White.copy(alpha = 0.6f)), Modifier.fillMaxWidth(), align = TextAlign.Start, minScale = 0.8f, translate = false)
+                    }
+                    Icon8("i_chevRw", (9 * k).dp, Color.White.copy(alpha = 0.5f))
                 }
             }
-            item { T("Edit names on your phone", F.t(12, color = C.text3), Modifier.fillMaxWidth().padding(vertical = 4.dp), align = TextAlign.Center) }
+            item { T("Edit names on your phone", F.t(11 * k, color = C.text3), Modifier.fillMaxWidth().padding(vertical = 4.dp), align = TextAlign.Center) }
         }
     }
 }
 
 // MARK: - 빠른 트레이닝
 
-/** 러닝 4칸 + 스테이션 8칸을 눌러 쌓음 (최대 16). 누르면 "＋ Sled Push · 3번째" + 짧은 진동 */
+/** 러닝 4칸(높이 22) + 스테이션 4 × 2 (34 × 38, 아이콘 17 + 이름 8) 을 눌러 쌓음 (최대 16). 아래로: 쌓인 칩 · Remove last | Clear all · ▶ Start */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WQuick(buzz: (BuzzKind) -> Unit) {
@@ -253,74 +267,70 @@ fun WQuick(buzz: (BuzzKind) -> Unit) {
     }
 
     Box(Modifier.fillMaxSize()) {
-        AmbientLayer(Ambient.y(0.16f, 0.7f, 0.45f, 0f, 0f, WatchStore.settings.glow))
-        RoundList("w.quickList", side = 12f) {
+        WMenuBackground(52)
+        val cw = (34 * k).dp
+        val g = (4 * k).dp
+        RoundList("w.quickList", side = 0f) {
             item { WTitle("Quick training") }
-            // 러닝 4칸
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    for (r in Defaults.runs) {
-                        Box(Modifier.weight(1f).height((32 * k).dp).wCard(10.dp).press { add(ProgItem("run", r)) }.testTag("w.quick.run.$r"),
-                            contentAlignment = Alignment.Center) {
-                            T(r, F.t(13, W600), Modifier.padding(horizontal = 1.dp), minScale = 0.7f, translate = false)
+                Column(verticalArrangement = Arrangement.spacedBy(g)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(g)) {
+                        for (r in Defaults.runs) {
+                            Box(Modifier.size(cw, (22 * k).dp).glassBg((9 * k).dp, GlassClear).press { add(ProgItem("run", r)) }.testTag("w.quick.run.$r"),
+                                contentAlignment = Alignment.Center) {
+                                T(r, F.t(11 * k, W600), Modifier.padding(horizontal = 1.dp), minScale = 0.7f, translate = false)
+                            }
                         }
                     }
-                }
-            }
-            // 스테이션 8칸 (3 · 3 · 2 — 동그란 화면 가장자리에 걸리지 않게)
-            for (row in Station.all.chunked(3)) item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
-                    for (s in row) {
-                        Column(
-                            Modifier.width((50 * k).dp).height((50 * k).dp).wCard(10.dp).press { add(ProgItem(s.key)) }.testTag("w.quick." + s.key),
-                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
-                        ) {
-                            Icon8(s.key, (22 * k).dp, Tint.Yellow)
-                            T(shortName(s.name), F.t(10, W600, C.text2), Modifier.padding(horizontal = 2.dp), minScale = 0.7f)
+                    for (row in Station.all.chunked(4)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(g)) {
+                            for (s in row) {
+                                Box(Modifier.size(cw, (38 * k).dp).glassBg((9 * k).dp, GlassClear).press { add(ProgItem(s.key)) }.testTag("w.quick." + s.key)) {
+                                    Icon8(s.key, (17 * k).dp, Tint.Yellow, Modifier.align(Alignment.TopCenter).padding(top = (6 * k).dp))
+                                    T(chipLabel(ProgItem(s.key)), F.t(8 * k, W600, Color.White.copy(alpha = 0.6f)),
+                                        Modifier.align(Alignment.BottomCenter).padding(bottom = (3 * k).dp, start = 1.dp, end = 1.dp), minScale = 0.7f, translate = false)
+                                }
+                            }
                         }
                     }
                 }
             }
             // 쌓인 구간
             item {
-                FlowRow(Modifier.fillMaxWidth().heightIn(min = 22.dp).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    if (WNav.quick.isEmpty()) T("Tap to add", F.t(12, color = C.text3))
+                FlowRow(Modifier.width(screenFrac(0.68f)).heightIn(min = 22.dp).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(g, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(g)) {
+                    if (WNav.quick.isEmpty()) T("Tap to add", F.t(12 * k, color = C.text3))
                     for (q in WNav.quick) {
-                        Row(Modifier.clip(RoundedCornerShape(6.dp)).background(hex(0x1C1C1C)).padding(vertical = 2.dp, horizontal = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Icon8(q.icon, 9.dp, if (q.icon == "run") Tint.White else Tint.Yellow)
-                            T(chipLabel(q), F.t(11, W600), translate = false)
+                        Row(Modifier.height((20 * k).dp).glassBg((7 * k).dp, GlassClear, 0.47f).padding(horizontal = (6 * k).dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((4 * k).dp)) {
+                            Icon8(q.icon, (11 * k).dp, if (q.icon == "run") Tint.White else Tint.Yellow)
+                            T(chipLabel(q), F.t(11 * k, W600), translate = false)
                         }
                     }
                 }
             }
             if (WNav.quick.isNotEmpty()) {
                 item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.width(screenFrac(0.66f)), horizontalArrangement = Arrangement.spacedBy((6 * k).dp)) {
                         SmallButton("Remove last", Modifier.weight(1f).testTag("w.quickUndo")) { WNav.quick = WNav.quick.dropLast(1); buzz(BuzzKind.Click) }
                         SmallButton("Clear all", Modifier.weight(1f).testTag("w.quickClear")) { WNav.quick = emptyList(); buzz(BuzzKind.Click) }
                     }
                 }
-                item {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Box(Modifier.width(screenFrac(0.72f)).height(36.dp).clip(RoundedCornerShape(50)).background(C.accent)
-                        .press {
-                            val p = WatchStore.saveQuick(WNav.quick)
-                            WNav.program = p; WNav.quick = emptyList(); WNav.open(WScreen.Confirm)
-                        }.testTag("w.quickStart"),
-                        contentAlignment = Alignment.Center) {
-                        T(wt("Start · %lld segments", WNav.quick.size), F.t(15, W600, Color.Black), Modifier.padding(horizontal = 10.dp), translate = false)
-                    }
-                    }
+                item { Spacer(Modifier.height((64 * k).dp)) }
+            }
+        }
+        if (WNav.quick.isNotEmpty()) {
+            WCanvas { L ->
+                WEdgeButton(L, wt("Start · %lld segments", WNav.quick.size), "play", "w.quickStart") {
+                    val p = WatchStore.saveQuick(WNav.quick)
+                    WNav.program = p; WNav.quick = emptyList(); WNav.open(WScreen.Confirm)
                 }
             }
         }
-        // 알림 (아래에서 잠깐)
-        // 2026-10-21: 아래 끝은 좁아서 글자가 잘림 → 조금 위로, 폭은 원 안으로
-        AnimatedVisibility(toast != null, Modifier.align(Alignment.BottomCenter).padding(bottom = (30 * k).dp).widthIn(max = roundWidth(30 * k)),
-            enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
-            Box(Modifier.height(26.dp).clip(RoundedCornerShape(50)).background(C.accent).padding(horizontal = 10.dp).testTag("w.quickToast"),
+        // 알림 (가운데 위쪽에 잠깐)
+        AnimatedVisibility(toast != null, Modifier.align(Alignment.TopCenter).padding(top = (46 * k).dp).widthIn(max = roundWidth(46 * k)),
+            enter = fadeIn() + slideInVertically { -it / 2 }, exit = fadeOut()) {
+            Box(Modifier.height(26.dp).glassBg(13.dp, GlassYellow, 0.47f, 0.27f).padding(horizontal = 10.dp).testTag("w.quickToast"),
                 contentAlignment = Alignment.Center) {
                 T(toast ?: "", F.t(13, W600, Color.Black), translate = false)
             }
@@ -332,21 +342,24 @@ const val MAX_SEGS = 16
 
 @Composable
 private fun SmallButton(t: String, modifier: Modifier, onClick: () -> Unit) {
-    Box(modifier.height(32.dp).clip(RoundedCornerShape(10.dp)).background(hex(0x1C1C1C)).press(onClick = onClick), contentAlignment = Alignment.Center) {
-        T(t, F.t(12, W600, C.bad), Modifier.padding(horizontal = 4.dp))
+    val k = wk()
+    Box(modifier.height((28 * k).dp).glassBg((14 * k).dp, GlassClear).press(onClick = onClick), contentAlignment = Alignment.Center) {
+        T(t, F.t(11 * k, W600), Modifier.padding(horizontal = 4.dp))
     }
 }
-
-private fun shortName(n: String): String = n.replace("Farmers Carry", "Farmers").replace("Wall Balls", "Wall Ball")
 
 private fun chipLabel(q: ProgItem, full: Boolean = false): String {
     if (q.icon == "run") return q.run ?: "1KM"
     if (full) return q.name()
     return q.name().replace("Farmers Carry", "FC").replace("Wall Balls", "WB").replace("Sled Push", "Push").replace("Sled Pull", "Pull")
+        .replace("SkiErg", "Ski")
 }
 
 // MARK: - 확인 (Start)
 
+/**
+ * 1.2.7: Race · Full Sim · 러닝 카드 = 가운데 블록 + 아래 끝 버튼 ▶ Start. PFT · 트레이닝 = 목록 (줄 높이 20) + 아래 끝 버튼.
+ */
 @Composable
 fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
     val mode = WNav.mode
@@ -354,105 +367,112 @@ fun WConfirm(onStart: (indoor: Boolean?) -> Unit) {
     val seq = WatchStore.seq(mode, if (mode == Mode.Training) program else null)
     val ev = WatchStore.settings.event
     val noEvent = mode == Mode.Race && !ev.isSet
-    val k = wk()
-    Box(Modifier.fillMaxSize()) {
-        AmbientLayer(Ambient.y(0.22f, 1.1f, 0.5f, 0.5f, 1.08f, WatchStore.settings.glow))
-        RoundList("w.confirm", side = 22f) {
-            item { WTitle(if (mode == Mode.Training) program.name else mode.title) }
-            when {
-                // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동 — 설명 + 할 일 · 단계 · 종목 목록
-                mode == Mode.Training && Kinds.isNew(program.kind) -> {
-                    item {
-                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon8(Kinds.icon(program.kind), 30.dp, Tint.Yellow)
-                            T(program.watchMeta, F.t(13, color = C.text2), Modifier.fillMaxWidth(), maxLines = 3, align = TextAlign.Center, translate = false)
-                        }
-                    }
-                    for (line in bonusLines(program)) item { SegRow(Kinds.icon(program.kind), line.first, line.second) }
-                }
-                mode == Mode.Training && program.isOpen -> item {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon8(if (program.isHIIT) "hiit" else "run", 30.dp, Tint.Yellow)
-                        T(program.meta ?: "", F.t(14, color = C.text2), Modifier.fillMaxWidth(), maxLines = 2, align = TextAlign.Center)
-                    }
-                }
-                mode == Mode.Pft -> {
-                    item {
-                        val best = WatchStore.ctx.pftBestTotal
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
-                            T(if (best != null) wt("BEST") + " " + Fm.t(best) else wt("6 movements · for time"), F.num(13, W500, C.text2), translate = false)
-                            if (best != null) PFTBadge(PFT.grade(best), 62.dp, 18.dp, 10f)
-                        }
-                    }
-                    for (s in seq) item { SegRow(s.icon, s.name, s.detail.split(" · ").first()) }
-                }
-                mode == Mode.Training -> {
-                    item {
-                        val sets = if (program.sets == 1) wt("1 set") else wt("%lld sets", program.sets)
-                        T(wt("%lld segments", seq.size) + " · " + sets, F.t(13, W500, C.text2), Modifier.fillMaxWidth(), align = TextAlign.Center, translate = false)
-                    }
-                    for (s in seq.filter { it.kind != SegKind.Rox }) item { SegRow(s.icon, s.name, if (s.target > 0) Fm.t(s.target) else "–") }
-                }
-                noEvent -> item {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        T("No race set up", F.t(16, W600))
-                        T("Add a race in the Race tab of the phone app and it will show up here.", F.t(13, color = C.text2), Modifier.fillMaxWidth(), maxLines = 4, align = TextAlign.Center)
-                    }
-                }
-                else -> item {
-                    val small = if (mode == Mode.Race) Fm.wdm(ev.date) + " · " + WatchStore.settings.div.name
-                        else WatchStore.settings.div.name + " · " + "8 runs · 8 stations".l10n
-                    // 86번: 워치에서 고른 목표는 그 숫자 그대로
-                    val goal = if (mode == Mode.Race) Fm.t(WatchStore.settings.goalTime)
-                        else WatchGoal.shown(WatchStore.watchGoal, seq, WatchStore.settings.roxTarget)
-                    val w = WatchStore.simPick.second
-                    val goalWord = if (mode == Mode.Race) "GOAL" else if (w == "VS GOAL") "GOAL" else w
-                    // 빌드 27 (71-1): Full Sim 은 맨 위 제목과 겹치던 큰 제목을 빼고 목표 시간을 크게. 목표를 누르면 워치에서 바로 바꿈(68-①)
-                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        if (mode == Mode.Race) T(ev.name, F.t(17, W600, tracking = -0.34f), Modifier.fillMaxWidth(), maxLines = 2,
-                            align = TextAlign.Center, translate = false)
-                        T(small, F.t(12, color = C.text2), Modifier.fillMaxWidth(), translate = false)
-                        if (mode == Mode.Sim) {
-                            Column(Modifier.padding(top = 4.dp).clip(RoundedCornerShape(12.dp)).press { WNav.open(WScreen.Goal) }
-                                .padding(horizontal = 8.dp, vertical = 2.dp).testTag("w.simGoal"),
-                                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    T(goal, F.num(34 * k, tracking = -0.6f), Modifier.testTag("w.goal"), minScale = 0.85f, translate = false)
-                                    Icon8("i_pencil", 13.dp, C.accent)
-                                }
-                                T(goalWord, F.t(11, W600, C.text2, tracking = 0.9f))
-                            }
-                        } else {
-                            T(goal, F.num(30 * k, tracking = -0.6f), Modifier.padding(top = 6.dp).testTag("w.goal"), translate = false)
-                            T(goalWord, F.t(11, W600, C.text2, tracking = 0.9f))
-                        }
-                    }
-                }
-            }
-            when {
-                noEvent -> {}
-                // 83번(빌드 28): 러닝은 시작할 때 실외(GPS) / 실내를 고름 — 카드에 저장된 쪽이 노란 단추, 다른 쪽은 회색
-                mode == Mode.Training && Kinds.runLike(program.kind) -> item {
-                    val cardIndoor = program.indoor ?: false
-                    // 2026-10-21: 동그란 화면 아래쪽이라 줄 폭을 줄임 (양 끝이 잘렸음)
-                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
-                      Row(Modifier.width(screenFrac(0.70f)), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        RunStart(false, !cardIndoor, Modifier.weight(1f)) { onStart(false) }
-                        RunStart(true, cardIndoor, Modifier.weight(1f)) { onStart(true) }
-                      }
-                    }
-                }
-                else -> item {
-                    // 2026-10-21: 알약 모양 + 폭 줄임 (화면 아래 끝에서 양 끝이 잘렸음)
-                    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
-                        Box(Modifier.width(screenFrac(0.62f)).height(40.dp).clip(Pill).background(C.accent).press { onStart(null) }.testTag("w.start"),
-                            contentAlignment = Alignment.Center) {
-                            T("Start", F.t(15, W600, Color.Black))
-                        }
-                    }
-                }
-            }
+    val title = if (mode == Mode.Training) program.name else mode.title
+    val tr = mode != Mode.Training
+    when {
+        noEvent -> WMenuFrame(54, title, "w.confirm", tr) { L ->
+            WText("No race set up", wf(L, 15f, W700), L, WScale.D / 2, 88f, 160f, translate = true)
+            T("Add a race in the Race tab of the phone app and it will show up here.", wf(L, 11f, W500, Color.White.copy(alpha = 0.6f)),
+                Modifier.at(L.dx(WScale.D / 2), L.dy(124f)).width(L.dv(150f)), maxLines = 4, align = TextAlign.Center)
         }
+        mode == Mode.Race || mode == Mode.Sim -> WMenuFrame(if (mode == Mode.Race) 54 else 55, title, "w.confirm", tr) { L ->
+            val small = if (mode == Mode.Race) Fm.wdm(ev.date) + " · " + WatchStore.settings.div.name
+                else WatchStore.settings.div.name + " · " + "8 runs · 8 stations".l10n
+            // 86번: 워치에서 고른 목표는 그 숫자 그대로
+            val goal = if (mode == Mode.Race) Fm.t(WatchStore.settings.goalTime)
+                else WatchGoal.shown(WatchStore.watchGoal, seq, WatchStore.settings.roxTarget)
+            val w = WatchStore.simPick.second
+            val goalWord = if (mode == Mode.Race) "GOAL" else if (w == "VS GOAL") "GOAL" else w
+            // 묶음: (대회 이름 15 Bold → 7 →) 작은 줄 11 → 12 → 블록 [GOAL · 1:20:00 · (TAP TO CHANGE)]
+            val c1 = wCap(15f)
+            val c2 = wCap(11f)
+            val tapWord = if (mode == Mode.Sim) wt("TAP TO CHANGE") else ""
+            val blk = 10f + wCap(10f) + 8f + wCap(34f) + (if (tapWord.isEmpty()) 0f else 8f + wCap(9f)) + 10f
+            val tot = (if (mode == Mode.Race) c1 + 7f else 0f) + c2 + 12f + blk
+            var y = (45f + 168f) / 2 - tot / 2
+            if (mode == Mode.Race) {
+                WText(ev.name, wf(L, 15f, W700), L, WScale.D / 2, y + c1 / 2, 160f, minScale = 0.7f)
+                y += c1 + 7f
+            }
+            WText(small, wf(L, 11f, W600, Color.White.copy(alpha = 0.6f)), L, WScale.D / 2, y + c2 / 2, 160f, minScale = 0.7f)
+            y += c2 + 12f
+            WBlock(L, y, y + blk, wt(goalWord), goal, tapWord, center = y + blk / 2)
+            if (mode == Mode.Sim) {
+                Box(Modifier.at(L.dx(WScale.D / 2), L.dy(y + blk / 2)).size(L.dv(150f), L.dv(blk)).testTag("w.simGoal")
+                    .press { WNav.open(WScreen.Goal) })
+            }
+            WEdgeButton(L, "Start", "play", "w.start") { onStart(null) }
+        }
+        mode == Mode.Training && program.isRun -> WMenuFrame(58, title, "w.confirm", false) { L ->
+            // 러닝 카드: [DISTANCE 5.00 · KM] → Indoor · No GPS (맑은 유리 알약 110 × 28) → 아래 끝 버튼 ▶ Outdoor · GPS (카드에 저장된 쪽이 아래 끝 버튼)
+            val cardIndoor = program.indoor ?: false
+            val hb = 28f
+            val yb1 = 172f - 8f - hb
+            val km = program.runKm ?: 0
+            WBlock(L, 45f, yb1 - 4f, wt("DISTANCE"), if (km > 0) String.format(java.util.Locale.US, "%.2f", km.toDouble()) else wt("Free"), if (km > 0) "KM" else "")
+            WPill(L, WScale.D / 2 - 55f, yb1, 110f, hb, GlassClear, 0.55f, if (cardIndoor) "w.startOutdoor" else "w.startIndoor",
+                onClick = { onStart(!cardIndoor) }) {
+                T(if (cardIndoor) wt("Outdoor") + " · GPS" else wt("Indoor") + " · " + wt("No GPS"), wf(L, 12f, W600), translate = false)
+            }
+            WEdgeButton(L, if (cardIndoor) wt("Indoor") + " · " + wt("No GPS") else wt("Outdoor") + " · GPS", "play",
+                if (cardIndoor) "w.startIndoor" else "w.startOutdoor") { onStart(cardIndoor) }
+        }
+        else -> ListConfirm(mode, program, seq, title, onStart)
+    }
+}
+
+/** PFT · 트레이닝 · 18번 운동: 제목 → 설명 한 줄 → 줄 (높이 20, 아이콘 12 · 이름 13 · 오른쪽 숫자) → 아래 끝 버튼 ▶ Start */
+@Composable
+private fun ListConfirm(mode: Mode, program: Program, seq: List<com.nkssi.splits8.shared.Seg>, title: String, onStart: (Boolean?) -> Unit) {
+    val k = wk()
+    val tr = mode != Mode.Training
+    val rows: List<Triple<String, String, String>> = when {
+        mode == Mode.Training && Kinds.isNew(program.kind) -> bonusLines(program).map { Triple(Kinds.icon(program.kind), it.first, it.second) }
+        mode == Mode.Training && program.isOpen -> emptyList()
+        mode == Mode.Pft -> seq.map { Triple(it.icon, it.name, it.detail.split(" · ").first()) }
+        else -> seq.filter { it.kind != SegKind.Rox || it.icon == "rest" }.map { Triple(it.icon, it.name, if (it.target > 0) Fm.t(it.target) else "–") }
+    }
+    Box(Modifier.fillMaxSize()) {
+        WMenuBackground(if (mode == Mode.Pft) 56 else 57)
+        RoundList("w.confirm", side = 0f) {
+            item { WTitle(title, tr) }
+            item {
+                when {
+                    mode == Mode.Pft -> {
+                        val best = WatchStore.ctx.pftBestTotal
+                        Row(Modifier.width(screenFrac(0.66f)), verticalAlignment = Alignment.CenterVertically) {
+                            if (best != null) {
+                                T("BEST", F.t(9 * k, W700, Color.White.copy(alpha = 0.6f), tracking = 0.6f))
+                                Spacer(Modifier.width((6 * k).dp))
+                                T(Fm.t(best), F.num(13 * k, W600), translate = false)
+                                Spacer(Modifier.weight(1f))
+                                PFTBadge(PFT.grade(best), (44 * k).dp, (15 * k).dp, 9f * k)
+                            } else T(wt("6 movements · for time"), F.t(11 * k, W600, Color.White.copy(alpha = 0.6f)), Modifier.fillMaxWidth(), translate = false)
+                        }
+                    }
+                    mode == Mode.Training && Kinds.isNew(program.kind) || program.isOpen -> Column(Modifier.width(screenFrac(0.7f)),
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon8(if (Kinds.isNew(program.kind)) Kinds.icon(program.kind) else if (program.isHIIT) "hiit" else "run", (26 * k).dp, Tint.Yellow)
+                        T(program.watchMeta, F.t(11 * k, W600, Color.White.copy(alpha = 0.6f)), Modifier.fillMaxWidth(), maxLines = 3, align = TextAlign.Center, translate = false)
+                    }
+                    else -> {
+                        val sets = if (program.sets == 1) wt("1 set") else wt("%lld sets", program.sets)
+                        T(wt("%lld segments", seq.size) + " · " + sets, F.t(11 * k, W600, Color.White.copy(alpha = 0.6f)), Modifier.fillMaxWidth(),
+                            align = TextAlign.Center, translate = false)
+                    }
+                }
+            }
+            if (rows.isNotEmpty()) item {
+                Column(Modifier.width(screenFrac(0.7f))) {
+                    rows.forEachIndexed { i, (ic, nm, v) ->
+                        SegRow(ic, nm, v)
+                        if (i < rows.size - 1) Box(Modifier.fillMaxWidth().height(0.8.dp).background(Color.White.copy(alpha = 0.09f)))
+                    }
+                }
+            }
+            item { Spacer(Modifier.height((60 * k).dp)) }
+        }
+        WCanvas { L -> WEdgeButton(L, "Start", "play", "w.start") { onStart(null) } }
     }
 }
 
@@ -470,68 +490,58 @@ private fun bonusLines(p: Program): List<Pair<String, String>> = when (p.kind) {
     else -> emptyList()
 }
 
-@Composable
-private fun RunStart(indoor: Boolean, main: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val fg = if (main) Color.Black else Color.White
-    Column(modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(if (main) C.accent else hex(0x262626)).press(onClick = onClick)
-        .testTag(if (indoor) "w.startIndoor" else "w.startOutdoor"),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically)) {
-        T(if (indoor) "Indoor" else "Outdoor", F.t(14, W600, fg), Modifier.padding(horizontal = 4.dp))
-        T(if (indoor) "No GPS" else "GPS", F.t(10, W500, fg.copy(alpha = 0.7f)), Modifier.padding(horizontal = 4.dp))
-    }
-}
-
 // MARK: - Full Sim 목표 고르기
 
-/** 빌드 27 (68-①): 워치에서 Full Sim 목표 완주 시간 고르기 (크라운 · 위아래로 1분 단위). 고르면 16구간을 다시 나눔 */
+/** 제목 "Goal time" → 휠 (줄 간격 24, 고른 줄 노랑 21 + 유리 띠) → ✓ Set (아래 끝 버튼) */
 @Composable
 fun WGoalPicker() {
     val k = wk()
     val range = WatchGoal.minutes
     val start = WatchGoal.initialMinutes(WatchStore.watchGoal, WatchStore.simTargets, WatchStore.settings.roxTarget)
     val state = androidx.wear.compose.material3.rememberPickerState(range.size, range.indexOf(start).coerceAtLeast(0), false)
-    Box(Modifier.fillMaxSize().testTag("w.goalPicker")) {
-        AmbientLayer(Ambient.y(0.18f, 1.0f, 0.5f, 0.5f, -0.1f, WatchStore.settings.glow))
-        Column(Modifier.fillMaxSize().padding(start = (26 * k).dp, end = (26 * k).dp, top = (26 * k).dp, bottom = (20 * k).dp),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            T("Goal time", F.t(13, W600, C.text2))
-            androidx.wear.compose.material3.Picker(state, { Fm.t(range[state.selectedOptionIndex] * 60) },
-                Modifier.weight(1f).fillMaxWidth().testTag("w.goalWheel"), verticalSpacing = 0.dp) { i ->
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    T(Fm.t(range[i] * 60), F.num(22, color = if (i == state.selectedOptionIndex) Color.White else C.text3), translate = false)
-                }
+    WMenuFrame(59, "Goal time", "w.goalPicker") { L ->
+        val mid = (45f + 168f) / 2
+        // 유리 띠
+        Box(Modifier.at(L.dx(WScale.D / 2), L.dy(mid)).size(L.dv(124f), L.dv(24f)).glassBg(L.dv(10f), Color.White.copy(alpha = 0.13f)))
+        androidx.wear.compose.material3.Picker(state, { Fm.t(range[state.selectedOptionIndex] * 60) },
+            Modifier.at(L.dx(WScale.D / 2), L.dy(mid)).size(L.dv(150f), L.dv(120f)).testTag("w.goalWheel"), verticalSpacing = 0.dp) { i ->
+            val sel = i == state.selectedOptionIndex
+            Box(Modifier.fillMaxWidth().height(L.dv(24f)), contentAlignment = Alignment.Center) {
+                T(Fm.t(range[i] * 60), wf(L, if (sel) 21f else 16f, W600, if (sel) C.accent else Color.White.copy(alpha = 0.45f), num = true), translate = false)
             }
-            // 2026-10-21: 아래 끝 단추가 원 밖으로 나가지 않게 (아래에 "폰 설정 따르기" 줄이 있으면 그만큼 위)
-            val below = (20 * k) + (if (WatchStore.watchGoal != null) 20f else 0f)
-            Box(Modifier.width(roundWidth(below)).height(36.dp).clip(Pill).background(C.accent)
-                .press { WatchStore.pickWatchGoal(range[state.selectedOptionIndex] * 60); WNav.pop() }.testTag("w.goalSet"),
-                contentAlignment = Alignment.Center) {
-                T("Set", F.t(14, W600, Color.Black))
-            }
-            if (WatchStore.watchGoal != null) {
-                T("Use phone setting", F.t(12, color = C.text2), Modifier.press { WatchStore.pickWatchGoal(null); WNav.pop() }.testTag("w.goalReset"))
-            }
+        }
+        if (WatchStore.watchGoal != null) {
+            T("Use phone setting", wf(L, 11f, W500, Color.White.copy(alpha = 0.6f)),
+                Modifier.at(L.dx(WScale.D / 2), L.dy(161f)).press { WatchStore.pickWatchGoal(null); WNav.pop() }.testTag("w.goalReset"))
+        }
+        WEdgeButton(L, "Set", "check", "w.goalSet", top = 172f) {
+            WatchStore.pickWatchGoal(range[state.selectedOptionIndex] * 60); WNav.pop()
         }
     }
 }
 
+/** 목록 한 줄 (높이 20): 아이콘 12 · 이름 13 · 오른쪽 숫자 13 */
 @Composable
 private fun SegRow(icon: String, name: String, right: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp, horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon8(icon, 14.dp, Tint.Yellow)
-        T(name, F.t(13), Modifier.weight(1f), align = TextAlign.Start, minScale = 0.85f, translate = false)
-        T(right, F.num(13, W500, C.text2), minScale = 0.85f, translate = false)
+    val k = wk()
+    Row(Modifier.fillMaxWidth().height((20 * k).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((7 * k).dp)) {
+        Icon8(icon, (12 * k).dp, if (icon == "run") Tint.White else if (icon == "roxzone" || icon == "rest") Tint.Mute else Tint.Yellow)
+        T(name, F.t(13 * k, W500), Modifier.weight(1f), align = TextAlign.Start, minScale = 0.8f, translate = false)
+        T(right, F.num(13 * k, W500, Color.White.copy(alpha = 0.6f)), minScale = 0.8f, translate = false)
     }
 }
 
 // MARK: - 3 · 2 · 1
 
-/** Start 를 누르면 3 · 2 · 1 을 센 뒤 시간이 시작됨. 화면을 누르면 취소 */
+/** 노란 숫자 96 Bold 가운데 + 귀퉁이 표시, 아래 "Tap to cancel". 화면을 누르면 취소 */
 @Composable
 fun WCountdown(n: Int, onCancel: () -> Unit) {
-    Box(Modifier.fillMaxSize().press(onClick = onCancel).testTag("w.countdown"), contentAlignment = Alignment.Center) {
-        AmbientLayer(Ambient.y(0.30f, 1.0f, 0.6f, 0.5f, 0.5f, WatchStore.settings.glow))
-        T("$n", F.num(96, W700, C.accent), Modifier.testTag("w.count"), translate = false)
-        T("Tap to cancel", F.t(13, color = C.text3), Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp))
+    Box(Modifier.fillMaxSize().press(onClick = onCancel).testTag("w.countdown")) {
+        WMenuFrame(60, null, "w.countdownFrame") { L ->
+            val ch = wCap(96f)
+            WBrackets(L, WScale.D / 2 - ch / 2 - 18f, WScale.D / 2 + ch / 2 + 18f, Color.White.copy(alpha = 0.47f))
+            WText("$n", wf(L, 96f, W700, C.accent, num = true), L, WScale.D / 2, WScale.D / 2, 120f, tag = "w.count")
+            WText("Tap to cancel", wf(L, 12f, W600, Color.White.copy(alpha = 0.6f)), L, WScale.D / 2, WScale.D - 30f, 140f, translate = true)
+        }
     }
 }

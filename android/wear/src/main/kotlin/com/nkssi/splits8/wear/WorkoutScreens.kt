@@ -1,34 +1,30 @@
 package com.nkssi.splits8.wear
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,17 +32,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -56,74 +51,71 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.pager.VerticalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
-import com.nkssi.splits8.shared.CheerInput
 import com.nkssi.splits8.shared.Bonus
+import com.nkssi.splits8.shared.CheerInput
 import com.nkssi.splits8.shared.CheerPicker
-import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.Fm
-import com.nkssi.splits8.shared.Units
+import com.nkssi.splits8.shared.IvStep
+import com.nkssi.splits8.shared.Kinds
 import com.nkssi.splits8.shared.Mode
 import com.nkssi.splits8.shared.PFT
 import com.nkssi.splits8.shared.Record
 import com.nkssi.splits8.shared.RecordFlag
+import com.nkssi.splits8.shared.Seg
 import com.nkssi.splits8.shared.SegKind
-import com.nkssi.splits8.shared.l10n
+import com.nkssi.splits8.shared.Units
 import com.nkssi.splits8.shared.runMeters
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
-// 운동 중 (아이폰 Views/WorkoutViews.swift): 위아래 페이지(크라운 · 베젤) = 실시간 · 조작 · 구간 목록.
-// 실시간에서 왼쪽으로 밀기 · 가운데 노란 단추 = 다음 구간, 오른쪽으로 밀기 = 조작. 조작에서 왼쪽으로 밀기 = 실시간.
-// 빌드 24 모양: SPLIT | GOAL(트레이닝 BEST · 러닝 PACE), 목표를 넘기면 SPLIT 빨강.
+// 운동 중 (1.2.7 새 디자인 — 애플워치와 같은 규칙, 동그란 화면 자리는 splits8-1.2.7-갤럭시워치-화면.md).
+// 위아래 페이지(베젤 · 크라운) = 실시간 · 목표 대비 · 심박/칼로리. 실시간에서 왼쪽으로 밀기 · 가운데 버튼 = 다음 구간,
+// 오른쪽으로 밀기 = 조작 화면 (위에 덮임). 조작 화면에서 왼쪽으로 밀기 = 돌아감.
 
-/**
- * 화면 크기별 크기 (225dp 기준 1.0). 빌드 27 (68 · 71번 확정안): 위 정보는 그대로, 아래에 NEXT 이름 + 컨트롤 줄
- * → 전체 글자를 조금 줄이고 간격을 고르게. 아이폰 WLiveMetrics(44mm 값)에서 출발, 동그란 화면이라 위아래를 조금 더 비움
- */
-private class LiveMetrics(val k: Float) {
-    val top = 18 * k          // TOTAL 이름표 위
-    val bottom = 13 * k        // 동그란 화면 아래 가장자리에 양옆 단추가 걸리지 않게
-    val totalFont = 27 * k     // 전체 시간
-    val icon = 16 * k          // 지금 구간 아이콘
-    val name = 14 * k          // 지금 구간 이름
-    val seg = 25 * k           // SPLIT · PACE 숫자
-    val nextName = 15 * k      // NEXT 아래 다음 구간 이름
-    val main = 44 * k          // 가운데 노란 단추 지름
-    val side = 30 * k          // 양옆 작은 단추 지름
-    /** 컨트롤 줄 폭 — 동그란 화면 아래쪽은 좁아서 양옆 단추가 원 안에 들어오게 */
-    val controlsW = 126 * k
+/** 베젤 아래 칸에서 크게 볼 것 (누르면 바뀜, 앱을 끄기 전까지 기억) */
+private object WBig {
+    var goal by mutableStateOf("vs")
+    var stat by mutableStateOf("max")
 }
 
 @Composable
-fun WWorkoutPager(buzz: (BuzzKind) -> Unit, startPage: Int = 0, startEnd: Boolean = false) {
+fun WWorkoutPager(buzz: (BuzzKind) -> Unit, startPage: Int = 0, startEnd: Boolean = false, startControls: Boolean = false) {
     val e = WatchStore.engine
-    // 1.2.3: 러닝 카드는 구간(KM 1 · KM 2) 목록 페이지 없음
-    val pager = rememberPagerState(initialPage = startPage) { if (e.isRunKind) 2 else 3 }
-    val scope = rememberCoroutineScope()
+    // 페이지: 실시간 · (목표 대비) · 심박/칼로리. 목표가 없는 운동은 목표 칸 없음
+    val pages: List<String> = buildList { add("live"); if (e.hasGoalTotal) add("goal"); add("stats") }
+    val pager = rememberPagerState(initialPage = startPage.coerceIn(0, pages.size - 1)) { pages.size }
     var endSheet by remember { mutableStateOf(startEnd) }
+    var controls by remember { mutableStateOf(startControls) }
     val aod = LocalAod.current
     val flash = remember { Animatable(0f) }
     LaunchedEffect(e.advanceCount) {
-        if (e.advanceCount == 0 || aod || e.isRunKind) return@LaunchedEffect      // 1.2.3: 러닝 카드는 1 km 마다 번쩍이지 않음
-        // 구간 전환 반짝: 노랑 0.42, 60ms 켜짐 → 260ms 사라짐
+        if (e.advanceCount == 0 || aod || e.isRunKind) return@LaunchedEffect      // 러닝 카드는 1 km 마다 번쩍이지 않음
+        // 1.2.7: 구간 넘어갈 때 흰 번쩍임 (약하게)
         flash.snapTo(0f)
         flash.animateTo(1f, tween(60, easing = LinearEasing))
         delay(30)
-        flash.animateTo(0f, tween(260))
+        flash.animateTo(0f, tween(300))
     }
-    fun go(p: Int) = scope.launch { pager.animateScrollToPage(p) }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         VerticalPager(pager, Modifier.fillMaxSize()) { page ->
-            when (page) {
-                0 -> WLive(onControls = { go(1) })
-                1 -> WControls(onBack = { go(0) }, onEnd = { endSheet = true }, onNext = { e.advance(); go(0) })
-                else -> WSegmentList()
+            when (pages.getOrNull(page)) {
+                "goal" -> WGoalPage(page, pages.size)
+                "stats" -> WStatsPage(page, pages.size)
+                else -> WLive(onControls = { controls = true })
             }
+        }
+        AnimatedVisibility(controls && !aod, enter = slideInHorizontally(tween(220)) { -it } + fadeIn(tween(160)),
+            exit = slideOutHorizontally(tween(220)) { -it } + fadeOut(tween(160))) {
+            WControls(onBack = { controls = false }, onEnd = { controls = false; endSheet = true },
+                onNext = { e.advance(); controls = false })
         }
         if (endSheet) {
             WEndSheet(
@@ -133,222 +125,341 @@ fun WWorkoutPager(buzz: (BuzzKind) -> Unit, startPage: Int = 0, startEnd: Boolea
                 buzz = buzz,
             )
         }
-        if (!aod && flash.value > 0f) Box(Modifier.fillMaxSize().background(Color(1f, 236f / 255f, 80f / 255f, 0.42f * flash.value)))
+        if (!aod && flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.32f * flash.value)))
     }
 }
 
 // MARK: 실시간
 
-/**
- * 빌드 27 (68-② · 71-3·5): TOTAL · 지금 구간(아이콘 + 이름) · SPLIT | PACE/GOAL/BEST · 아래 줄
- * → NEXT + 다음 구간 이름 · 목표 → 컨트롤 줄 (되돌리기 · 다음(큰 노란 단추) · 일시정지). 위아래 간격을 고르게.
- * Roxzone 은 같은 모양인데 숫자 · 이름이 회색 (점선 테두리 안 씀), 단추는 노랑 그대로. 어두운 화면에서는 단추를 숨김
- */
+/** 구간 색 (타이머 운동: 인터벌 빠르게 = 파랑, 천천히 · 걷기 · 휴식 = 회색, 그 밖 운동 = 노랑 / 휴식 = 회색) */
+private fun toneNow(): WTone {
+    val e = WatchStore.engine
+    val cur = e.cur
+    if (e.isRunKind) return WTone.Run
+    if (Kinds.isNew(e.kind)) {
+        if (cur.kind == SegKind.Rox) return WTone.Gray
+        if (e.kind == Kinds.IVRUN) return if (cur.name == IvStep.typeName(IvStep.FAST)) WTone.Run else WTone.Gray
+        if (e.kind == Kinds.EMOM && e.segWork.getOrNull(e.idx) != null) return WTone.Gray
+        return WTone.Station
+    }
+    return WTone.of(cur)
+}
+
 @Composable
 fun WLive(onControls: () -> Unit) {
     val e = WatchStore.engine
     val aod = LocalAod.current
-    val m = LiveMetrics(wk())
-    var now by remember { mutableLongStateOf(WatchStore.engine.now()) }
+    var now by remember { mutableLongStateOf(e.now()) }
     LaunchedEffect(Unit) { while (true) { now = WatchStore.engine.now(); delay(250) } }
-
-    // 존이 바뀌면 위쪽 빛이 새 존 색 0.75 로 켜졌다가 900ms 동안 평소(0.28)로
-    val z = if (e.hr > 0) e.zone.coerceIn(1, 5) else 0
-    val pulse = remember { Animatable(0f) }
-    var lastZone by remember { mutableStateOf(0) }
-    LaunchedEffect(z) {
-        if (!aod && lastZone > 0 && z > 0 && z != lastZone) { pulse.snapTo(1f); delay(90); pulse.animateTo(0f, tween(900)) }
-        lastZone = z
-    }
-    val zoneColor by animateColorAsState(C.zone(if (z == 0) 1 else z), tween(600), label = "zone")
     val swipePx = with(LocalDensity.current) { 40.dp.toPx() }
-    val isRox = e.cur.kind == SegKind.Rox
+    val tone = toneNow()
 
-    Box(
-        Modifier.fillMaxSize().testTag("w.live").pointerInput(Unit) {
-            var dx = 0f
-            detectHorizontalDragGestures(onDragStart = { dx = 0f }, onDragEnd = {
-                if (abs(dx) >= swipePx) { if (dx < 0) e.advance() else onControls() }
-            }) { _, d -> dx += d }
-        },
-    ) {
-        if (!aod) {
-            AmbientLayer(Ambient(0, 0f, 1f, 1f, 0.5f, 0.5f).copy(hex = zoneColor.toHex(), alpha = 0.28f, rx = 1.2f, ry = 0.55f, cx = 0.5f, cy = -0.14f))
-            if (pulse.value > 0f) AmbientLayer(Ambient(zoneColor.toHex(), 0.75f, 1.2f, 0.6f, 0.5f, -0.1f), Modifier.alpha(pulse.value))
+    WCanvas(Modifier.testTag("w.live").pointerInput(Unit) {
+        var dx = 0f
+        detectHorizontalDragGestures(onDragStart = { dx = 0f }, onDragEnd = {
+            if (abs(dx) >= swipePx) { if (dx < 0) mainAction() else onControls() }
+        }) { _, d -> dx += d }
+    }) { L ->
+        WBackground(tone, if (e.isRunKind) 0 else e.idx, aod)
+        val ink = if (aod) WAod.text else tone.ink
+        WClock(L, if (aod) WAod.text else if (tone.dark) Color.Black else Color.White.copy(alpha = 0.86f))
+        WTotalRow(L, if (e.isRunKind) "TIME" else "TOTAL", if (aod) Fm.t(e.total(now)).dropLast(2) + "––" else Fm.t(e.total(now)), tone, aod)
+        when {
+            e.isRunKind -> RunCard(L, now, tone, aod)
+            Kinds.isNew(e.kind) -> TimerCard(L, now, tone, aod)
+            else -> SegCard(L, now, tone, aod)
         }
-        Column(Modifier.fillMaxSize().padding(top = m.top.dp, start = 22.dp, end = 22.dp, bottom = m.bottom.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            // TOTAL (고정, 움직이지 않음)
-            T("TOTAL", F.t(10 * m.k, W600, C.text2, tracking = 1.0f))
-            val tot = e.total(now)
-            // 어두운 화면은 1분에 한 번만 그려짐 → 초 자리는 지움
-            T(if (aod) Fm.t(tot).dropLast(2) + "––" else Fm.t(tot),
-                F.num(m.totalFont, color = if (aod) C.text2 else if (isRox) C.d1 else Color.White, tracking = -0.02f * m.totalFont),
-                Modifier.fillMaxWidth().height((m.totalFont * 1.18f).dp).testTag("w.total"), translate = false)
-            // 지금 구간 + NEXT + 컨트롤 줄 (넘길 때 밀림: 나가는 쪽 왼쪽, 들어오는 쪽 오른쪽에서)
-            val curve = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
-            // 1.2.2: 러닝 카드는 1 km 마다 밀지 않음 (끊어 보이지 않게)
-            AnimatedContent(if (e.isRunKind) 0 else e.idx, Modifier.weight(1f).fillMaxWidth(), label = "seg",
-                transitionSpec = {
-                    (slideInHorizontally(tween(220, easing = curve)) { it * 2 / 5 } + fadeIn(tween(220))) togetherWith
-                        (slideOutHorizontally(tween(220, easing = curve)) { -it } + fadeOut(tween(220)))
-                }) { _ ->
-                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(Modifier.weight(1f).heightIn(min = 2.dp))
-                    Current(now, m, aod)
-                    Spacer(Modifier.weight(1f).heightIn(min = 4.dp))
-                    if (!aod) {
-                        // 1.2.2: 러닝 카드는 "NEXT KM 10" 을 안 보여 줌 (헷갈림 — 대표님 11-09)
-                        if (!e.isRunKind) {
-                            NextLabel(m)
-                            Spacer(Modifier.weight(1f).heightIn(min = 4.dp))
-                        }
-                        Controls(m)
-                    }
-                }
-            }
-        }
+        Buttons(L, tone, aod)
     }
 }
 
-private fun Color.toHex(): Long = ((red * 255).toLong() shl 16) or ((green * 255).toLong() shl 8) or (blue * 255).toLong()
-
-/** 구간 이름 · SPLIT | PACE(러닝) / GOAL · BEST(스테이션) · 아래 줄 */
+/** 맨 위 "TOTAL 23:41" (높이 29, 이름표 8 + 값 13) */
 @Composable
-private fun Current(now: Long, m: LiveMetrics, aod: Boolean) {
+private fun WTotalRow(L: WScale, label: String, value: String, tone: WTone, aod: Boolean) {
+    Row(Modifier.at(L.dx(WScale.D / 2), L.dy(29f)).testTag("w.total"), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(L.dv(4f))) {
+        T(label, wf(L, 8f, W700, if (aod) WAod.text else tone.label, tracking = 0.6f), translate = false)
+        T(value, wf(L, 13f, W600, if (aod) WAod.text else tone.ink, num = true).wShadow(tone, L, aod), translate = false)
+    }
+}
+
+/** 레이스 · 풀시뮬 · PFT · 하이록스 트레이닝 · HIIT: [이름 · 무게/거리] · SPLIT GOAL ♥ BPM · 점 · Next */
+@Composable
+private fun SegCard(L: WScale, now: Long, tone: WTone, aod: Boolean) {
     val e = WatchStore.engine
-    // 18번: 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성 운동은 남은 시간 · 거리를 크게
-    if (Kinds.isNew(e.kind)) { BonusCurrent(now, m, aod); return }
-    if (e.isRunKind) { RunCurrent(now, m, aod); return }
     val cur = e.cur
     val el = e.segEl(now)
-    val isRox = cur.kind == SegKind.Rox
-    val fg = if (aod) C.text3 else if (isRox) C.d1 else Color.White
+    val ink = if (aod) WAod.text else tone.ink
+    val sub = if (aod) WAod.text else tone.sub
+    val lab = if (aod) WAod.text else tone.label
+    // 귀퉁이 표시 40 ~ 92 안: 이름 24 Bold (폭 136 안에 맞게 14 까지) + 9 + 무게/거리 13
+    val y0 = 40f
+    val y1 = 92f
+    val info = detailLine(now)
+    val ct = wCap(24f)
+    val ci = wCap(13f)
+    val tot = if (info.isEmpty()) ct else ct + 9f + ci
+    val yy = (y0 + y1) / 2 - tot / 2
+    WBrackets(L, y0, y1, if (aod) WAod.mark else tone.mark)
+    WText(cur.name, wf(L, 24f, W700, ink).wShadow(tone, L, aod), L, WScale.D / 2, yy + ct / 2, 140f, minScale = 14f / 24f, tag = "w.segName")
+    if (info.isNotEmpty()) WText(info, wf(L, 13f, W600, sub).wShadow(tone, L, aod), L, WScale.D / 2, yy + ct + 9f + ci / 2, 150f,
+        minScale = 0.6f, tag = "w.detailLine")
+    // 칸
     val isRun = cur.icon == "run"
-    val over = cur.target > 0 && el > cur.target
-    // 빌드 24: 목표를 넘기면 SPLIT 빨강
-    val splitColor = if (aod) C.text3 else if (isRox) C.d1 else if (over) C.bad else C.accent
-    val rightColor = if (isRox) C.text2 else fg
+    val over = cur.target > 0 && el > cur.target && cur.kind != SegKind.Rox
     val imp = e.settings.imperial
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(Modifier.height((m.name + 6).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            Icon8(cur.icon, m.icon.dp, if (aod) Tint.Dim else if (isRox) Tint.Mute else Tint.Yellow)
-            T(cur.name, F.t(m.name, W600, if (isRox) C.text2 else fg), minScale = 0.8f, translate = false)
-        }
-        // 1.2.1: SPLIT · GOAL · ♥ BPM 세 칸 (시안 D2). 세 칸이라 숫자를 조금 줄이고(0.86), 세로줄은 더 잘 보이게(0.32)
-        val seg = (m.seg * 0.86f).let { kotlin.math.round(it) }
-        val hrOn = e.hr > 0 && !aod
-        val hrColor = if (hrOn) C.zone(e.zone.coerceIn(1, 5)) else C.text3
-        Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.Top) {
-            Col("SPLIT", if (aod) Fm.t(el).dropLast(2) + "––" else Fm.t(el), splitColor, seg, "w.split", rowH = m.seg)
-            ColSep(seg)
-            when {
-                isRun -> Col(if (imp) (if (curvedRun()) "PACE/MI ≈" else "PACE /MI") else (if (curvedRun()) "PACE ≈" else "PACE"),
-                    e.paceText(el, e.segDist, imp) ?: wt("Measuring"), rightColor, seg, "w.pace", rowH = m.seg)
-                // 빌드 24: 차이(±) 대신 목표 시간 그대로 (Roxzone 도). 트레이닝은 최고 기록 = BEST
-                cur.target > 0 -> Col(if (e.mode == Mode.Training) "BEST" else "GOAL", Fm.t(cur.target), rightColor, seg, "w.goal", rowH = m.seg)
-                else -> Col("", cur.detail, C.text2, 13f, "w.detail", small = true, rowH = m.seg)
-            }
-            ColSep(seg)
-            Col("♥ BPM", if (e.hr > 0) e.hr.toInt().toString() else "--", hrColor, seg, "w.bpm", labelColor = hrColor, rowH = m.seg)
-        }
-        T(detailLine(now), if (isRun) F.num(11, W500, C.text2) else F.t(11, W500, C.text2),
-            Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
+    val cols = ArrayList<Triple<String, String, String>>()
+    cols.add(Triple(if (over) wt("OVER") + " " + Fm.d(el - cur.target) else "SPLIT", if (aod) Fm.t(el).dropLast(2) + "––" else Fm.t(el), "w.split"))
+    when {
+        isRun -> cols.add(Triple(if (curvedRun()) "PACE ≈" else "PACE", e.paceText(el, e.segDist, imp) ?: "--", "w.pace"))
+        cur.target > 0 -> cols.add(Triple(if (e.mode == Mode.Training) "BEST" else "GOAL", Fm.t(cur.target), "w.goal"))
     }
+    cols.add(Triple("♥ BPM", if (e.hr > 0) e.hr.roundToInt().toString() else "--", "w.bpm"))
+    Cols(L, cols, 103f, 120f, 20f, ink, lab, tone, aod, overFirst = over)
+    // 점 · HIIT 는 "3 rounds done"
+    if (e.growsOpen) {
+        WText(wt("%lld rounds done", e.idx), wf(L, 11f, W600, sub).wShadow(tone, L, aod), L, WScale.D / 2, 141f, 150f, translate = false)
+    } else {
+        val (n, c) = liveDots()
+        if (n in 2..30) Dots(L, n, c, 141f, tone, aod)
+    }
+    NextLine(L, if (e.isLast) wt("Finish") else wt(e.nextSeg.name), tone, aod)
 }
 
-/**
- * 18번 지금 구간: 이름 줄 (라운드 3/8 · 휴식 · 스쿼트 2/3) · 큰 숫자 (남은 시간 / 남은 거리 / 세트 시간) · 아래 줄.
- * 운동 = 노랑, 휴식 = 회색 (타바타 화면 규칙). AMRAP 은 남은 총 시간 + 다 한 라운드 수
- */
+/** 타바타 · EMOM · AMRAP · 인터벌 러닝 · 기능성: [단계 · 큰 숫자 · 단위나 할 일] · 횟수 ♥ BPM · 점 · Next */
 @Composable
-private fun BonusCurrent(now: Long, m: LiveMetrics, aod: Boolean) {
+private fun TimerCard(L: WScale, now: Long, tone: WTone, aod: Boolean) {
     val e = WatchStore.engine
     val cur = e.cur
     val rest = cur.kind == SegKind.Rox
-    val big = if (aod) C.text3 else if (rest) C.d1 else C.accent
+    val ink = if (aod) WAod.text else tone.ink
+    val sub = if (aod) WAod.text else tone.sub
+    val lab = if (aod) WAod.text else tone.label
     val imp = e.settings.imperial
     val el = e.segEl(now)
-    // (이름 줄 오른쪽 작은 글자, 큰 숫자, 아래 줄)
-    val head: String
-    val value: String
-    var line = ""
+    var label: String
+    var value: String
+    var unit = ""
+    var count = ""
+    var countLabel = "ROUND"
     when (e.kind) {
         Kinds.AMRAP -> {
-            head = wt("%lld rounds", e.idx)
+            label = wt("TIME LEFT")
             value = Fm.t(e.capLeft(now) ?: 0)
-            line = e.tasks.joinToString(" · ")
+            unit = (wt("Round %lld", e.idx + 1) + " · " + Fm.t(el) + if (e.tasks.isEmpty()) "" else " · " + e.tasks.joinToString(" · "))
+            count = "${e.idx}"
+            countLabel = "ROUNDS"
         }
         Kinds.EMOM -> {
-            val n = e.seq.size
-            head = "${cur.rep ?: (e.idx + 1)}/$n"
-            value = Fm.t(e.segLeft(now) ?: 0)
             val w = e.segWork.getOrNull(e.idx)
-            line = if (w != null) wt("Done in %@", Fm.t(w)) else e.tasks.joinToString(" · ")
+            label = if (w != null) wt("REST") else wt("ROUND")
+            value = Fm.t(e.segLeft(now) ?: 0)
+            unit = if (w != null) wt("Done in %@", Fm.t(w)) else e.tasks.joinToString(" · ")
+            count = "${cur.rep ?: (e.idx + 1)}/${e.seq.size}"
         }
         Kinds.TABATA -> {
-            val n = e.seq.count { it.icon == "hiit" }
-            head = "${cur.rep ?: 1}/$n"
+            label = if (rest) wt("REST") else wt("WORK")
             value = Fm.t(e.segLeft(now) ?: 0)
+            count = "${cur.rep ?: 1}/${e.seq.count { it.icon == "hiit" }}"
         }
         Kinds.LIFT -> {
-            head = if (rest) "" else cur.detail.removePrefix("SET ")
+            label = if (rest) wt("REST") else wt(cur.name).uppercase(Locale.getDefault())
             value = if (rest) Fm.t(e.segLeft(now) ?: 0) else Fm.t(el)
-            line = if (rest) wt("Next: %@", wt(e.next.name)) else liftLine(cur.reps, cur.kg)
+            unit = if (rest) "" else liftLine(cur.reps, cur.kg)
+            count = if (rest) "" else cur.detail.removePrefix("SET ")
+            countLabel = "SET"
         }
         else -> {                                                       // 인터벌 러닝
             val distLen = Bonus.distLen(e.kind, cur)
-            head = cur.rep?.let { r -> "$r/${e.seq.mapNotNull { it.rep }.maxOrNull() ?: r}" } ?: ""
-            value = if (distLen != null) Units.dist(maxOf(0.0, distLen - e.segDist), imp) + (if (imp) " mi" else " km")
-                else Fm.t(e.segLeft(now) ?: 0)
-            line = ivLine(el)
+            val nm = wt(cur.name).uppercase(Locale.getDefault())
+            if (distLen != null) {
+                label = nm + " · " + distLen.roundToInt() + " m"
+                value = "${max(0.0, distLen - e.segDist).roundToInt()}"
+                unit = "M"
+            } else {
+                label = nm + (Bonus.timedLen(e.kind, cur)?.let { " · $it s" } ?: "")
+                value = Fm.t(e.segLeft(now) ?: 0)
+            }
+            count = cur.rep?.let { r -> "$r/${e.seq.mapNotNull { it.rep }.maxOrNull() ?: r}" } ?: ""
+            countLabel = "REP"
         }
     }
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(Modifier.height((m.name + 6).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            Icon8(if (rest) "hiit" else Kinds.icon(e.kind), m.icon.dp, if (aod) Tint.Dim else if (rest) Tint.Mute else Tint.Yellow)
-            T(wt(cur.name), F.t(m.name, W600, if (rest) C.text2 else Color.White), minScale = 0.8f, translate = false)
-            if (head.isNotEmpty()) T(head, F.num(m.name * 0.85f, W500, C.text2), translate = false)
-        }
-        T(if (aod) value.dropLast(2) + "––" else value, F.num(m.seg * 1.45f, color = big, tracking = -0.02f * m.seg),
-            Modifier.fillMaxWidth().height((m.seg * 1.6f).dp).testTag("w.bonusBig"), translate = false)
-        T(line, F.t(11, W500, C.text2), Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
-    }
+    // 귀퉁이 표시 40 ~ 96 안: 단계 11 · 큰 숫자 32 · 단위나 할 일 10
+    val y0 = 40f
+    val y1 = 96f
+    val ca = wCap(11f)
+    val cb = wCap(32f)
+    val cw = wCap(10f)
+    val tot = ca + 7f + cb + if (unit.isEmpty()) 0f else 6f + cw
+    val yy = (y0 + y1) / 2 - tot / 2
+    WBrackets(L, y0, y1, if (aod) WAod.mark else tone.mark)
+    WText(label, wf(L, 11f, W700, sub, tracking = 0.6f).wShadow(tone, L, aod), L, WScale.D / 2, yy + ca / 2, 140f)
+    WText(if (aod && value.contains(':')) value.dropLast(2) + "––" else value, wf(L, 32f, W700, ink, num = true).wShadow(tone, L, aod), L,
+        WScale.D / 2, yy + ca + 7f + cb / 2, 140f, minScale = 0.55f, tag = "w.bonusBig")
+    if (unit.isNotEmpty()) WText(unit, wf(L, 10f, W700, sub, tracking = 0.4f).wShadow(tone, L, aod), L, WScale.D / 2,
+        yy + ca + 7f + cb + 6f + cw / 2, 150f, tag = "w.detailLine")
+    val cols = ArrayList<Triple<String, String, String>>()
+    if (count.isNotEmpty()) cols.add(Triple(countLabel, count, "w.count"))
+    cols.add(Triple("♥ BPM", if (e.hr > 0) e.hr.roundToInt().toString() else "--", "w.bpm"))
+    Cols(L, cols, 106f, 122f, 18f, ink, lab, tone, aod)
+    // 점 ("3/8")
+    val p = count.split("/")
+    val a = p.getOrNull(0)?.toIntOrNull()
+    val b = p.getOrNull(1)?.toIntOrNull()
+    if (p.size == 2 && a != null && b != null && b in 2..30) Dots(L, b, max(0, a - 1), 141f, tone, aod)
+    if (e.kind != Kinds.AMRAP) NextLine(L, timerNext() ?: wt("Finish"), tone, aod)
 }
 
-/**
- * 1.2.2 러닝 카드 (대표님 11-09): 1 km 씩 끊어 보이지 않고 DIST(지금까지 총 거리) · PACE(지금 페이스) · ♥ BPM.
- * 아래 줄 = 목표 거리 · 평균 페이스 (처음부터 계속). 1 km 기록은 뒤에서 그대로 저장 (기록 화면 구간 표)
- */
+/** 러닝 카드: [카드 이름 · 거리 · KM] · PACE ♥ BPM · 진행 막대 · "Goal 5 km · Avg 5:14" */
 @Composable
-private fun RunCurrent(now: Long, m: LiveMetrics, aod: Boolean) {
+private fun RunCard(L: WScale, now: Long, tone: WTone, aod: Boolean) {
     val e = WatchStore.engine
     val imp = e.settings.imperial
-    val fg = if (aod) C.text3 else Color.White
+    val ink = if (aod) WAod.text else tone.ink
+    val sub = if (aod) WAod.text else tone.sub
+    val lab = if (aod) WAod.text else tone.label
     val d = e.runDistance
     val total = e.total(now)
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(Modifier.height((m.name + 6).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            Icon8("run", m.icon.dp, if (aod) Tint.Dim else Tint.Yellow)
-            T(e.title.ifEmpty { "Run" }, F.t(m.name, W600, fg), minScale = 0.8f, translate = false)
+    val y0 = 40f
+    val y1 = 96f
+    val ca = wCap(11f)
+    val cb = wCap(32f)
+    val cw = wCap(10f)
+    val tot = ca + 7f + cb + 6f + cw
+    val yy = (y0 + y1) / 2 - tot / 2
+    WBrackets(L, y0, y1, if (aod) WAod.mark else tone.mark)
+    WText(e.title.ifEmpty { "Run" }, wf(L, 11f, W700, sub, tracking = 0.4f).wShadow(tone, L, aod), L, WScale.D / 2, yy + ca / 2, 140f, translate = false)
+    WText(Units.dist(d, imp), wf(L, 32f, W700, ink, num = true).wShadow(tone, L, aod), L, WScale.D / 2, yy + ca + 7f + cb / 2, 140f, tag = "w.dist")
+    WText(if (imp) "MI" else "KM", wf(L, 10f, W700, sub, tracking = 0.6f).wShadow(tone, L, aod), L, WScale.D / 2, yy + ca + 7f + cb + 6f + cw / 2, 60f)
+    Cols(L, listOf(
+        Triple(if (curvedRun()) "PACE ≈" else "PACE", e.paceText(total, d, imp) ?: "--", "w.pace"),
+        Triple("♥ BPM", if (e.hr > 0) e.hr.roundToInt().toString() else "--", "w.bpm"),
+    ), 106f, 122f, 18f, ink, lab, tone, aod)
+    // 진행 막대 (목표 거리가 있을 때). 자유 러닝은 왔다 갔다
+    val goal = e.runGoalKm * 1000.0
+    val frac = if (goal > 0) (d / goal).coerceIn(0.0, 1.0).toFloat() else -1f
+    val swing = ((total % 4) / 4f).let { if (it < 0.5f) it * 2 else 2 - it * 2 }
+    Canvas(Modifier.fillMaxSize()) {
+        val x0 = L.x(60f).dp.toPx()
+        val x1 = L.x(167f).dp.toPx()
+        val y = L.y(141f).dp.toPx()
+        val th = L.v(4f).dp.toPx()
+        drawRoundRect(if (aod) WAod.dotOff else tone.dotOff, Offset(x0, y - th / 2), Size(x1 - x0, th), CornerRadius(th / 2))
+        val c = if (aod) WAod.text else ink
+        if (frac >= 0f) drawRoundRect(c, Offset(x0, y - th / 2), Size((x1 - x0) * frac, th), CornerRadius(th / 2))
+        else {
+            val seg = (x1 - x0) * 0.3f
+            drawRoundRect(c, Offset(x0 + (x1 - x0 - seg) * swing, y - th / 2), Size(seg, th), CornerRadius(th / 2))
         }
-        val seg = (m.seg * 0.86f).let { kotlin.math.round(it) }
-        val hrOn = e.hr > 0 && !aod
-        val hrColor = if (hrOn) C.zone(e.zone.coerceIn(1, 5)) else C.text3
-        Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.Top) {
-            Col(if (imp) "DIST MI" else "DIST KM", Units.dist(d, imp), if (aod) C.text3 else C.accent, seg, "w.dist", rowH = m.seg)
-            ColSep(seg)
-            // 지금 속도 → 모르면 처음부터의 평균 (구간마다 "측정 중" 으로 돌아가지 않게)
-            Col(if (imp) (if (curvedRun()) "PACE/MI ≈" else "PACE /MI") else (if (curvedRun()) "PACE ≈" else "PACE"),
-                e.paceText(total, d, imp) ?: wt("Measuring"), fg, seg, "w.pace", rowH = m.seg)
-            ColSep(seg)
-            Col("♥ BPM", if (e.hr > 0) e.hr.toInt().toString() else "--", hrColor, seg, "w.bpm", labelColor = hrColor, rowH = m.seg)
-        }
-        T(runSummary(now), F.num(11, W500, C.text2), Modifier.fillMaxWidth().height(14.dp).testTag("w.detailLine"), minScale = 0.6f, translate = false)
+    }
+    WText(runSummary(now), wf(L, 12f, W600, sub, num = true).wShadow(tone, L, aod), L, WScale.D / 2, 158f, 160f, tag = "w.runSummary")
+}
+
+/** 칸 (이름표 9 Bold · 값). 칸 사이 구분선 없음. overFirst = 첫 칸 이름표를 검정 굵게 (목표 넘김) */
+@Composable
+private fun Cols(L: WScale, cols: List<Triple<String, String, String>>, labelY: Float, valueY: Float, valueSize: Float,
+                 ink: Color, lab: Color, tone: WTone, aod: Boolean, overFirst: Boolean = false) {
+    val n = cols.size
+    val x0 = if (n == 2) 50f else 30f
+    val x1 = WScale.D - x0
+    cols.forEachIndexed { i, (l, v, tag) ->
+        val cx = x0 + (x1 - x0) * (i + 0.5f) / n
+        val cw = (x1 - x0) / n - 4f
+        WText(l, wf(L, 9f, W700, if (i == 0 && overFirst) ink else lab, tracking = 0.6f).wShadow(tone, L, aod), L, cx, labelY, cw + 8f)
+        WText(v, wf(L, valueSize, W600, ink, num = true).wShadow(tone, L, aod), L, cx, valueY, cw, minScale = 0.55f, tag = tag)
     }
 }
 
-/** 러닝 카드 아래 줄: "목표 10 km · 평균 5:12" (자유 러닝은 평균만) */
+/** 진행 점: 지난 것 · 지금 막대(11) · 남은 것 (간격 6.5, 10개 이하면 9) */
+@Composable
+private fun Dots(L: WScale, n: Int, cur: Int, y: Float, tone: WTone, aod: Boolean) {
+    Canvas(Modifier.fillMaxSize().testTag("w.dots")) {
+        val k = L.v(1f).dp.toPx()
+        val g = (if (n > 10) 6.5f else 9f) * k
+        val wc = 11f * k
+        val r = 1.7f * k
+        val totW = g * (n - 1) + wc - 2 * r
+        var x = L.x(WScale.D / 2).dp.toPx() - totW / 2
+        val yy = L.y(y).dp.toPx()
+        val ink = if (aod) WAod.text else tone.ink
+        for (i in 0 until n) {
+            if (i == cur) {
+                drawRoundRect(ink, Offset(x - r, yy - r), Size(wc, 2 * r), CornerRadius(r))
+                x += wc - 2 * r + g
+            } else {
+                drawCircle(if (i < cur) ink.copy(alpha = 0.59f) else if (aod) WAod.dotOff else tone.dotOff, r, Offset(x, yy))
+                x += g
+            }
+        }
+    }
+}
+
+/** "Next" 14 (반투명) + 다음 이름 Bold 14 (높이 158, 폭 172 안) */
+@Composable
+private fun NextLine(L: WScale, name: String, tone: WTone, aod: Boolean) {
+    Row(Modifier.at(L.dx(WScale.D / 2), L.dy(158f)).widthIn(max = L.dv(172f)).testTag("w.nextName"), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(L.dv(6f))) {
+        T("Next", wf(L, 14f, W600, if (aod) WAod.text else tone.sub).wShadow(tone, L, aod))
+        T(name, wf(L, 14f, W700, if (aod) WAod.text else tone.ink).wShadow(tone, L, aod), Modifier.widthIn(max = L.dv(130f)), minScale = 10f / 14f, translate = false)
+    }
+}
+
+/** 버튼 3개: 되돌리기 · 다음(→) · 일시정지 (가운데 r22 · 높이 194, 옆 r16 · ±50 · 높이 187). 러닝 카드는 가운데 일시정지 하나 */
+@Composable
+private fun Buttons(L: WScale, tone: WTone, aod: Boolean) {
+    val e = WatchStore.engine
+    val c = WScale.D / 2
+    if (e.isRunKind) {
+        WCircleButton(L, c, 194f, 22f, tone, aod, tag = "w.pauseLive", onClick = { e.togglePause() }) { p, col ->
+            wPause(p, L.v(16f).dp.toPx(), col, !e.running)
+        }
+        return
+    }
+    WCircleButton(L, c - 50f, 187f, 16f, tone, aod, on = e.canUndo, tag = "w.undoLive", onClick = { e.undo() }) { p, col ->
+        wUndo(p, L.v(16f).dp.toPx(), col)
+    }
+    val emomDone = Bonus.tapMarksDone(e.kind) && e.segWork.getOrNull(e.idx) != null
+    WCircleButton(L, c, 194f, 22f, tone, aod, on = e.running && !emomDone, tag = "w.next", onClick = { mainAction() }) { p, col ->
+        if (e.isLast || Bonus.tapMarksDone(e.kind)) wCheck(p, L.v(18f).dp.toPx(), col)
+        else wArrow(p, L.v(20f).dp.toPx(), L.v(17f).dp.toPx(), col)
+    }
+    WCircleButton(L, c + 50f, 187f, 16f, tone, aod, tag = "w.pauseLive", onClick = { e.togglePause() }) { p, col ->
+        wPause(p, L.v(13f).dp.toPx(), col, !e.running)
+    }
+}
+
+/** 가운데 버튼 · 왼쪽으로 밀기: 다음 구간 (EMOM 은 이 라운드 할 일 끝냄, 러닝 카드는 아무것도 안 함) */
+private fun mainAction() {
+    val e = WatchStore.engine
+    if (e.isRunKind || !e.running) return
+    if (Bonus.tapMarksDone(e.kind) && e.segWork.getOrNull(e.idx) != null) return
+    e.advance()
+}
+
+/** 진행 점 (Roxzone · 휴식은 빼고 셈): (모두, 지금 몇 번째 0부터) */
+private fun liveDots(): Pair<Int, Int> {
+    val e = WatchStore.engine
+    val all = e.seq.count { it.kind != SegKind.Rox }
+    val before = e.seq.take(e.idx).count { it.kind != SegKind.Rox }
+    return all to before.coerceAtMost(all - 1)
+}
+
+/** 타이머 운동 다음 단계 이름 ("Rest 10 s" · "Easy 0:40" · "Round 5" · "Squat · set 2"). 마지막이면 null */
+private fun timerNext(): String? {
+    val e = WatchStore.engine
+    val n: Seg = e.seq.getOrNull(e.idx + 1) ?: return null
+    return when (e.kind) {
+        Kinds.IVRUN -> {
+            val dl = Bonus.distLen(e.kind, n)
+            wt(n.name) + " " + (if (dl != null) "${dl.roundToInt()} m" else Fm.t(Bonus.timedLen(e.kind, n) ?: n.target))
+        }
+        Kinds.LIFT -> if (n.kind == SegKind.Rox) wt("Rest") + " " + Fm.t(n.target) else wt(n.name) + " · " + wt("set %lld", n.rep ?: 1)
+        Kinds.TABATA -> if (n.kind == SegKind.Rox) wt("Rest") + " ${n.target} s" else wt("Work") + " ${n.target} s"
+        else -> wt("Round %lld", n.rep ?: (e.idx + 2))
+    }
+}
+
+/** 러닝 카드 아래 줄: "Goal 5 km · Avg 5:12" (자유 러닝은 평균만) */
 private fun runSummary(now: Long): String {
     val e = WatchStore.engine
     val imp = e.settings.imperial
@@ -368,329 +479,268 @@ private fun liftLine(reps: Int?, kg: Double?): String {
     return if ((kg ?: 0.0) > 0) "$r × " + Bonus.kgText(kg ?: 0.0) else wt("%lld reps", r)
 }
 
-/** 인터벌 러닝 아래 줄: 지금 페이스 · 목표 페이스와 차이 (빠름 −0:05 / 느림 +0:07) */
-private fun ivLine(el: Int): String {
-    val e = WatchStore.engine
-    val imp = e.settings.imperial
-    val cur = e.cur
-    if (cur.kind == SegKind.Rox) return ""
-    val p = e.paceText(el, e.segDist, imp) ?: return wt("Measuring")
-    val goal = cur.pace ?: return wt("Pace %@", p)
-    val now = LivePaceSec.of(el, e.segDist) ?: return wt("Pace %@", p)
-    return wt("Pace %@", p) + " · " + Fm.d(now - goal)
-}
-
-/** 이 구간 평균 페이스 (초/km) — 목표와 비교용. 100 m 안 되면 null */
-private object LivePaceSec {
-    fun of(el: Int, dist: Double): Int? = if (dist < 100 || el <= 0) null else (el / dist * 1000).roundToInt()
-}
-
-/** 아래 줄: 러닝 = 거리, 스테이션 = 무게 · 거리 (더블이고 계획이 있으면 "Me 150 → 파트너 150 · 7 turns"), Roxzone = 빈 줄 */
+/** 아래 줄: 러닝 = "0.38 / 1.00 km", 스테이션 = 무게 · 거리 (더블 계획이 있으면 교대 줄), Roxzone = Transition, 휴식 = 없음 */
 private fun detailLine(now: Long): String {
     val e = WatchStore.engine
     val cur = e.cur
-    if (cur.icon == "run") return runLine(now)
-    if (cur.kind == SegKind.Rox) return ""
-    // 1.2.1: 교대 줄은 시뮬 · 레이스에서만 (트레이닝은 교대를 정한 게 아님)
+    if (cur.icon == "run") return runLine()
+    if (cur.icon == "rest") return ""
+    if (cur.kind == SegKind.Rox) return wt("Transition")
+    if (e.isHIIT) return ""
+    // 1.2.1: 교대 줄은 시뮬 · 레이스에서만
     if (e.mode != Mode.Training) doublesLine(cur, WatchStore.ctx.doublesPlan, e.settings.division)?.let { return it }
-    return if (cur.target > 0) Units.detail(cur.detail, e.settings.imperial) else ""
+    return Units.detail(cur.detail, e.settings.imperial)
 }
 
-/** 러닝 아래 줄: "0.62 / 1.00 km · Total 7.62 km · Avg 5:12" (빌드 27: lb · mi 설정이면 마일) */
-private fun runLine(now: Long): String {
+/** 러닝 아래 줄: "0.62 / 1.00 km" */
+private fun runLine(): String {
     val e = WatchStore.engine
     val imp = e.settings.imperial
     val segM = runMeters(e.cur.detail)
     val unit = if (imp) "mi" else "km"
-    val seg = Units.dist(minOf(segM, e.segDist), imp) + " / " + Units.dist(segM, imp) + " " + unit
-    if (!e.isRunKind || e.distance < 10) return seg
-    var line = seg + " · " + wt(if (imp) "Total %@ mi" else "Total %@ km", Units.dist(e.distance, imp))
-    // 84번(빌드 28): 운동 전체 평균 페이스 (1 km 마다 끊지 않고 처음부터 계속) — 200 m 뛴 뒤부터
-    if (e.distance >= 200) {
-        val avg = Units.pace((e.total(now) / e.distance * 1000).roundToInt(), imp)
-        if (avg in 1 until 3600) line += " · " + wt("Avg %@", Fm.t(avg))
-    }
-    return line
+    return Units.dist(minOf(segM, e.segDist), imp) + " / " + Units.dist(segM, imp) + " " + unit
 }
 
 private fun curvedRun(): Boolean = WatchStore.engine.settings.runMode == "curved" && WatchStore.engine.mode != Mode.Race
 
-/** 작은 이름표 + 큰 숫자 (세 칸이 같은 크기). rowH = 줄 높이 기준(화면 높이를 두 칸 때와 같게), labelColor = 이름표 색(♥ BPM 은 존 색) */
-@Composable
-private fun RowScope.Col(label: String, value: String, color: Color, size: Float, tag: String, small: Boolean = false,
-                         labelColor: Color = C.text3, rowH: Float = size) {
-    Column(Modifier.weight(1f).padding(horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        T(label, F.t(10, W600, labelColor, tracking = 0.8f), Modifier.height(12.dp), minScale = 0.7f)
-        T(value, if (small) F.t(13, W600, color) else F.num(size, color = color, tracking = -0.01f * size),
-            Modifier.fillMaxWidth().height((rowH * 1.12f).dp).testTag(tag), minScale = 0.55f, translate = false)
-    }
-}
+// MARK: 베젤 ↓ 1칸 · 2칸 (목표 대비 · 심박/칼로리)
 
-/** 칸 사이 세로줄 (1.2.1: 14% → 32%) */
-@Composable
-private fun ColSep(size: Float) {
-    Box(Modifier.padding(top = 12.dp).width(1.dp).height((size * 1.05f).dp).background(Color.White.copy(alpha = 0.32f)))
-}
+private data class InfoItem(val key: String, val label: String, val value: String, val word: String)
 
-/** 러닝 모드(거리 있음)는 1 km 마다 자동으로 넘어감 → 가운데 단추 대신 안내 */
-private val autoSplitView: Boolean get() = WatchStore.engine.isRunKind && WatchStore.engine.distance > 0
-
-/** NEXT (작게) + 다음 구간 그림 · 이름 (크게) + 그 목표 (회색). 마지막이면 FINISH · 운동 끝내기 */
 @Composable
-private fun NextLabel(m: LiveMetrics) {
+fun WGoalPage(page: Int, pages: Int) {
     val e = WatchStore.engine
-    val nx = e.nextSeg
-    val last = e.isLast
-    Column(Modifier.fillMaxWidth().testTag("w.nextName"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        T(if (last) "FINISH" else "NEXT", F.t(9, W600, C.text3, tracking = 1.0f))
-        Row(Modifier.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            if (last) {
-                Icon8("i_check", (m.nextName * 0.8f).dp, C.good)
-                T("End workout", F.t(m.nextName, W700), Modifier.weight(1f, fill = false))
-            } else {
-                Icon8(nx.icon, m.nextName.dp, if (nx.kind == SegKind.Rox) Tint.Mute else Tint.Yellow)
-                T(nx.name, F.t(m.nextName, W700), Modifier.weight(1f, fill = false), translate = false)
-                if (nx.target > 0 && !autoSplitView) T(Fm.t(nx.target), F.num(m.nextName * 0.72f, W500, C.text2), translate = false)
-            }
-        }
-    }
+    var now by remember { mutableLongStateOf(e.now()) }
+    LaunchedEffect(Unit) { while (true) { now = WatchStore.engine.now(); delay(1000) } }
+    val d = e.delta(now)
+    val vsBest = e.mode == Mode.Training || e.mode == Mode.Pft
+    val items = listOf(
+        InfoItem("vs", if (vsBest) "VS BEST" else "VS GOAL", Fm.d(d), if (d < 0) "AHEAD" else if (d > 0) "BEHIND" else "ON PACE"),
+        InfoItem("finish", "FINISH", Fm.t(e.projectedFinish(now)), "EST"),
+        InfoItem("goal", if (vsBest) "BEST" else "GOAL", Fm.t(e.targetTotal), ""),
+    )
+    InfoFrame(items, WBig.goal, { WBig.goal = it }, "vs", page, pages, now, "w.goalPage")
 }
 
-/** 컨트롤 줄: 되돌리기 (작은 회색) · 다음 (큰 노란, 삼각형 머리 화살표) · 일시정지 (작은 회색) */
 @Composable
-private fun Controls(m: LiveMetrics) {
+fun WStatsPage(page: Int, pages: Int) {
     val e = WatchStore.engine
-    Row(Modifier.width(m.controlsW.dp), verticalAlignment = Alignment.CenterVertically) {
-        // 1.2.3: 러닝 카드는 되돌리기 없음 (자리만 둠)
-        if (e.isRunKind) Spacer(Modifier.size(m.side.dp))
-        else SideButton(m, e.canUndo, "w.undoLive", { c -> Sym(R.drawable.sym_undo, (m.side * 0.42f).dp, c) }) { e.undo() }
-        Spacer(Modifier.weight(1f))
-        if (autoSplitView) {
-            // 1.2.3: 러닝 카드는 그냥 달림 — "1 km 마다 자동 넘김" 글씨도 없앰 (대표님 11-10, 자리만 둠)
-            Spacer(Modifier.width((m.main * 1.6f).dp).height(m.main.dp).testTag("w.autoSplit"))
-        } else {
-            val last = e.isLast
-            // 18번 EMOM: 가운데 단추 = "끝" (이 라운드 할 일을 끝냄 → 남은 시간은 휴식). 이미 눌렀으면 흐리게
-            val emom = Bonus.tapMarksDone(e.kind)
-            val emomDone = emom && e.segWork.getOrNull(e.idx) != null
-            Box(Modifier.size(m.main.dp).clip(CircleShape).background(if (emomDone) C.wCard else if (last || emom) C.good else C.accent)
-                .press(!emomDone) { e.advance() }.testTag("w.next"),
-                contentAlignment = Alignment.Center) {
-                if (last || emom) Icon8("i_check", (m.main * 0.42f).dp, if (emomDone) C.text3 else Color.Black)
-                else TriArrow(Modifier.size((m.main * 0.5f).dp, (m.main * 0.42f).dp), Color.Black)
-            }
-        }
-        Spacer(Modifier.weight(1f))
-        SideButton(m, true, "w.pauseLive", { c -> Icon8(if (e.running) "i_pause" else "i_play", (m.side * 0.42f).dp, c) }) { e.togglePause() }
+    var now by remember { mutableLongStateOf(e.now()) }
+    LaunchedEffect(Unit) { while (true) { now = WatchStore.engine.now(); delay(1000) } }
+    val mx = e.maxHRNow
+    val items = ArrayList<InfoItem>()
+    items.add(InfoItem("max", "MAX HR", if (mx > 0) "$mx" else "--", "BPM"))
+    items.add(InfoItem("kcal", "ENERGY", "${e.kcal.roundToInt()}", "KCAL"))
+    val runs = e.isRunKind || Kinds.runLike(e.kind) || e.cur.icon == "run"
+    if (runs) items.add(InfoItem("third", "CADENCE", e.cadenceNow(now)?.toString() ?: "--", "SPM"))
+    else {
+        val a = e.avgHRLive
+        items.add(InfoItem("third", "AVG BPM", if (a > 0) "$a" else "--", "BPM"))
     }
+    InfoFrame(items, WBig.stat, { WBig.stat = it }, "max", page, pages, now, "w.statsPage")
 }
 
+/** [이름표 11 · 큰 숫자 42 · 작은 말 10] + 두 칸 (± 42). 칸을 누르면 큰 자리와 바뀜, 큰 숫자를 누르면 처음대로 */
 @Composable
-private fun SideButton(m: LiveMetrics, on: Boolean, tag: String, glyph: @Composable (Color) -> Unit, onClick: () -> Unit) {
-    Box(Modifier.size(m.side.dp).clip(CircleShape).background(Color.White.copy(alpha = if (on) 0.16f else 0.07f)).press(on, onClick).testTag(tag),
-        contentAlignment = Alignment.Center) {
-        glyph(if (on) Color.White else C.text3)
-    }
-}
-
-/** 삼각형 머리 화살표 (3-A) — 가운데 노란 단추 안 (아이폰 TriArrow 와 같은 비율) */
-@Composable
-private fun TriArrow(modifier: Modifier, color: Color) {
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val bar = h * 0.18f
-        val headW = w * 0.42f
-        // 막대
-        drawRoundRect(color, Offset(w * 0.06f, h / 2 - bar / 2), Size(w - headW - w * 0.02f, bar), CornerRadius(bar * 0.35f))
-        // 머리 (삼각형)
-        val p = Path().apply {
-            moveTo(w - headW - w * 0.02f, h * 0.14f)
-            lineTo(w - w * 0.02f, h / 2)
-            lineTo(w - headW - w * 0.02f, h - h * 0.14f)
-            close()
+private fun InfoFrame(items: List<InfoItem>, bigKey: String, setBig: (String) -> Unit, def: String, page: Int, pages: Int, now: Long, tag: String) {
+    val e = WatchStore.engine
+    val aod = LocalAod.current
+    val tone = toneNow()
+    val big = items.firstOrNull { it.key == bigKey } ?: items[0]
+    val rest = items.filter { it.key != big.key }
+    WCanvas(Modifier.testTag(tag)) { L ->
+        WBackground(tone, if (e.isRunKind) 0 else e.idx, aod)
+        val ink = if (aod) WAod.text else tone.ink
+        val sub = if (aod) WAod.text else tone.sub
+        val lab = if (aod) WAod.text else tone.label
+        WClock(L, if (aod) WAod.text else if (tone.dark) Color.Black else Color.White.copy(alpha = 0.86f))
+        WTotalRow(L, if (e.isRunKind) "TIME" else "TOTAL", Fm.t(e.total(now)), tone, aod)
+        val p = 10f
+        val ca = wCap(11f)
+        val cb = wCap(42f)
+        val cw = wCap(10f)
+        val blk = p + ca + 8f + cb + 8f + cw + p
+        val colh = wCap(9f) + 7f + wCap(18f)
+        val tot = blk + 12f + colh
+        val y = (38f + (WScale.D - 22f)) / 2 - tot / 2
+        WBrackets(L, y, y + blk, if (aod) WAod.mark else tone.mark)
+        WText(big.label, wf(L, 11f, W700, sub, tracking = 0.6f).wShadow(tone, L, aod), L, WScale.D / 2, y + p + ca / 2, 140f)
+        WText(big.value, wf(L, 42f, W700, ink, num = true).wShadow(tone, L, aod), L, WScale.D / 2, y + p + ca + 8f + cb / 2, 130f, minScale = 0.55f, tag = "$tag.big")
+        if (big.word.isNotEmpty()) WText(big.word, wf(L, 10f, W700, lab, tracking = 0.6f).wShadow(tone, L, aod), L, WScale.D / 2,
+            y + p + ca + 8f + cb + 8f + cw / 2, 140f)
+        // 큰 숫자 누르면 처음대로
+        Box(Modifier.at(L.dx(WScale.D / 2), L.dy(y + blk / 2)).size(L.dv(140f), L.dv(blk))
+            .clickable(remember { MutableInteractionSource() }, indication = null) { if (bigKey != def) setBig(def) })
+        val yc = y + blk + 12f
+        rest.take(2).forEachIndexed { i, item ->
+            val cx = WScale.D / 2 + (if (i == 0) -42f else 42f)
+            WText(item.label, wf(L, 9f, W700, lab, tracking = 0.6f).wShadow(tone, L, aod), L, cx, yc + wCap(9f) / 2, 80f)
+            WText(item.value, wf(L, 18f, W600, ink, num = true).wShadow(tone, L, aod), L, cx, yc + wCap(9f) + 7f + wCap(18f) / 2, 76f, minScale = 0.6f)
+            Box(Modifier.at(L.dx(cx), L.dy(yc + colh / 2)).size(L.dv(78f), L.dv(colh + 14f)).testTag("$tag.${item.key}")
+                .clickable(remember(item.key) { MutableInteractionSource() }, indication = null) { setBig(item.key) })
         }
-        drawPath(p, color)
+        PageDots(L, page, pages, ink)
     }
 }
 
-// MARK: 조작
+/** 몇 번째 칸인지 = 오른쪽 가장자리 점 (베젤 따라) */
+@Composable
+private fun PageDots(L: WScale, page: Int, pages: Int, ink: Color) {
+    Canvas(Modifier.fillMaxSize()) {
+        val c = Offset(L.x(WScale.D / 2).dp.toPx(), L.y(WScale.D / 2).dp.toPx())
+        val rr = L.v(WScale.D / 2 - 7f).dp.toPx()
+        for (i in 0 until pages) {
+            val ang = Math.toRadians((-8.0 * (pages - 1) / 2) + i * 8.0)
+            val p = Offset(c.x + rr * cos(ang).toFloat(), c.y + rr * sin(ang).toFloat())
+            drawCircle(ink.copy(alpha = if (i == page) 1f else 0.43f), L.v(if (i == page) 2.6f else 1.6f).dp.toPx(), p)
+        }
+    }
+}
 
-/** 끝 · 멈춤 · 되돌리기 · 다음 (동그란 화면이라 2 × 2 둥근 단추) */
+// MARK: 조작 (오른쪽으로 밀기)
+
+/** End · Pause · Undo | Skip · Next 4줄 (높이 32 · 간격 6). 줄마다 그 높이의 동그라미 폭 − 좌우 10 (최대 152) */
 @Composable
 fun WControls(onBack: () -> Unit, onEnd: () -> Unit, onNext: () -> Unit) {
     val e = WatchStore.engine
-    var now by remember { mutableLongStateOf(WatchStore.engine.now()) }
-    LaunchedEffect(Unit) { while (true) { now = WatchStore.engine.now(); delay(500) } }
     val swipePx = with(LocalDensity.current) { 40.dp.toPx() }
-    val k = wk()
-    Box(Modifier.fillMaxSize().testTag("w.controls").pointerInput(Unit) {
+    val tone = toneNow()
+    WCanvas(Modifier.testTag("w.controls").pointerInput(Unit) {
         var dx = 0f
         detectHorizontalDragGestures(onDragStart = { dx = 0f }, onDragEnd = { if (dx <= -swipePx) onBack() }) { _, d -> dx += d }
-    }) {
-        AmbientLayer(Ambient(0xFFFFFF, 0.07f, 0.8f, 0.5f, 0.5f, 0.5f))
-        // 2026-10-21: 위 제목 줄 · 아래 안내 글이 동그란 테두리에 잘려서 안쪽으로
-        Column(Modifier.fillMaxSize().padding(top = (28 * k).dp, bottom = (30 * k).dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                T(if (e.mode == Mode.Training) e.title else e.mode.title, F.t(12, W600, C.accent), Modifier.width((90 * k).dp), translate = e.mode != Mode.Training)
-                T(Fm.t(e.total(now)), F.num(14), translate = false)
-            }
-            // 1.2.2: Skip 이 들어가서 위 줄 세 개(End · Pause · Undo) · 아래 줄 두 개(Skip · Next), 단추는 조금 작게
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy((6 * k).dp, Alignment.CenterVertically)) {
-                Row(horizontalArrangement = Arrangement.spacedBy((8 * k).dp)) {
-                    RoundButton("End", "i_x", C.bad, hex(0xFF453A, 0.22f), Color.White, "w.end", onClick = onEnd)
-                    RoundButton(if (e.running) "Pause" else "Resume", if (e.running) "i_pause" else "i_play", Color.White,
-                        Color.White.copy(alpha = 0.12f), Color.White, "w.pause") { e.togglePause() }
-                    val on = e.canUndo
-                    RoundButton("Undo", null, if (on) Color.White else C.text3, Color.White.copy(alpha = if (on) 0.12f else 0.05f),
-                        if (on) Color.White else C.text3, "w.undo", enabled = on) { e.undo(); onBack() }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy((14 * k).dp)) {
-                    val sk = e.canSkip
-                    RoundButton("Skip", null, if (sk) Color.White else C.text3, Color.White.copy(alpha = if (sk) 0.12f else 0.05f),
-                        if (sk) Color.White else C.text3, "w.skip", enabled = sk, sym = R.drawable.sym_skip) { e.skip(); onBack() }
-                    RoundButton("Next", "i_dblChev", Color.Black, C.accent, Color.Black, "w.controlsNext", labelColor = C.accent, onClick = onNext)
-                }
-            }
-            T("‹ Swipe left to go back", F.t(11, color = C.text3), Modifier.widthIn(max = roundWidth(30 * k)))
+    }.clickable(remember { MutableInteractionSource() }, indication = null) { }) { L ->
+        WBackground(tone, if (e.isRunKind) 0 else e.idx, false, darker = 0.12f)
+        WClock(L, if (tone.dark) Color.Black else Color.White)
+        val hgt = 32f
+        val g = 6f
+        val tot = 4 * hgt + 3 * g
+        val y0 = (24f + (WScale.D - 14f)) / 2 - tot / 2
+        val ys = List(4) { y0 + it * (hgt + g) }
+        fun rw(i: Int): Float = L.rowW(ys[i], ys[i] + hgt, 10f)
+        val c = WScale.D / 2
+        val glass = Color.White.copy(alpha = tone.glass)
+        // End
+        val w0 = rw(0)
+        WPill(L, c - w0 / 2, ys[0], w0, hgt, hex(0xFF3B30, 0.59f), 0.22f, "w.end", onClick = onEnd) {
+            PillLabel(L, "End", Color.White) { p, col -> wEndMark(p, L.v(13f).dp.toPx(), col) }
+        }
+        // Pause / Resume
+        val w1 = rw(1)
+        WPill(L, c - w1 / 2, ys[1], w1, hgt, glass, 0.55f, "w.pause", onClick = { e.togglePause() }) {
+            PillLabel(L, if (e.running) "Pause" else "Resume", tone.ink) { p, col -> wPause(p, L.v(11f).dp.toPx(), col, !e.running) }
+        }
+        // Undo | Skip
+        val w2 = rw(2)
+        val hf = (w2 - g) / 2
+        val un = e.canUndo
+        WPill(L, c - w2 / 2, ys[2], hf, hgt, glass.copy(alpha = if (un) tone.glass else tone.glass * 0.45f), 0.55f, "w.undo", enabled = un,
+            onClick = { e.undo(); onBack() }) {
+            PillLabel(L, "Undo", tone.ink.copy(alpha = if (un) 1f else 0.4f)) { p, col -> wUndo(p, L.v(13f).dp.toPx(), col) }
+        }
+        val sk = e.canSkip
+        WPill(L, c + w2 / 2 - hf, ys[2], hf, hgt, glass.copy(alpha = if (sk) tone.glass else tone.glass * 0.45f), 0.55f, "w.skip", enabled = sk,
+            onClick = { e.skip(); onBack() }) {
+            PillLabel(L, "Skip", tone.ink.copy(alpha = if (sk) 1f else 0.4f)) { p, col -> wSkip(p, L.v(11f).dp.toPx(), col) }
+        }
+        // Next
+        val w3 = rw(3)
+        val nOn = e.running && !e.isRunKind
+        WPill(L, c - w3 / 2, ys[3], w3, hgt, tone.nextBg, 0.22f, "w.controlsNext", enabled = nOn, onClick = onNext) {
+            PillLabel(L, "Next", tone.nextFg.copy(alpha = if (nOn) 1f else 0.4f)) { p, col -> wArrow(p, L.v(12f).dp.toPx(), L.v(12f).dp.toPx(), col) }
         }
     }
 }
 
 @Composable
-private fun RoundButton(label: String, glyph: String?, fg: Color, bg: Color, glyphColor: Color, tag: String,
-                        enabled: Boolean = true, labelColor: Color = fg, sym: Int = R.drawable.sym_undo, onClick: () -> Unit) {
-    val k = wk()
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Box(Modifier.size((44 * k).dp).clip(CircleShape).background(bg).press(enabled, onClick).testTag(tag), contentAlignment = Alignment.Center) {
-            if (glyph != null) Icon8(glyph, (19 * k).dp, glyphColor) else Sym(sym, (19 * k).dp, glyphColor)
-        }
-        T(label, F.t(11, W600, if (labelColor == Color.Black) C.accent else labelColor), Modifier.width((52 * k).dp))
-    }
-}
-
-// MARK: 구간 목록
-
-@Composable
-fun WSegmentList() {
-    val e = WatchStore.engine
-    var now by remember { mutableLongStateOf(WatchStore.engine.now()) }
-    LaunchedEffect(Unit) { while (true) { now = WatchStore.engine.now(); delay(1000) } }
-    val state = rememberScalingLazyListState(initialCenterItemIndex = e.idx + 1)
-    val k = wk()
-    Box(Modifier.fillMaxSize().testTag("w.segments")) {
-        AmbientLayer(Ambient(0xFFE600, 0.10f, 1f, 1f, 0.5f, 0f, linear = true))
-        ScalingLazyColumn(Modifier.fillMaxSize(), state = state,
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = (22 * k).dp, vertical = (26 * k).dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    T("SEGMENTS", F.t(12, W600, C.accent, tracking = 1f))
-                    T("${minOf(e.idx + 1, e.seq.size)}/${e.seq.size}", F.num(12, W400, C.text2), translate = false)
-                }
-            }
-            items(e.seq.size) { i ->
-                val s = e.seq[i]
-                val done = i < e.idx
-                val c = i == e.idx
-                val tint = when { c -> Tint.Black; done -> Tint.Dim; s.kind == SegKind.Rox -> Tint.Mute; else -> Tint.White }
-                val sk = done && i in e.skippedIdx          // 1.2.2
-                val time = when {
-                    sk -> wt("Skipped")
-                    done -> Fm.t(e.splits.getOrElse(i) { 0 })
-                    c -> Fm.t(e.segEl(now))
-                    else -> if (s.target > 0) Fm.t(s.target) else "–"
-                }
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (c) C.accent else Color.Transparent).padding(vertical = 5.dp, horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon8(s.icon, 13.dp, tint)
-                    T(s.name, F.t(12, if (c) W600 else W400, if (c) Color.Black else if (done) C.text2 else Color.White), Modifier.weight(1f),
-                        align = TextAlign.Start, minScale = 0.85f, translate = false)
-                    if (done && !sk) Icon8("i_check", 10.dp, C.good)
-                    T(time, F.num(12, W500, if (c) Color.Black else if (done) Color.White else C.text3), translate = false)
-                }
-            }
-        }
+private fun PillLabel(L: WScale, text: String, color: Color, icon: androidx.compose.ui.graphics.drawscope.DrawScope.(Offset, Color) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(L.dv(5f))) {
+        Canvas(Modifier.size(L.dv(13f))) { icon(center, color) }
+        T(text, wf(L, 14f, W600, color))
     }
 }
 
 // MARK: 끝내기 확인
 
-/** 저장하고 끝내기 · 버리기 · 계속. 버리기는 한 번 더 물음 */
+/** 제목 "End workout?" → [SEGMENTS DONE · 9 / 16 · REST WON'T BE SAVED] → Discard | Resume → ✓ Save & end (아래 끝 버튼) */
 @Composable
 fun WEndSheet(onEnd: () -> Unit, onDiscard: () -> Unit, onResume: () -> Unit, buzz: (BuzzKind) -> Unit) {
     val e = WatchStore.engine
     var ask by remember { mutableStateOf(false) }
-    val k = wk()
-    Box(Modifier.fillMaxSize().background(Color.Black).press { }.testTag("w.endSheet")) {
-        // 2026-10-21: 아래 단추 줄이 동그란 테두리에 잘려서 → 조금 올리고, 맨 아래 줄은 원 안에 들어오는 폭으로
-        val bottomPad = 30 * k
-        val lastW = roundWidth(bottomPad)
-        Column(Modifier.fillMaxSize().padding(start = (26 * k).dp, end = (26 * k).dp, top = (30 * k).dp, bottom = bottomPad.dp),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            if (!ask) {
-                T("End workout?", F.t(15, W600))
-                // 구간 수는 Roxzone 을 빼고 셈 (빌드 24 — 운동 중 화면의 n / 16 과 같게)
-                val done = e.seq.take(e.idx).count { it.kind != SegKind.Rox }
-                val all = e.seq.count { it.kind != SegKind.Rox }
-                T(if (e.growsOpen) wt("Everything so far will be saved.") else wt("%lld/%lld segments done. The rest won't be recorded.", done, all),
-                    F.t(12, color = C.text2), Modifier.fillMaxWidth(), maxLines = 3, align = TextAlign.Center, translate = false)
-                Spacer(Modifier.weight(1f))
-                SheetButton("Save & end", Color.Black, C.accent, Modifier.width(roundWidth(bottomPad + 39f)).testTag("w.endConfirm"), onEnd)
-                Row(Modifier.width(lastW), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SheetButton("Discard", C.bad, hex(0x2A1412), Modifier.weight(1f).testTag("w.discard")) { buzz(BuzzKind.Click); ask = true }
-                    SheetButton("Resume", Color.White, hex(0x1F1F1F), Modifier.weight(1f).testTag("w.resume"), onResume)
-                }
-            } else {
-                T("Discard this workout?", F.t(15, W600))
-                T("It won't be saved here, on your phone or in Health Connect.", F.t(12, color = C.text2), Modifier.fillMaxWidth(), maxLines = 3, align = TextAlign.Center)
-                Spacer(Modifier.weight(1f))
-                SheetButton("Discard", Color.White, C.bad, Modifier.width(roundWidth(bottomPad + 39f)).testTag("w.discardConfirm"), onDiscard)
-                SheetButton("Cancel", Color.White, hex(0x1F1F1F), Modifier.width(lastW)) { ask = false }
+    WCanvas(Modifier.background(Color.Black).clickable(remember { MutableInteractionSource() }, indication = null) { }.testTag("w.endSheet")) { L ->
+        WMenuBackground(61)
+        WClock(L, Color.White)
+        WMenuTitle(L, if (ask) "Discard this workout?" else "End workout?")
+        val hb = 32f
+        val g = 6f
+        val eb = 172f
+        val yb1 = eb - 8f - hb
+        val done = e.seq.take(e.idx).count { it.kind != SegKind.Rox }
+        val all = e.seq.count { it.kind != SegKind.Rox }
+        val (label, value, word, col) = when {
+            ask -> Quad("TOTAL", Fm.t(e.total()), "NOTHING WILL BE SAVED", hex(0xFF6B60))
+            e.growsOpen || Kinds.isNew(e.kind) -> Quad("TOTAL", Fm.t(e.total()), "EVERYTHING WILL BE SAVED", Color.White)
+            else -> Quad("SEGMENTS DONE", "$done / $all", if (done < all) "REST WON'T BE SAVED" else "", Color.White)
+        }
+        WBlock(L, 45f, yb1 - 4f, label, value, word, col, 32f, 9f, 7f, 40f)
+        val w = L.rowW(yb1, yb1 + hb, 10f)
+        val hf = (w - g) / 2
+        val c = WScale.D / 2
+        if (ask) {
+            WPill(L, c - w / 2, yb1, w, hb, Color.White.copy(alpha = 0.13f), 0.55f, "w.discardCancel", onClick = { ask = false }) {
+                T("Cancel", wf(L, 13f, W600, Color.White))
             }
+            WEdgeButton(L, "Discard", null, "w.discardConfirm", red = true, onClick = onDiscard)
+        } else {
+            WPill(L, c - w / 2, yb1, hf, hb, hex(0xFF3B30, 0.59f), 0.22f, "w.discard", onClick = { buzz(BuzzKind.Click); ask = true }) {
+                T("Discard", wf(L, 13f, W600, Color.White))
+            }
+            WPill(L, c + w / 2 - hf, yb1, hf, hb, Color.White.copy(alpha = 0.13f), 0.55f, "w.resume", onClick = onResume) {
+                T("Resume", wf(L, 13f, W600, Color.White))
+            }
+            WEdgeButton(L, "Save & end", "check", "w.endConfirm", onClick = onEnd)
         }
     }
 }
 
+private data class Quad(val a: String, val b: String, val c: String, val d: Color)
+
+/** 귀퉁이 표시 안 블록 [이름표 10 · 큰 숫자 · 작은 말 9]: top ~ bottom 의 세로 가운데. 반환 = (위, 아래) */
 @Composable
-private fun SheetButton(t: String, fg: Color, bg: Color, modifier: Modifier, onClick: () -> Unit) {
-    Box(modifier.height(34.dp).clip(Pill).background(bg).press(onClick = onClick), contentAlignment = Alignment.Center) {
-        T(t, F.t(14, W600, fg), Modifier.padding(horizontal = 6.dp))
-    }
+fun WBlock(L: WScale, top: Float, bottom: Float, label: String, value: String, word: String, color: Color = Color.White,
+           valueSize: Float = 34f, pad: Float = 10f, inner: Float = 7f, bm: Float = 40f, center: Float? = null): Pair<Float, Float> {
+    val ca = wCap(10f)
+    val cb = wCap(valueSize)
+    val cw = wCap(9f)
+    val blk = pad + ca + inner + cb + (if (word.isEmpty()) 0f else inner + cw) + pad
+    val y = (center ?: ((top + bottom) / 2)) - blk / 2
+    WBrackets(L, y, y + blk, Color.White.copy(alpha = 0.47f))
+    WText(label, wf(L, 10f, W700, Color.White.copy(alpha = 0.65f), tracking = 0.6f), L, WScale.D / 2, y + pad + ca / 2, 140f)
+    WText(value, wf(L, valueSize, W700, color, num = true), L, WScale.D / 2, y + pad + ca + inner + cb / 2, 140f, minScale = 0.6f, tag = "w.blockValue")
+    if (word.isNotEmpty()) WText(word, wf(L, 9f, W700, Color.White.copy(alpha = 0.55f), tracking = 0.5f), L, WScale.D / 2,
+        y + pad + ca + inner + cb + inner + cw / 2, 150f)
+    return y to y + blk
 }
 
 // MARK: 요약
 
+/** 제목 → 응원 한 줄 → [TOTAL 1:18:42 · −1:18 VS GOAL] → About top 12% → ✓ Done. 아래로 돌리면 AVG · MAX · KCAL · 구간 기록 */
 @Composable
 fun WSummary() {
     val e = WatchStore.engine
     val r = e.lastRecord ?: return
-    val k = wk()
+    val state = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
     Box(Modifier.fillMaxSize().testTag("w.summary")) {
-        AmbientLayer(Ambient(0x30D158, 0.18f, 1.2f, 0.6f, 0.5f, -0.1f))
-        // 2026-10-21: 첫 줄이 화면 가운데에서 시작해 아래 AVG · MAX · KCAL 이 잘렸음 → 첫 줄을 맨 위에 붙여 시작 (가운데 맞춤 끔)
-        val state = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
+        WMenuBackground(62)
         ScalingLazyColumn(Modifier.fillMaxSize(), state = state,
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = (22 * k).dp, end = (22 * k).dp, top = (30 * k).dp, bottom = (40 * k).dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             anchorType = androidx.wear.compose.foundation.lazy.ScalingLazyListAnchorType.ItemStart,
-            autoCentering = null) {
-            item { T(if (r.mode == Mode.Training) r.title else r.mode.title, F.t(12, W600, C.text2), translate = r.mode != Mode.Training) }
-            // 18번: 종류 줄 (EMOM · 12분 / AMRAP 7라운드 / 볼륨)
-            bonusSummary(r)?.let { line -> item { T(line, F.t(12, W600, C.accent), Modifier.fillMaxWidth(), maxLines = 2, align = TextAlign.Center, translate = false) } }
-            item { Head(r) }
-            // 1.2.4: 대략의 위치 한 줄 (Open = 상위 %, Pro · 더블 = 단계). 폰 기록 상세와 같은 계산
-            if ((r.mode == Mode.Race || r.mode == Mode.Sim) && r.splits16 != null) {
-                com.nkssi.splits8.shared.HyroxRank.of(r.division, r.total)?.let { rk ->
-                    item {
-                        T(rk.pct?.let { com.nkssi.splits8.shared.L10n.t("About top %d%%", it) } ?: com.nkssi.splits8.shared.L10n.t(rk.level),
-                            F.t(13, W600, C.accent), Modifier.fillMaxWidth().testTag("w.rank"), maxLines = 1, align = TextAlign.Center, minScale = 0.75f, translate = false)
-                    }
-                }
-            }
+            autoCentering = null,
+            scalingParams = androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f)) {
+            item { SummaryFirst(r) }
             item { Stats(r) }
             item {
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.wCard).padding(vertical = 4.dp)) {
+                Column(Modifier.fillMaxWidth(0.82f).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.08f)).padding(vertical = 4.dp)) {
                     for (s in r.segs.filter { it.kind != SegKind.Rox }) {
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp, horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -701,38 +751,54 @@ fun WSummary() {
                     }
                 }
             }
-            item {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Box(Modifier.width(screenFrac(0.6f)).height(36.dp).clip(Pill).background(C.accent)
-                        .press { e.reset(); WNav.open(null) }.testTag("w.done"), contentAlignment = Alignment.Center) {
-                        T("Done", F.t(14, W600, Color.Black))
-                    }
-                }
-            }
+            item { Spacer(Modifier.height(40.dp)) }
         }
     }
 }
 
 @Composable
-private fun Head(r: Record) {
-    val tg = r.vsTarget ?: r.total
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        // "수고했어요" 류 한 줄 (워치가 아는 것만으로 고름)
-        T(cheer(r), F.t(13, W600, C.accent), Modifier.fillMaxWidth().testTag("w.cheer"), maxLines = 3, align = TextAlign.Center, translate = false)
-        T(Fm.t(r.total), F.num(30, tracking = -0.9f), Modifier.padding(top = 4.dp).testTag("w.sumTotal"), translate = false)
-        r.pftGrade?.let { PFTBadge(it, 84.dp, 24.dp, 13f) }
-        if (r.vsTarget != null) {
-            Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                T(Fm.d(r.total - tg), F.num(14, color = if (r.total > tg) C.bad else C.good), translate = false)
-                T(r.vsWord, F.t(11, W600, C.text2, tracking = 0.8f))
+private fun SummaryFirst(r: Record) {
+    val e = WatchStore.engine
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    val side = min(cfg.screenWidthDp, cfg.screenHeightDp).dp
+    Box(Modifier.size(side)) {
+        WCanvas { L ->
+            WClock(L, Color.White)
+            WMenuTitle(L, if (r.mode == Mode.Training) r.title else r.mode.title, translate = r.mode != Mode.Training)
+            val tg = r.vsTarget ?: r.total
+            val rank: String? = if ((r.mode == Mode.Race || r.mode == Mode.Sim) && r.splits16 != null)
+                com.nkssi.splits8.shared.HyroxRank.of(r.division, r.total)?.let { rk ->
+                    rk.pct?.let { com.nkssi.splits8.shared.L10n.t("About top %d%%", it) } ?: com.nkssi.splits8.shared.L10n.t(rk.level)
+                } else null
+            val extra: String? = bonusSummary(r)
+            // 응원 · 블록 · (등급/종류/등수) 를 45 ~ 168 사이 가운데
+            val c0 = wCap(12f)
+            val p = 9f
+            val blk = p + wCap(10f) + 7f + wCap(34f) + (if (r.vsTarget != null) 7f + wCap(9f) else 0f) + p
+            val tail = listOfNotNull(rank, extra).size * (wCap(12f) + 10f) + (if (r.pftGrade != null) 32f else 0f)
+            val tot = c0 + 10f + blk + tail
+            var y = (45f + 168f) / 2 - tot / 2
+            WText(cheer(r), wf(L, 12f, W600, C.accent), L, WScale.D / 2, y + c0 / 2, 170f, minScale = 0.7f, tag = "w.cheer")
+            y += c0 + 10f
+            val word = if (r.vsTarget != null) Fm.d(r.total - tg) + " " + wt(r.vsWord) else ""
+            val (_, yb) = WBlock(L, y, y + blk, "TOTAL", Fm.t(r.total), word, Color.White, 34f, 9f, 7f, 36f, center = y + blk / 2)
+            y = yb + 10f
+            r.pftGrade?.let { g ->
+                Box(Modifier.at(L.dx(WScale.D / 2), L.dy(y + 11f))) { PFTBadge(g, L.dv(78f), L.dv(22f), 12f * L.s) }
+                y += 32f
             }
+            for (line in listOfNotNull(extra, rank)) {
+                WText(line, wf(L, 12f, W600, C.accent), L, WScale.D / 2, y + wCap(12f) / 2, 170f, minScale = 0.7f, tag = if (line == rank) "w.rank" else null)
+                y += wCap(12f) + 10f
+            }
+            WEdgeButton(L, "Done", "check", "w.done", onClick = { e.reset(); WNav.open(null) })
         }
     }
 }
 
 @Composable
 private fun Stats(r: Record) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.wCard).padding(vertical = 7.dp, horizontal = 10.dp),
+    Row(Modifier.fillMaxWidth(0.82f).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.08f)).padding(vertical = 7.dp, horizontal = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         for ((l, v, c) in listOf(
             Triple("AVG", if (r.avgHR > 0) "${r.avgHR}" else "--", C.hr),

@@ -466,18 +466,28 @@ struct BuilderView: View {
                 }
                     .buttonStyle(TileTap(radius: 16))
                     .accessibilityIdentifier("builder.st.roxzone")
+                // 1.2.7: 휴식(Rest) — 정한 시간 없이 재기만 함. 원하는 자리에 여러 번 넣을 수 있음
+                Button { add(ProgItem(icon: "rest"), key: "rest") } label: {
+                    grayTile("rest", "Rest")
+                        .modifier(TapMark(count: count(station: "rest"), flash: flashKey == "rest", radius: 16))
+                }
+                    .buttonStyle(TileTap(radius: 16))
+                    .accessibilityIdentifier("builder.st.rest")
             }
         }
     }
 
-    private var roxTile: some View {
+    private var roxTile: some View { grayTile("roxzone", "Roxzone") }
+
+    /// 회색 칸 (Roxzone · Rest)
+    private func grayTile(_ icon: String, _ title: String) -> some View {
         Color.clear
             .aspectRatio(1 / 1.08, contentMode: .fit)
             .frame(maxWidth: .infinity)
             .overlay {
                 VStack(spacing: 8) {
-                    Icon8("roxzone", 32, tint: .mute)
-                    Text("Roxzone").font(F.t(11, .semibold)).tracking(0.11)
+                    Icon8(icon, 32, tint: .mute)
+                    Text(title.l10n).font(F.t(11, .semibold)).tracking(0.11)
                         .multilineTextAlignment(.center).lineSpacing(1)
                         .foregroundStyle(C.text2)
                         .fixedSize(horizontal: false, vertical: true)

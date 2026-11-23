@@ -397,8 +397,10 @@ struct ProgItem: Codable, Hashable {
 
     /// 1.2.1: 트레이닝에도 Roxzone 을 종목처럼 넣을 수 있음 (대표님 10-30)
     var isRox: Bool { icon == "roxzone" }
-    func name() -> String { icon == "run" ? "Run" : isRox ? "Roxzone" : (Station.of(icon)?.name ?? icon) }
-    func detail(_ d: Division) -> String { icon == "run" ? (run ?? "1KM") : isRox ? "Transition" : (Station.of(icon)?.detail(d) ?? "") }
+    /// 1.2.7: 휴식(Rest) — 정한 시간 없이 재기만 함. 사용자가 다음으로 넘길 때까지 (대표님 11-20)
+    var isRest: Bool { icon == "rest" }
+    func name() -> String { icon == "run" ? "Run" : isRox ? "Roxzone" : isRest ? "Rest" : (Station.of(icon)?.name ?? icon) }
+    func detail(_ d: Division) -> String { icon == "run" ? (run ?? "1KM") : isRox ? "Transition" : isRest ? "" : (Station.of(icon)?.detail(d) ?? "") }
 }
 
 struct Program: Codable, Hashable, Identifiable {
@@ -525,7 +527,8 @@ enum ProgramLink {
                 guard Defaults.runs.contains(label) else { return nil }
                 seq.append(ProgItem(icon: "run", run: label))
             } else {
-                guard Station.of(x) != nil else { return nil }
+                // 1.2.7: Roxzone · Rest 도 받음 (예전엔 Roxzone 이 들어간 트레이닝 링크를 거부했음)
+                guard Station.of(x) != nil || x == "roxzone" || x == "rest" else { return nil }
                 seq.append(ProgItem(icon: x))
             }
         }
@@ -642,7 +645,7 @@ struct Friend: Codable, Hashable, Identifiable {
     var hasSplits: Bool { splits.count == 16 }
 }
 
-// MARK: - 대회 목록 (hyrox.com Find My Race · 2026-09-29 확인)
+// MARK: - 대회 목록 (hyrox.com Find My Race · 2026-11-21 확인. 서버 events 표가 먼저, 못 받으면 이 목록. 중동 · 인도 = Asia-Pacific, 남아공 = Europe 칸)
 
 struct EventItem: Codable, Hashable, Identifiable {
     var city: String
@@ -664,29 +667,81 @@ struct EventItem: Codable, Hashable, Identifiable {
     static let bundled: [EventItem] = [
         ["Seoul","KINTEX, Goyang","korea","2026-11-13","2026-11-15"],
         ["Incheon","Songdo Convensia","korea","2027-05-13","2027-05-16"],
-        ["Shanghai","China","asia","2026-10-31","2026-11-01"],
-        ["Guangzhou","China","asia","2026-11-21","2026-11-22"],
+        ["Guangzhou","China","asia","2026-11-20","2026-11-22"],
         ["Singapore","Singapore","asia","2026-11-26","2026-11-29"],
+        ["Gujarat","India","asia","2026-11-26","2026-11-28"],
+        ["Dubai","UAE","asia","2026-11-27","2026-11-28"],
         ["Sanya","China","asia","2026-12-05","2026-12-06"],
         ["Melbourne","Australia","asia","2026-12-09","2026-12-13"],
         ["Kuala Lumpur","Malaysia","asia","2026-12-10","2026-12-13"],
         ["Hong Kong","Hong Kong","asia","2027-01-07","2027-01-10"],
+        ["Noida","India","asia","2027-01-15","2027-01-17"],
         ["Osaka","Japan","asia","2027-01-21","2027-01-25"],
         ["Auckland","New Zealand","asia","2027-02-04","2027-02-07"],
         ["Bangkok","Thailand","asia","2027-02-11","2027-02-14"],
+        ["Hanoi","Vietnam","asia","2027-03-06","2027-03-07"],
         ["Taipei","Chinese Taipei","asia","2027-03-12","2027-03-14"],
-        ["Brisbane","Australia","asia","2027-03-31","2027-04-04"],
+        ["Brisbane","Australia","asia","2027-03-31","2027-04-05"],
         ["Nagoya","Japan","asia","2027-04-16","2027-04-18"],
+        ["Bengaluru","India","asia","2027-05-19","2027-05-23"],
         ["World Championships","AsiaWorld-Expo, Hong Kong","asia","2027-06-10","2027-06-13"],
-        ["Hamburg","Germany","europe","2026-10-28","2026-11-01"],
-        ["Barcelona","Spain","europe","2026-11-11","2026-11-15"],
+        ["Poznań","Poland","europe","2026-11-20","2026-11-22"],
+        ["Johannesburg","South Africa","europe","2026-11-26","2026-11-29"],
+        ["Utrecht","Netherlands","europe","2026-11-26","2026-11-30"],
         ["London","ExCeL London","europe","2026-12-02","2026-12-06"],
+        ["Milan","Italy","europe","2026-12-04","2026-12-06"],
         ["Stockholm","Sweden","europe","2026-12-10","2026-12-13"],
+        ["Frankfurt","Germany","europe","2026-12-10","2026-12-13"],
         ["Paris","France","europe","2026-12-12","2026-12-20"],
+        ["Gent","Belgium","europe","2026-12-17","2026-12-20"],
+        ["Helsinki I","Finland","europe","2026-12-18","2026-12-20"],
+        ["Manchester","UK","europe","2027-01-20","2027-01-31"],
         ["Amsterdam","Netherlands","europe","2027-01-22","2027-01-31"],
+        ["Verona","Italy","europe","2027-01-28","2027-01-31"],
+        ["Toulouse","France","europe","2027-02-03","2027-02-07"],
+        ["Bilbao","Spain","europe","2027-02-05","2027-02-07"],
+        ["Basel","Switzerland","europe","2027-02-12","2027-02-14"],
+        ["Katowice","Poland","europe","2027-02-19","2027-02-21"],
+        ["Vienna","Austria","europe","2027-02-19","2027-02-21"],
+        ["Mechelen","Belgium","europe","2027-03-03","2027-03-07"],
+        ["Glasgow","UK","europe","2027-03-10","2027-03-14"],
+        ["Madrid","Spain","europe","2027-03-17","2027-03-21"],
+        ["Copenhagen","Denmark","europe","2027-03-25","2027-03-28"],
+        ["Cape Town","South Africa","europe","2027-03-25","2027-03-28"],
+        ["Rotterdam","Netherlands","europe","2027-04-01","2027-04-04"],
+        ["Bari","Italy","europe","2027-04-02","2027-04-04"],
+        ["Warsaw","Poland","europe","2027-04-07","2027-04-11"],
+        ["Paris Grand Palais","France","europe","2027-04-08","2027-04-12"],
+        ["Cologne","Germany","europe","2027-04-08","2027-04-11"],
+        ["Málaga","Spain","europe","2027-04-15","2027-04-18"],
+        ["Helsinki II","Finland","europe","2027-04-16","2027-04-18"],
+        ["London Olympia","Olympia London","europe","2027-04-24","2027-05-02"],
+        ["Kraków","Poland","europe","2027-05-07","2027-05-09"],
+        ["Lyon","France","europe","2027-05-12","2027-05-16"],
+        ["Cardiff","UK","europe","2027-05-20","2027-05-29"],
+        ["Rimini","Italy","europe","2027-05-27","2027-05-30"],
+        ["Riga","Latvia","europe","2027-05-28","2027-05-30"],
         ["Dallas","USA","americas","2026-11-18","2026-11-22"],
+        ["Rio de Janeiro","Brazil","americas","2026-11-21","2026-11-22"],
         ["Anaheim","USA","americas","2026-12-03","2026-12-06"],
+        ["Nashville","USA","americas","2026-12-09","2026-12-13"],
+        ["Vancouver","Canada","americas","2026-12-17","2026-12-20"],
         ["Chicago","USA","americas","2027-02-11","2027-02-15"],
+        ["Cancun","Mexico","americas","2027-02-18","2027-02-21"],
+        ["Phoenix","USA","americas","2027-02-25","2027-02-28"],
+        ["Santiago","Chile","americas","2027-03-06","2027-03-06"],
+        ["Las Vegas","USA","americas","2027-03-12","2027-03-14"],
+        ["Guadalajara","Mexico","americas","2027-03-19","2027-03-21"],
+        ["Buenos Aires","Argentina","americas","2027-03-20","2027-03-21"],
+        ["Miami Beach","USA","americas","2027-03-26","2027-03-28"],
+        ["Houston","USA","americas","2027-04-01","2027-04-04"],
+        ["Monterrey","Mexico","americas","2027-04-16","2027-04-18"],
+        ["Ottawa","Canada","americas","2027-04-21","2027-04-25"],
+        ["Atlanta","USA","americas","2027-04-23","2027-04-25"],
+        ["Minneapolis","USA","americas","2027-05-07","2027-05-09"],
+        ["São Paulo","Brazil","americas","2027-05-08","2027-05-09"],
+        ["San Diego","USA","americas","2027-05-13","2027-05-16"],
+        ["Portland","USA","americas","2027-05-21","2027-05-23"],
     ].map { EventItem(city: $0[0], venue: $0[1], region: $0[2], start: $0[3], end: $0[4],
                       laps: knownLaps(city: $0[0], start: $0[3])) }
 }
@@ -805,7 +860,7 @@ struct Record: Codable, Hashable, Identifiable {
         guard mode == .pft, counts else { return nil }
         return PFT.grade(total)
     }
-    var roxTotal: Int { segs.filter { $0.kind == .rox }.map(\.time).reduce(0, +) }
+    var roxTotal: Int { segs.filter { $0.kind == .rox && $0.icon != "rest" }.map(\.time).reduce(0, +) }   // 1.2.7: 휴식은 Roxzone 합계에서 뺌
     var runs: [SegResult] { segs.filter { $0.kind == .run } }
     var runTotal: Int { runs.map(\.time).reduce(0, +) }
     var stationTotal: Int { segs.filter { $0.kind == .st }.map(\.time).reduce(0, +) }
@@ -1153,11 +1208,14 @@ enum SeqBuilder {
     /// Full Simulation / Race: Run i, Roxzone, Station, Roxzone … (마지막 스테이션 뒤 Roxzone 없음)
     static func full(div: Division, rox: Bool, targets16: [Int], roxTarget: Int = Defaults.roxTarget) -> [Seg] {
         var o: [Seg] = []
+        // 1.2.7: Roxzone 을 끄면 이동 시간은 다음 구간에 들어감 → 목표도 그만큼 더함
+        // (러닝 뒤 이동 → 스테이션, 스테이션 뒤 이동 → 다음 러닝)
+        let add: Int = rox ? 0 : roxTarget
         for i in 0..<8 {
-            o.append(Seg(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, target: targets16[i * 2]))
+            o.append(Seg(icon: "run", name: "Run \(i + 1)", detail: "1KM", kind: .run, target: targets16[i * 2] + (i > 0 ? add : 0)))
             if rox { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
             let s = Station.all[i]
-            o.append(Seg(icon: s.key, name: s.name, detail: s.detail(div), kind: .st, target: targets16[i * 2 + 1]))
+            o.append(Seg(icon: s.key, name: s.name, detail: s.detail(div), kind: .st, target: targets16[i * 2 + 1] + add))
             if rox && i < 7 { o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget)) }
         }
         return o
@@ -1190,6 +1248,11 @@ enum SeqBuilder {
                     o.append(Seg(icon: "roxzone", name: "Roxzone", detail: "Transition", kind: .rox, target: roxTarget))
                     continue
                 }
+                // 1.2.7: 휴식 — 회색 구간, 목표 없음(재기만), 최고 기록에 안 섞임
+                if it.isRest {
+                    o.append(Seg(icon: "rest", name: "Rest", detail: "", kind: .rox, target: 0))
+                    continue
+                }
                 let d = it.detail(div)
                 let key = SegKey.of(icon: it.icon, detail: d)
                 // 최고 기록이 아직 없으면 0 (= 비교 안 함). 예전에는 기본 목표와 비교해서 헷갈렸음
@@ -1208,7 +1271,7 @@ enum SegKey {
     /// 최고 기록으로 써도 되는 시간인지 (너무 빠른 시험용 탭은 빼기)
     /// 러닝: 1KM 2:30 기준으로 거리 비례 · 스테이션: 30초 · 인터벌: 제외
     static func plausible(icon: String, detail: String, time: Int) -> Bool {
-        if icon == "hiit" || icon == WKind.strengthIcon || icon == "roxzone" { return false }
+        if icon == "hiit" || icon == WKind.strengthIcon || icon == "roxzone" || icon == "rest" { return false }
         if icon == "run" {
             let m = runMeters(detail)
             return Double(time) >= Double(Record.minRun) * m / 1000

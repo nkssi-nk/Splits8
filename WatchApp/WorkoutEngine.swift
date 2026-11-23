@@ -158,6 +158,28 @@ final class WorkoutEngine: NSObject {
     func doneT() -> Int { splits.prefix(idx).reduce(0, +) }
     func total(_ now: Date) -> Int { doneT() + segEl(now) }
 
+    // MARK: 1.2.7 크라운 아래 칸 (목표 대비 · 심박 · 칼로리)
+
+    /// 목표 합 (모든 구간)
+    var targetTotal: Int { seq.map(\.target).reduce(0, +) }
+    /// 목표 대비 칸을 보여 줄 수 있는지: 끝이 정해져 있고, 스테이션 · 러닝마다 목표가 있을 때
+    var hasGoalTotal: Bool {
+        guard !growsOpen, !isNewKind, !isRunKind, targetTotal > 0 else { return false }
+        return seq.allSatisfy { $0.target > 0 || $0.kind == .rox }
+    }
+    /// 이대로 가면 예상 완주 (목표 합 + 지금까지 차이)
+    func projectedFinish(_ now: Date) -> Int { targetTotal + delta(now) }
+    /// 지금까지 최고 심박
+    var maxHRNow: Int { max(Int(hr.rounded()), hrSamples.map(\.b).max() ?? 0) }
+    /// 지금까지 평균 심박 (없으면 지금 심박)
+    var avgHRLive: Int { avgHRNow ?? Int(hr.rounded()) }
+    /// 분당 걸음 수 (걸음 수를 잴 때만, 30초 지난 뒤부터)
+    func cadenceNow(_ now: Date) -> Int? {
+        let t: Double = Double(total(now))
+        guard steps > 0, t >= 30 else { return nil }
+        return Int((steps / t * 60).rounded())
+    }
+
     /// 목표 대비: 끝낸 구간 합 − 목표 합 + 현재 구간 초과분
     func delta(_ now: Date) -> Int {
         let tg = seq.prefix(idx).map(\.target).reduce(0, +)

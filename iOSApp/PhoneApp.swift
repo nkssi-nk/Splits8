@@ -548,7 +548,8 @@ struct PhoneRoot: View {
                 .offset(x: edgeDrag)
 
             // 상태바 뒤 검은 그라데이션 (시안: linear-gradient(#000 60%, transparent), 54px)
-            if r.scr != .splash {
+            // 1.2.7: 운동 중 화면(폰 · 워치 같이 보기)은 바탕색이 위까지 이어지게 빼 둠 (시안과 같게)
+            if r.scr != .splash && r.scr != .phoneLive && r.scr != .watchLive {
                 GeometryReader { g in
                     LinearGradient(stops: [.init(color: .black, location: 0.6), .init(color: .black.opacity(0), location: 1)],
                                    startPoint: .top, endPoint: .bottom)

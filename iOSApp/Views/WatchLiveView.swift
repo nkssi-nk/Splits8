@@ -8,41 +8,48 @@ struct WatchLiveView: View {
     let r = Router.shared
     @State private var askEnd = false
 
+    @State private var page = 0
+    @State private var zoneHold = LiveZoneHold()
+    /// 받은 심박으로 세는 최고 · 평균 (워치가 보내는 상태에는 없음)
+    @State private var maxHR = 0
+    @State private var hrSum = 0
+    @State private var hrN = 0
+
     var body: some View {
         GeometryReader { g in
-            let m = PhoneLiveMetrics(height: g.size.height)
-            ZStack(alignment: .top) {
-                glow.frame(height: g.size.height * 0.5)
+            let L = PL(w: g.size.width, h: g.size.height)
+            ZStack {
                 if let st = mirror.state {
-                    content(st, m)
+                    content(st, L)
                 } else {
+                    Color.black.ignoresSafeArea()
                     waiting
                 }
             }
             .frame(width: g.size.width, height: g.size.height)
         }
+        .ignoresSafeArea()
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             r.backAction = { r.go(.home) }
         }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .onChange(of: mirror.state?.hr ?? 0) { _, hr in
+            guard hr > 0 else { return }
+            maxHR = max(maxHR, hr); hrSum += hr; hrN += 1
+        }
+        .task {
+            while !Task.isCancelled {
+                zoneHold.update(raw: mirror.state?.zone ?? 0)
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
         .alert("End workout?", isPresented: $askEnd) {
             Button("End", role: .destructive) { mirror.send(.end) }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The workout ends on Apple Watch and is saved there.")
         }
-    }
-
-    /// 위쪽 빛 = 지금 심박 구간 색 (심박이 없으면 테마색)
-    private var glow: some View {
-        let z: Int = mirror.state?.zone ?? 0
-        let hex: UInt32 = z >= 1 && z <= 5 ? C.zoneHex[z - 1] : GlowTheme.current.hex
-        return RadialGradient(colors: [Color(hex: hex, alpha: 0.30), Color(hex: hex, alpha: 0)],
-                              center: .top, startRadius: 0, endRadius: 420)
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.8), value: z)
-            .allowsHitTesting(false)
     }
 
     private var waiting: some View {
@@ -53,28 +60,40 @@ struct WatchLiveView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func content(_ st: LiveState, _ m: PhoneLiveMetrics) -> some View {
-        VStack(spacing: 0) {
-            // 빌드 24: 머리는 아이폰 직접 기록 화면과 같은 부품 (n / 16 은 Roxzone 뺌)
-            LiveHeader(f: frame(st, now: Date()), status: mirror.reconnecting ? "Apple Watch · Reconnecting…" : "Apple Watch · Live",
-                       live: !mirror.reconnecting, idPrefix: "watchLive")
-            if mirror.discarded {
-                // 워치에서 버림: 기록이 안 오니 '저장 중…'을 보여 주지 않고 잠시 뒤 홈으로 감
-                Spacer()
-            } else if st.finished || mirror.ended {
-                saving
-            } else {
-                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-                    LiveBody(f: frame(st, now: ctx.date), m: m, idPrefix: "watchLive")
+    private func content(_ st: LiveState, _ L: PL) -> some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+            let f: LiveFrame = frame(st, now: ctx.date)
+            let status: String = mirror.reconnecting ? "Apple Watch · Reconnecting…"
+                : (st.hr > 0 ? "Watch".l10n + " · \(st.hr) " + "BPM".l10n : "Apple Watch · Live")
+            ZStack {
+                LiveBackground(tone: f.tone, zone: zoneHold.shown, seed: isRunCard(st) ? 1 : st.idx)
+                if mirror.discarded {
+                    // 워치에서 버림: 기록이 안 오니 '저장 중…'을 보여 주지 않고 잠시 뒤 홈으로 감
+                    Color.clear
+                } else if st.finished || mirror.ended {
+                    Color.black.opacity(0.55).ignoresSafeArea()
+                    saving.padding(.top, L.y(150))
+                } else {
+                    TabView(selection: $page) {
+                        LiveMain(f: f, L: L, idPrefix: "watchLive")
+                            .frame(width: L.w, height: L.h).ignoresSafeArea().tag(0)
+                        LiveGoalPage(f: f, L: L, maxHR: maxHR, avgHR: hrN > 0 ? hrSum / hrN : nil)
+                            .frame(width: L.w, height: L.h).ignoresSafeArea().tag(1)
+                        if !isRunCard(st) {
+                            LiveSegmentList(L: L, tone: f.tone, seq: st.seq, idx: st.idx, splits: st.splits, skipped: [],
+                                            segEl: f.segEl, word: st.vsWord)
+                                .frame(width: L.w, height: L.h).ignoresSafeArea().tag(2)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .ignoresSafeArea()     // 1.2.7: 쪽 안 자리를 화면 전체 기준으로
+                    LivePageDots(L: L, count: isRunCard(st) ? 2 : 3, page: page, tone: f.tone)
+                    buttons(st, f, L)
                 }
-                .padding(.top, m.top * 0.6)
-                chips(st).padding(.top, 14 * m.k)
-                if !isRunCard(st) { LiveNextRow(next: nextSeg(st), m: m, dividerTop: m.dividerTop * 0.7) }
-                Spacer(minLength: 16)
-                buttons(st, m)
+                LiveTop(f: f, L: L, status: status, live: !mirror.reconnecting, idPrefix: "watchLive")
+                    .allowsHitTesting(false)
             }
         }
-        .padding(.horizontal, 20)
     }
 
     /// 워치에서 받은 상태 → 화면 한 장면
@@ -84,7 +103,8 @@ struct WatchLiveView: View {
                   running: st.running, open: st.open, segDist: st.segDist, totalDist: st.dist,
                   runKind: st.mode == .training && st.cur?.icon == "run",
                   speed: st.running ? st.spd : nil,
-                  runCard: isRunCard(st), runGoalKm: isRunCard(st) && !st.open ? st.seq.count : 0)
+                  runCard: isRunCard(st), runGoalKm: isRunCard(st) && !st.open ? st.seq.count : 0,
+                  splits: st.splits, hr: st.hr, zone: st.zone, kcal: st.kcal)
     }
 
     /// 1.2.2: 워치의 러닝 카드인지 (구간이 모두 "KM n" 러닝)
@@ -92,92 +112,26 @@ struct WatchLiveView: View {
         st.mode == .training && !st.seq.isEmpty && st.seq.allSatisfy { $0.icon == "run" && $0.name.hasPrefix("KM ") }
     }
 
-    /// 다음 구간 (HIIT · 자유 러닝은 아직 순서에 없는 다음 라운드/km)
-    private func nextSeg(_ st: LiveState) -> Seg? {
-        if let nx = st.nextSeg { return nx }
-        guard st.open else { return nil }
-        let n: Int = st.seq.count + 1
-        return st.cur?.icon == "hiit" ? SeqBuilder.hiitRound(n) : SeqBuilder.runKm(n)
-    }
-
-    /// ♥ 165 BPM [Z4] · 286 KCAL
-    private func chips(_ st: LiveState) -> some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "heart.fill").font(.system(size: 12)).foregroundStyle(C.hr)
-                Text(st.hr > 0 ? "\(st.hr)" : "--").font(F.num(15))
-                Text("BPM").font(F.t(10, .semibold)).foregroundStyle(C.text2)
-                if st.zone > 0 {
-                    Text("Z\(st.zone)").font(F.t(10, .bold)).foregroundStyle(.black)
-                        .padding(.horizontal, 5).frame(height: 16)
-                        .background(C.zones[min(4, st.zone - 1)], in: RoundedRectangle(cornerRadius: 4))
-                }
-            }
-            .padding(.horizontal, 12).frame(height: 32)
-            .background(Color.white.opacity(0.08), in: Capsule())
-            HStack(spacing: 5) {
-                Text("\(st.kcal)").font(F.num(15))
-                Text("KCAL").font(F.t(10, .semibold)).foregroundStyle(C.text2)
-            }
-            .padding(.horizontal, 12).frame(height: 32)
-            .background(Color.white.opacity(0.08), in: Capsule())
-        }
-    }
-
     // MARK: 아래 버튼 (누르면 워치로 보냄)
 
-    private func buttons(_ st: LiveState, _ m: PhoneLiveMetrics) -> some View {
+    private func buttons(_ st: LiveState, _ f: LiveFrame, _ L: PL) -> some View {
         let on: Bool = !mirror.reconnecting
-        return VStack(spacing: 0) {
-            // 1.2.3: 러닝 카드(1 km 자동)는 넘기기 버튼 없음 — "1 km 마다 자동 넘김" 글씨도 없앰 (대표님 11-10)
-            if !st.autoSplit {
-            YellowButton(height: m.buttonH, radius: m.buttonH / 2, enabled: on && st.running && !st.autoSplit,
-                         action: {
-                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                             mirror.send(.next)
-                         }) {
-                HStack(spacing: 10) {
-                    Text((st.autoSplit ? "Auto split every 1 km" : (st.nextSeg != nil || st.open ? "Next" : "Finish")).l10n)
-                    Text("›")
-                }
-                .font(F.t(m.buttonFont, .semibold))
-            }
-            .accessibilityIdentifier("watchLive.next")
-            }
-            HStack(spacing: 10) {
-                pill("End", icon: "stop.fill", color: C.bad, bg: Color(hex: 0xFF453A, alpha: 0.22), enabled: on) { askEnd = true }
-                    .accessibilityIdentifier("watchLive.end")
-                pill("Undo", icon: "arrow.uturn.backward", color: st.canUndo ? .white : C.text3,
-                     bg: Color.white.opacity(st.canUndo ? 0.12 : 0.05), enabled: on && st.canUndo) {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    mirror.send(.undo)
-                }
-                .accessibilityIdentifier("watchLive.undo")
-                pill(st.running ? "Pause" : "Resume", icon: st.running ? "pause.fill" : "play.fill",
-                     color: st.running ? .white : C.accent, bg: Color.white.opacity(0.12), enabled: on) {
-                    mirror.send(st.running ? .pause : .resume)
-                }
-                .accessibilityIdentifier("watchLive.pause")
-            }
-            .padding(.top, m.pillGap)
-            .padding(.bottom, m.bottom)
-        }
-        .opacity(on ? 1 : 0.5)
-    }
-
-    private func pill(_ t: String, icon: String, color: Color, bg: Color, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon).font(.system(size: 13, weight: .semibold))
-                Text(t.l10n).font(F.t(15, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(color)
-            .frame(maxWidth: .infinity).frame(height: 50)
-            .background(bg, in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(Press(scale: 0.97))
-        .disabled(!enabled)
+        return LiveButtons(L: L, tone: f.tone, idPrefix: "watchLive",
+                           nextTitle: st.autoSplit ? nil : (st.nextSeg != nil || st.open ? "Next" : "Finish"),
+                           nextOn: on && st.running,
+                           showUndo: !isRunCard(st), undoOn: st.canUndo,
+                           showSkip: false,
+                           running: st.running, enabled: on,
+                           onNext: {
+                               UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                               mirror.send(.next)
+                           },
+                           onEnd: { askEnd = true },
+                           onUndo: {
+                               UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                               mirror.send(.undo)
+                           },
+                           onPause: { mirror.send(st.running ? .pause : .resume) })
     }
 
     /// 워치가 끝냄: 기록이 도착하면 기록 화면 + 카드

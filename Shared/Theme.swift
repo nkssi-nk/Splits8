@@ -214,7 +214,8 @@ struct Icon8: View {
         self.name = name; self.size = size; self.color = tint.color
     }
     var body: some View {
-        Image(name)
+        // 1.2.7: 휴식(Rest) 은 그림 파일이 없어 시스템 모래시계 기호를 씀
+        (name == "rest" ? Image(systemName: "hourglass") : Image(name))
             .renderingMode(.template)
             .resizable()
             .interpolation(.high)

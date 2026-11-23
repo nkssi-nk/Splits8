@@ -1174,3 +1174,17 @@
 "Enter the distance shown on the treadmill. Splits and pace are recalculated; your time stays the same." = "러닝머신에 나온 거리를 넣으면 구간과 페이스를 다시 계산해요. 시간은 그대로예요.";
 "ON THE CARD" = "카드에 넣을 것";
 "Write something (optional)" = "글 쓰기 (선택)";
+
+/* 1.2.7 폰 운동 중 새 화면 (3장) · 잠금 화면 */
+"%lld rounds done" = "%lld라운드 완료";
+"to %@" = "다음 %@";
+"OVER" = "초과";
+"AHEAD" = "빠름";
+"BEHIND" = "느림";
+"ON PACE" = "목표대로";
+"FINISH" = "예상 완주";
+"AVG BPM" = "평균 심박";
+"REP" = "반복";
+"PACE" = "페이스";
+"Watch" = "워치";
+"Avg %@" = "평균 %@";

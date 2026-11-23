@@ -48,6 +48,22 @@ jobs:
             android/app/build/outputs/apk/debug/*.apk
             android/wear/build/outputs/apk/debug/*.apk
 
+      # 1.2.7: 화면 사진 (갤럭시 워치 · 폰 운동 화면 — 에뮬레이터 없이 로봇 사진)
+      - name: 화면 사진
+        continue-on-error: true
+        run: |
+          ./gradlew :wear:testDebugUnitTest --tests 'com.nkssi.splits8.wear.WShots' || true
+          ./gradlew :app:testDebugUnitTest --tests 'com.nkssi.splits8.Shots.*Live*' --tests 'com.nkssi.splits8.Shots.phoneCount' || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-shots
+          path: |
+            android/wear/build/shots/*.png
+            android/app/build/shots/*.png
+          if-no-files-found: warn
+
       # 구글 플레이용 (비밀값 3개가 있을 때만)
       - name: 플레이용 서명 키 꺼내기
         env:

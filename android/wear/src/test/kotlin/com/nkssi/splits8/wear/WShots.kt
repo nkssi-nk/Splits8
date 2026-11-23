@@ -120,8 +120,19 @@ class WShots {
     @Test fun w08Controls() {
         WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", sim(), 3, 80, 150.0, done = false)
         L10n.lang = "en"
-        rule.setContent { WWorkoutPager({}, startPage = 1) }
+        rule.setContent { WWorkoutPager({}, startControls = true) }
         rule.waitForIdle(); rule.onRoot().captureRoboImage("$out/w08_controls.png")
+    }
+    // 1.2.7: 베젤 ↓ 1칸 (목표 대비) · 타이머 운동 (타바타)
+    @Test fun w08GoalPage() {
+        WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", sim(), 6, 150, 162.0, done = false)
+        L10n.lang = "en"
+        rule.setContent { WWorkoutPager({}, startPage = 1) }
+        rule.waitForIdle(); rule.onRoot().captureRoboImage("$out/w08_goal.png")
+    }
+    @Test fun w16Tabata() {
+        WatchStore.engine.demoRun(Mode.Training, "Tabata", com.nkssi.splits8.shared.Bonus.tabataSeq(20, 10, 8), 4, 6, 164.0, done = false, kind = "tabata")
+        shot("w16_tabata")
     }
     @Test fun w09Segments() {
         WatchStore.engine.demoRun(Mode.Sim, "Full Simulation", sim(), 6, 40, 150.0, done = false)

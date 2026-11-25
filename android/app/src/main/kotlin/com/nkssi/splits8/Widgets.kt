@@ -264,11 +264,12 @@ object WidgetArt {
             "last" -> {
                 val nameP = pen.paint(14f, 600)
                 val col = if (s.lastKind == "run") blue(pal) else pal.accent
-                if (s.lastName == null) { pen.text(c, "No workout yet", x, y0, sub, w); return }
+                val lastName = s.lastName
+                if (lastName == null) { pen.text(c, "No workout yet", x, y0, sub, w); return }
                 val dot = dp(6f, k)
                 val nh = hOf(nameP)
                 c.drawCircle(x + dot / 2, y0 + nh / 2, dot / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = col })
-                pen.text(c, s.lastName, x + dot + dp(5f, k), y0, nameP, w - dot - dp(5f, k), 0.85f)
+                pen.text(c, lastName, x + dot + dp(5f, k), y0, nameP, w - dot - dp(5f, k), 0.85f)
                 pen.text(c, ago(s.lastDate, now), x, y0 + nh, sub, w)
                 val timeP = pen.paint(26f, 700, pal.fg, track = -0.8f, num = true)
                 val vs = s.lastVsGoal

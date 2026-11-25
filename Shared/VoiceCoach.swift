@@ -524,6 +524,7 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
         }
         nextPlayer = nil
         p.delegate = self
+        p.volume = VoiceCoach.volume          // 1.2.8: 크라운으로 정한 음성 음량
         player = p
         if !p.play() {
             player = nil
@@ -555,6 +556,20 @@ final class VoiceCoach: NSObject, AVAudioPlayerDelegate {
 
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         DispatchQueue.main.async { [weak self] in self?.clipDone(player) }
+    }
+
+    // MARK: 1.2.8 음성 음량 (대표님 11-25: 음성이 켜져 있으면 운동 중 크라운 = 음량). 0~1, 처음 1, 바꾼 값은 기억.
+    // 워치 시스템 음량 안에서 줄이고 키움 (시스템 음량보다 크게는 못 함)
+
+    static var volume: Float {
+        get { (UserDefaults.standard.object(forKey: "voiceVolume") as? Float) ?? 1 }
+        set { UserDefaults.standard.set(min(1, max(0, newValue)), forKey: "voiceVolume") }
+    }
+
+    /// 말하는 중이면 바로 적용
+    func applyVolume() {
+        player?.volume = VoiceCoach.volume
+        nextPlayer?.player.volume = VoiceCoach.volume
     }
 
     static func url(_ id: String) -> URL? {

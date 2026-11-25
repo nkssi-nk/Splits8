@@ -31,12 +31,56 @@ struct WidgetLookIntent: WidgetConfigurationIntent {
     var look: WidgetLook
 }
 
+/// 1.2.8 (대표님 11-24 "ABCD 다 넣자. 골라서"): D-day 가로형 오른쪽 칸 고르기
+enum WidgetSide: String, AppEnum {
+    case today, weeks, week, last, best
+    static var typeDisplayRepresentation: TypeDisplayRepresentation { "Right side" }
+    static var caseDisplayRepresentations: [WidgetSide: DisplayRepresentation] {
+        [.today: "Today", .weeks: "Last 4 weeks", .week: "This week", .last: "Last workout", .best: "Best vs goal"]
+    }
+}
+
+/// D-day 위젯 편집: 바탕 + 오른쪽 칸 (가로형)
+struct DdayLookIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource { "Next race" }
+    static var description: IntentDescription { "Choose the background and the right side." }
+    @Parameter(title: "Background", default: .auto)
+    var look: WidgetLook
+    @Parameter(title: "Right side", default: .today)
+    var side: WidgetSide
+}
+
 // MARK: 시간표 (자정마다 새로 그림 — D-day 와 이번 주가 바뀌므로)
 
 struct SnapEntry: TimelineEntry {
     let date: Date
     let snap: WidgetSnap
     var look: WidgetLook = .auto
+    var side: WidgetSide = .today
+}
+
+/// 1.2.8: D-day 위젯 시간표 (오른쪽 칸 · 오늘 링 때문에 자정마다)
+struct DdayProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> SnapEntry { SnapEntry(date: Date(), snap: .demo()) }
+
+    func snapshot(for configuration: DdayLookIntent, in context: Context) async -> SnapEntry {
+        let s: WidgetSnap = context.isPreview ? .demo() : (WidgetSnap.load() ?? .demo())
+        return SnapEntry(date: Date(), snap: s.fresh(Date()).todayFresh(Date()), look: configuration.look, side: configuration.side)
+    }
+
+    func timeline(for configuration: DdayLookIntent, in context: Context) async -> Timeline<SnapEntry> {
+        let now = Date()
+        let s: WidgetSnap = WidgetSnap.load() ?? WidgetSnap()
+        let cal = Calendar.current
+        var entries: [SnapEntry] = [SnapEntry(date: now, snap: s.fresh(now).todayFresh(now), look: configuration.look, side: configuration.side)]
+        var day: Date = cal.startOfDay(for: now)
+        for _ in 0..<7 {
+            guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+            entries.append(SnapEntry(date: next, snap: s.fresh(next).todayFresh(next), look: configuration.look, side: configuration.side))
+        }
+        return Timeline(entries: entries, policy: .atEnd)
+    }
 }
 
 struct SnapProvider: AppIntentTimelineProvider {
@@ -85,7 +129,7 @@ private struct LookWrap<V: View>: View {
 
 struct DdayWidget: Widget {
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: "splits8.dday", intent: WidgetLookIntent.self, provider: SnapProvider()) { e in
+        AppIntentConfiguration(kind: "splits8.dday", intent: DdayLookIntent.self, provider: DdayProvider()) { e in
             DdayEntryView(e: e)
         }
         .configurationDisplayName("Next race")
@@ -102,7 +146,7 @@ struct DdayEntryView: View {
         let stage: Int = ddayStage(e.snap.daysLeft(e.date))
         LookWrap(e: e, stage: stage, full: family == .systemSmall || family == .systemMedium) {
             switch family {
-            case .systemMedium: DdayMediumView(snap: e.snap, now: e.date)
+            case .systemMedium: DdayMediumView(snap: e.snap, now: e.date, side: e.side.rawValue)
             case .accessoryInline: DdayInlineView(snap: e.snap, now: e.date)
             case .accessoryRectangular: DdayRectView(snap: e.snap, now: e.date)
             case .accessoryCircular: DdayCircleView(snap: e.snap, now: e.date)

@@ -333,7 +333,7 @@ struct FindEventView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("D-\(days)").font(F.t(13, .semibold)).foregroundStyle(days <= 60 ? C.accent : C.text2)
+                    DdayText.text("D-\(days)", size: 13, weight: .semibold).foregroundStyle(days <= 60 ? C.accent : C.text2)
                     Text(range(st, en)).font(F.t(F.foot)).foregroundStyle(C.text3)
                 }
                 .fixedSize()

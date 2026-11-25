@@ -13,7 +13,7 @@ options:
 settings:
   base:
     APP_BUNDLE_ID: com.nkssi.splits8
-    MARKETING_VERSION: "1.2.7"
+    MARKETING_VERSION: "1.2.8"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic
@@ -146,6 +146,8 @@ targets:
       - path: Widgets
       - path: WidgetUI
       - path: Shared
+      # 1.2.8: 위젯 깃발 = 앱 Race 아이콘 (modeRace)
+      - path: Resources/Widgets/WidgetAssets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).widgets
@@ -174,6 +176,8 @@ targets:
     sources:
       - path: WatchWidgets
       - path: Shared
+      # 1.2.8: 잠금 위젯 깃발 = 앱 Race 아이콘 (modeRace)
+      - path: Resources/WatchWidgets/WidgetAssets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).watchkitapp.widgets

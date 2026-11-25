@@ -11,6 +11,12 @@ struct WWorkoutPager: View {
     @State private var controls = WatchDemo.controls
     @State private var endSheet = WatchDemo.shot == "end"
     @StateObject private var zoneHold = W8ZoneHold()
+    // 1.2.8 (대표님 11-25): 음성이 켜져 있으면 크라운 = 음성 음량, 화면 넘기기는 터치(밀기)로만. 음성이 꺼져 있으면 지금처럼 크라운으로 넘김
+    @State private var crownVol: Double = Double(VoiceCoach.volume)
+    @State private var volShown: Bool = false
+    @State private var volHide: DispatchWorkItem?
+    @FocusState private var crownFocus: Bool
+    private var voiceOn: Bool { engine.settings.voiceOn }
 
     var body: some View {
         ZStack {
@@ -50,6 +56,15 @@ struct WWorkoutPager: View {
                     .zIndex(2)
             }
 
+            // 1.2.8 크라운 음량 막대 (바꿀 때 1.2초)
+            if voiceOn && !aod {
+                W8VolumeHud(volume: crownVol)
+                    .opacity(volShown ? 1 : 0)
+                    .animation(.easeInOut(duration: volShown ? 0.12 : 0.3), value: volShown)
+                    .allowsHitTesting(false)
+                    .zIndex(4)
+            }
+
             // 구간 전환: 흰 번쩍임 (약하게, 터치 막지 않음)
             if !aod {
                 WSegmentFlash.color
@@ -60,6 +75,21 @@ struct WWorkoutPager: View {
             }
         }
         .ignoresSafeArea()
+        .focusable(voiceOn)
+        .focused($crownFocus)
+        .digitalCrownRotation($crownVol, from: 0, through: 1, by: 0.05, sensitivity: .low,
+                              isContinuous: false, isHapticFeedbackEnabled: true)
+        .onAppear { if voiceOn { crownFocus = true } }
+        .onChange(of: crownVol) { _, v in
+            guard voiceOn else { return }
+            VoiceCoach.volume = Float(v)
+            VoiceCoach.shared.applyVolume()
+            volShown = true
+            volHide?.cancel()
+            let w = DispatchWorkItem { volShown = false }
+            volHide = w
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: w)
+        }
         .onChange(of: engine.advanceCount) { _, _ in
             if !engine.isRunKind { flashNow() }      // 러닝 카드는 1 km 마다 번쩍이지 않음
         }
@@ -1039,5 +1069,32 @@ struct WSummary: View {
             Text(v).font(F.num(15)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+
+/// 1.2.8 크라운으로 음성 음량을 바꿀 때 잠깐 보이는 막대 (스피커 + 막대)
+struct W8VolumeHud: View {
+    let volume: Double
+
+    var body: some View {
+        GeometryReader { g in
+            let k: CGFloat = min(g.size.width / 208, g.size.height / 248)
+            HStack(spacing: 7 * k) {
+                Image(systemName: volume <= 0.001 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 12 * k, weight: .semibold))
+                    .foregroundStyle(.white)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.25))
+                    Capsule().fill(Color(hex: 0xFFE600)).frame(width: 80 * k * CGFloat(min(1, max(0, volume))))
+                }
+                .frame(width: 80 * k, height: 5 * k)
+            }
+            .padding(.horizontal, 12 * k)
+            .frame(height: 30 * k)
+            .background(Capsule().fill(Color.black.opacity(0.72)))
+            .position(x: g.size.width / 2, y: g.size.height * 0.72)
+        }
+        .ignoresSafeArea()
     }
 }

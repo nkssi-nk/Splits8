@@ -73,17 +73,19 @@ struct WatchDdayView: View {
                 }
             default:
                 if let d, let n = e.snap.raceName {
+                    // 1.2.8: 깃발 = 앱 Race 아이콘, "HYROX 대회" 이름표 뺌, D-170 은 늘 한 줄 (하이픈은 가운데로)
                     HStack(spacing: 6) {
-                        Image(systemName: "flag.checkered").foregroundStyle(Color(hex: 0xFFE600))
+                        Image("modeRace").resizable().renderingMode(.template).scaledToFit()
+                            .frame(width: 14, height: 14).foregroundStyle(Color(hex: 0xFFE600))
                         VStack(alignment: .leading, spacing: 0) {
-                            Text("HYROX RACE".l10n).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
-                            Text(n).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                            Text(n).font(.system(size: 15, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
                             Text(e.snap.raceDate.map { Fm.wdm.string(from: $0) } ?? "").font(.system(size: 12))
-                                .foregroundStyle(.secondary).lineLimit(1)
+                                .foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                         }
                         Spacer(minLength: 2)
-                        Text(d == 0 ? "D-DAY" : "D-\(d)").font(.system(size: 20, weight: .bold).monospacedDigit())
-                            .foregroundStyle(Color(hex: 0xFFE600)).minimumScaleFactor(0.6)
+                        DdayText.text(d == 0 ? "D-DAY" : "D-\(d)", size: 20, weight: .bold)
+                            .foregroundStyle(Color(hex: 0xFFE600))
+                            .lineLimit(1).fixedSize().layoutPriority(1)
                     }
                 } else {
                     VStack(alignment: .leading) {

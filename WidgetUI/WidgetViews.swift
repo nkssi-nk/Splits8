@@ -108,26 +108,63 @@ private func raceDay(_ s: WidgetSnap, _ d: Int) -> String {
     d == 0 ? "Today".l10n : (s.raceDate.map { Fm.wdm.string(from: $0) } ?? "")
 }
 
-// MARK: D-day 작게
+// MARK: D-day 작게 · 가로 (1.2.8 새 디자인 — 대표님 11-24 · 25)
+// 대회 정보는 작게 만큼만: 깃발 HYROX RACE · 대회 이름 · 날짜 · Division · D-170. 위젯 글자는 모두 영어.
+// 내용 묶음을 위아래 가운데 (위 여백 = 아래 여백). 가로형은 세로 선 오른쪽에 고른 칸 (폭 134).
+
+/// "HYROX RACE" 앞 깃발 = 앱 Race 아이콘 (modeRace, 노랑)
+struct WidgetRaceFlag: View {
+    @Environment(\.wpal) private var pal
+    let text: String
+    var body: some View {
+        HStack(spacing: 5) {
+            Image("modeRace").resizable().renderingMode(.template).scaledToFit()
+                .frame(width: 12, height: 12).foregroundStyle(pal.accent).widgetAccentable()
+            Text(text).font(.system(size: 10, weight: .bold)).tracking(0.7).foregroundStyle(pal.sub).lineLimit(1)
+        }
+    }
+}
+
+/// "Thu, May 13" (위젯은 영어)
+private let enDay: DateFormatter = {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US")
+    f.dateFormat = "EEE, MMM d"
+    return f
+}()
+
+/// 대회 정보 묶음 (작게 · 가로 왼쪽 같음)
+struct DdayInfoBlock: View {
+    @Environment(\.wpal) private var pal
+    let snap: WidgetSnap
+    let d: Int
+    let name: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            WidgetRaceFlag(text: d == 0 ? "RACE DAY" : "HYROX RACE")
+            Text(name).font(.system(size: 15, weight: .semibold)).foregroundStyle(pal.fg)
+                .lineLimit(1).minimumScaleFactor(0.8).padding(.top, 4)
+            Text(d == 0 ? "Today" : (snap.raceDate.map { enDay.string(from: $0) } ?? ""))
+                .font(.system(size: 11.5)).foregroundStyle(pal.sub).lineLimit(1)
+            if !snap.division.isEmpty {
+                Text(snap.division).font(.system(size: 11.5)).foregroundStyle(pal.sub).lineLimit(1).minimumScaleFactor(0.85)
+            }
+            DdayText.text(ddayText(d), size: 48, weight: .bold)
+                .tracking(-1.6).foregroundStyle(pal.accent).widgetAccentable()
+                .lineLimit(1).minimumScaleFactor(0.6)
+                .padding(.top, 8)
+        }
+    }
+}
 
 struct DdaySmallView: View {
-    @Environment(\.wpal) private var pal
     let snap: WidgetSnap
     let now: Date
     var body: some View {
         if let d = snap.daysLeft(now), let name = snap.raceName {
-            VStack(alignment: .leading, spacing: 0) {
-                WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "HYROX RACE")
-                Text(name).font(F.t(19, .semibold)).foregroundStyle(pal.fg).lineLimit(1).minimumScaleFactor(0.7)
-                    .padding(.top, 6)
-                Text(raceDay(snap, d)).font(F.t(13)).foregroundStyle(pal.sub).lineLimit(1)
-                Spacer(minLength: 0)
-                Text(ddayText(d)).font(F.num(d == 0 ? 34 : 44, .bold)).tracking(-0.03 * 44).foregroundStyle(pal.accent)
-                    .widgetAccentable()
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                    .padding(.bottom, 9)           // 가안 고친 것: 9pt 올림
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            DdayInfoBlock(snap: snap, d: d, name: name)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
             NoRaceView()
         }
@@ -148,55 +185,215 @@ struct NoRaceView: View {
     }
 }
 
-// MARK: D-day 가로형 (목표 · 최고 기록 막대)
+// MARK: D-day 가로형 — 왼쪽 대회 정보 + 세로 선 + 오른쪽 고른 칸 (today / weeks / week / last / best)
 
 struct DdayMediumView: View {
     @Environment(\.wpal) private var pal
     let snap: WidgetSnap
     let now: Date
+    var side: String = "today"
+
     var body: some View {
         if let d = snap.daysLeft(now), let name = snap.raceName {
-            VStack(alignment: .leading, spacing: 0) {
-                WidgetFlagLabel(text: d == 0 ? "RACE DAY" : "HYROX RACE")
-                Text(name).font(F.t(19, .semibold)).foregroundStyle(pal.fg).lineLimit(1).padding(.top, 6)
-                Text(raceDay(snap, d) + (snap.division.isEmpty ? "" : " · " + snap.division))
-                    .font(F.t(13)).foregroundStyle(pal.sub).lineLimit(1)
-                Spacer(minLength: 0)
-                // D-day 와 GOAL · BEST 막대 묶음을 한 줄에, 세로 가운데 맞춤 (D-day 가운데 = GOAL 과 BEST 사이)
-                HStack(alignment: .center, spacing: 16) {
-                    Text(ddayText(d)).font(F.num(d == 0 ? 34 : 42, .bold)).tracking(-0.03 * 42).foregroundStyle(pal.accent)
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    bars.frame(width: 140)
-                }
-                .padding(.bottom, 9)
+            HStack(alignment: .center, spacing: 12) {
+                DdayInfoBlock(snap: snap, d: d, name: name)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
+                Rectangle().fill(pal.light ? Color.black.opacity(0.12) : Color(hex: 0x262626)).frame(width: 1)
+                    .padding(.vertical, -2)
+                // 오른쪽 칸: 이름표는 "HYROX RACE" 와 같은 줄, 아래끝은 D-170 아래끝과 같게 (왼쪽 묶음 높이에 맞춤)
+                DdayInfoBlock(snap: snap, d: d, name: name).hidden()
+                    .frame(width: 134, alignment: .leading)
+                    .overlay(alignment: .topLeading) { WidgetSidePanel(snap: snap, now: now, side: side) }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             NoRaceView()
         }
     }
+}
 
-    /// 1.2.2 (대표님 11-09 "바가 뭐하러 있어"): 막대 대신 목표 · 최고 시간 두 줄 + 목표까지 남은 차이
-    ///  (예전엔 GOAL · BEST 둘 다 거의 꽉 찬 막대라 아무 뜻이 없었음)
-    private var bars: some View {
-        let g: Int = snap.goal ?? 0, b: Int = snap.best ?? 0
-        return VStack(alignment: .leading, spacing: 5) {
-            row("GOAL", g, pal.accent)
-            row("BEST", b, pal.fg)
-            if g > 0 && b > 0 {
-                Text(b <= g ? "Goal reached".l10n : String(format: "%@ to goal".l10n, Fm.t(b - g)))
-                    .font(F.t(11, .semibold)).foregroundStyle(b <= g ? pal.accent : pal.sub)
-                    .lineLimit(1).minimumScaleFactor(0.8)
-            }
+/// 가로형 오른쪽 칸
+struct WidgetSidePanel: View {
+    @Environment(\.wpal) private var pal
+    let snap: WidgetSnap
+    let now: Date
+    let side: String
+
+    private var r: WidgetSnap.Right { snap.right ?? WidgetSnap.Right() }
+    private var blue: Color { Color(hex: 0x1E78FA) }
+    private var kcalCol: Color { pal.light ? Color(hex: 0xAEAEB2) : Color(hex: 0xE5E5EA) }
+    private func kindCol(_ k: String) -> Color { k == "run" ? blue : pal.accent }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title).font(.system(size: 10, weight: .bold)).tracking(0.7).foregroundStyle(pal.sub).lineLimit(1)
+                .frame(height: 14, alignment: .center)
+            Spacer(minLength: 6)
+            content
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var title: String {
+        switch side {
+        case "weeks": return "LAST 4 WEEKS"
+        case "week": return "THIS WEEK"
+        case "last": return "LAST WORKOUT"
+        case "best": return "BEST vs GOAL"
+        default: return "TODAY"
         }
     }
 
-    private func row(_ label: String, _ v: Int, _ c: Color) -> some View {
+    private func mix(_ parts: [(String, Bool)]) -> Text {
+        parts.reduce(Text("")) { t, p in
+            t + Text(p.0).font(.system(size: 11.5, weight: p.1 ? .semibold : .regular).monospacedDigit())
+                .foregroundStyle(p.1 ? pal.fg : pal.sub)
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch side {
+        case "weeks": weeks
+        case "week": week
+        case "last": last
+        case "best": best
+        default: today
+        }
+    }
+
+    // TODAY 링 3개: 바깥 노랑 = 하이록스 연습 시간 · 가운데 파랑 = 러닝 km · 안쪽 연회색 = 칼로리. 꽉 참 = 지난 28일 운동한 날 평균
+    private var today: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                ring(Double(r.todayHyroxSec) / Double(max(1, r.avgHyroxSec)), pal.accent, inset: 0)
+                ring(r.todayRunKm / max(0.1, r.avgRunKm), blue, inset: 9.5)
+                ring(Double(r.todayKcal) / Double(max(1, r.avgKcal)), kcalCol, inset: 19)
+            }
+            .frame(width: 80, height: 80)
+            VStack(alignment: .leading, spacing: 6) {
+                mix([("\(r.todayHyroxSec / 60)", true), (" min", false)])
+                mix([(String(format: "%.1f", r.todayRunKm), true), (" km", false)])
+                mix([(grouped0(r.todayKcal), true), (" kcal", false)])
+            }
+            .lineLimit(1).minimumScaleFactor(0.8)
+        }
+    }
+
+    private func ring(_ f: Double, _ c: Color, inset: CGFloat) -> some View {
+        ZStack {
+            Circle().stroke(c.opacity(0.2), lineWidth: 7)
+            Circle().trim(from: 0, to: min(1, max(0, f)))
+                .stroke(c, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            if f > 1 {
+                Circle().trim(from: 0, to: min(1, f - 1))
+                    .stroke(c, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .shadow(color: .black.opacity(0.4), radius: 2)
+            }
+        }
+        .padding(inset + 3.5)
+        .widgetAccentable()
+    }
+
+    // 지난 4주 점 달력 (월요일 시작): 노랑 = 하이록스 연습 · 파랑 = 러닝만 · 빈칸 = 쉰 날 · 오늘 = 흰 테두리
+    private var weeks: some View {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: now)
+        let mon: Date = WidgetSnap.monday.dateInterval(of: .weekOfYear, for: now)?.start ?? today
+        let start: Date = cal.date(byAdding: .day, value: -21, to: cal.startOfDay(for: mon)) ?? today
+        return VStack(alignment: .leading, spacing: 8) {
+            Grid(horizontalSpacing: 5, verticalSpacing: 5) {
+                ForEach(0..<4, id: \.self) { row in
+                    GridRow {
+                        ForEach(0..<7, id: \.self) { col in
+                            let i: Int = row * 7 + col
+                            let day: Date = cal.date(byAdding: .day, value: i, to: start) ?? start
+                            let k: String = r.last28.indices.contains(i) ? r.last28[i] : ""
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(day > today ? Color.clear : (k == "" ? pal.track : kindCol(k)))
+                                .overlay {
+                                    if cal.isDate(day, inSameDayAs: today) {
+                                        RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(pal.fg, lineWidth: 1.5)
+                                    }
+                                }
+                                .frame(width: 13, height: 13)
+                        }
+                    }
+                }
+            }
+            mix([("\(r.count28)", true), (" workouts · ", false), ("\(r.streak)", true), (" streak", false)])
+                .lineLimit(1).minimumScaleFactor(0.8)
+        }
+    }
+
+    // 이번 주 요일 막대 (지금 이번 주 위젯 막대와 같음)
+    private var week: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            mix([("\(snap.weekCount)", true), (" workouts · ", false), (hours(snap.weekSec), true), (" h", false)])
+                .lineLimit(1).minimumScaleFactor(0.8)
+            WeekBars(snap: snap, height: 44)
+        }
+    }
+
+    // 최근 운동
+    @ViewBuilder private var last: some View {
+        if let n = r.lastName {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 5) {
+                    Circle().fill(kindCol(r.lastKind)).frame(width: 6, height: 6)
+                    Text(n).font(.system(size: 14, weight: .semibold)).foregroundStyle(pal.fg).lineLimit(1).minimumScaleFactor(0.85)
+                }
+                Text(ago(r.lastDate)).font(.system(size: 11.5)).foregroundStyle(pal.sub).lineLimit(1)
+                Spacer(minLength: 4)
+                Text(Fm.t(r.lastSec)).font(.system(size: 26, weight: .bold).monospacedDigit()).tracking(-0.8)
+                    .foregroundStyle(pal.fg).lineLimit(1).minimumScaleFactor(0.7)
+                if let v = r.lastVsGoal {
+                    (Text((v <= 0 ? "−" : "+") + Fm.t(abs(v))).font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(v <= 0 ? pal.accent : pal.sub)
+                     + Text(" vs goal").font(.system(size: 11.5)).foregroundStyle(pal.sub))
+                        .lineLimit(1).padding(.top, 3)
+                }
+            }
+        } else {
+            Text("No workout yet").font(.system(size: 11.5)).foregroundStyle(pal.sub)
+        }
+    }
+
+    private func ago(_ d: Date?) -> String {
+        guard let d else { return "" }
+        let cal = Calendar.current
+        let n: Int = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: cal.startOfDay(for: now)).day ?? 0
+        return n <= 0 ? "Today" : n == 1 ? "Yesterday" : "\(n) days ago"
+    }
+
+    // 최고 기록 vs 목표 + 가장 늦은 구간
+    @ViewBuilder private var best: some View {
+        if let g = snap.goal, let b = snap.best, g > 0, b > 0 {
+            VStack(alignment: .leading, spacing: 4) {
+                row("Best", Fm.t(b), pal.fg)
+                row("Goal", Fm.t(g), pal.accent)
+                Spacer(minLength: 2)
+                if let wn = r.weakName, r.weakDiff > 0 {
+                    Text("Weakest").font(.system(size: 11.5)).foregroundStyle(pal.sub)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(wn).font(.system(size: 13, weight: .semibold)).foregroundStyle(kindCol(r.weakKind)).lineLimit(1).minimumScaleFactor(0.8)
+                        Spacer(minLength: 4)
+                        Text("+" + Fm.t(r.weakDiff)).font(.system(size: 13, weight: .semibold).monospacedDigit()).foregroundStyle(pal.sub)
+                    }
+                }
+            }
+        } else {
+            Text("Set a goal in Race").font(.system(size: 11.5)).foregroundStyle(pal.sub)
+        }
+    }
+
+    private func row(_ l: String, _ v: String, _ c: Color) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(label.l10n).font(F.t(10, .semibold)).tracking(0.8).foregroundStyle(pal.sub)
+            Text(l).font(.system(size: 11.5)).foregroundStyle(pal.sub)
             Spacer(minLength: 4)
-            Text(v > 0 ? Fm.t(v) : "--:--").font(F.num(15)).foregroundStyle(v > 0 ? c : pal.sub).lineLimit(1)
+            Text(v).font(.system(size: 15, weight: .semibold).monospacedDigit()).foregroundStyle(c)
         }
     }
 }
@@ -217,7 +414,9 @@ struct WeekBars: View {
             ForEach(0..<7, id: \.self) { i in
                 VStack(spacing: 3) {
                     let m: Int = snap.dayMin[i]
-                    let c: Color = Mode(rawValue: snap.dayMode[i]).map { Color(hex: $0.calendarHex) } ?? pal.track
+                    // 1.2.8: 하이록스 연습 = 노랑 · 러닝만 = 파랑 (예전 값(Mode)은 노랑)
+                    let k: String = snap.dayMode[i]
+                    let c: Color = k.isEmpty ? pal.track : (k == "run" ? Color(hex: 0x1E78FA) : pal.accent)
                     RoundedRectangle(cornerRadius: 2, style: .continuous).fill(c)
                         .frame(height: m > 0 ? max(8, height * CGFloat(m) / CGFloat(mx)) : 3)
                     if labels {
@@ -323,15 +522,20 @@ struct DdayRectView: View {
     let snap: WidgetSnap
     let now: Date
     var body: some View {
+        // 1.2.8 (대표님 11-24): "D-170" 은 늘 한 줄 (자리를 먼저 차지), 위 "HYROX 대회" 이름표는 뺌
         if let d = snap.daysLeft(now), let n = snap.raceName {
             HStack(alignment: .center, spacing: 6) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("HYROX RACE".l10n).font(.system(size: 10, weight: .semibold)).opacity(0.7)
-                    Text(n).font(.system(size: 15, weight: .semibold)).lineLimit(1)
-                    Text(raceDay(snap, d)).font(.system(size: 12)).opacity(0.7).lineLimit(1)
+                    Text(n).font(.system(size: 15, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(raceDay(snap, d)).font(.system(size: 12)).opacity(0.7).lineLimit(1).minimumScaleFactor(0.8)
+                    if !snap.division.isEmpty {
+                        Text(snap.division).font(.system(size: 12)).opacity(0.7).lineLimit(1).minimumScaleFactor(0.8)
+                    }
                 }
                 Spacer(minLength: 0)
-                Text(ddayText(d)).font(.system(size: 22, weight: .bold).monospacedDigit()).minimumScaleFactor(0.6)
+                DdayText.text(ddayText(d), size: 22, weight: .bold)
+                    .lineLimit(1).fixedSize()
+                    .layoutPriority(1)
             }
         } else {
             VStack(alignment: .leading) {

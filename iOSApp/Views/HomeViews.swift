@@ -117,7 +117,7 @@ struct HomeView: View {
                             .font(F.t(13)).lineLimit(1).padding(.top, 6)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Text(dday(ev.date)).font(F.num(34)).tracking(-1.02).foregroundStyle(C.accent).lineLimit(1)
+                    DdayText.text(dday(ev.date), size: 34, weight: .semibold).tracking(-1.02).foregroundStyle(C.accent).lineLimit(1)   // 1.2.8: 하이픈 가운데로
                         .fixedSize()
                         .accessibilityIdentifier("home.dday")
                 }

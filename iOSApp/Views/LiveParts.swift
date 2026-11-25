@@ -120,19 +120,12 @@ struct LiveBackground: View {
     var body: some View {
         ZStack {
             LinearGradient(colors: tone.stops, startPoint: .top, endPoint: .bottom)
-            ForEach(W8Tone.zoneTint ? [4, 5] : [], id: \.self) { z in
-                if let zs = tone.zoneStops(z) {
-                    LinearGradient(stops: [.init(color: zs.colors[0], location: 0),
-                                           .init(color: zs.colors[1], location: zs.mid),
-                                           .init(color: zs.colors[2], location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .opacity(zone == z ? 1 : 0)
-                }
-            }
-            .animation(.easeInOut(duration: 1.0), value: zone)
-            W8Blobs(seed: seed &+ 101, color: tone.blob, alpha: tone == .station ? 0.38 : 0.22, blurPt: 46)
+            // 1.2.8: 노랑 덩어리 아주 약간 진하게 (워치 45 → 55% 와 같은 비율 0.38 → 0.46)
+            W8Blobs(seed: seed &+ 101, color: tone.blob, alpha: tone == .station ? 0.46 : 0.22, blurPt: 46)
                 .id(seed)
                 .transition(.opacity.animation(.easeInOut(duration: 0.6)))
+            // 1.2.8 심박 Z4 · Z5: 배경 아래쪽 (워치와 같음)
+            W8ZoneTint(tone: tone, zone: zone)
             // 위쪽 밝은 빛
             RadialGradient(colors: [Color.white.opacity(tone == .station ? 0.30 : 0.16), Color.white.opacity(0)],
                            center: UnitPoint(x: 0.5, y: -0.05), startRadius: 0, endRadius: 360)

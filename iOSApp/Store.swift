@@ -956,8 +956,8 @@ final class Store: NSObject, WCSessionDelegate {
     /// 53번: 위젯이 읽는 요약을 공용 폴더에 쓰고, 바뀌었으면 위젯 새로 고침
     func publishWidgets() {
         guard !loading, !Demo.enabled else { return }
-        let best: Int? = [simBest?.total, raceBest?.total].compactMap { $0 }.min()
-        let snap = WidgetSnap.make(records: records.filter(\.counts), settings: settings, best: best)
+        let bestRec: Record? = [simBest, raceBest].compactMap { $0 }.min(by: { $0.total < $1.total })
+        let snap = WidgetSnap.make(records: records.filter(\.counts), settings: settings, best: bestRec?.total, bestRec: bestRec)
         if snap.save() { WidgetCenter.shared.reloadAllTimelines() }
     }
 

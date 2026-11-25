@@ -9,6 +9,16 @@ struct WidgetPreviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Widgets").font(F.t(28, .bold)).padding(.top, 8)
+            // 1.2.8: D-day 가로형 오른쪽 칸 5가지 + 가장 긴 글자
+            label("D-day · medium · right side (1.2.8)")
+            ForEach(["today", "weeks", "last", "best", "week"], id: \.self) { sd in
+                medium(stage: 0) { DdayMediumView(snap: .demo(days: 170, now: now), now: now, side: sd) }
+            }
+            HStack(spacing: 12) {
+                small(stage: 0) { DdaySmallView(snap: .demo(days: 170, now: now), now: now) }
+                small(stage: 0) { DdaySmallView(snap: longSnap, now: now) }
+            }
+            medium(stage: 0) { DdayMediumView(snap: longSnap, now: now) }
             label("D-day · small (30 / 10 / race day)")
             HStack(spacing: 12) {
                 small(stage: 1) { DdaySmallView(snap: .demo(days: 24, now: now), now: now) }
@@ -62,6 +72,14 @@ struct WidgetPreviewView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 50)
+    }
+
+    /// 가장 긴 대회 이름 · Division
+    private var longSnap: WidgetSnap {
+        var s = WidgetSnap.demo(days: 200, now: now)
+        s.raceName = "World Championships"
+        s.division = "Doubles Women Pro"
+        return s
     }
 
     private var demoCard: LiveCardState {

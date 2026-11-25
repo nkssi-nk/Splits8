@@ -9,9 +9,9 @@ import SwiftUI
 enum W8Tone: Equatable {
     case station, run, gray
 
-    /// 11-21 대표님: 빌드 화면(심박 162 = Z4)에서 바탕이 주황으로 변한 것을 보고 "이렇게 해 줘"(시안 '지금 · 덩어리')
-    /// → 심박 존에 따라 바탕색을 바꾸지 않음. 구간 색(노랑 · 파랑 · 회색)만. 다시 켜려면 true
-    static let zoneTint: Bool = false
+    /// 1.2.8 (대표님 11-25 "다시 넣어. 배경 아래쪽으로"): 심박 Z4 · Z5 면 배경 아래쪽을 주황 · 빨강으로.
+    /// Roxzone · 휴식(회색)은 안 바뀜. 스테이션(노랑) 위는 더 빨갛게. (11-21 에 껐던 것을 다시 켬)
+    static let zoneTint: Bool = true
 
     static func of(_ s: Seg) -> W8Tone {
         if s.kind == .rox { return .gray }
@@ -46,17 +46,40 @@ enum W8Tone: Equatable {
     var edge: Color { self == .station ? Color(hex: 0xE1A000) : .black }
     /// 뒤에 비치는 덩어리 색 · 진하기
     var blob: Color { self == .station ? Color(hex: 0xC87800) : .black }
-    var blobAlpha: Double { self == .station ? 0.45 : 0.26 }
+    var blobAlpha: Double { self == .station ? 0.55 : 0.26 }     // 1.2.8: 노랑 45 → 55% (대표님 11-25 "아주 약간만 황토색")
 
-    /// 심박 Z4 · Z5 바탕 (Roxzone · 휴식은 안 바뀜). 위 · 가운데 · 아래와 가운데 자리
-    func zoneStops(_ z: Int) -> (colors: [Color], mid: CGFloat)? {
+    /// 1.2.8 심박 Z4 · Z5 색 (배경 아래쪽): 색 · 맨 아래 진하기. Roxzone · 휴식(회색)은 nil
+    /// 스테이션(노랑) 위: Z4 #FF5000 · Z5 #FF141E, 85% / 러닝(파랑) 위: Z4 #FF7A00 · Z5 #FF2D2D, 75%
+    func zoneTintColor(_ z: Int) -> (color: Color, max: Double)? {
         switch (self, z) {
-        case (.station, 4): return ([Color(hex: 0xFFE200), Color(hex: 0xFFBE0A), Color(hex: 0xFF8C14)], 0.55)
-        case (.station, 5): return ([Color(hex: 0xFFDE00), Color(hex: 0xFF9614), Color(hex: 0xF03223)], 0.45)
-        case (.run, 4): return ([Color(hex: 0x1E78FA), Color(hex: 0x2869EB), Color(hex: 0xFF8C1E)], 0.62)
-        case (.run, 5): return ([Color(hex: 0x1E78FA), Color(hex: 0x786EBE), Color(hex: 0xFF7814)], 0.40)
+        case (.station, 4): return (Color(hex: 0xFF5000), 0.85)
+        case (.station, 5): return (Color(hex: 0xFF141E), 0.85)
+        case (.run, 4): return (Color(hex: 0xFF7A00), 0.75)
+        case (.run, 5): return (Color(hex: 0xFF2D2D), 0.75)
         default: return nil
         }
+    }
+}
+
+/// 1.2.8 심박 존 색: 화면 위 45% 아래부터 맨 아래로 갈수록 진해짐. 글자 · 버튼은 안 바뀌고 배경만. 1초 부드럽게
+struct W8ZoneTint: View {
+    let tone: W8Tone
+    let zone: Int
+
+    var body: some View {
+        ZStack {
+            ForEach(W8Tone.zoneTint ? [4, 5] : [], id: \.self) { z in
+                if let t = tone.zoneTintColor(z) {
+                    LinearGradient(stops: [.init(color: t.color.opacity(0), location: 0),
+                                           .init(color: t.color.opacity(0), location: 0.45),
+                                           .init(color: t.color.opacity(t.max), location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                        .opacity(zone == z ? 1 : 0)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 1.0), value: zone)
+        .allowsHitTesting(false)
     }
 }
 
@@ -85,17 +108,6 @@ struct W8Background: View {
         } else {
             ZStack {
                 LinearGradient(colors: tone.stops, startPoint: .top, endPoint: .bottom)
-                // 심박 Z4 · Z5: 겹쳐 놓고 투명도만 천천히 바꿈 (1초)
-                ForEach(W8Tone.zoneTint ? [4, 5] : [], id: \.self) { z in
-                    if let zs = tone.zoneStops(z) {
-                        LinearGradient(stops: [.init(color: zs.colors[0], location: 0),
-                                               .init(color: zs.colors[1], location: zs.mid),
-                                               .init(color: zs.colors[2], location: 1)],
-                                       startPoint: .top, endPoint: .bottom)
-                            .opacity(zone == z ? 1 : 0)
-                    }
-                }
-                .animation(.easeInOut(duration: 1.0), value: zone)
                 // 가장자리
                 GeometryReader { g in
                     RoundedRectangle(cornerRadius: g.size.width * 0.2, style: .continuous)
@@ -106,6 +118,8 @@ struct W8Background: View {
                 W8Blobs(seed: seed, color: tone.blob, alpha: tone.blobAlpha)
                     .id(seed)
                     .transition(.opacity.animation(.easeInOut(duration: 0.6)))
+                // 1.2.8 심박 Z4 · Z5: 배경 아래쪽 (덩어리 위, 글자 아래)
+                W8ZoneTint(tone: tone, zone: zone)
                 if darker > 0 { Color.black.opacity(darker) }
             }
             .compositingGroup()

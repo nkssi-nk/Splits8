@@ -10,6 +10,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
@@ -118,27 +120,62 @@ object WidgetArt {
         return bmp to c
     }
 
-    /** 체크무늬 깃발 (아이폰 flag.checkered) + 라벨 */
+    /** 1.2.8: "HYROX RACE" 앞 깃발 = 앱의 Race 모드 아이콘 (mode_race, 노랑으로 칠함) + 라벨. 그린 높이를 돌려줌 */
     private fun flagLabel(c: Canvas, pen: Pen, x: Float, y: Float, text: String): Float {
         val k = pen.k
-        val sq = dp(2.4f, k)
-        val pole = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = pen.pal.accent }
-        c.drawRect(x, y + dp(1f, k), x + dp(1.4f, k), y + dp(12f, k), pole)
-        for (r in 0 until 3) for (col in 0 until 3) if ((r + col) % 2 == 0) {
-            val l = x + dp(1.4f, k) + col * sq
-            val t = y + dp(1f, k) + r * sq
-            c.drawRect(l, t, l + sq, t + sq, pole)
+        val p = pen.paint(10f, 700, pen.pal.sub, track = 0.7f)
+        val fm = p.fontMetrics
+        val lh = fm.descent - fm.ascent
+        val sz = dp(12f, k)
+        flagBmp(pen.ctx)?.let { b ->
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                colorFilter = PorterDuffColorFilter(pen.pal.accent, PorterDuff.Mode.SRC_IN)
+            }
+            val top = y + (lh - sz) / 2
+            c.drawBitmap(b, null, RectF(x, top, x + sz, top + sz), paint)
         }
-        return pen.text(c, WidgetKo.t(text), x + dp(16f, k), y, pen.paint(11f, 600, pen.pal.sub, track = 0.88f))
+        pen.text(c, text, x + sz + dp(5f, k), y, p)
+        return lh
     }
 
+    private var flagCache: Bitmap? = null
+    private fun flagBmp(ctx: Context): Bitmap? = flagCache ?: runCatching {
+        android.graphics.BitmapFactory.decodeResource(ctx.resources, R.drawable.mode_race)
+    }.getOrNull().also { flagCache = it }
+
     private fun ddayText(d: Int) = if (d == 0) "D-DAY" else "D-$d"
-    private fun raceDay(s: WidgetSnap, d: Int) = if (d == 0) WidgetKo.t("Today") else s.raceDate?.let { Fm.wdm(it) } ?: ""
+    private fun raceDay(s: WidgetSnap, d: Int) = if (d == 0) "Today" else s.raceDate?.let { enDate(it) } ?: ""
+    /** 위젯 글자는 모두 영어 (1.2.8): "Thu, May 13" */
+    private fun enDate(i: Instant) = java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US).format(i.atZone(Fm.zone))
     private fun hours(s: Int) = String.format(Locale.US, "%d:%02d", s / 3600, (s % 3600) / 60)
     private fun grouped(n: Int) = String.format(Locale.US, "%,d", n)
+    private fun blue(pal: WidgetPal) = 0xFF1E78FA.toInt()
+    private fun kcalCol(pal: WidgetPal) = if (pal.light) 0xFFAEAEB2.toInt() else 0xFFE5E5EA.toInt()
 
-    /** 다음 대회 (작게 · 가로형). wDp · hDp = 위젯 크기 */
-    fun dday(ctx: Context, snap: WidgetSnap, now: Instant, wDp: Float, hDp: Float, density: Float, pal: WidgetPal = WidgetPal.dark): Bitmap {
+    /**
+     * 1.2.8: "D-170" 을 그리되 가운데 "-" 만 위로 올려 대문자 · 숫자 높이 한가운데에 맞춤
+     * (글꼴의 하이픈은 소문자 높이 가운데라 큰 숫자 옆에서 처져 보임 — 대표님 11-25). 자리가 모자라면 minScale 까지 작게.
+     */
+    fun drawDday(c: Canvas, s: String, x: Float, baseline: Float, p: Paint, maxW: Float = Float.MAX_VALUE, minScale: Float = 0.6f) {
+        val size0 = p.textSize
+        while (p.measureText(s) > maxW && p.textSize > size0 * minScale) p.textSize *= 0.96f
+        val i = s.indexOf('-')
+        if (i < 0) { c.drawText(s, x, baseline, p); p.textSize = size0; return }
+        val a = s.substring(0, i); val b = s.substring(i + 1)
+        val bD = android.graphics.Rect(); p.getTextBounds("D", 0, 1, bD)
+        val bH = android.graphics.Rect(); p.getTextBounds("-", 0, 1, bH)
+        val dy = (bD.top + bD.bottom) / 2f - (bH.top + bH.bottom) / 2f
+        var cx = x
+        c.drawText(a, cx, baseline, p); cx += p.measureText(a)
+        c.drawText("-", cx, baseline + dy, p); cx += p.measureText("-")
+        c.drawText(b, cx, baseline, p)
+        p.textSize = size0
+    }
+
+    /** 다음 대회 (작게 · 가로형). wDp · hDp = 위젯 크기. side = 가로형 오른쪽 칸 (today / weeks / week / last / best) */
+    fun dday(ctx: Context, snap0: WidgetSnap, now: Instant, wDp: Float, hDp: Float, density: Float, pal: WidgetPal = WidgetPal.dark,
+             side: String = "today"): Bitmap {
+        val snap = snap0.fresh(now).todayFresh(now)
         val k = density
         val w = (wDp * k).toInt(); val h = (hDp * k).toInt()
         val d = snap.daysLeft(now)
@@ -151,43 +188,177 @@ object WidgetArt {
             noRace(c, pen, pad, inner, h)
             return bmp
         }
+        // 1.2.8 (대표님 11-24): 대회 정보는 작게 위젯 만큼만 — 깃발 HYROX RACE · 대회 이름 · 날짜 · Division · D-170
+        // 내용 묶음을 위아래 가운데 (위 여백 = 아래 여백). 가로형은 세로 선 오른쪽에 고른 칸 (폭 134)
         val wide = wDp >= 250
-        var y = pad
-        y += flagLabel(c, pen, pad, y, if (d == 0) "RACE DAY" else "HYROX RACE")
-        y += dp(6f, k)
-        y += pen.text(c, name, pad, y, pen.paint(19f, 600), inner, 0.7f)
-        val sub = raceDay(snap, d) + if (wide && snap.division.isNotEmpty()) " · " + WidgetKo.t(snap.division) else ""
-        pen.text(c, sub, pad, y, pen.paint(13f, 400, pen.pal.sub), inner)
-        // 아래: D-day (가로형이면 오른쪽에 GOAL · BEST 막대)
-        val big = pen.paint(if (d == 0) 34f else if (wide) 42f else 44f, 700, pen.pal.accent, track = -0.03f * 44, num = true)
-        val fm = big.fontMetrics
-        val bigH = fm.descent - fm.ascent
-        val bottom = h - pad - dp(9f, k)
-        val barsW = dp(140f, k)
-        pen.text(c, ddayText(d), pad, bottom - bigH + fm.descent * 0.6f, big, if (wide) inner - barsW - dp(16f, k) else inner, 0.6f)
+        val rightW = dp(134f, k)
+        val lineGap = dp(12f, k)
+        val leftW = if (wide) inner - rightW - lineGap * 2 - dp(1f, k) else inner
+        val lab = pen.paint(10f, 700, pal.sub, track = 0.7f)
+        val nm = pen.paint(15f, 600)
+        val sub = pen.paint(11.5f, 400, pal.sub)
+        val big = pen.paint(48f, 700, pal.accent, track = -1.6f, num = true)
+        fun hOf(p: Paint) = p.fontMetrics.let { it.descent - it.ascent }
+        // D-170 높이는 대문자 높이 (글자 위아래 빈칸 빼고)
+        val capB = android.graphics.Rect(); big.getTextBounds("D", 0, 1, capB)
+        val bigCap = capB.height().toFloat()
+        val labH = hOf(lab); val nmH = hOf(nm); val subH = hOf(sub)
+        val blockH = labH + dp(4f, k) + nmH + subH * 2 + dp(14f, k) + bigCap
+        val top = (h - blockH) / 2
+        var y = top
+        flagLabel(c, pen, pad, y, if (d == 0) "RACE DAY" else "HYROX RACE")
+        y += labH + dp(4f, k)
+        y += pen.text(c, name, pad, y, nm, leftW, 0.8f)
+        y += pen.text(c, raceDay(snap, d), pad, y, sub, leftW)
+        if (snap.division.isNotEmpty()) pen.text(c, snap.division, pad, y, sub, leftW)
+        y += subH + dp(14f, k)
+        val ddBase = y + bigCap
+        drawDday(c, ddayText(d), pad, ddBase, big, leftW, 0.6f)
         if (wide) {
-            // 1.2.2 (대표님 11-09 "바가 뭐하러 있어"): 막대 대신 목표 · 최고 시간 두 줄 + 목표까지 남은 차이 (아이폰 DdayMediumView 와 같음)
-            val g = snap.goal ?: 0; val b = snap.best ?: 0
-            val left = w - pad - barsW
-            val mid = bottom - bigH / 2
-            val gap = g > 0 && b > 0
-            var y = mid - dp(if (gap) 30f else 22f, k)
-            y += timeRow(c, pen, left, y, barsW, "GOAL", g, pen.pal.accent) + dp(5f, k)
-            y += timeRow(c, pen, left, y, barsW, "BEST", b, pen.pal.fg) + dp(5f, k)
-            if (gap) {
-                val s = if (b <= g) WidgetKo.t("Goal reached") else WidgetKo.t("%@ to goal").replace("%@", Fm.t(b - g))
-                pen.text(c, s, left, y, pen.paint(11f, 600, if (b <= g) pen.pal.accent else pen.pal.sub), barsW, 0.8f)
-            }
+            val lx = pad + leftW + lineGap
+            c.drawRect(lx, pad, lx + dp(1f, k), h - pad, Paint().apply { color = if (pal.light) 0x1F000000 else 0xFF262626.toInt() })
+            val rx = lx + dp(1f, k) + lineGap
+            right(c, pen, snap, now, side, rx, top, rightW, ddBase, labH)
         }
         return bmp
     }
 
-    /** 이름표(왼쪽) · 시간(오른쪽) 한 줄. 줄 높이를 돌려줌 */
-    private fun timeRow(c: Canvas, pen: Pen, x: Float, y: Float, w: Float, label: String, v: Int, color: Int): Float {
+    /** 가로형 오른쪽 칸: 이름표는 왼쪽 "HYROX RACE" 와 같은 줄(top), 내용 아래끝 = D-170 아래끝(bottom) */
+    private fun right(c: Canvas, pen: Pen, s: WidgetSnap, now: Instant, side: String, x: Float, top: Float, w: Float, bottom: Float, labH: Float) {
         val k = pen.k
-        val lh = pen.text(c, WidgetKo.t(label), x, y + dp(3f, k), pen.paint(10f, 600, pen.pal.sub, track = 0.8f))
-        val th = pen.text(c, if (v > 0) Fm.t(v) else "--:--", x + w, y, pen.paint(15f, 600, if (v > 0) color else pen.pal.sub, num = true), right = true)
-        return max(lh + dp(3f, k), th)
+        val pal = pen.pal
+        val lab = pen.paint(10f, 700, pal.sub, track = 0.7f)
+        val sub = pen.paint(11.5f, 400, pal.sub)
+        val subB = pen.paint(11.5f, 600, pal.fg, num = true)
+        fun hOf(p: Paint) = p.fontMetrics.let { it.descent - it.ascent }
+        val title = when (side) { "weeks" -> "LAST 4 WEEKS"; "week" -> "THIS WEEK"; "last" -> "LAST WORKOUT"; "best" -> "BEST vs GOAL"; else -> "TODAY" }
+        pen.text(c, title, x, top, lab, w)
+        val y0 = top + labH + dp(8f, k)
+        when (side) {
+            "weeks" -> {
+                // 7칸 × 4줄 네모 점 (월요일 시작). 노랑 = 하이록스 연습 · 파랑 = 러닝만 · 빈칸 = 쉰 날 · 오늘 = 흰 테두리
+                val gap = dp(5f, k)
+                val sz = min(dp(13f, k), (w - gap * 6) / 7)
+                val lineH = hOf(sub)
+                val gridH = sz * 4 + gap * 3
+                val gy = max(y0, bottom - lineH - dp(8f, k) - gridH)
+                val today = now.atZone(Fm.zone).toLocalDate()
+                val start = WidgetSnap.monday(now).minusDays(21)
+                for (i in 0 until 28) {
+                    val day = start.plusDays(i.toLong())
+                    if (day.isAfter(today)) continue
+                    val cx = x + (i % 7) * (sz + gap); val cy = gy + (i / 7) * (sz + gap)
+                    val col = when (s.last28.getOrNull(i)) { "hyrox" -> pal.accent; "run" -> blue(pal); else -> pal.track }
+                    val r = dp(4f, k)
+                    c.drawRoundRect(RectF(cx, cy, cx + sz, cy + sz), r, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = col })
+                    if (day == today) c.drawRoundRect(RectF(cx + dp(0.75f, k), cy + dp(0.75f, k), cx + sz - dp(0.75f, k), cy + sz - dp(0.75f, k)), r, r,
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = dp(1.5f, k); color = pal.fg })
+                }
+                mixLine(c, pen, x, bottom - lineH, w, listOf("${s.count28}" to true, " workouts · " to false, "${s.streak}" to true, " streak" to false))
+            }
+            "week" -> {
+                mixLine(c, pen, x, y0, w, listOf("${s.weekCount}" to true, " workouts · " to false, hours(s.weekSec) to true, " h" to false))
+                val barTop = y0 + hOf(sub) + dp(8f, k)
+                weekBars(c, pen, s, now, x, bottom, w, max(dp(16f, k), bottom - barTop - dp(13f, k)), labels = true)
+            }
+            "last" -> {
+                val nameP = pen.paint(14f, 600)
+                val col = if (s.lastKind == "run") blue(pal) else pal.accent
+                if (s.lastName == null) { pen.text(c, "No workout yet", x, y0, sub, w); return }
+                val dot = dp(6f, k)
+                val nh = hOf(nameP)
+                c.drawCircle(x + dot / 2, y0 + nh / 2, dot / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = col })
+                pen.text(c, s.lastName, x + dot + dp(5f, k), y0, nameP, w - dot - dp(5f, k), 0.85f)
+                pen.text(c, ago(s.lastDate, now), x, y0 + nh, sub, w)
+                val timeP = pen.paint(26f, 700, pal.fg, track = -0.8f, num = true)
+                val vs = s.lastVsGoal
+                val vsH = if (vs != null) hOf(sub) else 0f
+                val tb = android.graphics.Rect(); timeP.getTextBounds("0", 0, 1, tb)
+                val timeBase = bottom - vsH - (if (vs != null) dp(5f, k) else 0f)
+                c.drawText(Fm.t(s.lastSec), x, timeBase, timeP)
+                if (vs != null) {
+                    val fast = vs <= 0
+                    val txt = (if (fast) "−" else "+") + Fm.t(kotlin.math.abs(vs))
+                    val vp = pen.paint(11.5f, 600, if (fast) pal.accent else pal.sub, num = true)
+                    val tw = pen.text(c, txt, x, bottom - vsH, vp, w)
+                    pen.text(c, " vs goal", x + vp.measureText(txt), bottom - vsH, sub, w)
+                }
+            }
+            "best" -> {
+                val g = s.goal ?: 0; val b = s.best ?: 0
+                if (g <= 0 || b <= 0) { pen.text(c, "Set a goal in Race", x, y0, sub, w); return }
+                val vp = pen.paint(15f, 600, pal.fg, num = true)
+                val rh = hOf(vp)
+                pen.text(c, "Best", x, y0 + (rh - hOf(sub)) / 2, sub, w)
+                pen.text(c, Fm.t(b), x + w, y0, vp, right = true)
+                val vpY = pen.paint(15f, 600, pal.accent, num = true)
+                pen.text(c, "Goal", x, y0 + rh + dp(4f, k) + (rh - hOf(sub)) / 2, sub, w)
+                pen.text(c, Fm.t(g), x + w, y0 + rh + dp(4f, k), vpY, right = true)
+                val wn = s.weakName
+                if (wn != null && s.weakDiff > 0) {
+                    val np = pen.paint(13f, 600, if (s.weakKind == "run") blue(pal) else pal.accent)
+                    val nH = hOf(np)
+                    pen.text(c, "Weakest", x, bottom - nH - hOf(sub), sub, w)
+                    pen.text(c, wn, x, bottom - nH, np, w * 0.62f, 0.8f)
+                    pen.text(c, "+" + Fm.t(s.weakDiff), x + w, bottom - nH, pen.paint(13f, 600, pal.sub, num = true), right = true)
+                }
+            }
+            else -> {
+                // TODAY 링 3개: 바깥 노랑 = 하이록스 연습 시간 · 가운데 파랑 = 러닝 km · 안쪽 연회색 = 칼로리. 꽉 참 = 지난 28일 운동한 날 평균
+                val dia = min(dp(80f, k), bottom - y0)
+                val cy = bottom - dia / 2
+                val cx = x + dia / 2
+                val sw = dp(7f, k)
+                val gapR = dp(2.5f, k)
+                val rings = listOf(
+                    Triple(pal.accent, s.todayHyroxSec.toFloat() / max(1, s.avgHyroxSec), 0),
+                    Triple(blue(pal), (s.todayRunKm / max(0.1, s.avgRunKm)).toFloat(), 1),
+                    Triple(kcalCol(pal), s.todayKcal.toFloat() / max(1, s.avgKcal), 2),
+                )
+                for ((col, frac, i) in rings) {
+                    val r = dia / 2 - sw / 2 - i * (sw + gapR)
+                    val oval = RectF(cx - r, cy - r, cx + r, cy + r)
+                    val track = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = sw; color = col; alpha = 51 }
+                    c.drawArc(oval, 0f, 360f, false, track)
+                    val f = frac.coerceAtLeast(0f)
+                    if (f > 0f) {
+                        val pp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = sw; color = col; strokeCap = Paint.Cap.ROUND }
+                        c.drawArc(oval, -90f, min(f, 1f) * 360f, false, pp)
+                        if (f > 1f) c.drawArc(oval, -90f, (f - 1f).coerceAtMost(1f) * 360f, false, pp.apply { setShadowLayer(dp(2f, k), 0f, 0f, 0x66000000) })
+                    }
+                }
+                val lx = x + dia + dp(8f, k)
+                val lw = x + w - lx
+                val lines = listOf(
+                    (s.todayHyroxSec / 60).toString() to " min",
+                    String.format(Locale.US, "%.1f", s.todayRunKm) to " km",
+                    grouped(s.todayKcal) to " kcal",
+                )
+                val lh = hOf(sub)
+                val step = lh + dp(6f, k)
+                var ly = cy - (lh * 3 + dp(12f, k)) / 2
+                for ((v, u) in lines) { mixLine(c, pen, lx, ly, lw, listOf(v to true, u to false)); ly += step }
+            }
+        }
+    }
+
+    /** 굵은 숫자 + 회색 글자를 한 줄로 이어 그리기 */
+    private fun mixLine(c: Canvas, pen: Pen, x: Float, y: Float, w: Float, parts: List<Pair<String, Boolean>>) {
+        val b = pen.paint(11.5f, 600, pen.pal.fg, num = true)
+        val n = pen.paint(11.5f, 400, pen.pal.sub)
+        var cx = x
+        for ((t, bold) in parts) {
+            val p = if (bold) b else n
+            if (cx - x + p.measureText(t) > w) break
+            pen.text(c, t, cx, y, p)
+            cx += p.measureText(t)
+        }
+    }
+
+    private fun ago(d: Instant?, now: Instant): String {
+        d ?: return ""
+        val n = java.time.temporal.ChronoUnit.DAYS.between(d.atZone(Fm.zone).toLocalDate(), now.atZone(Fm.zone).toLocalDate()).toInt()
+        return when { n <= 0 -> "Today"; n == 1 -> "Yesterday"; else -> "$n days ago" }
     }
 
     /** 대회가 없을 때: "Add a race" */
@@ -196,11 +367,11 @@ object WidgetArt {
         flagLabel(c, pen, pad, pad, "HYROX RACE")
         val p2 = pen.paint(12f, 400, pen.pal.sub)
         val p1 = pen.paint(17f, 600)
-        val lines = wrap(WidgetKo.t("Count down to race day."), p2, inner, 2)
+        val lines = wrap("Count down to race day.", p2, inner, 2)
         val lh2 = p2.fontMetrics.let { it.descent - it.ascent }
         var y = h - pad - lh2 * lines.size
         val lh1 = p1.fontMetrics.let { it.descent - it.ascent }
-        pen.text(c, WidgetKo.t("Add a race"), pad, y - lh1 - dp(4f, k), p1, inner)
+        pen.text(c, "Add a race", pad, y - lh1 - dp(4f, k), p1, inner)
         for (l in lines) { pen.text(c, l, pad, y, p2, inner); y += lh2 }
     }
 
@@ -228,7 +399,8 @@ object WidgetArt {
         val days = listOf("M", "T", "W", "T", "F", "S", "S")
         for (i in 0 until 7) {
             val m = snap.dayMin[i]
-            val col = Mode.of(snap.dayMode[i])?.let { (0xFF000000 or it.calendarHex).toInt() } ?: pen.pal.track
+            // 1.2.8: 하이록스 연습 = 노랑 · 러닝만 = 파랑 (예전 값(Mode)은 노랑)
+            val col = when (snap.dayMode[i]) { "" -> pen.pal.track; "run" -> 0xFF1E78FA.toInt(); else -> pen.pal.accent }
             val hh = if (m > 0) max(dp(8f, k), barH * m / mx) else dp(3f, k)
             val l = x + i * (bw + gap)
             val b = bottom - labelH
@@ -306,8 +478,8 @@ object Widgets {
     /** 앱 데이터로 만든 요약 (아이폰 publishWidgets 와 같음: 정상 기록만, 최고 = Full Sim · 레이스 중 빠른 것) */
     fun snap(): WidgetSnap {
         val b = Store.book
-        val best = listOfNotNull(b.simBest?.total, b.raceBest?.total).minOrNull()
-        return WidgetSnap.make(Store.records.filter { it.counts }, Store.settings, best, Store.now())
+        val bestRec = listOfNotNull(b.simBest, b.raceBest).minByOrNull { it.total }
+        return WidgetSnap.make(Store.records.filter { it.counts }, Store.settings, bestRec?.total, Store.now(), bestRec)
     }
 
     fun refresh(ctx: Context) {
@@ -333,7 +505,12 @@ object Widgets {
     /** auto / black / white / theme */
     fun look(ctx: Context, id: Int): String = prefs(ctx).getString("look.$id", "auto") ?: "auto"
     fun setLook(ctx: Context, id: Int, look: String) { prefs(ctx).edit().putString("look.$id", look).apply() }
-    fun forget(ctx: Context, ids: IntArray) { prefs(ctx).edit().apply { ids.forEach { remove("look.$it") } }.apply() }
+    fun forget(ctx: Context, ids: IntArray) { prefs(ctx).edit().apply { ids.forEach { remove("look.$it"); remove("side.$it") } }.apply() }
+
+    /** 1.2.8: 가로형 D-day 위젯 오른쪽 칸 — today / weeks / week / last / best (기본 today) */
+    val sides = listOf("today" to "Today", "weeks" to "Last 4 weeks", "week" to "This week", "last" to "Last workout", "best" to "Best vs goal")
+    fun side(ctx: Context, id: Int): String = prefs(ctx).getString("side.$id", "today") ?: "today"
+    fun setSide(ctx: Context, id: Int, side: String) { prefs(ctx).edit().putString("side.$id", side).apply() }
 
     fun pal(ctx: Context, id: Int, snap: WidgetSnap): WidgetPal {
         val night = (ctx.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -351,7 +528,7 @@ object Widgets {
     }
 }
 
-/** 다음 대회 D-day (2×2 · 늘리면 목표 · 최고 막대까지). 누르면 Race 탭 */
+/** 다음 대회 D-day (2×2 · 늘리면 오른쪽에 고른 칸 — 1.2.8). 누르면 Race 탭 */
 class DdayWidget : AppWidgetProvider() {
     override fun onUpdate(ctx: Context, m: AppWidgetManager, ids: IntArray) {
         Store.init(ctx.applicationContext)
@@ -361,8 +538,8 @@ class DdayWidget : AppWidgetProvider() {
         for (id in ids) {
             val (w, h) = Widgets.size(m, id, 160f, 160f)
             val d = snap.daysLeft(now)
-            val label = if (d != null && snap.raceName != null) "${snap.raceName} D-$d" else WidgetKo.t("Add a race")
-            m.updateAppWidget(id, Widgets.views(ctx, WidgetArt.dday(ctx, snap, now, w, h, k, Widgets.pal(ctx, id, snap)), label, "race"))
+            val label = if (d != null && snap.raceName != null) "${snap.raceName} D-$d" else "Add a race"
+            m.updateAppWidget(id, Widgets.views(ctx, WidgetArt.dday(ctx, snap, now, w, h, k, Widgets.pal(ctx, id, snap), Widgets.side(ctx, id)), label, "race"))
         }
     }
 

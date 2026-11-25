@@ -95,6 +95,25 @@ fun Modifier.tap(enabled: Boolean = true, onClick: () -> Unit): Modifier =
 // MARK: 글자
 
 /** 번역해서 보여 주는 글자 (아이폰 Text("…") 와 같음 — 열쇠는 영어 원문) */
+/**
+ * 1.2.8: "D-170" 의 "-" 를 대문자 · 숫자 높이 한가운데로 올려 그림 (대표님 11-25 "-가 왜 가운데가 아니지").
+ * Pretendard 하이픈 가운데가 대문자 가운데보다 0.06 em 아래 → 글자 위쪽 높이(ascent 0.952 em) 의 0.064 배만큼 올림.
+ */
+@Composable
+fun DdayT(text: String, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) {
+    val i = text.indexOf('-')
+    val a = androidx.compose.ui.text.buildAnnotatedString {
+        if (i < 0) append(text) else {
+            append(text.substring(0, i))
+            pushStyle(androidx.compose.ui.text.SpanStyle(baselineShift = androidx.compose.ui.text.style.BaselineShift(0.064f)))
+            append("-")
+            pop()
+            append(text.substring(i + 1))
+        }
+    }
+    BasicText(a, modifier = modifier, style = style, maxLines = 1)
+}
+
 @Composable
 fun T(
     text: String, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier,

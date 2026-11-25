@@ -243,7 +243,7 @@ fun PhoneLiveView() {
         val frame = phoneFrame(eng, now)
         val isNew = Kinds.isNew(eng.kind)
         val tone = if (isNew) timerTone(eng) else frame.tone
-        LiveBackground8(tone, if (eng.isRunKind) 1 else eng.idx)
+        LiveBackground8(tone, if (eng.isRunKind) 1 else eng.idx, frame.zone)
         val pageCount = if (isNew) 1 else if (eng.isRunKind) 2 else 3
         val pager = rememberPagerState(pageCount = { pageCount })
         HorizontalPager(pager, Modifier.fillMaxSize().testTag("phone.pages")) { page ->

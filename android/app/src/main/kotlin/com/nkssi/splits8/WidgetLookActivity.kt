@@ -60,11 +60,12 @@ class WidgetLookActivity : ComponentActivity() {
         if (id == AppWidgetManager.INVALID_APPWIDGET_ID) { finish(); return }
         Store.init(applicationContext)
         enableEdgeToEdge()
-        setContent { LookPicker(id) { look -> choose(look) } }
+        setContent { LookPicker(id) { look, side -> choose(look, side) } }
     }
 
-    private fun choose(look: String) {
+    private fun choose(look: String, side: String?) {
         Widgets.setLook(this, id, look)
+        if (side != null) Widgets.setSide(this, id, side)
         Widgets.refresh(this)
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id))
         finish()
@@ -72,9 +73,13 @@ class WidgetLookActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LookPicker(id: Int, onPick: (String) -> Unit) {
+private fun LookPicker(id: Int, onPick: (String, String?) -> Unit) {
     val ctx = LocalContext.current
     var cur by remember { mutableStateOf(Widgets.look(ctx, id)) }
+    var side by remember { mutableStateOf(Widgets.side(ctx, id)) }
+    val isWeek = remember {
+        runCatching { AppWidgetManager.getInstance(ctx).getAppWidgetInfo(id)?.provider?.className?.endsWith("WeekWidget") }.getOrNull() == true
+    }
     val snap = remember { Widgets.snap() }
     val looks = listOf("auto" to "Automatic", "black" to "Black", "white" to "White", "theme" to "Theme color")
     Column(
@@ -89,14 +94,12 @@ private fun LookPicker(id: Int, onPick: (String) -> Unit) {
         val pal = WidgetPal.of(cur, night, snap.themeHex)
         val now = Store.now()
         val k = ctx.resources.displayMetrics.density
-        val bmp = remember(cur) {
-            val isWeek = runCatching {
-                AppWidgetManager.getInstance(ctx).getAppWidgetInfo(id)?.provider?.className?.endsWith("WeekWidget")
-            }.getOrNull() == true
-            if (isWeek) WidgetArt.week(ctx, snap, now, 170f, 170f, k, pal) else WidgetArt.dday(ctx, snap, now, 170f, 170f, k, pal)
+        // 1.2.8: D-day 위젯은 가로형으로 미리보기 (오른쪽 칸까지 보이게)
+        val bmp = remember(cur, side) {
+            if (isWeek) WidgetArt.week(ctx, snap, now, 170f, 170f, k, pal) else WidgetArt.dday(ctx, snap, now, 340f, 160f, k, pal, side)
         }
         Box(Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-            Image(bmp.asImageBitmap(), null, Modifier.size(170.dp))
+            Image(bmp.asImageBitmap(), null, if (isWeek) Modifier.size(170.dp) else Modifier.size(340.dp, 160.dp))
         }
         Column(Modifier.fillMaxWidth().card8()) {
             looks.forEachIndexed { i, (key, label) ->
@@ -109,8 +112,23 @@ private fun LookPicker(id: Int, onPick: (String) -> Unit) {
                 }
             }
         }
+        if (!isWeek) {
+            // 1.2.8: 가로형 오른쪽 칸 고르기 (아이폰 위젯 편집의 Right side)
+            T("Right side", F.t(13, W600, C.text2), Modifier.padding(start = 4.dp, top = 6.dp), maxLines = 1, translate = false)
+            Column(Modifier.fillMaxWidth().card8()) {
+                Widgets.sides.forEachIndexed { i, (key, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().rowLine(i < Widgets.sides.size - 1).tap { side = key }.padding(vertical = 14.dp, horizontal = 18.dp).testTag("side.$key"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        T(label, F.t(17), Modifier.weight(1f), maxLines = 1, translate = false)
+                        if (side == key) Check8()
+                    }
+                }
+            }
+        }
         Box(
-            Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).tap { onPick(cur) }.testTag("look.done"),
+            Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).tap { onPick(cur, if (isWeek) null else side) }.testTag("look.done"),
             contentAlignment = Alignment.Center,
         ) { T(WidgetKo.t("Done"), F.t(17, W600, Color.Black), maxLines = 1, translate = false) }
     }

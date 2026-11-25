@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -103,8 +104,8 @@ enum class LTone {
     val mainInk: Color get() = if (dark) C.accent else hex(0x1E78FA)
 
     companion object {
-        /** 11-21 대표님: 심박 존에 따라 바탕색을 바꾸지 않음 */
-        const val ZONE_TINT: Boolean = false
+        /** 1.2.8 (대표님 11-25): 심박 Z4 · Z5 면 배경 아래쪽을 주황 · 빨강으로 (Roxzone · 휴식 회색은 안 바뀜). 워치와 같음 */
+        const val ZONE_TINT: Boolean = true
 
         fun of(s: Seg): LTone = when {
             s.kind == SegKind.Rox -> Gray
@@ -235,9 +236,9 @@ data class LiveFrame8(
 
 // MARK: 배경 (C안)
 
-/** 구간 색 그라데이션 + 크게 흐린 덩어리 + 위쪽 밝은 빛 */
+/** 구간 색 그라데이션 + 크게 흐린 덩어리 + 위쪽 밝은 빛 + 1.2.8 심박 존 색 (아래쪽, zone = 지금 심박 존 0~5) */
 @Composable
-fun LiveBackground8(tone: LTone, seed: Int) {
+fun LiveBackground8(tone: LTone, seed: Int, zone: Int = 0) {
     Box(Modifier.fillMaxSize()) {
         Canvas(Modifier.fillMaxSize()) { drawRect(Brush.verticalGradient(tone.stops)) }
         Crossfade(seed, animationSpec = tween(600), label = "liveBlobs") { sd ->
@@ -246,7 +247,7 @@ fun LiveBackground8(tone: LTone, seed: Int) {
                 val n = 2 + (g.next() % 3).toInt()
                 List(n) { floatArrayOf(0.05f + 0.9f * g.unit(), 0.1f + 0.85f * g.unit(), 0.18f + 0.22f * g.unit(), 0.6f + 0.4f * g.unit()) }
             }
-            val a = if (tone == LTone.Station) 0.38f else 0.22f
+            val a = if (tone == LTone.Station) 0.46f else 0.22f       // 1.2.8: 노랑 덩어리 아주 약간 진하게 (워치 45 → 55% 와 같은 비율)
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val k = min(maxWidth.value / 393f, 1.3f)
                 Canvas(Modifier.fillMaxSize().blur((46 * k).dp)) {
@@ -256,11 +257,35 @@ fun LiveBackground8(tone: LTone, seed: Int) {
                 }
             }
         }
+        if (LTone.ZONE_TINT && tone != LTone.Gray) LiveZoneTint(tone == LTone.Station, zone)
         Canvas(Modifier.fillMaxSize()) {
             val c = Offset(size.width / 2, -0.05f * size.height)
             drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = if (tone == LTone.Station) 0.30f else 0.16f), Color.White.copy(alpha = 0f)),
                 c, 360.dp.toPx()))
         }
+    }
+}
+
+/**
+ * 1.2.8 심박 존 색 (워치 WZoneTint 와 같은 값): 그 존에 3초 머물면 바뀜 (1초 부드럽게). 화면 위 45% 아래부터 아래로 진해짐.
+ * 스테이션(노랑) 위: Z4 #FF5000 · Z5 #FF141E, 맨 아래 85% / 러닝(파랑) 위: Z4 #FF7A00 · Z5 #FF2D2D, 맨 아래 75%.
+ */
+@Composable
+fun LiveZoneTint(station: Boolean, zone: Int) {
+    var shown by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(zone) {
+        if (zone == shown) return@LaunchedEffect
+        kotlinx.coroutines.delay(3000)
+        shown = zone
+    }
+    var colorZone by remember { androidx.compose.runtime.mutableIntStateOf(5) }
+    if (shown >= 4) colorZone = shown
+    val a by animateFloatAsState(if (shown >= 4) 1f else 0f, androidx.compose.animation.core.tween(1000), label = "zoneTint")
+    if (a <= 0.001f) return
+    val col = if (station) (if (colorZone >= 5) hex(0xFF141E) else hex(0xFF5000)) else (if (colorZone >= 5) hex(0xFF2D2D) else hex(0xFF7A00))
+    val amax = if (station) 0.85f else 0.75f
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(Brush.verticalGradient(0f to col.copy(alpha = 0f), 0.45f to col.copy(alpha = 0f), 1f to col.copy(alpha = amax * a)))
     }
 }
 

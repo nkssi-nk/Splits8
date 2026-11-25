@@ -43,6 +43,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.rotary.onPreRotaryScrollEvent
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -104,7 +107,31 @@ fun WWorkoutPager(buzz: (BuzzKind) -> Unit, startPage: Int = 0, startEnd: Boolea
         flash.animateTo(0f, tween(300))
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    // 1.2.8 (대표님 11-25): 음성이 켜져 있으면 베젤 = 음성 음량, 화면 넘기기는 터치로만. 음성이 꺼져 있으면 지금처럼 베젤로 넘김
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val voiceOn = WatchStore.settings.voiceOpt == true
+    LaunchedEffect(Unit) { WearVoice.load(ctx) }
+    var vol by remember { mutableStateOf(WearVoice.volume) }
+    var volAt by remember { mutableLongStateOf(0L) }
+    var volShow by remember { mutableStateOf(false) }
+    LaunchedEffect(volAt) { if (volAt > 0) { volShow = true; delay(1200); volShow = false } }
+    var lastStep by remember { mutableLongStateOf(0L) }
+    val volFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(voiceOn) { if (voiceOn) runCatching { volFocus.requestFocus() } }
+
+    Box(Modifier.fillMaxSize().background(Color.Black).onPreRotaryScrollEvent { ev ->
+        if (!voiceOn || aod) return@onPreRotaryScrollEvent false
+        val t = ev.uptimeMillis
+        if (ev.verticalScrollPixels != 0f && t - lastStep >= 40) {
+            lastStep = t
+            val nv = (WearVoice.volume + (if (ev.verticalScrollPixels > 0) 0.05f else -0.05f)).coerceIn(0f, 1f)
+            WearVoice.setVolume(ctx, nv)
+            vol = nv
+            volAt = System.currentTimeMillis()
+            if (nv == 0f || nv == 1f) buzz(BuzzKind.Click)
+        }
+        true
+    }.then(if (voiceOn) Modifier.focusRequester(volFocus).focusable() else Modifier)) {
         VerticalPager(pager, Modifier.fillMaxSize()) { page ->
             when (pages.getOrNull(page)) {
                 "goal" -> WGoalPage(page, pages.size)
@@ -126,6 +153,7 @@ fun WWorkoutPager(buzz: (BuzzKind) -> Unit, startPage: Int = 0, startEnd: Boolea
             )
         }
         if (!aod && flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.32f * flash.value)))
+        if (voiceOn && !aod) WVolumeHud(vol, volShow)
     }
 }
 
@@ -160,7 +188,7 @@ fun WLive(onControls: () -> Unit) {
             if (abs(dx) >= swipePx) { if (dx < 0) mainAction() else onControls() }
         }) { _, d -> dx += d }
     }) { L ->
-        WBackground(tone, if (e.isRunKind) 0 else e.idx, aod)
+        WBackground(tone, if (e.isRunKind) 0 else e.idx, aod, zone = if (e.hr > 0) e.zone else 0)
         val ink = if (aod) WAod.text else tone.ink
         WClock(L, if (aod) WAod.text else if (tone.dark) Color.Black else Color.White.copy(alpha = 0.86f))
         WTotalRow(L, if (e.isRunKind) "TIME" else "TOTAL", if (aod) Fm.t(e.total(now)).dropLast(2) + "––" else Fm.t(e.total(now)), tone, aod)
@@ -549,7 +577,7 @@ private fun InfoFrame(items: List<InfoItem>, bigKey: String, setBig: (String) ->
     val big = items.firstOrNull { it.key == bigKey } ?: items[0]
     val rest = items.filter { it.key != big.key }
     WCanvas(Modifier.testTag(tag)) { L ->
-        WBackground(tone, if (e.isRunKind) 0 else e.idx, aod)
+        WBackground(tone, if (e.isRunKind) 0 else e.idx, aod, zone = if (e.hr > 0) e.zone else 0)
         val ink = if (aod) WAod.text else tone.ink
         val sub = if (aod) WAod.text else tone.sub
         val lab = if (aod) WAod.text else tone.label
@@ -609,7 +637,7 @@ fun WControls(onBack: () -> Unit, onEnd: () -> Unit, onNext: () -> Unit) {
         var dx = 0f
         detectHorizontalDragGestures(onDragStart = { dx = 0f }, onDragEnd = { if (dx <= -swipePx) onBack() }) { _, d -> dx += d }
     }.clickable(remember { MutableInteractionSource() }, indication = null) { }) { L ->
-        WBackground(tone, if (e.isRunKind) 0 else e.idx, false, darker = 0.12f)
+        WBackground(tone, if (e.isRunKind) 0 else e.idx, false, darker = 0.12f, zone = if (e.hr > 0) e.zone else 0)
         WClock(L, if (tone.dark) Color.Black else Color.White)
         val hgt = 32f
         val g = 6f

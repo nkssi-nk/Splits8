@@ -224,7 +224,7 @@ private fun NextRace() {
                 Modifier.padding(top = 6.dp), style = F.t(13), maxLines = 1,
             )
         }
-        T(dday(ev.date), F.num(34, color = C.accent, tracking = -1.02f), Modifier.testTag("home.dday"), maxLines = 1, translate = false)
+        com.nkssi.splits8.ui.DdayT(dday(ev.date), F.num(34, color = C.accent, tracking = -1.02f), Modifier.testTag("home.dday"))
     }
 }
 

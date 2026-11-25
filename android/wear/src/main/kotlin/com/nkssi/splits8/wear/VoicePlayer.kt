@@ -82,6 +82,7 @@ class VoicePlayer(context: Context) {
         val p = players.getOrNull(i) ?: run { lineDone(g); return }
         p.setOnCompletionListener { if (g == gen) h.postDelayed({ startAt(g, i + 1) }, GAP_MS) }
         p.setOnErrorListener { _, _, _ -> if (g == gen) h.post { startAt(g, i + 1) }; true }
+        runCatching { val v = WearVoice.volume; p.setVolume(v, v) }      // 1.2.8: 베젤로 정한 음성 음량
         runCatching { p.start() }.onFailure { h.post { startAt(g, i + 1) } }
     }
 
@@ -135,10 +136,35 @@ class VoicePlayer(context: Context) {
         /** 조각 사이 틈 (ms) */
         const val GAP_MS = 30L      // 1.2.5: 조각 끝 쉼을 잘라서 0.12 → 0.03초
     }
+
+    /** 1.2.8: 말하는 중에 음량을 바꾸면 바로 적용 */
+    fun applyVolume() {
+        h.post { val v = WearVoice.volume; players.forEach { runCatching { it.setVolume(v, v) } } }
+    }
 }
 
 /** 워치 앱 하나에 재생기 하나 */
 object WearVoice {
     @Volatile private var p: VoicePlayer? = null
     fun get(c: Context): VoicePlayer = p ?: synchronized(this) { p ?: VoicePlayer(c).also { p = it } }
+
+    /**
+     * 1.2.8 음성 음량 0~1 (대표님 11-25: 음성이 켜져 있으면 운동 중 베젤 = 음량). 처음 1, 바꾼 값은 기억.
+     * 시스템 미디어 음량 안에서 줄이고 키움.
+     */
+    @Volatile var volume: Float = 1f
+        private set
+    private var loaded = false
+
+    fun load(c: Context) {
+        if (loaded) return
+        loaded = true
+        volume = c.getSharedPreferences("voice", Context.MODE_PRIVATE).getFloat("vol", 1f).coerceIn(0f, 1f)
+    }
+
+    fun setVolume(c: Context, v: Float) {
+        volume = v.coerceIn(0f, 1f)
+        c.getSharedPreferences("voice", Context.MODE_PRIVATE).edit().putFloat("vol", volume).apply()
+        p?.applyVolume()
+    }
 }

@@ -89,16 +89,17 @@ enum class WTone {
     val edge: Color get() = if (this == Station) hex(0xE1A000) else Color.Black
     /** 뒤에 비치는 덩어리 */
     val blob: Color get() = if (this == Station) hex(0xC87800) else Color.Black
-    val blobAlpha: Float get() = if (this == Station) 0.45f else 0.26f
+    val blobAlpha: Float get() = if (this == Station) 0.55f else 0.26f      // 1.2.8: 노랑 45 → 55% (대표님 11-25 "아주 약간만 황토색")
     /** 조작 화면 · 운동 중 Next 글자 (노랑 위 = 검정 바탕 노랑 글자, 그 밖 = 흰 바탕 파랑 글자) */
     val nextFg: Color get() = if (dark) C.accent else hex(0x145FEB)
     val nextBg: Color get() = if (dark) Color.Black.copy(alpha = 0.69f) else Color.White.copy(alpha = 0.8f)
 
     companion object {
         /**
-         * 11-21 대표님 (애플워치와 같음): 심박 존에 따라 바탕색을 바꾸지 않음. 구간 색만.
+         * 1.2.8 (대표님 11-25 "다시 넣어. 배경 아래쪽으로"): Z4 · Z5 면 배경 아래쪽을 주황 · 빨강으로.
+         * Roxzone · 휴식(회색)은 안 바뀜. 스테이션(노랑) 위는 더 빨갛게. (11-21 에 껐던 것을 다시 켬)
          */
-        const val ZONE_TINT: Boolean = false
+        const val ZONE_TINT: Boolean = true
 
         fun of(s: Seg): WTone = when {
             s.kind == SegKind.Rox -> Gray
@@ -198,9 +199,9 @@ private fun clockText(): String {
 
 // MARK: 바탕
 
-/** 운동 중 바탕: 그라데이션 + 가장자리 + 흐린 덩어리 (구간마다 새 모양) */
+/** 운동 중 바탕: 그라데이션 + 가장자리 + 흐린 덩어리 (구간마다 새 모양) + 1.2.8 심박 존 색 (아래쪽, zone = 지금 심박 존 0~5) */
 @Composable
-fun WBackground(tone: WTone, seed: Int, aod: Boolean, darker: Float = 0f) {
+fun WBackground(tone: WTone, seed: Int, aod: Boolean, darker: Float = 0f, zone: Int = 0) {
     if (aod) { Canvas(Modifier.fillMaxSize()) { drawRect(Color.Black) }; return }
     Box(Modifier.fillMaxSize()) {
         Canvas(Modifier.fillMaxSize()) {
@@ -211,7 +212,58 @@ fun WBackground(tone: WTone, seed: Int, aod: Boolean, darker: Float = 0f) {
                 center = center, radius = r), radius = r * 1.02f, center = center)
         }
         Crossfade(seed, animationSpec = tween(600), label = "blobs") { sd -> WBlobs(sd, tone.blob, tone.blobAlpha) }
+        if (WTone.ZONE_TINT && tone != WTone.Gray) WZoneTint(tone == WTone.Station, zone)
         if (darker > 0f) Canvas(Modifier.fillMaxSize()) { drawRect(Color.Black.copy(alpha = darker)) }
+    }
+}
+
+/**
+ * 1.2.8 심박 존 색: 그 존에 3초 머물면 바뀜 (1초 부드럽게). 화면 위 45% 아래부터 맨 아래로 갈수록 진해짐.
+ * 스테이션(노랑) 위: Z4 #FF5000 · Z5 #FF141E, 맨 아래 85% / 러닝(파랑) 위: Z4 #FF7A00 · Z5 #FF2D2D, 맨 아래 75%.
+ */
+@Composable
+fun WZoneTint(station: Boolean, zone: Int) {
+    var shown by remember { mutableStateOf(0) }
+    LaunchedEffect(zone) {
+        if (zone == shown) return@LaunchedEffect
+        kotlinx.coroutines.delay(3000)
+        shown = zone
+    }
+    var colorZone by remember { mutableStateOf(5) }
+    if (shown >= 4) colorZone = shown
+    val a by animateFloatAsState(if (shown >= 4) 1f else 0f, tween(1000), label = "zoneTint")
+    if (a <= 0.001f) return
+    val col = zoneTintColor(station, colorZone)
+    val amax = if (station) 0.85f else 0.75f
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(Brush.verticalGradient(0f to col.copy(alpha = 0f), 0.45f to col.copy(alpha = 0f), 1f to col.copy(alpha = amax * a)))
+    }
+}
+
+fun zoneTintColor(station: Boolean, zone: Int): Color =
+    if (station) (if (zone >= 5) hex(0xFF141E) else hex(0xFF5000)) else (if (zone >= 5) hex(0xFF2D2D) else hex(0xFF7A00))
+
+/** 1.2.8 베젤로 음성 음량을 바꿀 때 잠깐 보이는 음량 막대 (스피커 + 막대) */
+@Composable
+fun WVolumeHud(volume: Float, visible: Boolean) {
+    val a by animateFloatAsState(if (visible) 1f else 0f, tween(if (visible) 120 else 300), label = "volHud")
+    if (a <= 0.001f) return
+    Canvas(Modifier.fillMaxSize()) {
+        val k = size.minDimension / WScale.D
+        val w = 120f * k; val h = 30f * k
+        val x = (size.width - w) / 2; val y = size.height * 0.70f
+        drawRoundRect(Color.Black.copy(alpha = 0.72f * a), Offset(x, y), Size(w, h), CornerRadius(h / 2))
+        // 스피커
+        val sx = x + 12f * k; val cy = y + h / 2
+        val sp = Path().apply {
+            moveTo(sx, cy - 3f * k); lineTo(sx + 4f * k, cy - 3f * k); lineTo(sx + 9f * k, cy - 7f * k)
+            lineTo(sx + 9f * k, cy + 7f * k); lineTo(sx + 4f * k, cy + 3f * k); lineTo(sx, cy + 3f * k); close()
+        }
+        drawPath(sp, Color.White.copy(alpha = a))
+        // 막대
+        val bx = sx + 17f * k; val bw = x + w - 14f * k - bx
+        drawRoundRect(Color.White.copy(alpha = 0.25f * a), Offset(bx, cy - 2.5f * k), Size(bw, 5f * k), CornerRadius(2.5f * k))
+        drawRoundRect(hex(0xFFE600).copy(alpha = a), Offset(bx, cy - 2.5f * k), Size(bw * volume.coerceIn(0f, 1f), 5f * k), CornerRadius(2.5f * k))
     }
 }
 

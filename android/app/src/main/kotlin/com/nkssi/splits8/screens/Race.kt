@@ -539,7 +539,7 @@ private fun EventRow(e: EventItem, last: Boolean) {
             T(e.venue, F.t(13, color = C.text2), maxLines = 1, translate = false)
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            T("D-$days", F.t(13, W600, if (days <= 60) C.accent else C.text2), maxLines = 1, translate = false)
+            com.nkssi.splits8.ui.DdayT("D-$days", F.t(13, W600, if (days <= 60) C.accent else C.text2))
             val ma = Fm.mon(st.atStartOfDay(Fm.zone).toInstant())
             val mb = Fm.mon(en.atStartOfDay(Fm.zone).toInstant())
             val range = if (st.monthValue == en.monthValue) L10n.t("%lld–%lld %@", st.dayOfMonth, en.dayOfMonth, mb)

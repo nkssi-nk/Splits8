@@ -118,7 +118,7 @@ fun WatchLiveView() {
         val f = watchFrame(st, now, WatchMirror.received)
         val status = if (WatchMirror.reconnecting) "Watch · Reconnecting…"
             else if (st.hr > 0) "Watch".l10n + " · ${st.hr} " + "BPM".l10n else "Watch · Live"
-        LiveBackground8(f.tone, if (isRunCard(st)) 1 else st.idx)
+        LiveBackground8(f.tone, if (isRunCard(st)) 1 else st.idx, f.zone)
         when {
             // 워치에서 버림: 기록이 안 오니 잠시 뒤 홈으로
             WatchMirror.discarded -> {}

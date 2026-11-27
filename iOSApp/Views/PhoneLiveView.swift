@@ -1225,9 +1225,9 @@ struct StartOnPhoneButton: View {
                     Image(systemName: "iphone").font(.system(size: 14, weight: .semibold))
                     Text("Start on iPhone").font(F.t(14, .semibold)).lineLimit(1)
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(C.ink)
                 .padding(.horizontal, 14).frame(height: 36)
-                .background(Color.white.opacity(0.10), in: Capsule())
+                .background(C.ink.opacity(Appear.light ? 0.08 : 0.10), in: Capsule())
                 .contentShape(Capsule())
             }
             .buttonStyle(Press(scale: 0.96))

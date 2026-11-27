@@ -169,6 +169,11 @@ struct YellowGlass<S: InsettableShape>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background {
+                if Appear.light {
+                    // 1.2.9 라이트 모드: 노란 유리 대신 진한 금색 (흰 글자)
+                    shape.fill(C.accent)
+                        .shadow(color: glow ? C.accent.opacity(0.25) : .clear, radius: 9, y: 6)
+                } else {
                 ZStack {
                     if #available(iOS 26.0, *) {
                         Color.clear.glassEffect(.regular.tint(Color(hex: 0xFFE600, alpha: 0.88)), in: shape)
@@ -179,13 +184,14 @@ struct YellowGlass<S: InsettableShape>: ViewModifier {
                                                        Color(red: 1, green: 214 / 255, blue: 0, opacity: 0.80)],
                                               startPoint: .top, endPoint: .bottom))
                     // 위 1px 하이라이트 · 아래 1px 그늘
-                    shape.strokeBorder(LinearGradient(stops: [.init(color: C.ink.opacity(0.6), location: 0),
-                                                              .init(color: C.ink.opacity(0), location: 0.12),
+                    shape.strokeBorder(LinearGradient(stops: [.init(color: Color.white.opacity(0.6), location: 0),
+                                                              .init(color: Color.white.opacity(0), location: 0.12),
                                                               .init(color: .black.opacity(0), location: 0.88),
                                                               .init(color: .black.opacity(0.10), location: 1)],
                                                       startPoint: .top, endPoint: .bottom), lineWidth: 1)
                 }
                 .shadow(color: glow ? Color(red: 1, green: 214 / 255, blue: 0, opacity: 0.20) : .clear, radius: 9, y: 6)
+                }
             }
             .contentShape(shape)
     }

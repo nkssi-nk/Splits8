@@ -168,7 +168,7 @@ fun grouped(n: Int): String = String.format(Locale.US, "%,d", n)
 /** 타일 한 칸 (라벨 · 값 · 단위). sub = 제목 줄 오른쪽의 작은 두 번째 값 */
 private data class DetailTile(
     val label: String, val value: String, val unit: String = "",
-    val color: Color = Color.White, val unitColor: Color = Color.Transparent, val sub: String = "",
+    val color: Color = C.ink, val unitColor: Color = Color.Transparent, val sub: String = "",
 )
 
 private fun backLabel(from: Scr): String = when (from) {
@@ -306,7 +306,7 @@ private fun Header(rec: Record) {
         Column(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.clip(RoundedCornerShape(6.dp)).background(C.accent).padding(vertical = 3.dp, horizontal = 8.dp)) {
-                    T(rec.mode.title, F.t(11, W600, Color.Black), maxLines = 1)
+                    T(rec.mode.title, F.t(11, W600, C.onAccent), maxLines = 1)
                 }
                 Label8(Fm.wdmy(rec.date))
                 // 빌드 27: 러닝 PB 는 머리에 거리까지 ("★ 5K PB")
@@ -382,7 +382,7 @@ fun partnerColor(nick: String): Color {
 private fun PartnerChip(rec: Record, nick: String) {
     val divName = if (isDoubles(rec)) Division.of(rec.division).name else ""
     Row(
-        Modifier.padding(top = 8.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.10f))
+        Modifier.padding(top = 8.dp).clip(RoundedCornerShape(50)).background(C.ink.copy(alpha = 0.10f))
             .padding(top = 5.dp, bottom = 5.dp, start = 5.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -400,7 +400,7 @@ private fun PartnerRow(rec: Record) {
             .padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        T(if (nick == null) "Add partner" else "Partner", F.t(15, color = if (nick == null) C.accent else Color.White),
+        T(if (nick == null) "Add partner" else "Partner", F.t(15, color = if (nick == null) C.accent else C.ink),
             Modifier.weight(1f), maxLines = 1)
         T((nick?.let { "@$it" } ?: "") + " ›", F.t(15, color = C.text2), maxLines = 1, translate = false)
     }
@@ -591,14 +591,14 @@ private fun PftCard(rec: Record) {
     }
     val shape = RoundedCornerShape(20.dp)
     val border: Brush = if (g == null) SolidColor(C.cardBorder) else Brush.linearGradient(
-        0f to hex(g.hex1, 0.9f), 0.45f to hex(g.hex2, 0.25f), 1f to Color.White.copy(alpha = 0.08f),
+        0f to hex(g.hex1, 0.9f), 0.45f to hex(g.hex2, 0.25f), 1f to C.ink.copy(alpha = 0.08f),
     )
     Column(
         Modifier.fillMaxWidth()
             // 빌드 26: 등급 색으로 은은하게 빛남 + 테두리 빛 한 바퀴 (Unranked · 등급 없음은 없음)
             .then(if (g != null && g != PFTGrade.Unranked) Modifier.outerGlow(hex(g.hex1, 0.28f), 20.dp, 18.dp) else Modifier)
             .borderLight(hex((g ?: PFTGrade.Unranked).hex1), if (g == null || g == PFTGrade.Unranked) LightMode.Off else LightMode.Once, 20.dp)
-            .clip(shape).background(Color(0xFF121210))
+            .clip(shape).background(C.ad(0x121210))
             .border(1.dp, border, shape).testTag("detail.pft")
             .padding(top = 20.dp, start = 18.dp, end = 18.dp, bottom = 18.dp),
     ) {
@@ -683,9 +683,9 @@ private fun ShareButton() {
             .press(0.97f, tag = "Share with photo") { Router.go(Scr.Share) },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
-        Glyph("i_share", 18.dp, Color.Black)
+        Glyph("i_share", 18.dp, C.onAccent)
         Spacer(Modifier.width(8.dp))
-        T("Share with photo", F.t(15, W600, Color.Black), maxLines = 1)
+        T("Share with photo", F.t(15, W600, C.onAccent), maxLines = 1)
     }
 }
 
@@ -741,12 +741,12 @@ private fun FriendCard(rec: Record, me: List<Int>, f: Friend) {
                 val x = i * (pw + gap)
                 val hm = size.height * min(1f, me[i] / 340f)
                 val hf = size.height * min(1f, f.splits[i] / 340f)
-                drawRect(Color.White, Offset(x, size.height - hm), androidx.compose.ui.geometry.Size(bw, hm))
+                drawRect(C.ink, Offset(x, size.height - hm), androidx.compose.ui.geometry.Size(bw, hm))
                 drawRect(C.g3A, Offset(x + bw + 1.dp.toPx(), size.height - hf), androidx.compose.ui.geometry.Size(bw, hf))
             }
         }
         Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LegendDot(Color.White, "Me".l10n)
+            LegendDot(C.ink, "Me".l10n)
             LegendDot(C.g3A, name)
             Spacer(Modifier.weight(1f))
             T("Run 1 → Wall Balls", F.t(F.foot, color = C.text3), maxLines = 1, translate = false)   // 아이폰도 영어 그대로
@@ -801,7 +801,7 @@ private fun HrCard(rec: Record) {
             val dash = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()))
             for (b in bounds) {
                 val x = b * w
-                drawLine(Color.White.copy(alpha = 0.14f), Offset(x, 0f), Offset(x, h), 1.dp.toPx(), pathEffect = dash)
+                drawLine(C.ink.copy(alpha = 0.14f), Offset(x, 0f), Offset(x, h), 1.dp.toPx(), pathEffect = dash)
             }
             val line = Path()
             sample.forEachIndexed { i, q ->
@@ -938,9 +938,9 @@ private fun SplitRow(rec: Record, s: SegResult, last: Boolean, prior: Map<String
             .padding(vertical = 11.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon8(s.icon, 24.dp, if (sk) C.text3 else if (s.kind == SegKind.Run) Color.White else C.accent)
+        Icon8(s.icon, 24.dp, if (sk) C.text3 else if (s.kind == SegKind.Run) C.ink else C.accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            T(title, F.t(15, W500, if (sk) C.text2 else Color.White), maxLines = 1, translate = !partial)
+            T(title, F.t(15, W500, if (sk) C.text2 else C.ink), maxLines = 1, translate = !partial)
             T(if (sk) Units.detail(s.detail, imp) else sub, F.num(11, W500, C.text2, tracking = 0.22f), maxLines = 1, translate = false)
         }
         Column(horizontalAlignment = Alignment.End) {
@@ -1027,10 +1027,10 @@ private fun RankBar(p: Int, modifier: Modifier = Modifier) {
         val w = size.width
         val barH = 10.dp.toPx()
         val top = 4.dp.toPx()
-        drawRoundRect(Brush.horizontalGradient(listOf(C.accent, Color(0xFF6E6A3A), Color(0xFF2A2924))), Offset(0f, top),
+        drawRoundRect(Brush.horizontalGradient(listOf(C.accent, Color(0xFF6E6A3A), C.ad(0x2A2924))), Offset(0f, top),
             androidx.compose.ui.geometry.Size(w, barH), androidx.compose.ui.geometry.CornerRadius(barH / 2))
         val x = w * p.coerceIn(0, 100) / 100f
-        drawRoundRect(Color.White, Offset(x - 2.5.dp.toPx(), top + barH / 2 - 9.dp.toPx()), androidx.compose.ui.geometry.Size(5.dp.toPx(), 18.dp.toPx()),
+        drawRoundRect(C.ink, Offset(x - 2.5.dp.toPx(), top + barH / 2 - 9.dp.toPx()), androidx.compose.ui.geometry.Size(5.dp.toPx(), 18.dp.toPx()),
             androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
         for ((m, t) in labels) {
             val lay = tm.measure(t, style)
@@ -1054,7 +1054,7 @@ private fun BenchRow(name: String, mine: Int, bench: Int, pace: Boolean = false)
         ))
         Canvas(Modifier.fillMaxWidth().height(3.dp)) {
             val r = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
-            drawRoundRect(Color.White.copy(alpha = 0.06f), cornerRadius = r)
+            drawRoundRect(C.ink.copy(alpha = 0.06f), cornerRadius = r)
             val f = min(1f, abs(d) / 90f)
             drawRoundRect(color, size = size.copy(width = max(2.dp.toPx(), size.width * f)), cornerRadius = r)
         }
@@ -1131,9 +1131,9 @@ private fun BoxScope.RouteDrawing(route: List<RoutePt>, chunks: List<Triple<Int,
             // 옅은 격자 (지도 느낌)
             val g = 28.dp.toPx()
             var x = 0f
-            while (x < size.width) { drawLine(Color.White.copy(alpha = 0.035f), Offset(x, 0f), Offset(x, size.height), 1f); x += g }
+            while (x < size.width) { drawLine(C.ink.copy(alpha = 0.035f), Offset(x, 0f), Offset(x, size.height), 1f); x += g }
             var y = 0f
-            while (y < size.height) { drawLine(Color.White.copy(alpha = 0.035f), Offset(0f, y), Offset(size.width, y), 1f); y += g }
+            while (y < size.height) { drawLine(C.ink.copy(alpha = 0.035f), Offset(0f, y), Offset(size.width, y), 1f); y += g }
             // 경로가 다 보이게 (가장자리 여유 20%, 가로세로 비율 유지)
             val lat0 = route.first().a
             val kx = cos(Math.toRadians(lat0))
@@ -1160,7 +1160,7 @@ private fun BoxScope.RouteDrawing(route: List<RoutePt>, chunks: List<Triple<Int,
                 route.indices.forEach { if (it == 0) p.moveTo(pt(it).x, pt(it).y) else p.lineTo(pt(it).x, pt(it).y) }
                 drawPath(p, C.accent, style = Stroke(w, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
-            drawCircle(Color.White, 5.dp.toPx(), pt(0))
+            drawCircle(C.ink, 5.dp.toPx(), pt(0))
             drawCircle(C.accent, 6.dp.toPx(), pt(route.size - 1))
         }
 }

@@ -94,6 +94,7 @@ import com.nkssi.splits8.shared.l10n
 import com.nkssi.splits8.shared.mainSegs
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.Icon8
 import com.nkssi.splits8.ui.Label8
 import com.nkssi.splits8.ui.Sym
@@ -305,9 +306,9 @@ fun PhoneLiveView() {
                         (slideInVertically(tween(250)) { it / 3 } + fadeIn(tween(250))) togetherWith
                             (slideOutVertically(tween(250)) { -it / 3 } + fadeOut(tween(200)))
                     }, label = "count") { k ->
-                        key(k) { T("$k", F.num(160, W700, C.accent), Modifier.testTag("phone.count"), maxLines = 1, translate = false) }
+                        key(k) { T("$k", FD.num(160, W700, C.yellow), Modifier.testTag("phone.count"), maxLines = 1, translate = false) }
                     }
-                    T("Tap to cancel", F.t(15, color = C.text2), maxLines = 1)
+                    T("Tap to cancel", FD.t(15, color = C.dText2), maxLines = 1)
                 }
             }
         }
@@ -324,9 +325,9 @@ internal fun PhoneSegmentList(seq: List<Seg>, idx: Int, splits: List<Int>, skipp
     Column(Modifier.fillMaxSize().testTag("phone.segments")) {
         Row(Modifier.fillMaxWidth().padding(top = (m.top * 0.6f).dp, bottom = 8.dp, start = 6.dp, end = 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            T("SEGMENTS", F.t(13, W600, C.accent, tracking = 1f))
-            T("${min(idx + 1, seq.size)}/${seq.size}", F.num(13, W400, C.text2), Modifier.weight(1f), translate = false)
-            T(word, F.t(12, W600, C.text2, tracking = 0.8f), translate = false)
+            T("SEGMENTS", FD.t(13, W600, C.yellow, tracking = 1f))
+            T("${min(idx + 1, seq.size)}/${seq.size}", FD.num(13, W400, C.dText2), Modifier.weight(1f), translate = false)
+            T(word, FD.t(12, W600, C.dText2, tracking = 0.8f), translate = false)
         }
         LazyColumn(Modifier.fillMaxSize(), state = state, verticalArrangement = Arrangement.spacedBy(2.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 10.dp)) {
@@ -334,7 +335,7 @@ internal fun PhoneSegmentList(seq: List<Seg>, idx: Int, splits: List<Int>, skipp
                 val s = seq[i]
                 val done = i < idx
                 val c = i == idx
-                val tint = when { c -> Color.Black; done -> C.text3; s.kind == SegKind.Rox -> C.text2; else -> Color.White }
+                val tint = when { c -> Color.Black; done -> C.dText3; s.kind == SegKind.Rox -> C.dText2; else -> Color.White }
                 val my = splits.getOrElse(i) { 0 }
                 val sk = done && i in skipped
                 val diff: Int? = if (done && !sk && s.target > 0) my - s.target else null
@@ -344,14 +345,14 @@ internal fun PhoneSegmentList(seq: List<Seg>, idx: Int, splits: List<Int>, skipp
                     c -> Fm.t(segEl)
                     else -> if (s.target > 0) Fm.t(s.target) else "–"
                 }
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (c) C.accent else Color.Transparent).padding(vertical = 9.dp, horizontal = 12.dp),
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (c) C.yellow else Color.Transparent).padding(vertical = 9.dp, horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon8(s.icon, 18.dp, tint)
-                    T(s.name, F.t(16, if (c) W600 else W400, if (c) Color.Black else if (done) C.text2 else Color.White), Modifier.weight(1f),
+                    T(s.name, FD.t(16, if (c) W600 else W400, if (c) Color.Black else if (done) C.dText2 else Color.White), Modifier.weight(1f),
                         maxLines = 1, align = TextAlign.Start, translate = false)
-                    if (diff != null) T(Fm.d(diff), F.num(13, W500, if (diff <= 0) C.good else C.bad), translate = false)
+                    if (diff != null) T(Fm.d(diff), FD.num(13, W500, if (diff <= 0) C.good else C.bad), translate = false)
                     else if (done && !sk) Icon8("i_check", 11.dp, C.good)
-                    T(time, if (sk) F.t(14, W500, C.text3) else F.num(16, W500, if (c) Color.Black else if (done) Color.White else C.text3),
+                    T(time, if (sk) FD.t(14, W500, C.dText3) else FD.num(16, W500, if (c) Color.Black else if (done) Color.White else C.dText3),
                         Modifier.widthIn(min = 58.dp), maxLines = 1, align = TextAlign.End, translate = false)
                 }
             }
@@ -379,7 +380,7 @@ internal fun RowScope.Pill(icon: Int, label: String, fg: Color, bg: Color, h: Fl
     ) {
         Sym(icon, 15.dp, fg)
         Spacer(Modifier.width(7.dp))
-        T(label, F.t(15, W600, fg), maxLines = 1)
+        T(label, FD.t(15, W600, fg), maxLines = 1)
     }
 }
 
@@ -502,12 +503,12 @@ fun FinishSheet(rec: Record) {
         }
         Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 12.dp + 52.dp + 16.dp)) {
             c.tag?.let { FinishTag(it, c.tone, rec) }
-            T(c.line, F.t(F.title2, W600), Modifier.testTag("finish.line"), translate = false)
+            T(c.line, FD.t(F.title2, W600), Modifier.testTag("finish.line"), translate = false)
             // 18번: 종류 줄 (EMOM · 12분 · 인터벌 타이머 40/20 × 10 · 기능성 운동)
             val name = if (Kinds.isNew(rec.kind)) (Bonus.kindLine(rec) ?: rec.title.l10n)
                 else if (rec.mode == Mode.Training) rec.title else rec.mode.title.l10n
-            T(name + " · " + Fm.wdm(rec.date), F.t(F.foot, color = C.text2), Modifier.padding(top = 4.dp), maxLines = 1, translate = false)
-            FitText(Fm.t(rec.total), F.num(46, color = if (isGold) gold else Color.White, tracking = -0.92f), Modifier.padding(top = 14.dp), minScale = 0.6f)
+            T(name + " · " + Fm.wdm(rec.date), FD.t(F.foot, color = C.dText2), Modifier.padding(top = 4.dp), maxLines = 1, translate = false)
+            FitText(Fm.t(rec.total), FD.num(46, color = if (isGold) gold else Color.White, tracking = -0.92f), Modifier.padding(top = 14.dp), minScale = 0.6f)
             Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for ((l, v, u) in finishTiles(rec)) FinishTile(l, v, u)
             }
@@ -515,17 +516,17 @@ fun FinishSheet(rec: Record) {
         }
         Row(Modifier.align(Alignment.BottomCenter).padding(start = 22.dp, end = 22.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
-                    Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).press(tag = "finish.primary") {
+                    Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(14.dp)).background(C.yellow).press(tag = "finish.primary") {
                         Router.finish = null
                         if (c.tone != Cheer.Tone.Check) Router.go(Scr.Share)
                     },
                     contentAlignment = Alignment.Center,
-                ) { T(if (c.tone == Cheer.Tone.Check) "Check splits" else "Share", F.t(17, W600, Color.Black), maxLines = 1) }
+                ) { T(if (c.tone == Cheer.Tone.Check) "Check splits" else "Share", FD.t(17, W600, Color.Black), maxLines = 1) }
                 Box(
                     Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.12f))
                         .press(tag = "finish.done") { Router.finish = null },
                     contentAlignment = Alignment.Center,
-                ) { T("Done", F.t(17, W600), maxLines = 1) }
+                ) { T("Done", FD.t(17, W600), maxLines = 1) }
         }
     }
 }
@@ -559,8 +560,8 @@ private fun RowScope.FinishTile(label: String, value: String, unit: String) {
     Column(Modifier.weight(1f).card8(14.dp).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Label8(label, size = F.cap2)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            FitText(value, F.num(20), Modifier.weight(1f, fill = false), minScale = 0.7f)
-            if (unit.isNotEmpty()) T(unit, F.t(F.cap2, W600, C.text2), Modifier.padding(bottom = 2.dp), maxLines = 1, translate = false)
+            FitText(value, FD.num(20), Modifier.weight(1f, fill = false), minScale = 0.7f)
+            if (unit.isNotEmpty()) T(unit, FD.t(F.cap2, W600, C.dText2), Modifier.padding(bottom = 2.dp), maxLines = 1, translate = false)
         }
     }
 }
@@ -574,6 +575,6 @@ private fun FinishTag(tag: String, tone: Cheer.Tone, rec: Record? = null) {
     if (tag == "★ PB" && rec != null && rec.isRunKind) com.nkssi.splits8.Store.book.runPBLabel(rec)?.let { text = "★ $it" }
     Box(Modifier.padding(bottom = 12.dp).height(24.dp).clip(RoundedCornerShape(50)).background(fill).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center) {
-        T(text, F.t(F.cap1, W700, ink, tracking = 0.72f), maxLines = 1, translate = false)
+        T(text, FD.t(F.cap1, W700, ink, tracking = 0.72f), maxLines = 1, translate = false)
     }
 }

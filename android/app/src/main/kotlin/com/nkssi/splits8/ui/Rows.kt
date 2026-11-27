@@ -61,7 +61,7 @@ fun PBPill(label: String? = null) {
 @Composable
 fun FlagPill(flag: RecordFlag) {
     androidx.compose.foundation.layout.Box(
-        Modifier.height(20.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.10f)).padding(horizontal = 7.dp),
+        Modifier.height(20.dp).clip(RoundedCornerShape(6.dp)).background(C.ink.copy(alpha = 0.10f)).padding(horizontal = 7.dp),
         contentAlignment = Alignment.Center,
     ) { T(flag.label, F.t(11, W600, C.text2, tracking = 0.22f), maxLines = 1) }
 }
@@ -185,7 +185,7 @@ private fun beamStops(light: Color, double: Boolean): Pair<FloatArray, IntArray>
         add(at, light.copy(alpha = 0f))
         add(at + 0.16f, light.copy(alpha = 0.55f))
         add(at + 0.255f, light)
-        add(at + 0.285f, Color.White)
+        add(at + 0.285f, C.ink)
         add(at + 0.30f, light.copy(alpha = 0f))
     }
     add(0f, light.copy(alpha = 0f))
@@ -196,7 +196,7 @@ private fun beamStops(light: Color, double: Boolean): Pair<FloatArray, IntArray>
 
 /** 등급 색 테두리 (왼쪽 위가 진하고 오른쪽 아래로 옅어짐) */
 fun PFTGrade.borderBrush(): Brush = Brush.linearGradient(
-    0f to hex(hex1, 0.9f), 0.45f to hex(hex2, 0.25f), 1f to Color.White.copy(alpha = 0.08f),
+    0f to hex(hex1, 0.9f), 0.45f to hex(hex2, 0.25f), 1f to C.ink.copy(alpha = 0.08f),
 )
 
 /** 홈 프로필 카드: PFT 등급 색 테두리. 골드는 들어올 때마다 빛이 한 바퀴 */

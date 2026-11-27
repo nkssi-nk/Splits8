@@ -1026,6 +1026,8 @@ data class Settings(
     val blockedOpt: List<BlockedUser>? = null,
     /** 배경 빛 색. 노랑이면 비워 둠 */
     val themeOpt: String? = null,
+    /** 1.2.9 화면 모드. null = 다크(예전 그대로), "light" = 라이트. 폰 앱만 (워치는 늘 다크) */
+    val appearOpt: String? = null,
     /** 워치 운동을 폰에 같이 보여 주기. null = 켬 */
     val mirrorOpt: Boolean? = null,
     /** 앱 안에서 고른 언어(ko / en). null = 기기 언어 */
@@ -1092,6 +1094,7 @@ data class Settings(
     /** 1.2.3: 바퀴 안내 (기본 켬) */
     val voiceLap: Boolean get() = voiceLapOpt ?: true
     val glow: GlowTheme get() = GlowTheme.of(themeOpt)
+    val light: Boolean get() = appearOpt == "light"
     /** 워치 운동을 폰에 같이 보여 주기 (기본 켬) */
     val mirror: Boolean get() = mirrorOpt ?: true
     /** 이동 목표 (없으면 30초) */
@@ -1114,6 +1117,7 @@ data class Settings(
     fun withVoiceCheer(v: String) = copy(voiceCheerOpt = if (v == "low") null else v)
     fun withVoiceLap(v: Boolean) = copy(voiceLapOpt = if (v) null else false)
     fun withGlow(v: GlowTheme) = copy(themeOpt = if (v == GlowTheme.Yellow) null else v.raw)
+    fun withLight(v: Boolean) = copy(appearOpt = if (v) "light" else null)
     fun withMirror(v: Boolean) = copy(mirrorOpt = if (v) null else false)
 
     /** 1.2.5: 쓸 수 있는 안정 심박 (35~100, 최대보다 20 넘게 낮을 때만) */

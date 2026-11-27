@@ -74,8 +74,8 @@ import kotlinx.coroutines.launch
 
 /** 막대 색: 나 = 노랑, 파트너 = 회색 */
 object DblColor {
-    val me = C.accent
-    val partner = hex(0x48484A)
+    val me: Color get() = C.accent
+    val partner: Color get() = C.ad(0x48484A)
 }
 
 /** 글자 모음 (아이폰 DblText) */
@@ -198,14 +198,14 @@ fun DoublesPlanSheet() {
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.08f))
+                Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).background(C.ink.copy(alpha = 0.08f))
                     .press(tag = "dbl.reset") { plan = DoublesPlan().copy(partnerName = plan.partnerName, partnerId = plan.partnerId) },
                     contentAlignment = Alignment.Center) {
                     T("Reset", F.t(15, W600), maxLines = 1)
                 }
                 Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).background(C.accent)
                     .press(tag = "dbl.share") { share() }, contentAlignment = Alignment.Center) {
-                    T("Share", F.t(15, W600, Color.Black), maxLines = 1)
+                    T("Share", F.t(15, W600, C.onAccent), maxLines = 1)
                 }
             }
             Note8("In Doubles, you run all 8 runs together. Only stations are split.")
@@ -220,7 +220,7 @@ private fun PartnerCard(plan: DoublesPlan, onChange: (DoublesPlan) -> Unit) {
     Column(Modifier.fillMaxWidth().card8().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Label8("PARTNER")
         val name = plan.partnerName ?: ""
-        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.06f))
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.ink.copy(alpha = 0.06f))
             .padding(vertical = 12.dp, horizontal = 14.dp)) {
             if (name.isEmpty()) T("Partner", F.t(17, color = C.text3), maxLines = 1)
             BasicTextField(name, { v ->
@@ -239,12 +239,12 @@ private fun PartnerCard(plan: DoublesPlan, onChange: (DoublesPlan) -> Unit) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (f in shown) {
                     val on = plan.partnerId == f.id
-                    Box(Modifier.height(34.dp).clip(CircleShape).background(if (on) C.accent else Color.White.copy(alpha = 0.10f))
+                    Box(Modifier.height(34.dp).clip(CircleShape).background(if (on) C.accent else C.ink.copy(alpha = 0.10f))
                         .press(0.96f, tag = "dbl.friend." + f.id) {
                             onChange(if (on) plan.copy(partnerId = null, partnerName = null)
                             else plan.copy(partnerId = f.id, partnerName = DoublesPlan.cleanName(f.name)))
                         }.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                        T(f.name, F.t(13, W600, if (on) Color.Black else Color.White), maxLines = 1, translate = false)
+                        T(f.name, F.t(13, W600, if (on) C.onAccent else C.ink), maxLines = 1, translate = false)
                     }
                 }
             }
@@ -311,7 +311,7 @@ private fun DoublesStationPage(plan: DoublesPlan, index: Int, onCancel: () -> Un
                         T("${n + 1}", F.num(13, color = C.text3), Modifier.width(20.dp), maxLines = 1, translate = false)
                         Box(Modifier.size(8.dp).clip(CircleShape).background((if (t.me) DblColor.me else DblColor.partner).copy(alpha = if (isRest) 0.6f else 1f)))
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            T(if (t.me) "Me".l10n else draft.partnerShown, F.t(15, if (isRest) androidx.compose.ui.text.font.FontWeight.Medium else W600, if (isRest) C.text2 else Color.White),
+                            T(if (t.me) "Me".l10n else draft.partnerShown, F.t(15, if (isRest) androidx.compose.ui.text.font.FontWeight.Medium else W600, if (isRest) C.text2 else C.ink),
                                 maxLines = 1, translate = false)
                             if (isRest) {
                                 Box(Modifier.border(1.dp, C.line, RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp)) {
@@ -320,7 +320,7 @@ private fun DoublesStationPage(plan: DoublesPlan, index: Int, onCancel: () -> Un
                             }
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            T(DoublesPlan.amountText(i, t.amount), F.num(15, color = if (isRest) C.text2 else Color.White), maxLines = 1, translate = false)
+                            T(DoublesPlan.amountText(i, t.amount), F.num(15, color = if (isRest) C.text2 else C.ink), maxLines = 1, translate = false)
                             T(DoublesPlan.num(start) + " → " + DoublesPlan.num(start + t.amount) + unit, F.num(11, androidx.compose.ui.text.font.FontWeight.Normal, C.text3),
                                 maxLines = 1, translate = false)
                         }
@@ -357,16 +357,16 @@ private fun DoublesStationPage(plan: DoublesPlan, index: Int, onCancel: () -> Un
 /** 동그란 +/− 버튼. 못 누르는 상태면 흐리게 보이고, 누르면 이유를 알려 줌 */
 @Composable
 private fun StepButton(glyph: String, on: Boolean, tag: String, onTap: () -> Unit, onBlocked: () -> Unit) {
-    Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = if (on) 0.12f else 0.05f))
+    Box(Modifier.size(32.dp).clip(CircleShape).background(C.ink.copy(alpha = if (on) 0.12f else 0.05f))
         .tap { if (on) onTap() else onBlocked() }.testTag(tag), contentAlignment = Alignment.Center) {
-        T(glyph, F.t(17, W600, if (on) Color.White else C.text3), maxLines = 1, translate = false)
+        T(glyph, F.t(17, W600, if (on) C.ink else C.text3), maxLines = 1, translate = false)
     }
 }
 
 /** 공유용 카드 (360 너비 → 3배로 그림) */
 @Composable
 fun DoublesShareCard(plan: DoublesPlan, division: String) {
-    Column(Modifier.width(360.dp).background(Color.Black).padding(22.dp)) {
+    Column(Modifier.width(360.dp).background(C.bg).padding(22.dp)) {
         Wordmark(22f)
         T("Our swap plan", F.t(28, W600), Modifier.padding(top = 18.dp), maxLines = 1)
         T(division.l10n + " · " + "Me".l10n + " & " + plan.partnerShown, F.t(13, color = C.text2), Modifier.padding(top = 4.dp),

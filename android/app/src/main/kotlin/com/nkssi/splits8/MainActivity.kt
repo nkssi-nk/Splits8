@@ -77,6 +77,15 @@ fun App(showLogo: Boolean = true) {
     // 앱이 앞에 있는 동안: 다른 기기 로그인 확인 (3분마다) · 친구 목록 새로 받기
     val life = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    // 1.2.9 라이트 모드: 위 상태줄 · 아래 내비게이션 글자색도 바꿈
+    val light = Store.settings.light
+    LaunchedEffect(light) {
+        val t = android.graphics.Color.TRANSPARENT
+        (ctx as? androidx.activity.ComponentActivity)?.enableEdgeToEdge(
+            statusBarStyle = if (light) SystemBarStyle.light(t, t) else SystemBarStyle.dark(t),
+            navigationBarStyle = if (light) SystemBarStyle.light(t, t) else SystemBarStyle.dark(t),
+        )
+    }
     LaunchedEffect(life) {
         life.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
             WatchSync.refreshState()

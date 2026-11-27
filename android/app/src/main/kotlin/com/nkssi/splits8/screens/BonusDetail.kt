@@ -73,7 +73,7 @@ private fun TableRow(name: String, nameColor: Color, cells: List<String>, last: 
     ) {
         T(name, if (header) F.t(11, W600, C.text3, tracking = 0.6f) else F.t(15, W600, nameColor), Modifier.weight(1.4f), maxLines = 1, translate = false)
         for (c in cells) {
-            T(c, if (header) F.t(11, W600, C.text3, tracking = 0.6f) else F.num(15, W500, Color.White), Modifier.weight(1f),
+            T(c, if (header) F.t(11, W600, C.text3, tracking = 0.6f) else F.num(15, W500, C.ink), Modifier.weight(1f),
                 maxLines = 1, align = androidx.compose.ui.text.style.TextAlign.End, translate = false)
         }
     }
@@ -92,7 +92,7 @@ private fun RoundsTable(rec: Record) {
             val full = rec.kind != Kinds.TABATA || s.time >= s.target
             val name = if (partial) "Extra".l10n else s.name.l10n
             val time = if (emom) (s.work?.let { Fm.t(it) } ?: "–") else Fm.t(s.time)
-            TableRow(name, if (partial || !full) C.text2 else Color.White, listOf(time, s.hr?.toString() ?: "–"), i == rows.size - 1,
+            TableRow(name, if (partial || !full) C.text2 else C.ink, listOf(time, s.hr?.toString() ?: "–"), i == rows.size - 1,
                 tag = "detail.round.$i")
         }
     }
@@ -134,7 +134,7 @@ private fun StepsTable(rec: Record) {
             val pace = if (d != null && d >= 50 && s.kind == SegKind.Run) Fm.t(Units.pace((s.time / d * 1000).roundToInt(), imp)) else "–"
             val dist = if (d != null && d > 0) Units.dist(d, imp) + " " + Units.distUnit(imp) else "–"
             val label = s.name.l10n + (s.rep?.let { " $it" } ?: "")
-            TableRow(label, if (fast) C.accent else if (s.kind == SegKind.Rox) C.text2 else Color.White,
+            TableRow(label, if (fast) C.accent else if (s.kind == SegKind.Rox) C.text2 else C.ink,
                 listOf(dist, Fm.t(s.time), pace), i == rec.segs.size - 1, tag = "detail.step.$i")
         }
     }
@@ -161,7 +161,7 @@ private fun LiftTables(rec: Record) {
     }
     for ((name, sets) in Bonus.liftTable(rec)) {
         Column(Modifier.fillMaxWidth().padding(top = 8.dp).card8(18.dp)) {
-            TableRow(name.l10n, Color.White, listOf("REPS".l10n, "KG", "TIME".l10n), false, header = false)
+            TableRow(name.l10n, C.ink, listOf("REPS".l10n, "KG", "TIME".l10n), false, header = false)
             sets.forEachIndexed { i, s ->
                 if (edit) LiftEditRow(rec, s, i == sets.size - 1)
                 else TableRow(L10n.t("Set %lld", s.rep ?: (i + 1)), C.text2,

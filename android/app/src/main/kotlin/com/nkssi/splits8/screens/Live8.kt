@@ -69,6 +69,7 @@ import com.nkssi.splits8.shared.l10n
 import com.nkssi.splits8.shared.runMeters
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.W600
 import com.nkssi.splits8.ui.W700
 import com.nkssi.splits8.ui.hex
@@ -101,7 +102,7 @@ enum class LTone {
     val blob: Color get() = if (this == Station) hex(0xC87800) else Color.Black
     /** 큰 버튼 · 지금 구간 띠 (노랑 위 = 검정 바탕 노랑 글자, 그 밖 = 흰 바탕 파랑 글자) */
     val mainFill: Color get() = if (dark) Color.Black.copy(alpha = 0.69f) else Color.White.copy(alpha = 0.8f)
-    val mainInk: Color get() = if (dark) C.accent else hex(0x1E78FA)
+    val mainInk: Color get() = if (dark) C.yellow else hex(0x1E78FA)
 
     companion object {
         /** 1.2.8 (대표님 11-25): 심박 Z4 · Z5 면 배경 아래쪽을 주황 · 빨강으로 (Roxzone · 휴식 회색은 안 바뀜). 워치와 같음 */
@@ -406,15 +407,15 @@ fun LiveTop8(f: LiveFrame8, L: PL, status: String, live: Boolean, tagPrefix: Str
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.atP((L.w / 2).dp, L.dy(70f)).widthIn(max = (L.w - 48).dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            val st = F.t(L.v(13f), W600, t.label).lShadow(t)
+            val st = FD.t(L.v(13f), W600, t.label).lShadow(t)
             BasicText((if (f.mode == com.nkssi.splits8.shared.Mode.Training) f.title else f.mode.title).l10n, style = st, maxLines = 1)
             BasicText("·", style = st)
             Canvas(Modifier.size(7.dp)) { drawCircle(if (live) hex(0x34C759) else t.sub) }
             BasicText(status.l10n, Modifier.testTag("$tagPrefix.status"), style = st, maxLines = 1)
         }
         Row(Modifier.atP((L.w / 2).dp, L.dy(104f)), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BasicText((if (f.runCard) "TIME" else "TOTAL").l10n, style = F.t(L.v(13f), W700, t.label, tracking = 1f).lShadow(t))
-            BasicText(Fm.t(f.total), Modifier.testTag("$tagPrefix.total"), style = F.num(L.v(30f), W600, if (f.running) t.ink else t.sub).lShadow(t))
+            BasicText((if (f.runCard) "TIME" else "TOTAL").l10n, style = FD.t(L.v(13f), W700, t.label, tracking = 1f).lShadow(t))
+            BasicText(Fm.t(f.total), Modifier.testTag("$tagPrefix.total"), style = FD.num(L.v(30f), W600, if (f.running) t.ink else t.sub).lShadow(t))
         }
     }
 }
@@ -425,9 +426,9 @@ fun LiveTop8(f: LiveFrame8, L: PL, status: String, live: Boolean, tagPrefix: Str
 @Composable
 fun RowScopeCell(L: PL, label: String, value: String, tone: LTone, strong: Boolean = false, size: Float = 40f, tag: String? = null, modifier: Modifier) {
     Box(modifier.height(L.dy(80f)), contentAlignment = Alignment.Center) {
-        LText(label, F.t(L.v(14f), W700, if (strong) tone.ink else tone.label, tracking = 0.8f).lShadow(tone),
+        LText(label, FD.t(L.v(14f), W700, if (strong) tone.ink else tone.label, tracking = 0.8f).lShadow(tone),
             Modifier.fillMaxWidth().padding(horizontal = 4.dp).offsetY(-L.y(20f)))
-        LText(value, F.num(L.v(size), W600, tone.ink).lShadow(tone),
+        LText(value, FD.num(L.v(size), W600, tone.ink).lShadow(tone),
             Modifier.fillMaxWidth().padding(horizontal = 4.dp).offsetY(L.y(20f)).let { if (tag != null) it.testTag(tag) else it }, minScale = 0.5f)
     }
 }
@@ -486,11 +487,11 @@ fun LivePageDots8(L: PL, count: Int, page: Int, tone: LTone) {
 fun LiveBigBlock8(L: PL, label: String, main: String, unit: String = "", tone: LTone, labelColor: Color? = null, tag: String? = null) {
     val hasUnit = unit.isNotEmpty()
     Box(Modifier.fillMaxSize()) {
-        LText(label, F.t(L.v(17f), W700, labelColor ?: tone.sub, tracking = 1f).lShadow(tone),
+        LText(label, FD.t(L.v(17f), W700, labelColor ?: tone.sub, tracking = 1f).lShadow(tone),
             Modifier.atP((L.w / 2).dp, L.dy(if (hasUnit) 192.9f else 206.2f)).width((L.w - 80).dp), minScale = 0.7f)
-        LText(main, F.num(L.v(84f), W700, tone.ink).lShadow(tone),
+        LText(main, FD.num(L.v(84f), W700, tone.ink).lShadow(tone),
             Modifier.atP((L.w / 2).dp, L.dy(if (hasUnit) 244.7f else 258f)).width((L.w - 80).dp).let { if (tag != null) it.testTag(tag) else it }, minScale = 0.45f)
-        if (hasUnit) LText(unit, F.t(L.v(15f), W700, tone.label, tracking = 1f).lShadow(tone),
+        if (hasUnit) LText(unit, FD.t(L.v(15f), W700, tone.label, tracking = 1f).lShadow(tone),
             Modifier.atP((L.w / 2).dp, L.dy(295.9f)).width((L.w - 80).dp), minScale = 0.7f)
     }
 }
@@ -500,8 +501,8 @@ fun LiveBigBlock8(L: PL, label: String, main: String, unit: String = "", tone: L
 fun LiveNext8(L: PL, name: String, tone: LTone, tag: String) {
     Row(Modifier.atP((L.w / 2).dp, L.dy(534f)).widthIn(max = (L.w - 48).dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        BasicText("Next".l10n, style = F.t(L.v(26f), W600, tone.sub).lShadow(tone), maxLines = 1)
-        LText(name, F.t(L.v(26f), W700, tone.ink).lShadow(tone), Modifier.widthIn(max = (L.w - 130).dp).testTag(tag))
+        BasicText("Next".l10n, style = FD.t(L.v(26f), W600, tone.sub).lShadow(tone), maxLines = 1)
+        LText(name, FD.t(L.v(26f), W700, tone.ink).lShadow(tone), Modifier.widthIn(max = (L.w - 130).dp).testTag(tag))
     }
 }
 
@@ -516,9 +517,9 @@ fun LiveMain8(f: LiveFrame8, L: PL, tagPrefix: String) {
             LiveBigBlock8(L, f.title.ifEmpty { "Run" }.l10n, Units.dist(f.runDist, f.imperial), if (f.imperial) "MI" else "KM", t, tag = "$tagPrefix.dist")
         } else {
             val one = f.detailLine.isEmpty()
-            LText(f.cur.name.l10n, F.t(L.v(52f), W700, t.ink).lShadow(t),
+            LText(f.cur.name.l10n, FD.t(L.v(52f), W700, t.ink).lShadow(t),
                 Modifier.atP((L.w / 2).dp, L.dy(if (one) 244f else 227.2f)).width(min(L.w - 80, L.v(300f)).dp).testTag("$tagPrefix.name"), minScale = 30f / 52f)
-            if (!one) LText(f.detailLine, F.t(L.v(22f), W600, t.sub).lShadow(t),
+            if (!one) LText(f.detailLine, FD.t(L.v(22f), W600, t.sub).lShadow(t),
                 Modifier.atP((L.w / 2).dp, L.dy(271.4f)).width((L.w - 80).dp))
         }
         LiveCells(L, 398f, cellList(f), t, tagPrefix)
@@ -533,7 +534,7 @@ fun LiveMain8(f: LiveFrame8, L: PL, tagPrefix: String) {
                     drawRoundRect(Color.Black.copy(alpha = 0.3f), Offset(x0, y - h / 2), Size(w, h), CornerRadius(h / 2))
                     if (frac != null) drawRoundRect(Color.White, Offset(x0, y - h / 2), Size(max(h, w * frac), h), CornerRadius(h / 2))
                 }
-                LText(f.runSummary, F.num(L.v(15f), W600, t.sub).lShadow(t), Modifier.atP((L.w / 2).dp, L.dy(494f)).width((L.w - 48).dp))
+                LText(f.runSummary, FD.num(L.v(15f), W600, t.sub).lShadow(t), Modifier.atP((L.w / 2).dp, L.dy(494f)).width((L.w - 48).dp))
             }
             !f.open -> {
                 val units = f.seq.indices.filter { f.seq[it].kind != SegKind.Rox || f.seq[it].icon == "rest" }
@@ -541,7 +542,7 @@ fun LiveMain8(f: LiveFrame8, L: PL, tagPrefix: String) {
                 val onRox = f.cur.kind == SegKind.Rox && f.cur.icon != "rest"
                 LiveDots8(L, 482f, units.size, before, t, onRox)
             }
-            f.cur.icon == "hiit" -> LText(L10n.t("%lld rounds done", f.idx), F.t(L.v(15f), W700, t.sub),
+            f.cur.icon == "hiit" -> LText(L10n.t("%lld rounds done", f.idx), FD.t(L.v(15f), W700, t.sub),
                 Modifier.atP((L.w / 2).dp, L.dy(482f)).width((L.w - 48).dp))
         }
         if (!f.runCard) LiveNext8(L, f.nextSeg?.name?.l10n ?: "Finish".l10n, t, "live.nextName")
@@ -606,7 +607,7 @@ fun LiveButtons8(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     val ink = tone.mainInk.copy(alpha = if (nextOn) 1f else 0.45f)
                     Canvas(Modifier.size(L.dv(26f), L.dv(22f))) { lArrow(center, size.width, size.height, ink) }
-                    LText(nextTitle.l10n, F.t(L.v(24f), W700, ink), Modifier.widthIn(max = (L.w - 140).dp))
+                    LText(nextTitle.l10n, FD.t(L.v(24f), W700, ink), Modifier.widthIn(max = (L.w - 140).dp))
                 }
             }
         }
@@ -633,7 +634,7 @@ private fun PillBtn(L: PL, modifier: Modifier, t: String, fill: Color, rim: Floa
         val c = fg.copy(alpha = if (on) 1f else 0.4f)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Canvas(Modifier.size(L.dv(15f))) { icon(c) }
-            LText(t.l10n, F.t(L.v(15f), W600, c), minScale = 0.7f)
+            LText(t.l10n, FD.t(L.v(15f), W600, c), minScale = 0.7f)
         }
     }
 }
@@ -651,9 +652,9 @@ fun LiveSegmentList8(L: PL, tone: LTone, seq: List<Seg>, idx: Int, splits: List<
         Column(Modifier.fillMaxWidth().padding(top = L.dy(134f)).height(L.dy(574f - 134f))) {
             Row(Modifier.fillMaxWidth().height(L.dy(24f)).padding(horizontal = 30.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                BasicText("SEGMENTS".l10n, style = F.t(L.v(14f), W700, tone.ink, tracking = 1f))
-                BasicText("${min(idx + 1, seq.size)}/${seq.size}", Modifier.weight(1f), style = F.num(L.v(14f), W600, tone.sub))
-                BasicText(word.l10n, style = F.t(L.v(13f), W700, tone.label, tracking = 0.8f))
+                BasicText("SEGMENTS".l10n, style = FD.t(L.v(14f), W700, tone.ink, tracking = 1f))
+                BasicText("${min(idx + 1, seq.size)}/${seq.size}", Modifier.weight(1f), style = FD.num(L.v(14f), W600, tone.sub))
+                BasicText(word.l10n, style = FD.t(L.v(13f), W700, tone.label, tracking = 0.8f))
             }
             LazyColumn(Modifier.fillMaxWidth().weight(1f), state = state, contentPadding = PaddingValues(horizontal = 20.dp)) {
                 items(seq.size) { i ->
@@ -673,9 +674,9 @@ fun LiveSegmentList8(L: PL, tone: LTone, seq: List<Seg>, idx: Int, splits: List<
                     val timeColor = if (c) tone.mainInk else if (d) tone.ink else tone.sub
                     Row(Modifier.fillMaxWidth().height(L.dy(26f)).let { if (c) it.drawBehind { lGlass(size, size.height / 2, tone.mainFill, 0.22f) } else it }
                         .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        BasicText(s.name.l10n, Modifier.weight(1f), style = F.t(L.v(16f), if (c) W700 else W600, nameColor), maxLines = 1)
-                        if (diff != null) BasicText(Fm.d(diff), style = F.num(L.v(14f), W600, if (diff <= 0) good else bad))
-                        BasicText(time, Modifier.widthIn(min = 58.dp), style = (if (sk) F.t(L.v(14f), FontWeight.Medium, tone.sub) else F.num(L.v(16f), W600, timeColor))
+                        BasicText(s.name.l10n, Modifier.weight(1f), style = FD.t(L.v(16f), if (c) W700 else W600, nameColor), maxLines = 1)
+                        if (diff != null) BasicText(Fm.d(diff), style = FD.num(L.v(14f), W600, if (diff <= 0) good else bad))
+                        BasicText(time, Modifier.widthIn(min = 58.dp), style = (if (sk) FD.t(L.v(14f), FontWeight.Medium, tone.sub) else FD.num(L.v(16f), W600, timeColor))
                             .copy(textAlign = TextAlign.End), maxLines = 1)
                     }
                 }

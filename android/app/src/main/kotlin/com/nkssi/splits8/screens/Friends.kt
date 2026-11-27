@@ -212,7 +212,7 @@ private fun Cheers() {
                 Avatar8(34.dp, c.nickname.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(c.avatarUrl))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     T("@" + c.nickname, F.t(15, W600), maxLines = 1, translate = false)
-                    T(if (k.isEmoji) L10n.t("Sent you %@", k.emoji) else k.emoji + " " + k.line.l10n, F.t(13, color = if (c.seen) C.text2 else Color.White),
+                    T(if (k.isEmoji) L10n.t("Sent you %@", k.emoji) else k.emoji + " " + k.line.l10n, F.t(13, color = if (c.seen) C.text2 else C.ink),
                         maxLines = 1, translate = false)
                 }
                 T(cheerAgo(c.createdAt), F.t(12, color = C.text3), maxLines = 1, translate = false)
@@ -344,9 +344,9 @@ private fun Blocked() {
 /** 32 높이 알약 */
 @Composable
 private fun Pill(title: String, yellow: Boolean, tag: String, enabled: Boolean = true, dim: Boolean = false, onClick: () -> Unit) {
-    Box(Modifier.height(32.dp).clip(CircleShape).background(if (yellow) C.accent else Color.White.copy(alpha = 0.12f))
+    Box(Modifier.height(32.dp).clip(CircleShape).background(if (yellow) C.accent else C.ink.copy(alpha = 0.12f))
         .press(0.96f, enabled = enabled, tag = tag, onClick = onClick).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-        T(title, F.t(13, W600, if (yellow) Color.Black else if (dim) C.text2 else Color.White), maxLines = 1)
+        T(title, F.t(13, W600, if (yellow) C.onAccent else if (dim) C.text2 else C.ink), maxLines = 1)
     }
 }
 

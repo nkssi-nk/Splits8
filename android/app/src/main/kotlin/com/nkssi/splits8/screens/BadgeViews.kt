@@ -74,11 +74,11 @@ fun BadgeIcon(b: Badge, on: Boolean, size: Dp = 54.dp, modifier: Modifier = Modi
         modifier.size(size)
             .then(if (on) Modifier.outerGlow(C.accent.copy(alpha = 0.35f), size / 2, 8.dp) else Modifier)
             .clip(CircleShape)
-            .background(if (on) Brush.verticalGradient(listOf(Color(0xFFFFE600), Color(0xFFFFB800))) else Brush.linearGradient(listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.06f))))
-            .border(1.dp, if (on) Color.White.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.10f), CircleShape),
+            .background(if (on) Brush.verticalGradient(listOf(C.accent, Color(0xFFFFB800))) else Brush.linearGradient(listOf(C.ink.copy(alpha = 0.06f), C.ink.copy(alpha = 0.06f))))
+            .border(1.dp, if (on) C.ink.copy(alpha = 0.35f) else C.ink.copy(alpha = 0.10f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Sym(badgeSym(b.icon), size * 0.42f, if (on) Color.Black else C.text3)
+        Sym(badgeSym(b.icon), size * 0.42f, if (on) C.onAccent else C.text3)
     }
 }
 
@@ -108,7 +108,7 @@ fun BadgesCard() {
                                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     BadgeIcon(b, d != null)
-                                    T(b.title, F.t(11, W500, if (d != null) Color.White else C.text3), Modifier.fillMaxWidth().height(28.dp),
+                                    T(b.title, F.t(11, W500, if (d != null) C.ink else C.text3), Modifier.fillMaxWidth().height(28.dp),
                                         maxLines = 2, align = TextAlign.Center)
                                 }
                             }

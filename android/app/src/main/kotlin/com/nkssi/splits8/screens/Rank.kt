@@ -77,7 +77,7 @@ fun OfficialCard(o: OfficialResult) {
     Column(Modifier.fillMaxWidth().card8().padding(vertical = 16.dp, horizontal = 18.dp).testTag("detail.official"),
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            T("OFFICIAL", F.t(10, W700, Color.Black), Modifier.clip(RoundedCornerShape(6.dp)).background(C.accent).padding(vertical = 2.dp, horizontal = 7.dp), translate = false)
+            T("OFFICIAL", F.t(10, W700, C.onAccent), Modifier.clip(RoundedCornerShape(6.dp)).background(C.accent).padding(vertical = 2.dp, horizontal = 7.dp), translate = false)
             T("${o.event} · ${o.division.l10n}", F.t(13, color = C.text2), maxLines = 1, translate = false)
         }
         Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -111,7 +111,7 @@ fun OfficialEntrySection(ev: RaceEvent) {
         F.t(13, color = C.text2), Modifier.padding(horizontal = 4.dp))
     Box(Modifier.fillMaxWidth().height(48.dp).yellowFill(RoundedCornerShape(50), on = ev.isSet)
         .press(enabled = ev.isSet, tag = "ev.addOfficial") { Router.officialFor = ev }, contentAlignment = Alignment.Center) {
-        T("Add official result", F.t(16, W600, if (ev.isSet) Color.Black else C.text3), maxLines = 1)
+        T("Add official result", F.t(16, W600, if (ev.isSet) C.onAccent else C.text3), maxLines = 1)
     }
     T("Official results ↗", F.t(14, W600, C.accent), Modifier.fillMaxWidth().padding(vertical = 6.dp)
         .tap { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(RESULTS_URL))) } }.testTag("ev.officialResults"),
@@ -220,7 +220,7 @@ fun OfficialImportSheet(ev: RaceEvent) {
         Box(Modifier.fillMaxWidth().height(48.dp).yellowFill(RoundedCornerShape(50))
             .press(tag = "official.pick") { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             contentAlignment = Alignment.Center) {
-            T(if (readOnce) "Choose another screenshot" else "Choose screenshot", F.t(16, W600, Color.Black), maxLines = 1)
+            T(if (readOnce) "Choose another screenshot" else "Choose screenshot", F.t(16, W600, C.onAccent), maxLines = 1)
         }
         T(if (reading) "Reading the screenshot…".l10n else "🔒 " + "The photo is read only on this device.".l10n,
             F.t(12, color = C.text2), Modifier.fillMaxWidth(), align = TextAlign.Center, translate = false)
@@ -234,7 +234,7 @@ fun OfficialImportSheet(ev: RaceEvent) {
                 T(division, F.t(15, color = C.accent), Modifier.tap { divOpen = !divOpen }, translate = false)
             }
             if (divOpen) Division.all.forEach { d ->
-                T(d.name, F.t(15, color = if (d.name == division) C.accent else Color.White),
+                T(d.name, F.t(15, color = if (d.name == division) C.accent else C.ink),
                     Modifier.fillMaxWidth().tap { division = d.name; divOpen = false }.padding(vertical = 8.dp, horizontal = 28.dp), translate = false)
             }
             Row8("Overall time", total, "1:21:30", tag = "official.total") { total = it }
@@ -295,7 +295,7 @@ fun IndoorDistanceCard(rec: com.nkssi.splits8.shared.Record) {
                     Router.detail = x
                     text = ""
                 }, contentAlignment = Alignment.Center) {
-                T("Fix distance", F.t(15, W600, if (canFix) Color.Black else C.text3), maxLines = 1)
+                T("Fix distance", F.t(15, W600, if (canFix) C.onAccent else C.text3), maxLines = 1)
             }
         }
         T("Enter the distance shown on the treadmill. Splits and pace are recalculated; your time stays the same.", F.t(12, color = C.text3))

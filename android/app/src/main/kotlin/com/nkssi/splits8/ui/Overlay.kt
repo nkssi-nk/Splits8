@@ -99,7 +99,7 @@ fun AskHost() {
         val x = shown ?: return@AnimatedVisibility
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).tap { }, contentAlignment = Alignment.Center) {
             Column(
-                Modifier.width(280.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2C2C2E)).testTag("ask"),
+                Modifier.width(280.dp).clip(RoundedCornerShape(14.dp)).background(C.ad(0x2C2C2E)).testTag("ask"),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 18.dp),
@@ -107,10 +107,10 @@ fun AskHost() {
                     T(x.title, F.t(17, W600), align = TextAlign.Center)
                     if (x.message != null) T(x.message, F.t(13, color = C.d1).copy(lineHeight = androidx.compose.ui.unit.TextUnit(18f, androidx.compose.ui.unit.TextUnitType.Sp)), align = TextAlign.Center)
                 }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(C.ink.copy(alpha = 0.12f)))
                 if (x.alt != null) {
                     // 세 단추: 세로로 쌓음 (OK · 빨간 단추 · Cancel)
-                    val line = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f))
+                    val line = Modifier.fillMaxWidth().height(1.dp).background(C.ink.copy(alpha = 0.12f))
                     Box(Modifier.fillMaxWidth().height(46.dp).tap { Router.ask = null; x.onOk() }.testTag("ask.ok"), contentAlignment = Alignment.Center) {
                         T(x.ok, F.t(17, W600, C.accent), maxLines = 1)
                     }
@@ -131,7 +131,7 @@ fun AskHost() {
                         Box(Modifier.weight(1f).fillMaxHeight().tap { Router.ask = null }.testTag("ask.cancel"), contentAlignment = Alignment.Center) {
                             T(x.cancel, F.t(17, color = C.accent), maxLines = 1)
                         }
-                        Box(Modifier.width(1.dp).fillMaxHeight().background(Color.White.copy(alpha = 0.12f)))
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(C.ink.copy(alpha = 0.12f)))
                     }
                     Box(
                         Modifier.weight(1f).fillMaxHeight().tap { Router.ask = null; x.onOk() }.testTag("ask.ok"),
@@ -186,7 +186,7 @@ fun <T : Any> Sheet8(item: T?, onClose: () -> Unit, large: Boolean = false, bg: 
                         ) { _, dy -> scope.launch { drag.snapTo((drag.value + dy).coerceAtLeast(0f)) } }
                     },
                     contentAlignment = Alignment.Center,
-                ) { Box(Modifier.size(36.dp, 5.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.25f))) }
+                ) { Box(Modifier.size(36.dp, 5.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.25f))) }
                 content(it)
             }
         }
@@ -289,8 +289,8 @@ fun PagedCard(count: Int, modifier: Modifier = Modifier, row: @Composable (index
 @Composable
 private fun PagerArrow(icon: String, on: Boolean, tag: String, onClick: () -> Unit) {
     Box(Modifier.size(44.dp).press(0.92f, enabled = on, tag = tag, onClick = onClick), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = if (on) 0.08f else 0.04f)), contentAlignment = Alignment.Center) {
-            Glyph(icon, 13.dp, if (on) C.accent else Color(0xFF4A4A4A))
+        Box(Modifier.size(34.dp).clip(CircleShape).background(C.ink.copy(alpha = if (on) 0.08f else 0.04f)), contentAlignment = Alignment.Center) {
+            Glyph(icon, 13.dp, if (on) C.accent else C.ad(0x4A4A4A))
         }
     }
 }
@@ -313,7 +313,7 @@ fun EmptyHistory() {
 
 /** 안드로이드에 따로 그린 작은 기호 (휴지통 · 링크 · 폰) */
 @Composable
-fun Sym(id: Int, size: Dp, color: Color = Color.White, modifier: Modifier = Modifier) {
+fun Sym(id: Int, size: Dp, color: Color = C.ink, modifier: Modifier = Modifier) {
     androidx.compose.foundation.Image(
         androidx.compose.ui.res.painterResource(id), null, modifier.size(size),
         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(color),

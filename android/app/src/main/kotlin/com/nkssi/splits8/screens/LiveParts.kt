@@ -38,6 +38,7 @@ import com.nkssi.splits8.shared.SegKind
 import com.nkssi.splits8.shared.runMeters
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.Icon8
 import com.nkssi.splits8.ui.T
 import com.nkssi.splits8.ui.W600
@@ -142,17 +143,17 @@ fun LiveHeader(f: LiveFrame, status: String, live: Boolean, tagPrefix: String) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                T(if (f.mode == Mode.Training) f.title else f.mode.title, F.t(17, W600), maxLines = 1)
+                T(if (f.mode == Mode.Training) f.title else f.mode.title, FD.t(17, W600), maxLines = 1)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(if (live) C.good else C.text3))
-                    T(status, F.t(12, color = C.text2), Modifier.testTag("$tagPrefix.status"), maxLines = 1)
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(if (live) C.good else C.dText3))
+                    T(status, FD.t(12, color = C.dText2), Modifier.testTag("$tagPrefix.status"), maxLines = 1)
                 }
             }
             Spacer(Modifier.width(12.dp))
             if (!f.open && !f.runCard) {
-                Box(Modifier.height(22.dp).border(1.dp, C.accent.copy(alpha = 0.5f), RoundedCornerShape(50)).padding(horizontal = 8.dp),
+                Box(Modifier.height(22.dp).border(1.dp, C.yellow.copy(alpha = 0.5f), RoundedCornerShape(50)).padding(horizontal = 8.dp),
                     contentAlignment = Alignment.Center) {
-                    T("${f.countNow} / ${f.countTotal}", F.num(12, color = C.accent), Modifier.testTag("$tagPrefix.of"), maxLines = 1, translate = false)
+                    T("${f.countNow} / ${f.countTotal}", FD.num(12, color = C.yellow), Modifier.testTag("$tagPrefix.of"), maxLines = 1, translate = false)
                 }
             }
         }
@@ -168,9 +169,9 @@ fun LiveProgressBar(fraction: Float, height: Float = 3f) {
         val cy = size.height / 2
         val x = size.width * fraction
         drawRoundRect(Color.White.copy(alpha = 0.16f), Offset(0f, cy - h / 2), Size(size.width, h), CornerRadius(h / 2))
-        drawRoundRect(C.accent, Offset(0f, cy - h / 2), Size(max(h, x), h), CornerRadius(h / 2))
-        drawCircle(Brush.radialGradient(listOf(C.accent.copy(alpha = 0.6f), C.accent.copy(alpha = 0f)), Offset(x, cy), h * 3), h * 3, Offset(x, cy))
-        drawCircle(C.accent, h * 1.5f, Offset(x, cy))
+        drawRoundRect(C.yellow, Offset(0f, cy - h / 2), Size(max(h, x), h), CornerRadius(h / 2))
+        drawCircle(Brush.radialGradient(listOf(C.yellow.copy(alpha = 0.6f), C.yellow.copy(alpha = 0f)), Offset(x, cy), h * 3), h * 3, Offset(x, cy))
+        drawCircle(C.yellow, h * 1.5f, Offset(x, cy))
     }
 }
 
@@ -179,22 +180,22 @@ fun LiveProgressBar(fraction: Float, height: Float = 3f) {
 fun LiveBody(f: LiveFrame, totalFont: Float, segFont: Float, icon: Float, nameFont: Float, detailFont: Float,
              segTop: Float, nameTop: Float, tagPrefix: String, modifier: Modifier = Modifier) {
     val cur = f.cur
-    val timeColor = if (f.running) Color.White else C.text2
+    val timeColor = if (f.running) Color.White else C.dText2
     // 지금 하는 구간의 시간은 노랑 (전체 시간은 흰색), 목표를 넘기면 빨강
-    val segColor = if (!f.running) C.text2 else if (f.over) C.bad else C.accent
+    val segColor = if (!f.running) C.dText2 else if (f.over) C.bad else C.yellow
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        T("TOTAL", F.t(12, W600, C.text2, tracking = 1.44f), maxLines = 1)
-        FitText(Fm.t(f.total), F.num(totalFont, color = timeColor, tracking = -0.02f * totalFont),
+        T("TOTAL", FD.t(12, W600, C.dText2, tracking = 1.44f), maxLines = 1)
+        FitText(Fm.t(f.total), FD.num(totalFont, color = timeColor, tracking = -0.02f * totalFont),
             Modifier.testTag("$tagPrefix.total"), minScale = 0.6f)
         Row(Modifier.padding(top = (segTop * 0.6f).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon8(cur.icon, (icon * 0.7f).dp, if (cur.kind == SegKind.Rox) C.text2 else C.accent)
+            Icon8(cur.icon, (icon * 0.7f).dp, if (cur.kind == SegKind.Rox) C.dText2 else C.yellow)
             // 1.2.2: 러닝 카드는 "KM 9" 대신 운동 이름
-            FitText(if (f.runCard) f.title.ifEmpty { "Run" } else cur.name, F.t(nameFont, W600), minScale = 0.7f)
+            FitText(if (f.runCard) f.title.ifEmpty { "Run" } else cur.name, FD.t(nameFont, W600), minScale = 0.7f)
         }
         if (f.runCard) {
             // 1.2.2 러닝 카드 (대표님 11-09): DIST(지금까지 총 거리) | PACE(지금 페이스, 모르면 처음부터 평균 — 1 km 마다 "측정 중" 안 됨)
             Row(Modifier.padding(top = nameTop.dp).fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                LiveCol(if (f.imperial) "DIST MI" else "DIST KM", Units.dist(f.runDist, f.imperial), if (f.running) C.accent else C.text2,
+                LiveCol(if (f.imperial) "DIST MI" else "DIST KM", Units.dist(f.runDist, f.imperial), if (f.running) C.yellow else C.dText2,
                     segFont * 0.85f, Modifier.testTag("$tagPrefix.dist"))
                 Box(Modifier.padding(top = 22.dp).width(1.dp).height((segFont * 0.85f).dp).background(Color.White.copy(alpha = 0.14f)))
                 LiveCol(if (f.imperial) "PACE /MI" else "PACE /KM", LivePace.text(f.total, f.runDist, f.imperial, f.speed), timeColor, segFont * 0.85f)
@@ -208,10 +209,10 @@ fun LiveBody(f: LiveFrame, totalFont: Float, segFont: Float, icon: Float, nameFo
                 cur.kind == SegKind.Run -> LiveCol(if (f.imperial) "PACE /MI" else "PACE /KM",
                     LivePace.text(f.segEl, f.segDist, f.imperial, f.speed), timeColor, segFont * 0.85f)
                 cur.target > 0 -> LiveCol(f.goalWord, Fm.t(cur.target), timeColor, segFont * 0.85f, Modifier.testTag("$tagPrefix.goal"))
-                else -> LiveCol("", Units.detail(cur.detail, f.imperial), C.text2, nameFont)
+                else -> LiveCol("", Units.detail(cur.detail, f.imperial), C.dText2, nameFont)
             }
         }
-        FitText(if (f.runCard) f.runSummary else f.detailLine, F.num(detailFont, androidx.compose.ui.text.font.FontWeight.Normal, C.aeb),
+        FitText(if (f.runCard) f.runSummary else f.detailLine, FD.num(detailFont, androidx.compose.ui.text.font.FontWeight.Normal, C.dAeb),
             Modifier.padding(top = 6.dp).height((detailFont * 1.4f).dp), minScale = 0.7f)
     }
 }
@@ -219,8 +220,8 @@ fun LiveBody(f: LiveFrame, totalFont: Float, segFont: Float, icon: Float, nameFo
 @Composable
 private fun RowScope.LiveCol(label: String, value: String, color: Color, size: Float, modifier: Modifier = Modifier) {
     Column(modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Box(Modifier.height(18.dp), contentAlignment = Alignment.Center) { T(label, F.t(12, W600, C.text3, tracking = 1f), maxLines = 1) }
-        FitText(value, F.num(size, color = color, tracking = -0.01f * size), minScale = 0.5f)
+        Box(Modifier.height(18.dp), contentAlignment = Alignment.Center) { T(label, FD.t(12, W600, C.dText3, tracking = 1f), maxLines = 1) }
+        FitText(value, FD.num(size, color = color, tracking = -0.01f * size), minScale = 0.5f)
     }
 }
 
@@ -231,12 +232,12 @@ fun LiveNextRow(next: Seg?, labelFont: Float, nameFont: Float, iconSize: Float, 
         Box(Modifier.padding(top = dividerTop.dp, bottom = (14 * k).dp).padding(horizontal = 20.dp).fillMaxWidth().height(1.dp)
             .background(Color.White.copy(alpha = 0.12f)))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            T("NEXT", F.t(labelFont, color = C.text2, tracking = 0.1f * labelFont), maxLines = 1)
+            T("NEXT", FD.t(labelFont, color = C.dText2, tracking = 0.1f * labelFont), maxLines = 1)
             if (next != null) {
-                Icon8(next.icon, iconSize.dp, if (next.kind == SegKind.Rox) C.text2 else C.accent)
-                T(next.name, F.t(nameFont, W600), Modifier.testTag("$tagPrefix.nextName"), maxLines = 1)
+                Icon8(next.icon, iconSize.dp, if (next.kind == SegKind.Rox) C.dText2 else C.yellow)
+                T(next.name, FD.t(nameFont, W600), Modifier.testTag("$tagPrefix.nextName"), maxLines = 1)
             } else {
-                T("Finish", F.t(nameFont, W600, C.accent), maxLines = 1)
+                T("Finish", FD.t(nameFont, W600, C.yellow), maxLines = 1)
             }
         }
     }

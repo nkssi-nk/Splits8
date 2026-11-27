@@ -46,7 +46,7 @@ fun Wheel8(
         if (i >= 0 && i != state.firstVisibleItemIndex && !state.isScrollInProgress) state.scrollToItem(i)
     }
     Box(modifier.height(150.dp).testTag(tag), contentAlignment = Alignment.Center) {
-        Box(Modifier.fillMaxWidth().height(itemH).background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp)))
+        Box(Modifier.fillMaxWidth().height(itemH).background(androidx.compose.ui.graphics.C.ink.copy(alpha = 0.08f), RoundedCornerShape(8.dp)))
         val pad = (150.dp - itemH) / 2
         LazyColumn(Modifier.fillMaxWidth().height(150.dp), state = state, flingBehavior = fling, contentPadding = PaddingValues(vertical = pad)) {
             items(values.size) { i ->

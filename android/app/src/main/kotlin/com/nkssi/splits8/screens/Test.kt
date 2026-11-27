@@ -114,7 +114,7 @@ private fun TestSeg(selected: String, modifier: Modifier = Modifier, onSelect: (
                 Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(9.dp)).background(if (on) C.accent else Color.Transparent)
                     .tap { onSelect(k) }.testTag("test.seg.$k"),
                 contentAlignment = Alignment.Center,
-            ) { T(l, F.t(15, W600, if (on) Color.Black else C.text2), maxLines = 1) }
+            ) { T(l, F.t(15, W600, if (on) C.onAccent else C.text2), maxLines = 1) }
         }
     }
 }
@@ -301,7 +301,7 @@ private fun PFTScale(total: Int?, modifier: Modifier = Modifier) {
                     Box(
                         Modifier.offset(x = x).size(4.dp, 18.dp).testTag("pft.marker")
                             .background(Color.Black, RoundedCornerShape(3.dp)).padding(1.dp)
-                            .background(Color.White, RoundedCornerShape(2.dp)),
+                            .background(C.ink, RoundedCornerShape(2.dp)),
                     )
                 }
             }
@@ -390,7 +390,7 @@ private fun SimView() {
                 Box(Modifier.height(30.dp).clip(RoundedCornerShape(8.dp)).background(if (on) C.accent else C.btn1A)
                     .tap { metric = c.key }.testTag("sim.metric." + c.key).padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center) {
-                    T(c.label, F.t(11, W600, if (on) Color.Black else C.aeb, tracking = 0.88f), maxLines = 1)
+                    T(c.label, F.t(11, W600, if (on) C.onAccent else C.aeb, tracking = 0.88f), maxLines = 1)
                 }
             }
         }
@@ -518,7 +518,7 @@ private fun SimRow(t: String, value: String, numeric: Boolean = false, onClick: 
 fun TrendChart(values: List<Int>, modifier: Modifier = Modifier) {
     val tm = rememberTextMeasurer()
     val small = F.num(10, color = C.text3)
-    val big = F.num(13, color = Color.White)
+    val big = F.num(13, color = C.ink)
     Canvas(modifier.fillMaxWidth().height(150.dp)) {
         val n = values.size
         val w = size.width
@@ -528,7 +528,7 @@ fun TrendChart(values: List<Int>, modifier: Modifier = Modifier) {
         val span = maxOf(1, mx - mn).toFloat()
         val xs = (0 until n).map { w * (0.04f + it * 0.92f / maxOf(1, n - 1)) }
         val ys = values.map { (30f + (it - mn) / span * 90f) * u }
-        for (gy in listOf(30f, 75f, 120f)) drawLine(Color(0xFF1C1C1C), Offset(0f, gy * u), Offset(w, gy * u), u)
+        for (gy in listOf(30f, 75f, 120f)) drawLine(C.ad(0x1C1C1C), Offset(0f, gy * u), Offset(w, gy * u), u)
         val p = Path()
         for (i in 0 until n) if (i == 0) p.moveTo(xs[i], ys[i]) else p.lineTo(xs[i], ys[i])
         drawPath(p, C.accent, style = Stroke(2 * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
@@ -536,7 +536,7 @@ fun TrendChart(values: List<Int>, modifier: Modifier = Modifier) {
             val last = i == n - 1
             val r = (if (last) 10f else 6f) / 2 * u
             val c = Offset(xs[i], ys[i])
-            drawCircle(if (last) C.accent else Color.Black, r, c)
+            drawCircle(if (last) C.accent else C.bg, r, c)
             drawCircle(C.accent, r + u, c, style = Stroke(2 * u))
             val lay = tm.measure(Fm.t(values[i]), if (last) big else small)
             // 라벨 아래 끝이 점 위 12
@@ -577,10 +577,10 @@ fun RunFatigueCard(result: FatigueResult, footnote: String) {
                 val frac = if (d == null || d <= 0) 0.03f else (d.toFloat() / result.maxDelta).coerceIn(0.03f, 1f)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     T(name, F.t(F.sub), Modifier.width(104.dp), maxLines = 1)
-                    Box(Modifier.weight(1f).height(10.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f))) {
+                    Box(Modifier.weight(1f).height(10.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.08f))) {
                         Box(Modifier.fillMaxWidth(frac).height(10.dp).clip(CircleShape).background(if (top) C.accent else C.text2))
                     }
-                    T(d?.let { Fm.d(it) } ?: "—", F.num(F.sub, color = if (top) C.accent else Color.White), Modifier.width(56.dp),
+                    T(d?.let { Fm.d(it) } ?: "—", F.num(F.sub, color = if (top) C.accent else C.ink), Modifier.width(56.dp),
                         maxLines = 1, align = androidx.compose.ui.text.style.TextAlign.End, translate = false)
                 }
             }
@@ -601,7 +601,7 @@ fun RunFatigueCard(result: FatigueResult, footnote: String) {
             )
         } else {
             T("You're holding your average pace on the runs after stations too.", F.t(F.sub),
-                Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.06f))
+                Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.ink.copy(alpha = 0.06f))
                     .padding(vertical = 10.dp, horizontal = 12.dp))
         }
         T(footnote, F.t(F.foot, color = C.text2), Modifier.padding(top = 10.dp), translate = false)

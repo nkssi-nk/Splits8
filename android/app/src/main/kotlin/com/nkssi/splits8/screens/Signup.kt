@@ -215,11 +215,11 @@ fun Onboarding2() {
                 Label8(if (age) "AGE" else "MAX HEART RATE")
                 T("${if (age) s.age else s.manualHr}", F.num(44, tracking = -1.32f), Modifier.testTag("ob.hrValue"), maxLines = 1, translate = false)
             }
-            Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.14f)).press(0.94f, tag = "hr.down") { bump(-1) },
+            Box(Modifier.size(44.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.14f)).press(0.94f, tag = "hr.down") { bump(-1) },
                 contentAlignment = Alignment.Center) { T("−", F.t(20), translate = false) }
             Spacer(Modifier.width(8.dp))
             Box(Modifier.size(44.dp).yellowFill(CircleShape).press(0.94f, tag = "hr.up") { bump(1) }, contentAlignment = Alignment.Center) {
-                T("+", F.t(20, color = Color.Black), translate = false)
+                T("+", F.t(20, color = C.onAccent), translate = false)
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
@@ -326,7 +326,7 @@ private fun PermRow(icon: String, name: String, sub: String, on: Boolean, last: 
     Row(modifier.fillMaxWidth().rowLine(!last).let { if (onClick != null) it.tap { onClick() } else it }.padding(vertical = 16.dp, horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(if (on) C.good.copy(alpha = 0.15f) else C.control), contentAlignment = Alignment.Center) {
-            Glyph(icon, 18.dp, if (on) C.good else Color.White)
+            Glyph(icon, 18.dp, if (on) C.good else C.ink)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             T(name, F.t(17, W500), maxLines = 1)
@@ -392,12 +392,12 @@ fun AuthView() {
         }
         BusyButton("Continue with email", busy, emailOK, "auth.email") { sendCode() }
         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.1f)))
+            Box(Modifier.weight(1f).height(1.dp).background(C.ink.copy(alpha = 0.1f)))
             T("or", F.t(13, color = C.text3))
-            Box(Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.1f)))
+            Box(Modifier.weight(1f).height(1.dp).background(C.ink.copy(alpha = 0.1f)))
         }
         // 흰 버튼 54 + 구글 G (아이폰의 "Sign in with Apple" 자리)
-        Row(Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).press(tag = "auth.google") { google() },
+        Row(Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).border(1.dp, C.cardBorder, RoundedCornerShape(16.dp)).press(tag = "auth.google") { google() },
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
             Image(painterResource(R.drawable.google_g), null, Modifier.size(20.dp))
             T("Continue with Google", F.t(17, W600, Color.Black), maxLines = 1)
@@ -767,7 +767,7 @@ private fun BigChoice(title: String, on: Boolean, modifier: Modifier, tag: Strin
     Box(modifier.height(80.dp).clip(shape).background(if (on) Color(0x1AFFE600) else C.card)
         .border(if (on) 1.5.dp else 1.dp, if (on) C.accent else C.cardBorder, shape).press(0.97f, tag = tag, onClick = onClick),
         contentAlignment = Alignment.Center) {
-        T(title, F.t(17, W600, if (on) C.accent else Color.White), Modifier.padding(horizontal = 10.dp), align = TextAlign.Center, maxLines = 2)
+        T(title, F.t(17, W600, if (on) C.accent else C.ink), Modifier.padding(horizontal = 10.dp), align = TextAlign.Center, maxLines = 2)
     }
 }
 
@@ -777,13 +777,13 @@ private fun DivChips(keys: List<String>, selected: String?, showRecommend: Boole
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (k in keys) {
             val on = selected == k
-            Row(Modifier.height(40.dp).clip(CircleShape).background(if (on) C.accent else Color.White.copy(alpha = 0.08f))
+            Row(Modifier.height(40.dp).clip(CircleShape).background(if (on) C.accent else C.ink.copy(alpha = 0.08f))
                 .tap { onPick(k) }.testTag("profile.div.$k").padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                T(Division.of(k).name, F.t(15, W600, if (on) Color.Black else Color.White), maxLines = 1, translate = false)
+                T(Division.of(k).name, F.t(15, W600, if (on) C.onAccent else C.ink), maxLines = 1, translate = false)
                 if (showRecommend && k in recommended) {
                     Box(Modifier.clip(RoundedCornerShape(6.dp)).background(if (on) Color.Black.copy(alpha = 0.15f) else Color(0x29FFE600)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        T("Recommended", F.t(11, W600, if (on) Color.Black else C.accent), maxLines = 1)
+                        T("Recommended", F.t(11, W600, if (on) C.onAccent else C.accent), maxLines = 1)
                     }
                 }
             }

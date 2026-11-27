@@ -218,7 +218,7 @@ fun ShareView() {
                 RouteMapShot(route, h) { img -> if (img != null && mapOn && mapShotH == h) { photo = img.asImageBitmap(); mono = false } }
             }
             if (variant == "poster") MoveHint(layout != PosterLayout()) { layout = PosterLayout() }
-            Seg8(listOf("story" to "Story 9:16", "post" to "Post 4:5"), ratio, track = Color(0xFF141414)) { ratio = it }
+            Seg8(listOf("story" to "Story 9:16", "post" to "Post 4:5"), ratio, track = C.ad(0x141414)) { ratio = it }
             VariantButtons(variant) { variant = it }
             // 1.2.5: 카드에 넣을 것 고르기 + 내 글 (Poster)
             if (variant == "poster") ShareContentCard(data, hide, caption, { k -> hide = if (k in hide) hide - k else hide + k }) { caption = it.take(60) }
@@ -259,7 +259,7 @@ fun ShareView() {
                         }
                     },
                     contentAlignment = Alignment.Center,
-                ) { T("Share", F.t(15, W600, Color.Black), maxLines = 1) }
+                ) { T("Share", F.t(15, W600, C.onAccent), maxLines = 1) }
                 Box(
                     Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(14.dp)).background(C.btn1A).press(tag = "share.save") {
                         scope.launch {
@@ -339,8 +339,8 @@ private fun VariantButtons(selected: String, onPick: (String) -> Unit) {
             val on = selected == k
             val shape = RoundedCornerShape(10.dp)
             Box(
-                Modifier.weight(1f).height(38.dp).clip(shape).background(Color(0xFF111111))
-                    .border(if (on) 1.5.dp else 1.dp, if (on) C.accent else Color(0xFF1C1C1C), shape).tap { onPick(k) }.testTag(l),
+                Modifier.weight(1f).height(38.dp).clip(shape).background(C.ad(0x111111))
+                    .border(if (on) 1.5.dp else 1.dp, if (on) C.accent else C.ad(0x1C1C1C), shape).tap { onPick(k) }.testTag(l),
                 contentAlignment = Alignment.Center,
             ) { T(l, F.t(13, W600, if (on) C.accent else C.aeb), maxLines = 1) }
         }
@@ -359,11 +359,11 @@ private fun OptionRow(label: String, trailing: @Composable () -> Unit) {
 /** White / Black · Off / Light / Heavy (트랙 #141414 모서리 9 안쪽 2, 칸 ×28 모서리 7, 13/600, 고른 칸 흰 0.16) */
 @Composable
 private fun MiniSeg(items: List<Pair<String, String>>, selected: String, w: Int, tag: String, onPick: (String) -> Unit) {
-    Row(Modifier.clip(RoundedCornerShape(9.dp)).background(Color(0xFF141414)).padding(2.dp)) {
+    Row(Modifier.clip(RoundedCornerShape(9.dp)).background(C.ad(0x141414)).padding(2.dp)) {
         for ((k, l) in items) {
             val on = selected == k
             Box(
-                Modifier.size(w.dp, 28.dp).clip(RoundedCornerShape(7.dp)).background(if (on) Color.White.copy(alpha = 0.16f) else Color.Transparent)
+                Modifier.size(w.dp, 28.dp).clip(RoundedCornerShape(7.dp)).background(if (on) C.ink.copy(alpha = 0.16f) else Color.Transparent)
                     .tap { onPick(k) }.testTag("$tag.$k"),
                 contentAlignment = Alignment.Center,
             ) { T(l, F.t(13, W600), maxLines = 1) }
@@ -477,15 +477,15 @@ private fun ShareContentCard(d: ShareData, hide: Set<String>, caption: String, o
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for ((k, name) in row) {
                     val on = k !in hide
-                    Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(50)).background(if (on) C.accent else Color(0xFF1C1C1C))
+                    Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(50)).background(if (on) C.accent else C.ad(0x1C1C1C))
                         .tap { onToggle(k) }.testTag("share.show.$k"), contentAlignment = Alignment.Center) {
-                        T((if (on) "✓ " else "+ ") + name, F.t(13, W600, if (on) Color.Black else C.text2), maxLines = 1, translate = false)
+                        T((if (on) "✓ " else "+ ") + name, F.t(13, W600, if (on) C.onAccent else C.text2), maxLines = 1, translate = false)
                     }
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF1C1C1C)).padding(vertical = 10.dp, horizontal = 12.dp)) {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.ad(0x1C1C1C)).padding(vertical = 10.dp, horizontal = 12.dp)) {
             if (caption.isEmpty()) T("Write something (optional)", F.t(15, color = C.text3), maxLines = 1)
             androidx.compose.foundation.text.BasicTextField(caption, onCaption, Modifier.fillMaxWidth().testTag("share.caption"), maxLines = 3,
                 textStyle = F.t(15), cursorBrush = androidx.compose.ui.graphics.SolidColor(C.accent))

@@ -1,5 +1,6 @@
 package com.nkssi.splits8.screens
 
+import androidx.compose.ui.draw.alpha
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -195,7 +196,7 @@ private fun HomeShowRow() {
         if (open) {
             androidx.compose.ui.window.Popup(alignment = Alignment.TopEnd, offset = androidx.compose.ui.unit.IntOffset(0, 0),
                 onDismissRequest = { open = false }, properties = androidx.compose.ui.window.PopupProperties(focusable = true)) {
-                Column(Modifier.padding(end = 12.dp).width(240.dp).shadow(18.dp, RoundedCornerShape(14.dp), ambientColor = Color.Black, spotColor = Color.Black).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2C2C2E))) {
+                Column(Modifier.padding(end = 12.dp).width(240.dp).shadow(18.dp, RoundedCornerShape(14.dp), ambientColor = Color.Black, spotColor = Color.Black).clip(RoundedCornerShape(14.dp)).background(C.ad(0x2C2C2E))) {
                     val keys = com.nkssi.splits8.shared.HomeShow.keys
                     keys.forEachIndexed { i, k ->
                         Row(Modifier.fillMaxWidth().rowLine(i < keys.size - 1).tap {
@@ -243,7 +244,7 @@ private fun ProfileCard() {
             .padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Avatar8(44.dp, ini, photo = Store.photo, bg = if (signed) C.accent else C.control, fg = if (signed) Color.Black else C.text2)
+        Avatar8(44.dp, ini, photo = Store.photo, bg = if (signed) C.accent else C.control, fg = if (signed) C.onAccent else C.text2)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             T(if (signed) "@$nick" else "My profile".l10n, F.t(17, W600), maxLines = 1, translate = false)
             val sub = listOf(Store.settings.div.name) + if (signed) emptyList() else listOf("Not signed up".l10n)
@@ -271,16 +272,29 @@ private fun ToggleRow(title: String, sub: String?, on: Boolean, last: Boolean, t
 private fun ThemeSection() {
     val t = Store.settings.glow
     val tint by animateColorAsState(hex(t.hex, minOf(0.3f, 0.16f * t.gain.toFloat())), label = "glow")
+    val light = Store.settings.light
     SectionLabel("THEME")
+    // 1.2.9 화면 모드 (다크 / 라이트)
+    Row(
+        Modifier.fillMaxWidth().card8().padding(vertical = 8.dp, horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        T("Appearance", F.t(17), Modifier.weight(1f), maxLines = 1)
+        Seg8(listOf("dark" to "Dark", "light" to "Light"), if (light) "light" else "dark", Modifier.testTag("settings.appearance"), minWidth = 150.dp) { k ->
+            Store.update { it.withLight(k == "light") }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
     Row(
         Modifier.fillMaxWidth().card8().background(Brush.horizontalGradient(listOf(tint.copy(alpha = 0f), tint)), RoundedCornerShape(20.dp))
-            .padding(vertical = 8.dp, horizontal = 18.dp),
+            .padding(vertical = 8.dp, horizontal = 18.dp).alpha(if (light) 0.4f else 1f),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         T("Glow color", F.t(17), Modifier.weight(1f), maxLines = 1)
-        GlowSwatches(t, "settings.theme") { g -> Store.update { it.withGlow(g) } }
+        // 라이트 모드는 뒤쪽 빛이 없어서 빛 색 고르기를 끔
+        GlowSwatches(t, "settings.theme") { g -> if (!light) Store.update { it.withGlow(g) } }
     }
-    Note8("Changes the glow behind each screen. Yellow buttons and the logo stay the same.")
+    Note8(if (light) "Light mode has no glow behind the screens." else "Changes the glow behind each screen. Yellow buttons and the logo stay the same.")
 }
 
 /** 동그란 색 6개 (24 + 테두리). 고른 색은 흰 2 테두리 */
@@ -291,7 +305,7 @@ fun GlowSwatches(selected: GlowTheme, tagPrefix: String = "glow", size: androidx
             val on = g == selected
             Box(
                 Modifier.size(size + 8.dp).clip(CircleShape)
-                    .border(if (on) 2.dp else 1.dp, if (on) Color.White else Color.White.copy(alpha = 0.14f), CircleShape)
+                    .border(if (on) 2.dp else 1.dp, if (on) C.ink else C.ink.copy(alpha = 0.14f), CircleShape)
                     .tap { onPick(g) }.testTag("$tagPrefix.${g.raw}"),
                 contentAlignment = Alignment.Center,
             ) { Box(Modifier.size(size).clip(CircleShape).background(hex(g.hex))) }
@@ -471,8 +485,8 @@ fun AccountView() {
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.size(104.dp).tap { pickPhoto() }.testTag("profile.photo")) {
                     Avatar8(104.dp, if (Store.photo != null) "" else if (signed) nick.take(1).uppercase() else "?", photo = Store.photo,
-                        bg = if (signed) C.accent else C.control, fg = if (signed) Color.Black else C.text2)
-                    Box(Modifier.align(Alignment.BottomEnd).offset(x = 3.dp, y = 3.dp).size(38.dp).clip(CircleShape).background(Color.Black),
+                        bg = if (signed) C.accent else C.control, fg = if (signed) C.onAccent else C.text2)
+                    Box(Modifier.align(Alignment.BottomEnd).offset(x = 3.dp, y = 3.dp).size(38.dp).clip(CircleShape).background(C.bg),
                         contentAlignment = Alignment.Center) {
                         Box(Modifier.size(32.dp).clip(CircleShape).background(C.control), contentAlignment = Alignment.Center) { Glyph("i_camera", 16.dp) }
                     }

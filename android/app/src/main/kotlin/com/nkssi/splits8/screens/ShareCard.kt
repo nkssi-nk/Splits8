@@ -81,6 +81,7 @@ import com.nkssi.splits8.ui.Ambient
 import com.nkssi.splits8.ui.AmbientLayer
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.Glyph
 import com.nkssi.splits8.ui.Icon8
 import com.nkssi.splits8.ui.Sym
@@ -349,7 +350,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
 
     // 글자색 (시안 tc / acc / tcLine / pillBg)
     val tc = if (tb) Color.Black else Color.White
-    val acc = if (tb) Color.Black else C.accent
+    val acc = if (tb) Color.Black else C.yellow
     val tcLine = if (tb) Color.Black.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.16f)
     val pillBg = if (tb) Color.White.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.07f)
 
@@ -366,7 +367,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
     fun Glow(a: Double, rx: Float, ry: Float, cx: Float, cy: Float, themed: Boolean = false) {
         val hex = if (themed) o.glow.hex else 0xFFE600L
         val alpha = if (themed) min(1.0, a * o.glow.gain) else a
-        AmbientLayer(Ambient(hex, alpha.toFloat(), rx, ry, cx, cy), Modifier.fillMaxSize())
+        AmbientLayer(Ambient(hex, alpha.toFloat(), rx, ry, cx, cy), Modifier.fillMaxSize(), always = true)
     }
 
     @Composable
@@ -379,8 +380,8 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0B)), contentAlignment = androidx.compose.ui.BiasAlignment(0f, -0.5f)) {
                 if (o.placeholder) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Glyph("i_camera", 26.dp, C.text2)
-                        T("Tap to choose a photo", F.t(13, W500, C.text2), maxLines = 1)
+                        Glyph("i_camera", 26.dp, C.dText2)
+                        T("Tap to choose a photo", FD.t(13, W500, C.dText2), maxLines = 1)
                     }
                 }
             }
@@ -393,14 +394,14 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
     /** 큰 시간 (line-height 0.95, 한 줄, 자리가 모자라면 작아짐) */
     @Composable
     fun Big(s: String, size: Float, track: Float, color: Color = Color.White, modifier: Modifier = Modifier) {
-        FitText(s, F.num(size, W600, color, tracking = track * size),
+        FitText(s, FD.num(size, W600, color, tracking = track * size),
             modifier.height((size * 0.95f).dp).wrapContentHeight(Alignment.CenterVertically, unbounded = true))
     }
 
     /** 8 / 600, 자간 0.12em */
     @Composable
     fun Tiny(s: String, color: Color, modifier: Modifier = Modifier) {
-        T(s, F.t(8, W600, color, tracking = 0.96f), modifier, maxLines = 1, translate = false)
+        T(s, FD.t(8, W600, color, tracking = 0.96f), modifier, maxLines = 1, translate = false)
     }
 
     /** ★ PB 알약 (22 높이, 11 / 600, 별 10) */
@@ -412,19 +413,19 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Sym(R.drawable.sym_star, 10.dp, fg)
-            T(d.pbText, F.t(11, W600, fg), maxLines = 1, translate = false)
+            T(d.pbText, FD.t(11, W600, fg), maxLines = 1, translate = false)
         }
     }
 
     @Composable
-    fun YellowPB() = PbPill(C.accent.copy(alpha = 0.14f), C.accent.copy(alpha = 0.5f), C.accent)
+    fun YellowPB() = PbPill(C.yellow.copy(alpha = 0.14f), C.yellow.copy(alpha = 0.5f), C.yellow)
 
     /** 스테이션 이름 + 옆에 작은 사양 (50M · 152KG). 사양도 이름과 같은 색 */
     @Composable
     fun NameCell(p: SharePair, size: Float, color: Color, modifier: Modifier) {
         Row(modifier, verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            T(p.sn, F.t(size, W500, color), maxLines = 1, translate = false)
-            if (p.spec.isNotEmpty()) FitText(p.spec, F.num(max(8f, size - 3.5f), W500, color), Modifier.weight(1f, fill = false), minScale = 0.75f)
+            T(p.sn, FD.t(size, W500, color), maxLines = 1, translate = false)
+            if (p.spec.isNotEmpty()) FitText(p.spec, FD.num(max(8f, size - 3.5f), W500, color), Modifier.weight(1f, fill = false), minScale = 0.75f)
         }
     }
 
@@ -544,14 +545,14 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 if ("logo" !in o.hide) Mark(tb)
-                if (hasNick) T(nickText, textShadow(F.t(12, W600, tc)), maxLines = 1, translate = false)
+                if (hasNick) T(nickText, textShadow(FD.t(12, W600, tc)), maxLines = 1, translate = false)
             }
             Spacer(Modifier.weight(1f).width(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (d.pb && "pb" !in o.hide) PbPill(pillBg, tcLine, acc)
                 if ("badge" !in o.hide) Box(Modifier.clip(RoundedCornerShape(50)).background(pillBg).border(1.dp, tcLine, RoundedCornerShape(50))
                     .padding(vertical = 5.dp, horizontal = 10.dp)) {
-                    T(d.badge, F.t(11, W600, acc), maxLines = 1, translate = false)
+                    T(d.badge, FD.t(11, W600, acc), maxLines = 1, translate = false)
                 }
             }
         }
@@ -579,10 +580,10 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             if ("kcal" !in hide) stats.add(Triple("KCAL", d.kcal, 18))
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = ha) {
-            if (o.caption.isNotEmpty()) T(o.caption, textShadow(F.t(22, W700, tc, tracking = -0.44f)), Modifier.padding(bottom = 8.dp), maxLines = 3,
+            if (o.caption.isNotEmpty()) T(o.caption, textShadow(FD.t(22, W700, tc, tracking = -0.44f)), Modifier.padding(bottom = 8.dp), maxLines = 3,
                 align = listOf(TextAlign.Start, TextAlign.Center, TextAlign.End)[i], translate = false)
-            if (placeLine.isNotEmpty()) T(placeLine, textShadow(F.t(13, W500, tc)), maxLines = 1, translate = false)
-            if (d.partner.isNotEmpty() && "partner" !in hide) T(d.partnerText, textShadow(F.t(12, W500, tc.copy(alpha = 0.75f))), Modifier.padding(top = 2.dp), maxLines = 1, translate = false)
+            if (placeLine.isNotEmpty()) T(placeLine, textShadow(FD.t(13, W500, tc)), maxLines = 1, translate = false)
+            if (d.partner.isNotEmpty() && "partner" !in hide) T(d.partnerText, textShadow(FD.t(12, W500, tc.copy(alpha = 0.75f))), Modifier.padding(top = 2.dp), maxLines = 1, translate = false)
             if ("big" !in hide) Big(if (d.isRun) d.distance else d.total, if (post) 64f else 76f, -0.045f, tc, Modifier.padding(top = 6.dp))
             if (stats.isNotEmpty()) Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 for ((label, value, size) in stats) PosterStat(label, value, ha, size)
@@ -594,7 +595,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
     fun androidx.compose.foundation.layout.RowScope.PosterStat(label: String, value: String, ha: Alignment.Horizontal, size: Int = 18) {
         Column(Modifier.weight(1f), horizontalAlignment = ha) {
             Tiny(label, tc)
-            FitText(value, textShadow(F.num(size, W600, tc, tracking = -0.01f * size)), minScale = 0.7f)
+            FitText(value, textShadow(FD.num(size, W600, tc, tracking = -0.01f * size)), minScale = 0.7f)
         }
     }
 
@@ -659,14 +660,14 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
                 ) {
                     Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) { Icon8(p.icon, icon.dp, acc) }
                     Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        T("${i + 1}. $name", textShadow(F.t(size, W500, tc)), maxLines = 1, translate = false)
+                        T("${i + 1}. $name", textShadow(FD.t(size, W500, tc)), maxLines = 1, translate = false)
                         // 사양은 남는 자리 오른쪽 끝에 (모자랄 때만 작아짐)
                         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                            if (p.spec.isNotEmpty()) FitText(p.spec, textShadow(F.num(max(8f, size - 3.5f), W500, tc)), minScale = 0.7f)
+                            if (p.spec.isNotEmpty()) FitText(p.spec, textShadow(FD.num(max(8f, size - 3.5f), W500, tc)), minScale = 0.7f)
                         }
                     }
-                    Box(Modifier.width(numW), contentAlignment = Alignment.CenterEnd) { FitText(p.rt, textShadow(F.num(size, W500, tc)), minScale = 0.8f) }
-                    Box(Modifier.width(numW), contentAlignment = Alignment.CenterEnd) { FitText(p.st, textShadow(F.num(size, W600, tc)), minScale = 0.8f) }
+                    Box(Modifier.width(numW), contentAlignment = Alignment.CenterEnd) { FitText(p.rt, textShadow(FD.num(size, W500, tc)), minScale = 0.8f) }
+                    Box(Modifier.width(numW), contentAlignment = Alignment.CenterEnd) { FitText(p.st, textShadow(FD.num(size, W600, tc)), minScale = 0.8f) }
                 }
             }
         }
@@ -711,7 +712,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
                     PhotoView(baseFilter)
                     Box(Modifier.align(Alignment.TopStart).padding(14.dp)) { Mark(tb) }
                     if (hasNick) {
-                        T(nickText, F.t(12, W600, tc).copy(shadow = if (tb) null else Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, 1f), 3f)),
+                        T(nickText, FD.t(12, W600, tc).copy(shadow = if (tb) null else Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, 1f), 3f)),
                             Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 14.dp), maxLines = 1, translate = false)
                     }
                 }
@@ -738,7 +739,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
         Box(Modifier.fillMaxWidth().clip(shape).border(1.dp, Color.White.copy(alpha = 0.10f), shape)) {
             Box(Modifier.matchParentSize().background(Color.White.copy(alpha = 0.07f))) { Glow(0.30, 0.9f, 0.9f, 0.9f, 1.1f, themed = true) }
             Column(Modifier.fillMaxWidth().padding(top = 16.dp, start = 18.dp, end = 18.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                val small = F.t(12, W500, C.text2)
+                val small = FD.t(12, W500, C.dText2)
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         T("${d.place} · ${d.divName}", small, Modifier.weight(1f), maxLines = 1, translate = false)
@@ -751,14 +752,14 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
                     Big(if (d.isRun) d.distance else d.total, if (post) 48f else 56f, -0.04f, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(8.dp))
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        T(if (d.isRun) d.avgPace else d.vsValue, F.num(14, W600, C.accent), maxLines = 1, translate = false)
-                        T(if (d.isRun) d.total else "${d.avgHR} BPM", F.num(14, W600, if (d.isRun) Color.White else C.text2), maxLines = 1, translate = false)
+                        T(if (d.isRun) d.avgPace else d.vsValue, FD.num(14, W600, C.yellow), maxLines = 1, translate = false)
+                        T(if (d.isRun) d.total else "${d.avgHR} BPM", FD.num(14, W600, if (d.isRun) Color.White else C.dText2), maxLines = 1, translate = false)
                     }
                 }
                 if (o.showSplits && d.seq.isNotEmpty()) {
                     TicketStrip()
                     Row(Modifier.fillMaxWidth()) {
-                        val st = F.num(8, W600, C.text3, tracking = 0.8f)
+                        val st = FD.num(8, W600, C.dText3, tracking = 0.8f)
                         T("RUN ${d.runTotal}", st, maxLines = 1, translate = false)
                         Spacer(Modifier.weight(1f).width(4.dp))
                         T("STATIONS ${d.stationTotal}", st, maxLines = 1, translate = false)
@@ -788,7 +789,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
                     addRoundRect(androidx.compose.ui.geometry.RoundRect(Rect(x, size.height - bh, x + bw, size.height),
                         topLeft = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()), topRight = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())))
                 }
-                drawPath(p, if (s.run) Color.White.copy(alpha = 0.18f) else C.accent)
+                drawPath(p, if (s.run) Color.White.copy(alpha = 0.18f) else C.yellow)
             }
         }
     }
@@ -807,9 +808,9 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
                 Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (d.isRun) {
                         BlockTile("TIME", d.total, Color.White)
-                        BlockTile("AVG PACE", d.avgPace, C.accent)
+                        BlockTile("AVG PACE", d.avgPace, C.yellow)
                     } else {
-                        BlockTile(d.vsWord, d.vsValue, C.accent)
+                        BlockTile(d.vsWord, d.vsValue, C.yellow)
                         BlockTile("AVG HR", d.avgHR, Color.White)
                         if (d.hasRox) BlockTile("ROXZONE", d.rox, Color.White)
                     }
@@ -825,13 +826,13 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             Column(Modifier.weight(1f)) {
                 Mark(false)
                 Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    T(d.badge, F.t(13, W600), maxLines = 1, translate = false)
+                    T(d.badge, FD.t(13, W600), maxLines = 1, translate = false)
                     if (d.pb) YellowPB()
                 }
-                T("${d.place} · ${d.date}", F.t(13, W500, Color.White.copy(alpha = 0.65f)), Modifier.padding(top = 3.dp), maxLines = 1, translate = false)
-                if (d.partner.isNotEmpty()) T(d.partnerText, F.t(12, W500, Color.White.copy(alpha = 0.65f)), Modifier.padding(top = 2.dp), maxLines = 1, translate = false)
+                T("${d.place} · ${d.date}", FD.t(13, W500, Color.White.copy(alpha = 0.65f)), Modifier.padding(top = 3.dp), maxLines = 1, translate = false)
+                if (d.partner.isNotEmpty()) T(d.partnerText, FD.t(12, W500, Color.White.copy(alpha = 0.65f)), Modifier.padding(top = 2.dp), maxLines = 1, translate = false)
             }
-            if (hasNick) T(nickText, F.t(13, W600, C.accent), Modifier.padding(top = 3.dp), maxLines = 1, translate = false)
+            if (hasNick) T(nickText, FD.t(13, W600, C.yellow), Modifier.padding(top = 3.dp), maxLines = 1, translate = false)
         }
     }
 
@@ -844,7 +845,7 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Tiny(label, Color.White.copy(alpha = 0.55f))
-            FitText(value, F.num(18, W600, color), minScale = 0.7f)
+            FitText(value, FD.num(18, W600, color), minScale = 0.7f)
         }
     }
 
@@ -868,11 +869,11 @@ private class CardScope(val d: ShareData, val o: ShareOpts, val rects: Map<Strin
             d.pairs.forEachIndexed { i, p ->
                 Row(Modifier.fillMaxWidth().height(rowH).then(if (i < d.pairs.size - 1) Modifier.bottomLine(Color.White.copy(alpha = 0.07f)) else Modifier),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    T(p.no, F.num(11, W600, C.accent), Modifier.width(20.dp), maxLines = 1, translate = false)
+                    T(p.no, FD.num(11, W600, C.yellow), Modifier.width(20.dp), maxLines = 1, translate = false)
                     Box(Modifier.width(16.dp).graphicsLayer { alpha = 0.9f }, contentAlignment = Alignment.Center) { Icon8(p.icon, 14.dp, Color.White) }
                     NameCell(p, size, Color.White, Modifier.weight(1f))
-                    Box(Modifier.width(40.dp), contentAlignment = Alignment.CenterEnd) { T(p.rt, F.num(size, W500, Color.White.copy(alpha = 0.5f)), maxLines = 1, translate = false) }
-                    Box(Modifier.width(44.dp), contentAlignment = Alignment.CenterEnd) { FitText(p.st, F.num(num, W600), minScale = 0.8f) }
+                    Box(Modifier.width(40.dp), contentAlignment = Alignment.CenterEnd) { T(p.rt, FD.num(size, W500, Color.White.copy(alpha = 0.5f)), maxLines = 1, translate = false) }
+                    Box(Modifier.width(44.dp), contentAlignment = Alignment.CenterEnd) { FitText(p.st, FD.num(num, W600), minScale = 0.8f) }
                 }
             }
         }

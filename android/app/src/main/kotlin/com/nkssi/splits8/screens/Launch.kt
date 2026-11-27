@@ -37,6 +37,7 @@ import com.nkssi.splits8.Router
 import com.nkssi.splits8.Scr
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.T
 import com.nkssi.splits8.ui.W600
 import com.nkssi.splits8.ui.Wordmark
@@ -66,17 +67,17 @@ fun SplashView() {
             Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal = 28.dp).padding(bottom = 30.dp + navBottom()),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            T("8 RUNS · 8 STATIONS", F.te(11, W600, C.accent, em = 0.28f), maxLines = 1)
+            T("8 RUNS · 8 STATIONS", FD.te(11, W600, C.yellow, em = 0.28f), maxLines = 1)
             Wordmark(72f)
             T("Every run. Every station. Every second on your wrist.",
-                F.t(15, color = Color.White.copy(alpha = 0.78f)).copy(lineHeight = 21.75.sp), Modifier.widthIn(max = 300.dp))
+                FD.t(15, color = Color.White.copy(alpha = 0.78f)).copy(lineHeight = 21.75.sp), Modifier.widthIn(max = 300.dp))
             // 1.2.1: 처음 깐 사람 · 계정이 있는 사람을 첫 화면에서 바로 나눔 (같은 크기 버튼 두 개)
             YellowButton("I'm new here", Modifier.padding(top = 10.dp), tag = "splash.start") { Router.returning = false; Router.go(Scr.Ob1) }
             Box(
                 Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.14f))
                     .press(tag = "splash.signin") { Router.toAuth(Scr.Splash, "signin") },
                 contentAlignment = Alignment.Center,
-            ) { T("I have an account", F.t(17, W600), maxLines = 1) }
+            ) { T("I have an account", FD.t(17, W600), maxLines = 1) }
         }
     }
 }

@@ -204,7 +204,7 @@ fun SetCalibView() {
                     sent = true
                     WatchSync.startCalibration(icon)
                 }, contentAlignment = Alignment.Center) {
-                T(if (sent) "Sent to watch" else "Start on watch", F.t(17, W600, Color.Black), maxLines = 1)
+                T(if (sent) "Sent to watch" else "Start on watch", F.t(17, W600, C.onAccent), maxLines = 1)
             }
             if (sent) Note8("If nothing shows on the watch, open SPLITS8 on the watch.", color = C.text2)
 
@@ -228,7 +228,7 @@ fun SetCalibView() {
 private fun CalStep(n: Int, t: String, last: Boolean = false) {
     Row(Modifier.fillMaxWidth().rowLine(!last).padding(vertical = 12.dp, horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(24.dp).clip(CircleShape).background(C.accent), contentAlignment = Alignment.Center) {
-            T("$n", F.t(13, W700, Color.Black), maxLines = 1, translate = false)
+            T("$n", F.t(13, W700, C.onAccent), maxLines = 1, translate = false)
         }
         T(t, F.t(15), Modifier.weight(1f))
     }

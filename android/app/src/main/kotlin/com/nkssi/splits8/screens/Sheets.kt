@@ -76,12 +76,12 @@ fun Overlays() {
     Sheet8(Router.testInfo, onClose = { Router.testInfo = null }, large = true) { k -> TestInfoSheet(k) }
     // 목표 시간 · 더블 시트는 아이폰처럼 더 어두운 #141414 (회색 러닝 막대가 보이게)
     Sheet8(Router.raceSheet, onClose = { Router.raceSheet = null }, large = Router.raceSheet == "doubles",
-        bg = androidx.compose.ui.graphics.Color(0xFF141414)) { k ->
+        bg = androidx.compose.ui.graphics.C.ad(0x141414)) { k ->
         if (k == "doubles") DoublesPlanSheet() else GoalTimeSheet()
     }
     Sheet8(Router.userMenu, onClose = { Router.userMenu = null }) { u -> UserMenuSheet(u) }
     Sheet8(Router.partnerFor, onClose = { Router.partnerFor = null }) { id -> PartnerSheet(id) }
-    Sheet8(Router.cheerTo, onClose = { Router.cheerTo = null }, bg = androidx.compose.ui.graphics.Color(0xFF1C1C1E)) { f -> CheerSheet(f) }
+    Sheet8(Router.cheerTo, onClose = { Router.cheerTo = null }, bg = androidx.compose.ui.graphics.C.ad(0x1C1C1E)) { f -> CheerSheet(f) }
     Sheet8(Router.finish, onClose = { Router.finish = null }) { rec -> FinishSheet(rec) }
     Sheet8(Router.officialFor, onClose = { Router.officialFor = null }, large = true) { ev -> OfficialImportSheet(ev) }
     ToastHost()
@@ -131,13 +131,13 @@ private fun HiitRunSheet(req: BonusRequest) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon8(if (hiit) "hiit" else "run", 26.dp, C.accent)
             T(if (hiit) "HIIT" else "Running", F.t(F.title3, W600), Modifier.weight(1f), maxLines = 1)
-            Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f)).tap { Router.bonus = null }.testTag("bonus.close"),
+            Box(Modifier.size(32.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.10f)).tap { Router.bonus = null }.testTag("bonus.close"),
                 contentAlignment = Alignment.Center) { Glyph("i_x", 14.dp, C.text2) }
         }
         // 이름 (82번)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Label8("NAME")
-            Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.08f))
+            Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(C.ink.copy(alpha = 0.08f))
                 .padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
                 if (name.isEmpty()) T(defaultName, F.t(17, color = C.text3), maxLines = 1)
                 androidx.compose.foundation.text.BasicTextField(name, { name = it.take(40) }, Modifier.fillMaxWidth().testTag("bonus.name"),
@@ -158,10 +158,10 @@ private fun HiitRunSheet(req: BonusRequest) {
                         val on = km == k
                         Box(
                             Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(10.dp))
-                                .background(if (on) C.accent else Color.White.copy(alpha = 0.10f)).tap { km = k }.testTag("bonus.km.$k"),
+                                .background(if (on) C.accent else C.ink.copy(alpha = 0.10f)).tap { km = k }.testTag("bonus.km.$k"),
                             contentAlignment = Alignment.Center,
                         ) {
-                            T(if (k > 0) "${k}K" else "Free".l10n, F.t(F.sub, W600, if (on) Color.Black else Color.White), maxLines = 1, translate = false)
+                            T(if (k > 0) "${k}K" else "Free".l10n, F.t(F.sub, W600, if (on) C.onAccent else C.ink), maxLines = 1, translate = false)
                         }
                     }
                 }
@@ -247,7 +247,7 @@ private fun PlanSheet(req: PlanRequest) {
                     Chevron8()
                 }
                 AnimatedVisibility(open == "program") {
-                    Column(Modifier.background(Color.White.copy(alpha = 0.03f)).rowLine(true)) {
+                    Column(Modifier.background(C.ink.copy(alpha = 0.03f)).rowLine(true)) {
                         Store.programs.forEachIndexed { i, p ->
                             Row(
                                 Modifier.fillMaxWidth().heightIn(min = 44.dp).rowLine(i < Store.programs.size - 1, start = 34.dp)
@@ -312,8 +312,8 @@ private fun PlanRow(title: String, last: Boolean, tag: String, onClick: () -> Un
 /** 날짜 · 시간 값 (회색 알약, 펼쳤으면 노란 글자) */
 @Composable
 private fun ValuePill(text: String, on: Boolean) {
-    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.10f)).padding(horizontal = 11.dp, vertical = 6.dp)) {
-        T(text, F.t(17, color = if (on) C.accent else Color.White), maxLines = 1, translate = false)
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(C.ink.copy(alpha = 0.10f)).padding(horizontal = 11.dp, vertical = 6.dp)) {
+        T(text, F.t(17, color = if (on) C.accent else C.ink), maxLines = 1, translate = false)
     }
 }
 
@@ -351,7 +351,7 @@ private fun MiniMonth(selected: LocalDate, modifier: Modifier = Modifier, onPick
                                 contentAlignment = Alignment.Center,
                             ) {
                                 T("${d.dayOfMonth}", F.num(15, if (sel || d == today) W600 else androidx.compose.ui.text.font.FontWeight.Normal,
-                                    when { sel -> Color.Black; d == today -> C.accent; d.isBefore(today) -> C.text3; else -> Color.White }),
+                                    when { sel -> C.onAccent; d == today -> C.accent; d.isBefore(today) -> C.text3; else -> C.ink }),
                                     translate = false)
                             }
                         }

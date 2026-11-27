@@ -164,8 +164,8 @@ private fun NewTrainingButton() {
         }.padding(vertical = 16.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        T("New training", F.t(17, W600, Color.Black, tracking = -0.17f), Modifier.weight(1f), maxLines = 1)
-        Glyph("i_plus", 22.dp, Color.Black)
+        T("New training", F.t(17, W600, C.onAccent, tracking = -0.17f), Modifier.weight(1f), maxLines = 1)
+        Glyph("i_plus", 22.dp, C.onAccent)
     }
 }
 
@@ -224,7 +224,7 @@ fun ProgramCard(p: Program, expanded: Boolean, onMore: () -> Unit) {
     val shape = RoundedCornerShape(20.dp)
     Column(
         Modifier.fillMaxWidth().clip(shape)
-            .background(Brush.linearGradient(0f to C.accent.copy(alpha = 0.15f), 0.55f to Color.White.copy(alpha = 0.07f), 1f to Color.White.copy(alpha = 0.05f)))
+            .background(Brush.linearGradient(0f to C.accent.copy(alpha = 0.15f), 0.55f to C.ink.copy(alpha = 0.07f), 1f to C.ink.copy(alpha = 0.05f)))
             .strokeBorder(C.accent.copy(alpha = 0.28f), 20.dp)
             .padding(vertical = 16.dp, horizontal = 18.dp)
             .animateContentSize(tween(250)),
@@ -236,11 +236,11 @@ fun ProgramCard(p: Program, expanded: Boolean, onMore: () -> Unit) {
                 T(p.name, F.t(20, W600, tracking = -0.4f), maxLines = 1)
             }
             Box(Modifier.size(30.dp).clip(CircleShape).background(C.accent), contentAlignment = Alignment.Center) {
-                Glyph("i_chevR", 13.dp, Color.Black)
+                Glyph("i_chevR", 13.dp, C.onAccent)
             }
         }
         if (p.isOpen) {
-            Row(Modifier.height(34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 10.dp),
+            Row(Modifier.height(34.dp).clip(RoundedCornerShape(10.dp)).background(C.ink.copy(alpha = 0.08f)).padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon8(Kinds.icon(p.kind), 18.dp, C.accent)
                 T(openLine(p), F.t(13, W600, C.d1), maxLines = 1, translate = false)
@@ -294,7 +294,7 @@ private fun Grid4(count: Int, gap: Dp, cell: @Composable (Int, Modifier) -> Unit
 
 @Composable
 private fun Chip(it: ProgItem, modifier: Modifier) {
-    Row(modifier.height(34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 6.dp),
+    Row(modifier.height(34.dp).clip(RoundedCornerShape(10.dp)).background(C.ink.copy(alpha = 0.08f)).padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)) {
         Icon8(it.icon, 16.dp, C.accent)
         T(chipLabel(it), F.t(11, W600, C.d1, tracking = 0.22f), maxLines = 1, translate = false)
@@ -305,7 +305,7 @@ private fun Chip(it: ProgItem, modifier: Modifier) {
 @Composable
 private fun MoreChip(more: Int?, modifier: Modifier, onClick: () -> Unit) {
     Row(
-        modifier.height(34.dp).strokeBorder(Color.White.copy(alpha = 0.16f), 10.dp).tap(onClick = onClick).testTag("training.more"),
+        modifier.height(34.dp).strokeBorder(C.ink.copy(alpha = 0.16f), 10.dp).tap(onClick = onClick).testTag("training.more"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         Box(Modifier.size(10.dp, 11.dp).doubleChevron(up = more == null))
@@ -320,7 +320,7 @@ private fun MoreChip(more: Int?, modifier: Modifier, onClick: () -> Unit) {
 fun ShareTrainingButton(program: Program) {
     val ctx = LocalContext.current
     Row(
-        Modifier.height(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f))
+        Modifier.height(36.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.10f))
             .press(0.96f, tag = "builder.shareLink") {
                 val url = ProgramLink.webUrl(program) ?: return@press
                 val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
@@ -337,7 +337,7 @@ fun ShareTrainingButton(program: Program) {
 @Composable
 fun StartOnPhoneButton(mode: Mode, program: Program?, before: (() -> Unit)? = null) {
     Row(
-        Modifier.height(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f))
+        Modifier.height(36.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.10f))
             .press(0.96f, tag = "startOnPhone." + mode.name.lowercase()) { askStartOnPhone(mode, program, before) }
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -504,7 +504,7 @@ private fun AddTile(item: ProgItem, key: String, radius: Dp, modifier: Modifier,
     val shape = RoundedCornerShape(radius)
     Box(
         modifier.scale(s).card8(radius)
-            .background(Color.White.copy(alpha = if (pressed) 0.07f else 0f), shape)
+            .background(C.ink.copy(alpha = if (pressed) 0.07f else 0f), shape)
             .clickable(src, null) {
                 if (Router.draftSeq.size >= Router.MAX_SEQ) {
                     haptic.performHapticFeedback(HapticFeedbackType.Reject)
@@ -524,7 +524,7 @@ private fun AddTile(item: ProgItem, key: String, radius: Dp, modifier: Modifier,
                 Modifier.align(Alignment.TopEnd).padding(5.dp).heightIn(min = 18.dp).widthIn(min = 18.dp)
                     .clip(CircleShape).background(C.accent).padding(horizontal = 5.dp),
                 contentAlignment = Alignment.Center,
-            ) { T("$count", F.num(12, W700, Color.Black), translate = false) }
+            ) { T("$count", F.num(12, W700, C.onAccent), translate = false) }
         }
     }
     if (flashKey == key) {
@@ -632,7 +632,7 @@ private fun SeqRow(
         }
         // 빼기 원 (#2A2A2A + 빨간 −)
         Box(Modifier.size(20.dp).tap(onClick = onRemove).testTag("builder.remove.$slot"), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(16.7.dp).clip(CircleShape).background(Color(0xFF2A2A2A)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(16.7.dp).clip(CircleShape).background(C.ad(0x2A2A2A)), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(6.7.dp, 1.85.dp).clip(CircleShape).background(C.bad))
             }
         }

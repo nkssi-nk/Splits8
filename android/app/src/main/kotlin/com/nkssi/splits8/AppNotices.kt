@@ -138,8 +138,8 @@ fun NoticeBanner() {
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            T(last, F.t(15, W600, Color.Black), Modifier.weight(1f), maxLines = 1, translate = false)
-            Chevron8(color = Color.Black)
+            T(last, F.t(15, W600, C.onAccent), Modifier.weight(1f), maxLines = 1, translate = false)
+            Chevron8(color = C.onAccent)
         }
     }
 }
@@ -251,14 +251,14 @@ fun UpdateBand() {
         Modifier.fillMaxWidth().height(48.dp).clip(shape).background(C.accent).padding(start = 18.dp, end = 6.dp).testTag("update.band"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        T(if (ready) "Restart to update" else "A new version is available", F.t(15, W600, Color.Black), Modifier.weight(1f), maxLines = 1)
-        Box(Modifier.height(32.dp).clip(CircleShape).background(Color.Black)
+        T(if (ready) "Restart to update" else "A new version is available", F.t(15, W600, C.onAccent), Modifier.weight(1f), maxLines = 1)
+        Box(Modifier.height(32.dp).clip(CircleShape).background(C.bg)
             .press(0.96f, tag = "update.go") { if (ready) AppUpdate.restart() else AppUpdate.start(ctx as? Activity) }
             .padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
             T(if (ready) "Restart" else "Update", F.t(13, W600, C.accent), maxLines = 1)
         }
         Box(Modifier.size(36.dp).tap { AppUpdate.dismiss() }.testTag("update.close"), contentAlignment = Alignment.Center) {
-            Glyph("i_x", 13.dp, Color.Black)
+            Glyph("i_x", 13.dp, C.onAccent)
         }
     }
 }

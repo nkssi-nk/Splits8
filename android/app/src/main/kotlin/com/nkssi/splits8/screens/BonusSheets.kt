@@ -124,7 +124,7 @@ internal fun NewBonusSheet(req: BonusRequest) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon8(Kinds.icon(kind), 26.dp, C.accent)
             T(Kinds.title(kind), F.t(F.title3, W600), Modifier.weight(1f), maxLines = 1)
-            Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f)).tap { Router.bonus = null }.testTag("bonus.close"),
+            Box(Modifier.size(32.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.10f)).tap { Router.bonus = null }.testTag("bonus.close"),
                 contentAlignment = Alignment.Center) { Glyph("i_x", 14.dp, C.text2) }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -245,9 +245,9 @@ private fun <V> ChipRow(items: List<Pair<V, String>>, selected: V, tag: String, 
                 for ((v, l) in row) {
                     val on = v == selected
                     Box(Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(10.dp))
-                        .background(if (on) C.accent else Color.White.copy(alpha = 0.10f)).tap { onPick(v) }.testTag("$tag.$v"),
+                        .background(if (on) C.accent else C.ink.copy(alpha = 0.10f)).tap { onPick(v) }.testTag("$tag.$v"),
                         contentAlignment = Alignment.Center) {
-                        T(l, F.t(F.sub, W600, if (on) Color.Black else Color.White), maxLines = 1, translate = false)
+                        T(l, F.t(F.sub, W600, if (on) C.onAccent else C.ink), maxLines = 1, translate = false)
                     }
                 }
                 repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
@@ -260,7 +260,7 @@ private fun <V> ChipRow(items: List<Pair<V, String>>, selected: V, tag: String, 
 @Composable
 private fun TextBox(value: String, hint: String, tag: String, cap: KeyboardCapitalization = KeyboardCapitalization.Sentences,
                     single: Boolean = true, onChange: (String) -> Unit) {
-    Box(Modifier.fillMaxWidth().heightIn(min = 46.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.08f))
+    Box(Modifier.fillMaxWidth().heightIn(min = 46.dp).clip(RoundedCornerShape(12.dp)).background(C.ink.copy(alpha = 0.08f))
         .padding(horizontal = 14.dp, vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
         if (value.isEmpty()) T(hint, F.t(17, color = C.text3), maxLines = if (single) 1 else 4, translate = false)
         BasicTextField(value, onChange, Modifier.fillMaxWidth().testTag(tag),
@@ -283,7 +283,7 @@ private fun PresetRow(p: IvPreset, on: Boolean, onPick: () -> Unit) {
         .background(if (on) C.accent.copy(alpha = 0.16f) else Color.Transparent).tap(onClick = onPick).padding(horizontal = 10.dp)
         .testTag("bonus.preset." + p.name), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f)) {
-            T(p.name, F.t(F.sub, W600, if (on) C.accent else Color.White), maxLines = 1, translate = false)
+            T(p.name, F.t(F.sub, W600, if (on) C.accent else C.ink), maxLines = 1, translate = false)
             T(p.steps.joinToString(" · ") { Bonus.stepText(it) }, F.t(F.foot, color = C.text2), maxLines = 1, translate = false)
         }
     }
@@ -361,7 +361,7 @@ private fun AddLift(have: List<String>, onAdd: (String) -> Unit) {
     for (row in left.chunked(2)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (n in row) {
-                Box(Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.10f))
+                Box(Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(10.dp)).background(C.ink.copy(alpha = 0.10f))
                     .tap { onAdd(n) }.testTag("bonus.addLift.$n"), contentAlignment = Alignment.Center) {
                     T("+ " + n.l10n, F.t(F.foot, W600), maxLines = 1, translate = false)
                 }
@@ -383,7 +383,7 @@ private fun AddLift(have: List<String>, onAdd: (String) -> Unit) {
 /** 숫자만 받는 칸 (AMRAP 추가 동작 수 등) */
 @Composable
 internal fun NumberBox(value: String, hint: String, tag: String, onChange: (String) -> Unit) {
-    Box(Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.08f))
+    Box(Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp)).background(C.ink.copy(alpha = 0.08f))
         .padding(horizontal = 12.dp, vertical = 9.dp), contentAlignment = Alignment.CenterStart) {
         if (value.isEmpty()) T(hint, F.t(17, color = C.text3), maxLines = 1, translate = false)
         BasicTextField(value, { v -> onChange(v.filter { it.isDigit() }.take(3)) }, Modifier.fillMaxWidth().testTag(tag),

@@ -29,7 +29,8 @@ data class Ambient(
 
         /** 테마 색 빛 (기본 노랑). 파랑 · 보라는 같은 값이면 어둡게 보여서 gain 으로 보정 */
         fun y(a: Float, rx: Float, ry: Float, cx: Float, cy: Float, theme: GlowTheme): Ambient =
-            Ambient(theme.hex, minOf(1f, (a * theme.gain).toFloat()), rx, ry, cx, cy)
+            // 1.2.9: 라이트 모드는 뒤쪽 빛을 끔
+            if (Appear.light) none else Ambient(theme.hex, minOf(1f, (a * theme.gain).toFloat()), rx, ry, cx, cy)
     }
 }
 
@@ -46,8 +47,8 @@ object GlowDrift {
 }
 
 @Composable
-fun AmbientLayer(a: Ambient, modifier: Modifier = Modifier) {
-    if (a.alpha <= 0f) return
+fun AmbientLayer(a: Ambient, modifier: Modifier = Modifier, always: Boolean = false) {
+    if (a.alpha <= 0f || (Appear.light && !always)) return
     val c = hex(a.hex, a.alpha)
     val clear = hex(a.hex, 0f)
     Canvas(modifier.fillMaxSize()) {

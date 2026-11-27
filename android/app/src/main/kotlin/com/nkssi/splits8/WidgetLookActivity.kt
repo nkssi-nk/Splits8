@@ -39,6 +39,7 @@ import com.nkssi.splits8.shared.WidgetKo
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.Check8
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.T
 import com.nkssi.splits8.ui.W600
 import com.nkssi.splits8.ui.card8
@@ -86,8 +87,8 @@ private fun LookPicker(id: Int, onPick: (String, String?) -> Unit) {
         Modifier.fillMaxSize().background(Color.Black).statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        T(WidgetKo.t("Background"), F.t(28, W600, tracking = -0.5f), maxLines = 1, translate = false)
-        T(WidgetKo.t("Choose the widget background."), F.t(15, color = C.text2), translate = false)
+        T(WidgetKo.t("Background"), FD.t(28, W600, tracking = -0.5f), maxLines = 1, translate = false)
+        T(WidgetKo.t("Choose the widget background."), FD.t(15, color = C.dText2), translate = false)
         // 미리보기 (지금 고른 바탕)
         val night = (ctx.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -107,29 +108,29 @@ private fun LookPicker(id: Int, onPick: (String, String?) -> Unit) {
                     Modifier.fillMaxWidth().rowLine(i < looks.size - 1).tap { cur = key }.padding(vertical = 14.dp, horizontal = 18.dp).testTag("look.$key"),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    T(WidgetKo.t(label), F.t(17), Modifier.weight(1f), maxLines = 1, translate = false)
+                    T(WidgetKo.t(label), FD.t(17), Modifier.weight(1f), maxLines = 1, translate = false)
                     if (cur == key) Check8()
                 }
             }
         }
         if (!isWeek) {
             // 1.2.8: 가로형 오른쪽 칸 고르기 (아이폰 위젯 편집의 Right side)
-            T("Right side", F.t(13, W600, C.text2), Modifier.padding(start = 4.dp, top = 6.dp), maxLines = 1, translate = false)
+            T("Right side", FD.t(13, W600, C.dText2), Modifier.padding(start = 4.dp, top = 6.dp), maxLines = 1, translate = false)
             Column(Modifier.fillMaxWidth().card8()) {
                 Widgets.sides.forEachIndexed { i, (key, label) ->
                     Row(
                         Modifier.fillMaxWidth().rowLine(i < Widgets.sides.size - 1).tap { side = key }.padding(vertical = 14.dp, horizontal = 18.dp).testTag("side.$key"),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        T(label, F.t(17), Modifier.weight(1f), maxLines = 1, translate = false)
+                        T(label, FD.t(17), Modifier.weight(1f), maxLines = 1, translate = false)
                         if (side == key) Check8()
                     }
                 }
             }
         }
         Box(
-            Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(14.dp)).background(C.accent).tap { onPick(cur, if (isWeek) null else side) }.testTag("look.done"),
+            Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(14.dp)).background(C.yellow).tap { onPick(cur, if (isWeek) null else side) }.testTag("look.done"),
             contentAlignment = Alignment.Center,
-        ) { T(WidgetKo.t("Done"), F.t(17, W600, Color.Black), maxLines = 1, translate = false) }
+        ) { T(WidgetKo.t("Done"), FD.t(17, W600, Color.Black), maxLines = 1, translate = false) }
     }
 }

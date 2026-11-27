@@ -245,6 +245,7 @@ internal object L10nKo {
         m["Change photo"] = "사진 변경"
         m["Change weights later on the phone — the watch only marks sets done."] = "무게는 나중에 폰에서 고칠 수 있어요. 워치는 세트 끝만 눌러요."
         m["Changes the glow behind each screen. Yellow buttons and the logo stay the same."] = "화면 뒤에 비치는 빛의 색만 바뀌어요. 노란 버튼과 로고는 그대로예요."
+        m["Light mode has no glow behind the screens."] = "라이트 모드에서는 화면 뒤 빛이 없어요."
         m["Changing your division updates every station weight and rep count in Training, Full Simulation and Race. Weights can change each season, so check the official rules."] = "Division을 바꾸면 트레이닝·풀 시뮬레이션·레이스의 모든 스테이션 무게와 횟수가 함께 바뀌어요. 무게는 시즌마다 조정될 수 있으니 공식 규정을 확인하세요."
         m["Check"] = "확인 필요"
         // 1.2.2 · 건너뛰기

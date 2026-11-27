@@ -53,6 +53,7 @@ import com.nkssi.splits8.shared.SeqBuilder
 import com.nkssi.splits8.shared.l10n
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.GrayPill
 import com.nkssi.splits8.ui.Icon8
 import com.nkssi.splits8.ui.Sym
@@ -111,7 +112,7 @@ fun WatchLiveView() {
         if (st == null) {
             Box(Modifier.fillMaxSize().background(Color.Black))
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                T("Connecting to your watch…", F.t(15, color = C.text2), maxLines = 1)
+                T("Connecting to your watch…", FD.t(15, color = C.dText2), maxLines = 1)
             }
             return@BoxWithConstraints
         }
@@ -151,17 +152,17 @@ private fun Chips(st: LiveState, modifier: Modifier) {
         Row(Modifier.height(32.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Sym(R.drawable.sym_heart, 12.dp, C.hr)
-            T(if (st.hr > 0) "${st.hr}" else "--", F.num(15), Modifier.testTag("watchLive.hr"), maxLines = 1, translate = false)
-            T("BPM", F.t(10, W600, C.text2), maxLines = 1, translate = false)
+            T(if (st.hr > 0) "${st.hr}" else "--", FD.num(15), Modifier.testTag("watchLive.hr"), maxLines = 1, translate = false)
+            T("BPM", FD.t(10, W600, C.dText2), maxLines = 1, translate = false)
             if (st.zone > 0) {
                 Box(Modifier.height(16.dp).clip(RoundedCornerShape(4.dp)).background(C.zone(st.zone)).padding(horizontal = 5.dp),
-                    contentAlignment = Alignment.Center) { T("Z${st.zone}", F.t(10, W700, Color.Black), maxLines = 1, translate = false) }
+                    contentAlignment = Alignment.Center) { T("Z${st.zone}", FD.t(10, W700, Color.Black), maxLines = 1, translate = false) }
             }
         }
         Row(Modifier.height(32.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            T("${st.kcal}", F.num(15), maxLines = 1, translate = false)
-            T("KCAL", F.t(10, W600, C.text2), maxLines = 1, translate = false)
+            T("${st.kcal}", FD.num(15), maxLines = 1, translate = false)
+            T("KCAL", FD.t(10, W600, C.dText2), maxLines = 1, translate = false)
         }
     }
 }
@@ -189,9 +190,9 @@ private fun Buttons(st: LiveState, f: LiveFrame8, L: PL, buzz: (Boolean) -> Unit
 private fun Saving(modifier: Modifier) {
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Spacer(Modifier.weight(1f))
-        Icon8("deviceWatch", 44.dp, C.accent)
-        T("Saving on your watch…", F.t(17, W600), Modifier.testTag("watchLive.saving"), maxLines = 1)
-        T("Your record will appear here in a moment.", F.t(14, color = C.text2))
+        Icon8("deviceWatch", 44.dp, C.yellow)
+        T("Saving on your watch…", FD.t(17, W600), Modifier.testTag("watchLive.saving"), maxLines = 1)
+        T("Your record will appear here in a moment.", FD.t(14, color = C.dText2))
         Spacer(Modifier.weight(1f))
         GrayPill("Home", Modifier.padding(bottom = 60.dp)) { Router.go(Scr.Home) }
     }

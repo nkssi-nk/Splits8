@@ -26,7 +26,7 @@ fun FoldChips(
 ) {
     val toggleW = height + 6.dp
     val toggle: @Composable () -> Unit = {
-        Box(Modifier.size(toggleW, height).strokeBorder(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f), radius)
+        Box(Modifier.size(toggleW, height).strokeBorder(androidx.compose.ui.graphics.C.ink.copy(alpha = 0.16f), radius)
             .doubleChevron(open).tap(onClick = onToggle).testTag(tag))
     }
     if (open) {

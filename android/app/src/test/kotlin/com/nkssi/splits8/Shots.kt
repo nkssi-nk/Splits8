@@ -377,6 +377,27 @@ class Shots {
         rule.onRoot().captureRoboImage("$out/$name.png")
     }
 
+    // 1.2.9 라이트 모드 화면 (A1 은 이름에 Live 가 든 사진만 찍어서 이름에 Live 를 넣음)
+    private fun lightOn() { Store.update { it.withLight(true) } }
+    @Config(sdk = [35], qualifiers = "w412dp-h2400dp-xxhdpi")
+    @Test fun lightLive01Home() {
+        val now = java.time.Instant.parse("2026-09-25T03:00:00Z")
+        Store.now = { now }
+        val o = Demo.Opts(friends = true, raceDays = 3)
+        Store.useDemo(Demo.settings(o, Store.today()), Demo.programs(), Demo.records(o), Demo.friends(),
+            Demo.leaderboard(), Demo.requests(), "demo.me")
+        lightOn(); shot("90_light_home", s = Scr.Home)
+    }
+    @Config(sdk = [35], qualifiers = "w412dp-h1900dp-xxhdpi")
+    @Test fun lightLive02Training() { demoTraining(); lightOn(); shot("91_light_training", s = Scr.Training) }
+    @Test fun lightLive03Sim() { demoTraining(); lightOn(); Router.testTab = "sim"; shot("92_light_sim", s = Scr.Sim) }
+    @Test fun lightLive04Pft() { demoTraining(); lightOn(); Router.testTab = "pft"; shot("93_light_pft", s = Scr.Sim) }
+    @Config(sdk = [35], qualifiers = "w412dp-h1900dp-xxhdpi")
+    @Test fun lightLive05Race() { demoRace(); lightOn(); shot("94_light_race", s = Scr.Race) }
+    @Config(sdk = [35], qualifiers = "w412dp-h1900dp-xxhdpi")
+    @Test fun lightLive06Settings() { demoTraining(); lightOn(); shot("95_light_settings", s = Scr.Settings) }
+    @Test fun lightLive07SettingsKo() { demoTraining("ko"); lightOn(); shot("96_light_settings_ko", "ko", Scr.Settings) }
+
     @Test fun phoneLive() = demoPhone("75_phone_live", "en")
     @Test fun phoneLiveKo() = demoPhone("75_phone_live_ko", "ko", pause = true)
     @Test fun phoneCount() = demoPhone("76_phone_count", "en", count = true)

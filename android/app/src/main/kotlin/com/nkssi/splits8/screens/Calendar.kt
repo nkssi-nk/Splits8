@@ -190,7 +190,7 @@ private fun DayCell(d: LocalDate, isSel: Boolean, isToday: Boolean, modifier: Mo
         if (raceDay && !isSel) m = m.border(1.5.dp, raceColor, CircleShape)
         else if (isToday && !isSel) m = m.border(1.dp, C.accent, CircleShape)
         Box(m, contentAlignment = Alignment.Center) {
-            T("${d.dayOfMonth}", F.num(15, if (isSel) W600 else W400, if (isSel) Color.Black else Color.White), translate = false)
+            T("${d.dayOfMonth}", F.num(15, if (isSel) W600 else W400, if (isSel) C.onAccent else C.ink), translate = false)
         }
         // 표시: 그날 한 운동 종류별 점 / 대회 깃발 / 예약 링
         val recs = Store.records(d)

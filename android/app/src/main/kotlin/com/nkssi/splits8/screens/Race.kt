@@ -144,8 +144,8 @@ private fun GoalCard() {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // 89번(빌드 28): 막대 뜻이 안 보였음 → 한 줄 설명 (막대 길이 = 시간, 짧을수록 빠름)
             T("Goal vs your best race · shorter bar = faster", F.t(12, color = C.text3), maxLines = 1)
-            GoalBar("Goal", best?.let { minOf(1f, goal.toFloat() / maxOf(1, it)) } ?: 1f, C.accent, Fm.t(goal), Color.White)
-            GoalBar("Best", if (best == null) 0f else 1f, Color.White.copy(alpha = 0.35f), best?.let { Fm.t(it) } ?: "--:--", C.text2)
+            GoalBar("Goal", best?.let { minOf(1f, goal.toFloat() / maxOf(1, it)) } ?: 1f, C.accent, Fm.t(goal), C.ink)
+            GoalBar("Best", if (best == null) 0f else 1f, C.ink.copy(alpha = 0.35f), best?.let { Fm.t(it) } ?: "--:--", C.text2)
         }
         val line = when {
             best == null -> "Once you have a race record, we'll compare it with your best".l10n
@@ -164,7 +164,7 @@ private fun GoalCard() {
 private fun GoalBar(t: String, frac: Float, fill: Color, value: String, valueColor: Color) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         T(t, F.t(13, W500, C.text2), Modifier.width(44.dp), maxLines = 1)
-        Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.08f))) {
+        Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.ink.copy(alpha = 0.08f))) {
             Box(Modifier.fillMaxWidth(frac.coerceIn(0f, 1f)).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(fill))
         }
         T(value, F.num(15, color = valueColor), Modifier.width(64.dp), maxLines = 1, align = TextAlign.End, translate = false)
@@ -298,7 +298,7 @@ fun GoalTimeSheet() {
 /** 1.2.3: 페이스 − / + 동그란 버튼 */
 @Composable
 private fun PaceStep(label: String, tag: String, onClick: () -> Unit) {
-    Box(Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)).press(tag = tag, onClick = onClick),
+    Box(Modifier.size(36.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.08f)).press(tag = tag, onClick = onClick),
         contentAlignment = Alignment.Center) {
         T(label, F.t(18, W600), maxLines = 1, translate = false)
     }
@@ -337,7 +337,7 @@ fun SetEventView() {
                 .padding(vertical = 14.dp, horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(C.accent), contentAlignment = Alignment.Center) {
-                    Glyph("i_searchB", 18.dp, Color.Black)
+                    Glyph("i_searchB", 18.dp, C.onAccent)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     T("Find event", F.t(17, W600), maxLines = 1)
@@ -388,9 +388,9 @@ private fun timeLabel(ev: RaceEvent): String = if (ev.hasTime) hm12(ev) else "No
 private fun PickRow(t: String, value: String, open: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().rowLine(true).padding(vertical = 10.dp, horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
         T(t, F.t(17), Modifier.weight(1f), maxLines = 1)
-        Box(Modifier.height(34.dp).clip(RoundedCornerShape(8.dp)).background(if (open) Color(0x29FFE600) else Color.White.copy(alpha = 0.08f))
+        Box(Modifier.height(34.dp).clip(RoundedCornerShape(8.dp)).background(if (open) Color(0x29FFE600) else C.ink.copy(alpha = 0.08f))
             .tap(onClick = onClick).testTag("ev.$t").padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-            T(value, F.num(17, W400, if (open) C.accent else Color.White), maxLines = 1, translate = false)
+            T(value, F.num(17, W400, if (open) C.accent else C.ink), maxLines = 1, translate = false)
         }
     }
 }
@@ -422,7 +422,7 @@ private fun EventCalendar(selected: LocalDate, onPick: (LocalDate) -> Unit) {
                             Box(Modifier.size(36.dp).clip(CircleShape).background(if (on) C.accent else Color.Transparent)
                                 .tap(enabled = !past) { onPick(d) }.testTag("ev.day.$d"), contentAlignment = Alignment.Center) {
                                 T("${d.dayOfMonth}", F.num(17, if (on || isT) W600 else W400,
-                                    when { on -> Color.Black; past -> C.chev; isT -> C.accent; else -> Color.White }), translate = false)
+                                    when { on -> C.onAccent; past -> C.chev; isT -> C.accent; else -> C.ink }), translate = false)
                             }
                         }
                     }
@@ -466,9 +466,9 @@ private fun EventTimeGrid(ev: RaceEvent, onTime: (String) -> Unit) {
 
 @Composable
 private fun TimeCell(t: String, on: Boolean, modifier: Modifier, tag: String, onClick: () -> Unit) {
-    Box(modifier.height(40.dp).clip(RoundedCornerShape(10.dp)).background(if (on) C.accent else Color.White.copy(alpha = 0.08f))
+    Box(modifier.height(40.dp).clip(RoundedCornerShape(10.dp)).background(if (on) C.accent else C.ink.copy(alpha = 0.08f))
         .tap(onClick = onClick).testTag(tag), contentAlignment = Alignment.Center) {
-        T(t, F.num(17, color = if (on) Color.Black else Color.White), maxLines = 1, translate = false)
+        T(t, F.num(17, color = if (on) C.onAccent else C.ink), maxLines = 1, translate = false)
     }
 }
 
@@ -490,9 +490,9 @@ fun FindEventView() {
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for ((k, l) in EventItem.regions) {
                     val on = region == k
-                    Box(Modifier.height(32.dp).clip(CircleShape).background(if (on) C.accent else Color.White.copy(alpha = 0.08f))
+                    Box(Modifier.height(32.dp).clip(CircleShape).background(if (on) C.accent else C.ink.copy(alpha = 0.08f))
                         .tap { region = k }.testTag("ev.region.$k").padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                        T(l, F.t(13, W600, if (on) Color.Black else Color.White), maxLines = 1)
+                        T(l, F.t(13, W600, if (on) C.onAccent else C.ink), maxLines = 1)
                     }
                 }
             }
@@ -574,7 +574,7 @@ fun SetGoalsView() {
                     val t = g.getOrElse(i) { 0 }
                     Row(Modifier.fillMaxWidth().rowLine(i < 15).padding(vertical = 9.dp).padding(start = 18.dp, end = 12.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon8(if (run) "run" else st.key, 20.dp, if (run) Color.White else C.accent)
+                        Icon8(if (run) "run" else st.key, 20.dp, if (run) C.ink else C.accent)
                         Column(Modifier.weight(1f)) {
                             T(if (run) L10n.t("Run %lld", i / 2 + 1) else st.name, F.t(15, W500), maxLines = 1, translate = false)
                             T(com.nkssi.splits8.shared.Units.detail(if (run) "1KM" else st.detail(s.div), s.imperial), F.num(11, W400, C.text2), maxLines = 1, translate = false)

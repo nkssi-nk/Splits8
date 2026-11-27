@@ -63,12 +63,12 @@ fun RaceLeaderboard() {
                 lbStations.forEach { (k, name) ->
                     val on = s.lbStation == k
                     Row(
-                        Modifier.height(34.dp).clip(CircleShape).background(if (on) C.accent else Color.White.copy(alpha = 0.08f))
+                        Modifier.height(34.dp).clip(CircleShape).background(if (on) C.accent else C.ink.copy(alpha = 0.08f))
                             .tap { Store.update { it.copy(lbStation = k) } }.padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Icon8(k, 14.dp, if (on) Color.Black else C.accent)
-                        T(name, F.t(13, W600, if (on) Color.Black else Color.White), maxLines = 1, translate = false)
+                        Icon8(k, 14.dp, if (on) C.onAccent else C.accent)
+                        T(name, F.t(13, W600, if (on) C.onAccent else C.ink), maxLines = 1, translate = false)
                     }
                 }
             }
@@ -116,10 +116,10 @@ private fun LbRow(i: Int, row: LBRow, me: Boolean, meT: Int?, last: Boolean) {
             .padding(vertical = 12.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        T("${i + 1}", F.num(17, color = if (i == 0) C.accent else Color.White), Modifier.width(22.dp), translate = false)
-        Avatar8(34.dp, row.nickname.take(1).uppercase(), photo = if (me) Store.photo else com.nkssi.splits8.RemoteImages.get(row.avatar_url), bg = if (me) C.accent else C.control, fg = if (me) Color.Black else Color.White)
+        T("${i + 1}", F.num(17, color = if (i == 0) C.accent else C.ink), Modifier.width(22.dp), translate = false)
+        Avatar8(34.dp, row.nickname.take(1).uppercase(), photo = if (me) Store.photo else com.nkssi.splits8.RemoteImages.get(row.avatar_url), bg = if (me) C.accent else C.control, fg = if (me) C.onAccent else C.ink)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            T(if (me) L10n.t("@%@ (you)", row.nickname) else "@${row.nickname}", F.t(15, if (me) W600 else W500, if (me) C.accent else Color.White),
+            T(if (me) L10n.t("@%@ (you)", row.nickname) else "@${row.nickname}", F.t(15, if (me) W600 else W500, if (me) C.accent else C.ink),
                 maxLines = 1, translate = false)
             T(row.division, F.t(13, color = C.text2), maxLines = 1, translate = false)
         }
@@ -138,7 +138,7 @@ private fun NoRecordRow(f: com.nkssi.splits8.shared.Friend, text: String, last: 
     Row(Modifier.fillMaxWidth().rowLine(!last).padding(vertical = 12.dp, horizontal = 18.dp).testTag("lb.friend." + f.id),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         T("–", F.num(17, color = C.text3), Modifier.width(22.dp), translate = false)
-        Avatar8(34.dp, f.name.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(f.avatarUrl), bg = C.control, fg = Color.White)
+        Avatar8(34.dp, f.name.take(1).uppercase(), photo = com.nkssi.splits8.RemoteImages.get(f.avatarUrl), bg = C.control, fg = C.ink)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             T("@${f.name}", F.t(15, W500), maxLines = 1, translate = false)
             T(f.div, F.t(13, color = C.text2), maxLines = 1, translate = false)

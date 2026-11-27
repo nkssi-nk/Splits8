@@ -128,7 +128,7 @@ private fun ProfileCard() {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Avatar8(52.dp, if (signed) nick.take(1).uppercase() else "?", photo = Store.photo, bg = if (signed) C.accent else C.control,
-            fg = if (signed) Color.Black else C.text2)
+            fg = if (signed) C.onAccent else C.text2)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 T(if (signed) "@$nick" else "My profile".l10n, F.t(17, W600, tracking = -0.17f), Modifier.weight(1f, fill = false),
@@ -193,7 +193,7 @@ private fun NextRace() {
     val intensity = listOf(0f, 0.38f, 0.65f, 1f, 1f)[stage]
     val lap = listOf(6f, 12f, 9f, 6f, 4f)[stage]
     val shape = RoundedCornerShape(20.dp)
-    val y = Color(0xFFFFE600)
+    val y = C.accent
     val bg: Modifier = if (stage >= 2) {
         val fill = if (stage == 2) 0.07f else if (stage == 3) 0.20f else 0.30f
         val from = if (stage == 4) 0.1f else 0.3f
@@ -202,7 +202,7 @@ private fun NextRace() {
         Modifier
             .then(if (glow > 0f) Modifier.outerGlow(y.copy(alpha = glow), 20.dp, if (stage == 4) 16.dp else 14.dp, 8.dp) else Modifier)
             .clip(shape)
-            .background(Brush.horizontalGradient(from to Color.White.copy(alpha = 0.05f), 1f to y.copy(alpha = fill)))
+            .background(Brush.horizontalGradient(from to C.ink.copy(alpha = 0.05f), 1f to y.copy(alpha = fill)))
             .border(1.dp, y.copy(alpha = line), shape)
     } else Modifier.card8()
     Row(
@@ -312,8 +312,8 @@ private fun FriendsHeader() {
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                T(if (n == 1) L10n.t("1 request") else L10n.t("%lld requests", n), F.t(13, W600, Color.Black), maxLines = 1, translate = false)
-                Chevron8(color = Color.Black)
+                T(if (n == 1) L10n.t("1 request") else L10n.t("%lld requests", n), F.t(13, W600, C.onAccent), maxLines = 1, translate = false)
+                Chevron8(color = C.onAccent)
             }
         }
     }
@@ -422,7 +422,7 @@ private fun BarChart(week: Boolean, iv: Period, modifier: Modifier) {
                 Box(Modifier.fillMaxWidth().height(maxH.dp), contentAlignment = Alignment.BottomCenter) {
                     val h = if (secs > 0) maxOf(6f, maxH * secs / mx) else 2f
                     Box(Modifier.fillMaxWidth().height(h.dp).clip(RoundedCornerShape(if (secs > 0) 4.dp else 1.dp))
-                        .background(if (secs > 0) color else Color.White.copy(alpha = 0.14f)))
+                        .background(if (secs > 0) color else C.ink.copy(alpha = 0.14f)))
                 }
                 T(label, F.t(F.cap2, W500, C.text3), maxLines = 1, translate = false)
             }

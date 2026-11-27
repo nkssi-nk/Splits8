@@ -180,7 +180,7 @@ fun Note8(text: String, modifier: Modifier = Modifier, color: Color = C.text3) {
 
 /** 아이폰 그림 이름으로 색칠한 아이콘 (스테이션 · 모드 · i_* 모두) */
 @Composable
-fun Icon8(name: String, size: Dp, color: Color = Color.White, modifier: Modifier = Modifier) {
+fun Icon8(name: String, size: Dp, color: Color = C.ink, modifier: Modifier = Modifier) {
     val id = IconRes.of(name)
     if (id == null) {
         Spacer(modifier.size(size))
@@ -192,7 +192,7 @@ fun Icon8(name: String, size: Dp, color: Color = Color.White, modifier: Modifier
 
 /** 작은 아이콘 (i_*) — Icon8 과 같음, 아이폰 이름 맞춤 */
 @Composable
-fun Glyph(name: String, size: Dp, color: Color = Color.White, modifier: Modifier = Modifier) = Icon8(name, size, color, modifier)
+fun Glyph(name: String, size: Dp, color: Color = C.ink, modifier: Modifier = Modifier) = Icon8(name, size, color, modifier)
 
 /** › (14, #48484C) */
 @Composable
@@ -238,7 +238,7 @@ private fun Modifier.clipRight(f: Float) = drawWithContent {
 
 /** 노란 유리 바탕. on=false 면 회색 비활성 바탕 */
 fun Modifier.yellowFill(shape: Shape, on: Boolean = true, glow: Boolean = true): Modifier {
-    if (!on) return this.clip(shape).background(Color.White.copy(alpha = 0.12f), shape)
+    if (!on) return this.clip(shape).background(C.ink.copy(alpha = 0.12f), shape)
     return this
         .then(if (glow) Modifier.shadow(9.dp, shape, ambientColor = Color(0x33FFD600), spotColor = Color(0x55FFD600)) else Modifier)
         .clip(shape)
@@ -246,7 +246,7 @@ fun Modifier.yellowFill(shape: Shape, on: Boolean = true, glow: Boolean = true):
         .border(
             1.dp,
             Brush.verticalGradient(
-                0f to Color.White.copy(alpha = 0.6f), 0.12f to Color.White.copy(alpha = 0f),
+                0f to C.ink.copy(alpha = 0.6f), 0.12f to C.ink.copy(alpha = 0f),
                 0.88f to Color.Black.copy(alpha = 0f), 1f to Color.Black.copy(alpha = 0.10f),
             ),
             shape,
@@ -264,7 +264,7 @@ fun YellowButton(
             .press(enabled = enabled, tag = tag, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        T(title, F.t(17, W600, if (enabled) Color.Black else C.text3), maxLines = 1)
+        T(title, F.t(17, W600, if (enabled) C.onAccent else C.text3), maxLines = 1)
     }
 }
 
@@ -273,7 +273,7 @@ fun YellowButton(
 fun YellowPill(title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(modifier.height(34.dp).yellowFill(CircleShape).press(0.96f, onClick = onClick).padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center) {
-        T(title, F.t(13, W600, Color.Black), maxLines = 1)
+        T(title, F.t(13, W600, C.onAccent), maxLines = 1)
     }
 }
 
@@ -281,7 +281,7 @@ fun YellowPill(title: String, modifier: Modifier = Modifier, onClick: () -> Unit
 @Composable
 fun GrayPill(title: String, modifier: Modifier = Modifier, icon: String? = null, onClick: () -> Unit) {
     Row(
-        modifier.height(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f))
+        modifier.height(34.dp).clip(CircleShape).background(C.ink.copy(alpha = 0.10f))
             .press(0.96f, onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -307,7 +307,7 @@ fun Seg8(
                 m.height(height).clip(RoundedCornerShape(radius - 2.dp)).background(if (on) C.segOn else Color.Transparent)
                     .tap { onSelect(k) }.then(if (minWidth > 0.dp) Modifier.padding(horizontal = 12.dp) else Modifier),
                 contentAlignment = Alignment.Center,
-            ) { T(l, F.t(fontSize, W600, if (on) Color.White else C.text2), maxLines = 1) }
+            ) { T(l, F.t(fontSize, W600, if (on) C.ink else C.text2), maxLines = 1) }
         }
     }
 }
@@ -322,7 +322,7 @@ fun Pills8(items: List<Pair<String, String>>, selected: String, modifier: Modifi
                 Modifier.height(24.dp).clip(RoundedCornerShape(6.dp)).background(if (on) C.segOn else Color.Transparent)
                     .tap { onSelect(k) }.padding(horizontal = 9.dp),
                 contentAlignment = Alignment.Center,
-            ) { T(l, F.t(11, W600, if (on) Color.White else C.text2), maxLines = 1) }
+            ) { T(l, F.t(11, W600, if (on) C.ink else C.text2), maxLines = 1) }
         }
     }
 }
@@ -335,7 +335,7 @@ fun Toggle8(on: Boolean, modifier: Modifier = Modifier, w: Dp = 51.dp, h: Dp = 3
     Box(modifier.size(w, h).clip(CircleShape).background(if (on) C.accent else C.control).tap { onChange(!on) }) {
         Box(
             Modifier.offset(x = x).align(Alignment.CenterStart).size(k)
-                .shadow(2.dp, CircleShape).background(if (on) Color.Black else Color.White, CircleShape),
+                .shadow(2.dp, CircleShape).background(if (on) C.onAccent else C.ink, CircleShape),
         )
     }
 }
@@ -367,7 +367,7 @@ fun CountBadge(n: Int) {
     if (n <= 0) return
     Box(Modifier.heightIn(min = 20.dp).widthIn(min = 20.dp).clip(CircleShape).background(C.accent).padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center) {
-        T(if (n > 99) "99+" else "$n", F.num(12, W600, Color.Black), translate = false)
+        T(if (n > 99) "99+" else "$n", F.num(12, W600, C.onAccent), translate = false)
     }
 }
 
@@ -391,7 +391,7 @@ fun SettingRow(
 /** 원형 사진/이니셜 */
 @Composable
 fun Avatar8(size: Dp, initial: String, modifier: Modifier = Modifier, photo: androidx.compose.ui.graphics.ImageBitmap? = null,
-            bg: Color = C.control, fg: Color = Color.White) {
+            bg: Color = C.control, fg: Color = C.ink) {
     Box(modifier.size(size).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
         if (photo != null) {
             Image(photo, null, Modifier.size(size), contentScale = ContentScale.Crop)
@@ -416,7 +416,7 @@ fun Field8(placeholder: String, text: String, modifier: Modifier = Modifier, siz
 @Composable
 fun SearchField8(placeholder: String, text: String, modifier: Modifier = Modifier, prefix: String? = null, onChange: (String) -> Unit) {
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 12.dp),
+        modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.ink.copy(alpha = 0.08f)).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (prefix != null) T(prefix, F.t(17, color = C.text2), translate = false) else Glyph("i_search", 16.dp, C.text2)
@@ -444,7 +444,7 @@ fun PFTBadge(grade: PFTGrade, modifier: Modifier = Modifier, width: Dp = 78.dp, 
     ) {
         Box(
             Modifier.padding(start = lead).size(dot).clip(CircleShape).background(Color.Black.copy(alpha = 0.28f))
-                .border(maxOf(1.5f, fontSize / 6).dp, Color.White.copy(alpha = 0.55f), CircleShape),
+                .border(maxOf(1.5f, fontSize / 6).dp, C.ink.copy(alpha = 0.55f), CircleShape),
         )
         T(grade.label, F.te(fontSize, W800, hex(grade.inkHex), 0.04f),
             Modifier.weight(1f).padding(start = 2.dp, end = lead * 0.7f), maxLines = 1, align = TextAlign.Center, translate = false)

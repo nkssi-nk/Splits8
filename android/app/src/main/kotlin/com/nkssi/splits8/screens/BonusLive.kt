@@ -34,6 +34,7 @@ import com.nkssi.splits8.shared.Units
 import com.nkssi.splits8.shared.l10n
 import com.nkssi.splits8.ui.C
 import com.nkssi.splits8.ui.F
+import com.nkssi.splits8.ui.FD
 import com.nkssi.splits8.ui.Icon8
 import com.nkssi.splits8.ui.Label8
 import com.nkssi.splits8.ui.Stepper8
@@ -53,7 +54,7 @@ internal fun BonusLiveBody(eng: PhoneRunEngine, now: Long, m: LiveMetrics, modif
     val rest = cur.kind == SegKind.Rox
     val imp = Store.settings.imperial
     val el = eng.segEl(now)
-    val bigColor = if (!eng.running) C.text2 else if (rest) C.d1 else C.accent
+    val bigColor = if (!eng.running) C.dText2 else if (rest) C.dD1 else C.yellow
     val label: String
     val big: String
     var head = ""
@@ -102,18 +103,18 @@ internal fun BonusLiveBody(eng: PhoneRunEngine, now: Long, m: LiveMetrics, modif
         }
     }
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        T("TOTAL", F.t(12, W600, C.text2, tracking = 1.44f), maxLines = 1)
-        FitText(Fm.t(eng.total(now)), F.num(m.totalFont * 0.62f, color = if (eng.running) Color.White else C.text2),
+        T("TOTAL", FD.t(12, W600, C.dText2, tracking = 1.44f), maxLines = 1)
+        FitText(Fm.t(eng.total(now)), FD.num(m.totalFont * 0.62f, color = if (eng.running) Color.White else C.dText2),
             Modifier.testTag("phone.total"), minScale = 0.6f)
         Row(Modifier.padding(top = (m.segTop * 0.5f).dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon8(if (rest) "hiit" else Kinds.icon(eng.kind), (m.icon * 0.6f).dp, if (rest) C.text2 else C.accent)
-            FitText(cur.name.l10n, F.t(m.nameFont, W600, if (rest) C.text2 else Color.White), minScale = 0.7f)
-            if (head.isNotEmpty()) T(head, F.num(m.nameFont * 0.8f, color = C.text2), maxLines = 1, translate = false)
+            Icon8(if (rest) "hiit" else Kinds.icon(eng.kind), (m.icon * 0.6f).dp, if (rest) C.dText2 else C.yellow)
+            FitText(cur.name.l10n, FD.t(m.nameFont, W600, if (rest) C.dText2 else Color.White), minScale = 0.7f)
+            if (head.isNotEmpty()) T(head, FD.num(m.nameFont * 0.8f, color = C.dText2), maxLines = 1, translate = false)
         }
         Label8(label, Modifier.padding(top = (m.nameTop * 1.4f).dp))
-        FitText(big, F.num(m.totalFont * 1.25f, color = bigColor, tracking = -0.02f * m.totalFont),
+        FitText(big, FD.num(m.totalFont * 1.25f, color = bigColor, tracking = -0.02f * m.totalFont),
             Modifier.testTag("phone.bonusBig"), minScale = 0.5f)
-        FitText(line, F.t(m.detailFont, color = C.aeb), Modifier.padding(top = 4.dp).height((m.detailFont * 1.4f).dp), minScale = 0.7f)
+        FitText(line, FD.t(m.detailFont, color = C.dAeb), Modifier.padding(top = 4.dp).height((m.detailFont * 1.4f).dp), minScale = 0.7f)
     }
 }
 
@@ -161,13 +162,13 @@ internal fun LiftSetSheet(name: String, setLabel: String, reps: Int, kg: Double,
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).tap(onClick = onCancel).testTag("phone.liftSheet"),
         contentAlignment = Alignment.BottomCenter) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(C.sheet).tap { }
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(C.dSheet).tap { }
                 .padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 34.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                T(name, F.t(F.title3, W600), maxLines = 1)
-                T(setLabel, F.t(F.foot, color = C.text2), maxLines = 1, translate = false)
+                T(name, FD.t(F.title3, W600), maxLines = 1)
+                T(setLabel, FD.t(F.foot, color = C.dText2), maxLines = 1, translate = false)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Label8("REPS", Modifier.weight(1f))

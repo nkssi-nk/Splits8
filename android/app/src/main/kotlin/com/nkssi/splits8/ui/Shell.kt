@@ -93,7 +93,7 @@ fun PhoneRoot(screen: @Composable (Scr) -> Unit) {
     val scr = Router.scr
     val theme = Store.settings.glow
     val haze = remember { dev.chrisbanes.haze.HazeState() }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().background(C.bg)) {
         // 배경 빛 + 화면 = 위 고정 바가 뒤로 비춰 흐리게 보여 줄 내용
         Box(Modifier.fillMaxSize().hazeSource(haze)) {
             Crossfade(scr to theme, animationSpec = tween(500), label = "ambient") { (s, t) ->
@@ -107,7 +107,7 @@ fun PhoneRoot(screen: @Composable (Scr) -> Unit) {
         if (scr != Scr.Splash && scr != Scr.PhoneLive && scr != Scr.WatchLive) {
             val top = statusTop()
             if (top > 0.dp) {
-                Box(Modifier.fillMaxWidth().height(top).background(Brush.verticalGradient(0.6f to Color.Black, 1f to Color.Transparent)))
+                Box(Modifier.fillMaxWidth().height(top).background(Brush.verticalGradient(0.6f to C.bg, 1f to Color.Transparent)))
             }
         }
         if (scr.showsBar) androidx.compose.runtime.CompositionLocalProvider(LocalHaze provides haze) { TopBar8() }
@@ -186,11 +186,11 @@ fun TopBar8() {
     Column(Modifier.fillMaxWidth()) {
         Box(
             Modifier.fillMaxWidth().height(top + 44.dp)
-                .let { if (blur) it.hazeEffect(haze, dev.chrisbanes.haze.materials.HazeMaterials.ultraThin(Color.Black)) else it }
+                .let { if (blur) it.hazeEffect(haze, dev.chrisbanes.haze.materials.HazeMaterials.ultraThin(C.bg)) else it }
                 .background(Color.Black.copy(alpha = if (blur) 0.55f else 0.82f))
                 .drawBehind {
                     val y = size.height - 0.5.dp.toPx()
-                    drawLine(Color.White.copy(alpha = 0.06f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+                    drawLine(C.ink.copy(alpha = 0.06f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
                 }
                 .padding(top = top).padding(horizontal = 20.dp),
         ) {
@@ -267,7 +267,7 @@ fun TabBar8(modifier: Modifier = Modifier) {
             .shadow(16.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
             .clip(shape)
             .background(Color(0xE6161616))
-            .border(0.5.dp, Color.White.copy(alpha = 0.1f), shape),
+            .border(0.5.dp, C.ink.copy(alpha = 0.1f), shape),
     ) {
         val side = 6.dp
         val cell = (maxWidth - side * 2) / tabs.size

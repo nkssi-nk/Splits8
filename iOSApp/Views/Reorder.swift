@@ -77,7 +77,7 @@ extension View {
     /// 끄는 줄 모양 (빌더와 같음): 배경 #2C2C2E · 둥근 모서리 · 1.03배 · 그림자 · 손가락 따라 이동 · 맨 앞
     func reorderLift(_ dragging: Bool, offset: CGFloat, corner: CGFloat = 14) -> some View {
         self
-            .background(dragging ? Color(hex: 0x2C2C2E) : Color.black.opacity(0.001))
+            .background(dragging ? C.ad(0x2C2C2E) : Color.black.opacity(0.001))
             .clipShape(RoundedRectangle(cornerRadius: dragging ? corner : 0, style: .continuous))
             .scaleEffect(dragging ? 1.03 : 1)
             .shadow(color: .black.opacity(dragging ? 0.5 : 0), radius: 12, y: 6)

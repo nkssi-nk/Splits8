@@ -63,7 +63,7 @@ struct WidgetPreviewView: View {
             HStack(spacing: 8) {
                 Icon8(demoCard.segIcon, 18, tint: .yellow)
                 Spacer()
-                Text(Fm.t(demoCard.segSec)).font(F.num(15)).foregroundStyle(C.accent)
+                Text(Fm.t(demoCard.segSec)).font(F.num(15)).foregroundStyle(C.yellow)
             }
             .padding(.horizontal, 16).frame(width: 230, height: 36)
             .background(Color.black, in: Capsule())
@@ -89,7 +89,7 @@ struct WidgetPreviewView: View {
     }
 
     private func label(_ t: String) -> some View {
-        Text(t).font(F.t(13, .semibold)).foregroundStyle(C.text2).padding(.top, 6)
+        Text(t).font(F.t(13, .semibold)).foregroundStyle(C.dText2).padding(.top, 6)
     }
 
     private func small<V: View>(stage: Int, pal: WPal = .dark, @ViewBuilder _ v: () -> V) -> some View {
@@ -105,6 +105,6 @@ struct WidgetPreviewView: View {
             .environment(\.wpal, pal)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(C.accent.opacity(pal.light ? 0 : [0.0, 0.25, 0.4, 0.8][stage]), lineWidth: 1.5))
+                .strokeBorder(C.yellow.opacity(pal.light ? 0 : [0.0, 0.25, 0.4, 0.8][stage]), lineWidth: 1.5))
     }
 }

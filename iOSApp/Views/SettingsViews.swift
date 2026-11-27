@@ -128,7 +128,7 @@ struct SettingsView: View {
             SectionLabel(text: "ACCOUNT", top: 14)
             Button { confirmSignOut = true } label: {
                 HStack(spacing: 12) {
-                    Text("Sign out").font(F.t(17)).foregroundStyle(.white)
+                    Text("Sign out").font(F.t(17)).foregroundStyle(C.ink)
                     Spacer(minLength: 8)
                     Text(verbatim: "@" + (store.settings.nickname ?? "")).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
                 }
@@ -183,6 +183,19 @@ struct SettingsView: View {
     private var themeSection: some View {
         VStack(spacing: 10) {
             SectionLabel(text: "THEME", top: 14)
+            // 1.2.9 화면 모드 (다크 / 라이트)
+            HStack(spacing: 8) {
+                Text("Appearance").font(F.t(17)).lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                Seg8(items: [("dark", "Dark"), ("light", "Light")], selected: store.settings.light ? "light" : "dark",
+                     minWidth: 150) { k in
+                    store.settings.light = k == "light"
+                }
+                .accessibilityIdentifier("settings.appearance")
+            }
+            .padding(.vertical, 8).padding(.horizontal, 18)
+            .card8()
+            .padding(.bottom, 8)
             HStack(spacing: 8) {
                 Text("Glow color").font(F.t(17)).lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 4)
@@ -202,7 +215,10 @@ struct SettingsView: View {
                     .allowsHitTesting(false)
             }
             .animation(.easeInOut(duration: 0.3), value: store.settings.glow)
-            Note8(text: "Changes the glow behind each screen. Yellow buttons and the logo stay the same.")
+            // 라이트 모드는 뒤쪽 빛이 없어서 빛 색 고르기를 끔
+            .opacity(store.settings.light ? 0.4 : 1)
+            .allowsHitTesting(!store.settings.light)
+            Note8(text: store.settings.light ? "Light mode has no glow behind the screens." : "Changes the glow behind each screen. Yellow buttons and the logo stay the same.")
         }
     }
 
@@ -255,9 +271,9 @@ struct SettingsView: View {
         return Button { r.go(.account) } label: {
             HStack(spacing: 14) {
                 Avatar8(size: 44, photo: store.photo, initial: ini,
-                        bg: signed ? C.accent : C.control, fg: signed ? .black : C.text2, fontSize: 17)
+                        bg: signed ? C.accent : C.control, fg: signed ? C.onAccent : C.text2, fontSize: 17)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(signed ? "@\(nick)" : "My profile").font(F.t(17, .semibold)).foregroundStyle(.white).lineLimit(1)
+                    Text(signed ? "@\(nick)" : "My profile").font(F.t(17, .semibold)).foregroundStyle(C.ink).lineLimit(1)
                     Text(profileSub(signed))
                         .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                 }
@@ -285,7 +301,7 @@ struct SettingsView: View {
         let on = store.watchPaired && store.watchInstalled
         let sub = store.watchPaired ? (store.watchInstalled ? "Splits8 installed" : "Splits8 not installed") : "Not paired"
         return HStack(spacing: 12) {
-            Glyph("i_device", 22, .white)
+            Glyph("i_device", 22, C.ink)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Apple Watch").font(F.t(17))
                 Text(sub.l10n).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
@@ -347,7 +363,7 @@ struct SetRunView: View {
         return Button { store.settings.runMode = k } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(RunModes.name(k).l10n).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white)
+                    Text(RunModes.name(k).l10n).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(C.ink)
                     Text(RunModes.spec(k).l10n).font(F.t(13)).foregroundStyle(C.text3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

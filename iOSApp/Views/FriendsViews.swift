@@ -87,7 +87,7 @@ struct FriendsView: View {
         .sheet(item: $cheerTo) { f in
             CheerSheet(friend: f)
                 .presentationDetents([.height(430)])
-                .presentationBackground(Color(hex: 0x1C1C1E))
+                .presentationBackground(C.ad(0x1C1C1E))
         }
         .alert(String(localized: "You can add up to \(Friend.freeLimit) friends"), isPresented: $limitAlert) {
             Button("OK", role: .cancel) {}
@@ -222,7 +222,7 @@ struct FriendsView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("@" + c.nickname).font(F.t(15, .semibold)).lineLimit(1)
                             Text(k.isEmoji ? String(localized: "Sent you \(k.emoji)") : k.emoji + " " + k.line.l10n)
-                                .font(F.t(13)).foregroundStyle(c.seen ? C.text2 : .white).lineLimit(1)
+                                .font(F.t(13)).foregroundStyle(c.seen ? C.text2 : C.ink).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         Text(Self.ago(c.created_at)).font(F.t(12)).foregroundStyle(C.text3).lineLimit(1)
@@ -275,9 +275,9 @@ struct FriendsView: View {
     private func pill(_ title: String, yellow: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title.l10n).font(F.t(13, .semibold))
-                .foregroundStyle(yellow ? Color.black : .white)
+                .foregroundStyle(yellow ? C.onAccent : C.ink)
                 .padding(.horizontal, 14).frame(height: 32)
-                .background(yellow ? C.accent : Color.white.opacity(0.12), in: Capsule())
+                .background(yellow ? C.accent : C.ink.opacity(0.12), in: Capsule())
                 .contentShape(Capsule())
         }
         .buttonStyle(Press(scale: 0.96))
@@ -294,9 +294,9 @@ struct FriendsView: View {
                         Text("@" + b.name).font(F.t(17)).foregroundStyle(C.text2).lineLimit(1)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Button { withAnimation(.easeOut(duration: 0.2)) { store.unhide(b.id) } } label: {
-                            Text("Unhide").font(F.t(13, .semibold)).foregroundStyle(.white)
+                            Text("Unhide").font(F.t(13, .semibold)).foregroundStyle(C.ink)
                                 .padding(.horizontal, 14).frame(height: 32)
-                                .background(Color.white.opacity(0.12), in: Capsule())
+                                .background(C.ink.opacity(0.12), in: Capsule())
                                 .contentShape(Capsule())
                         }
                         .buttonStyle(Press(scale: 0.96))
@@ -322,9 +322,9 @@ struct FriendsView: View {
                         Text("@" + b.name).font(F.t(17)).foregroundStyle(C.text2).lineLimit(1)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Button { withAnimation(.easeOut(duration: 0.2)) { store.unblock(b.id) } } label: {
-                            Text("Unblock").font(F.t(13, .semibold)).foregroundStyle(.white)
+                            Text("Unblock").font(F.t(13, .semibold)).foregroundStyle(C.ink)
                                 .padding(.horizontal, 14).frame(height: 32)
-                                .background(Color.white.opacity(0.12), in: Capsule())
+                                .background(C.ink.opacity(0.12), in: Capsule())
                                 .contentShape(Capsule())
                         }
                         .buttonStyle(Press(scale: 0.96))
@@ -373,9 +373,9 @@ struct FriendsView: View {
                 if let got { store.respond(got, accept: true) } else { add(h) }
             } label: {
                 Text(title.l10n).font(F.t(13, .semibold))
-                    .foregroundStyle(yellow ? Color.black : C.text2)
+                    .foregroundStyle(yellow ? C.onAccent : C.text2)
                     .padding(.horizontal, 14).frame(height: 32)
-                    .background(yellow ? C.accent : Color.white.opacity(0.12), in: Capsule())
+                    .background(yellow ? C.accent : C.ink.opacity(0.12), in: Capsule())
                     .contentShape(Capsule())
             }
             .buttonStyle(Press(scale: 0.96))
@@ -401,7 +401,7 @@ struct FriendsView: View {
                 FriendAvatar(url: f.avatarUrl, ini: f.ini, size: 40)
                     .photoTap(f.avatarUrl.map { PhotoItem(url: $0, title: "@" + f.name, sub: f.div) })
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(f.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white).lineLimit(1)
+                    Text(f.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(C.ink).lineLimit(1)
                     Text(friendSub(f))
                         .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                 }
@@ -488,7 +488,7 @@ struct CountBadge: View {
     let n: Int
     var body: some View {
         if n > 0 {
-            Text("\(n)").font(F.num(12, .semibold)).foregroundStyle(.black)
+            Text("\(n)").font(F.num(12, .semibold)).foregroundStyle(C.onAccent)
                 .padding(.horizontal, 6).frame(minWidth: 20, minHeight: 20)
                 .background(C.accent, in: Capsule())
                 .fixedSize()
@@ -508,7 +508,7 @@ struct CheerSheet: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Capsule().fill(Color.white.opacity(0.25)).frame(width: 36, height: 5).padding(.top, 8)
+            Capsule().fill(C.ink.opacity(0.25)).frame(width: 36, height: 5).padding(.top, 8)
             Text(String(localized: "Cheer @\(friend.name)")).font(F.t(20, .semibold)).lineLimit(1)
             if sent {
                 Spacer()
@@ -533,7 +533,7 @@ struct CheerSheet: View {
                         Button { send(k) } label: {
                             HStack(spacing: 10) {
                                 Text(k.emoji).font(.system(size: 18))
-                                Text(k.line.l10n).font(F.t(16)).foregroundStyle(.white)
+                                Text(k.line.l10n).font(F.t(16)).foregroundStyle(C.ink)
                                 Spacer()
                             }
                             .padding(.vertical, 12).padding(.horizontal, 16)

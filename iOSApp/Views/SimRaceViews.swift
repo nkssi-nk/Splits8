@@ -119,7 +119,7 @@ struct SimView: View {
         .sheet(isPresented: $info) {
             SimInfoSheet()
                 .presentationDetents([.large])
-                .presentationBackground(Color(hex: 0x1C1C1E))
+                .presentationBackground(C.ad(0x1C1C1E))
                 .preferredColorScheme(.dark)
         }
     }
@@ -149,7 +149,7 @@ struct SimView: View {
                 let on = metric == c.key
                 Button { withAnimation(.easeOut(duration: 0.2)) { metric = c.key } } label: {
                     Text(c.label.l10n).font(F.t(11, .semibold)).tracking(0.88)
-                        .foregroundStyle(on ? Color.black : C.aeb)
+                        .foregroundStyle(on ? C.onAccent : C.aeb)
                         .padding(.horizontal, 12).frame(height: 30)
                         .background(on ? C.accent : C.btn1A, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
@@ -365,7 +365,7 @@ struct TrendChart: View {
         let n = values.count
         return ZStack(alignment: .topLeading) {
             ForEach([30.0, 75.0, 120.0], id: \.self) { gy in
-                Rectangle().fill(Color(hex: 0x1C1C1C)).frame(width: w, height: 1).offset(y: gy - 0.5)
+                Rectangle().fill(C.ad(0x1C1C1C)).frame(width: w, height: 1).offset(y: gy - 0.5)
             }
             Path { p in
                 for i in 0..<n {
@@ -387,11 +387,11 @@ struct TrendChart: View {
         // 라벨 아래 끝이 점 상자 아래에서 12 위 (bottom:12px)
         let lift: CGFloat = (12 - size / 2) + fs * 0.6
         return ZStack {
-            Circle().fill(last ? C.accent : Color.black)
+            Circle().fill(last ? C.accent : C.bg)
                 .frame(width: size, height: size)
                 .overlay(Circle().stroke(C.accent, lineWidth: 2).frame(width: size + 2, height: size + 2))
             Text(Fm.t(values[i])).font(F.num(fs))
-                .foregroundStyle(last ? Color.white : C.text3)
+                .foregroundStyle(last ? C.ink : C.text3)
                 .fixedSize()
                 .offset(y: -lift)
         }
@@ -449,8 +449,8 @@ struct RaceView: View {
                 // 89번(빌드 28): 막대 뜻이 안 보였음 → 한 줄 설명 (막대 길이 = 시간, 짧을수록 빠름)
                 Text("Goal vs your best race · shorter bar = faster".l10n).font(F.t(12)).foregroundStyle(C.text3)
                 bar("Goal", frac: best.map { min(1, Double(goal) / Double(max(1, $0))) } ?? 1, fill: C.accent,
-                    value: Fm.t(goal), valueColor: .white)
-                bar("Best", frac: best == nil ? 0 : 1, fill: Color.white.opacity(0.35),
+                    value: Fm.t(goal), valueColor: C.ink)
+                bar("Best", frac: best == nil ? 0 : 1, fill: C.ink.opacity(0.35),
                     value: best.map { Fm.t($0) } ?? "--:--", valueColor: C.text2)
             }
             Text(goalLine(best: best, goal: goal)).font(F.t(F.sub)).foregroundStyle(C.text3)
@@ -476,7 +476,7 @@ struct RaceView: View {
             Text(t.l10n).font(F.t(13, .medium)).foregroundStyle(C.text2).frame(width: 44, alignment: .leading)
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 2).fill(C.ink.opacity(0.08))
                     RoundedRectangle(cornerRadius: 2).fill(fill)
                         .frame(width: g.size.width * CGFloat(max(0, min(1, frac))))
                 }
@@ -635,12 +635,12 @@ struct RaceLeaderboard: View {
                     Task { await store.refreshLeaderboard() }
                 } label: {
                     HStack(spacing: 6) {
-                        Icon8(st.0, 14, on ? Color.black : C.accent)
+                        Icon8(st.0, 14, on ? C.onAccent : C.accent)
                         Text(st.1).font(F.t(13, .semibold))
                     }
-                    .foregroundStyle(on ? Color.black : Color.white)
+                    .foregroundStyle(on ? C.onAccent : C.ink)
                     .padding(.horizontal, 12).frame(height: 34)
-                    .background(on ? C.accent : Color.white.opacity(0.08), in: Capsule())
+                    .background(on ? C.accent : C.ink.opacity(0.08), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("lb.st." + st.0)
@@ -720,7 +720,7 @@ struct RaceLeaderboard: View {
                 .frame(width: 22, alignment: .leading)
             RaceLbAvatar(me: false, photo: nil, url: f.avatarUrl, initial: f.ini)
             VStack(alignment: .leading, spacing: 1) {
-                Text(verbatim: "@" + f.name).font(F.t(15, .medium)).foregroundStyle(Color.white).lineLimit(1)
+                Text(verbatim: "@" + f.name).font(F.t(15, .medium)).foregroundStyle(C.ink).lineLimit(1)
                 Text(f.div).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -736,13 +736,13 @@ struct RaceLeaderboard: View {
         let me: Bool = row.user_id == store.myId
         return Button { open(row) } label: {
             HStack(spacing: 12) {
-                Text("\(i + 1)").font(F.num(17)).foregroundStyle(i == 0 ? C.accent : Color.white)
+                Text("\(i + 1)").font(F.num(17)).foregroundStyle(i == 0 ? C.accent : C.ink)
                     .frame(width: 22, alignment: .leading)
                 RaceLbAvatar(me: me, photo: me ? store.photo : nil, url: me ? nil : row.avatar_url,
                              initial: String(row.nickname.prefix(1)).uppercased())
                 VStack(alignment: .leading, spacing: 1) {
                     Text(me ? "@\(row.nickname) (you)" : "@\(row.nickname)")
-                        .font(F.t(15, me ? .semibold : .medium)).foregroundStyle(me ? C.accent : Color.white).lineLimit(1)
+                        .font(F.t(15, me ? .semibold : .medium)).foregroundStyle(me ? C.accent : C.ink).lineLimit(1)
                     Text(row.division).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -784,7 +784,7 @@ private struct RaceLbAvatar: View {
     var body: some View {
         // 14번: AsyncImage 대신 RemoteImages (저장 + 취소 안 됨)
         Avatar8(size: 34, photo: RemoteImages.shared.image(url) ?? photo, initial: initial,
-                bg: me ? C.accent : C.control, fg: me ? Color.black : Color.white, fontSize: 15)
+                bg: me ? C.accent : C.control, fg: me ? C.onAccent : C.ink, fontSize: 15)
     }
 }
 
@@ -853,7 +853,7 @@ struct GoalTimeSheet: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16).padding(.top, 8)
-        .background(Color(hex: 0x141414).ignoresSafeArea())
+        .background(C.ad(0x141414).ignoresSafeArea())
         .onChange(of: total) { _, _ in if !paceTouched { pace = autoPace } }
         .onChange(of: style) { _, _ in if !paceTouched { pace = autoPace } }
     }
@@ -877,7 +877,7 @@ struct GoalTimeSheet: View {
         Button(action: act) {
             Image(systemName: sym).font(.system(size: 15, weight: .bold))
                 .frame(width: 36, height: 36)
-                .background(Color.white.opacity(0.08), in: Circle())
+                .background(C.ink.opacity(0.08), in: Circle())
         }
         .buttonStyle(.plain)
         .buttonRepeatBehavior(.enabled)
@@ -988,13 +988,13 @@ struct RunFatigueCard: View {
                 .frame(width: 104, alignment: .leading)
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.08))
+                    Capsule().fill(C.ink.opacity(0.08))
                     Capsule().fill(top ? C.accent : C.text2)
                         .frame(width: g.size.width * f)
                 }
             }
             .frame(height: 10)
-            Text(valueText(d)).font(F.num(F.sub)).foregroundStyle(top ? C.accent : Color.white)
+            Text(valueText(d)).font(F.num(F.sub)).foregroundStyle(top ? C.accent : C.ink)
                 .lineLimit(1)
                 .frame(width: 56, alignment: .trailing)
         }
@@ -1019,7 +1019,7 @@ struct RunFatigueCard: View {
                 .font(F.t(F.sub))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 10).padding(.horizontal, 12)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(C.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }

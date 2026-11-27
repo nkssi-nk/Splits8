@@ -24,7 +24,7 @@ private struct BusyLabel: View {
     var body: some View {
         ZStack {
             Text(title.l10n).opacity(busy ? 0 : 1)
-            if busy { ProgressView().tint(.black) }
+            if busy { ProgressView().tint(C.onAccent) }
         }
     }
 }
@@ -112,7 +112,7 @@ struct AuthView: View {
     /// radius 14 카드, padding 15×16, 17pt · 이메일 키보드
     private var emailField: some View {
         TextField("", text: $r.email, prompt: Text("you@example.com").foregroundColor(C.text3))
-            .font(F.t(17)).foregroundStyle(.white)
+            .font(F.t(17)).foregroundStyle(C.ink)
             .keyboardType(.emailAddress).textContentType(.emailAddress)
             .textInputAutocapitalization(.never).autocorrectionDisabled()
             .submitLabel(.continue)
@@ -125,9 +125,9 @@ struct AuthView: View {
     /// ── or ── (선 rgba 255 0.1, 13 #6E6E73, margin 6 0)
     private var orLine: some View {
         HStack(spacing: 12) {
-            Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+            Rectangle().fill(C.ink.opacity(0.1)).frame(height: 1)
             Text("or").font(F.t(13)).foregroundStyle(C.text3)
-            Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+            Rectangle().fill(C.ink.opacity(0.1)).frame(height: 1)
         }
         .padding(.vertical, 6)
     }
@@ -136,12 +136,12 @@ struct AuthView: View {
     private var appleButton: some View {
         Button { signInApple() } label: {
             HStack(spacing: 8) {
-                Glyph("i_apple", 20, .black)
+                Glyph("i_apple", 20, C.onInk)
                 Text("Sign in with Apple").font(F.t(17, .semibold))
             }
-            .foregroundStyle(.black)
+            .foregroundStyle(C.onInk)
             .frame(maxWidth: .infinity).frame(height: 54)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(C.ink, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(Press())
@@ -376,7 +376,7 @@ struct NickView: View {
         HStack(spacing: 0) {
             Text("@").font(F.t(17)).foregroundStyle(C.text3)
             TextField("", text: $r.nickDraft, prompt: Text("nickname").foregroundColor(C.text3))
-                .font(F.t(17)).foregroundStyle(.white)
+                .font(F.t(17)).foregroundStyle(C.ink)
                 .keyboardType(.asciiCapable)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.done)
@@ -492,11 +492,11 @@ struct AccountView: View {
             PhotosPicker(selection: $pick, matching: .images) {
                 ZStack(alignment: .bottomTrailing) {
                     Avatar8(size: 104, photo: store.photo, initial: initial,
-                            bg: signed ? C.accent : C.control, fg: signed ? .black : C.text2, fontSize: 40)
-                    Glyph("i_camera", 16, .white)
+                            bg: signed ? C.accent : C.control, fg: signed ? C.onAccent : C.text2, fontSize: 40)
+                    Glyph("i_camera", 16, C.ink)
                         .frame(width: 32, height: 32)
                         .background(C.control, in: Circle())
-                        .background(Circle().fill(Color.black).padding(-3))
+                        .background(Circle().fill(C.bg).padding(-3))
                 }
                 .frame(width: 104, height: 104)
             }
@@ -549,7 +549,7 @@ struct AccountView: View {
             }
         } label: {
             HStack(spacing: 12) {
-                Text("On home card".l10n).font(F.t(17)).foregroundStyle(.white).frame(maxWidth: .infinity, alignment: .leading)
+                Text("On home card".l10n).font(F.t(17)).foregroundStyle(C.ink).frame(maxWidth: .infinity, alignment: .leading)
                 Text(HomeShow.name(cur).l10n).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1).fixedSize()
                 Chevron8()
             }
@@ -597,7 +597,7 @@ struct AccountView: View {
 
         VStack(spacing: 0) {
             Button { Task { await store.signOut() } } label: {
-                Text("Sign out").font(F.t(17)).foregroundStyle(.white).frame(maxWidth: .infinity, alignment: .leading)
+                Text("Sign out").font(F.t(17)).foregroundStyle(C.ink).frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 14).padding(.horizontal, 18).contentShape(Rectangle())
             }
             .buttonStyle(.plain).rowLine(true)

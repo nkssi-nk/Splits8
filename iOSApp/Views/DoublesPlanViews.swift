@@ -12,8 +12,8 @@ private struct DblIndex: Identifiable {
 
 /// 막대 색: 나 = 노랑, 파트너 = 회색
 enum DblColor {
-    static let me: Color = C.accent
-    static let partner: Color = Color(hex: 0x48484A)
+    static var me: Color { C.accent }
+    static var partner: Color { C.ad(0x48484A) }
 }
 
 struct DoublesPlanSheet: View {
@@ -39,7 +39,7 @@ struct DoublesPlanSheet: View {
             }
         }
         .padding(.horizontal, 16)
-        .background(Color(hex: 0x141414).ignoresSafeArea())
+        .background(C.ad(0x141414).ignoresSafeArea())
         .sheet(item: $editing) { e in
             DoublesStationSheet(plan: $plan, index: e.id)
                 .presentationDetents([.large])
@@ -73,11 +73,11 @@ struct DoublesPlanSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Label8("PARTNER")
             TextField("", text: nameBinding, prompt: Text("Partner".l10n).foregroundColor(C.text3))
-                .font(F.t(17)).foregroundStyle(.white)
+                .font(F.t(17)).foregroundStyle(C.ink)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.done)
                 .padding(.vertical, 12).padding(.horizontal, 14)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(C.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityIdentifier("dbl.partner")
             if !store.shownFriends.isEmpty {
                 Text("Or pick a friend").font(F.t(13)).foregroundStyle(C.text2)
@@ -107,9 +107,9 @@ struct DoublesPlanSheet: View {
             }
         } label: {
             Text(f.name).font(F.t(13, .semibold)).lineLimit(1)
-                .foregroundStyle(on ? Color.black : Color.white)
+                .foregroundStyle(on ? C.onAccent : C.ink)
                 .padding(.horizontal, 14).frame(height: 34)
-                .background(on ? C.accent : Color.white.opacity(0.10), in: Capsule())
+                .background(on ? C.accent : C.ink.opacity(0.10), in: Capsule())
                 .contentShape(Capsule())
         }
         .buttonStyle(Press(scale: 0.96))
@@ -134,7 +134,7 @@ struct DoublesPlanSheet: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 12) {
                     Icon8(s.key, 20, C.accent)
-                    Text(s.name.l10n).font(F.t(15, .semibold)).foregroundStyle(.white).lineLimit(1)
+                    Text(s.name.l10n).font(F.t(15, .semibold)).foregroundStyle(C.ink).lineLimit(1)
                     Spacer(minLength: 8)
                     Text(DblText.summaryLine(plan, i)).font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -162,7 +162,7 @@ struct DoublesPlanSheet: View {
         } label: {
             Text("Reset".l10n).font(F.t(15, .semibold))
                 .frame(maxWidth: .infinity).frame(height: 48)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(C.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(Press())
@@ -172,7 +172,7 @@ struct DoublesPlanSheet: View {
     /// 계획 그림 + 링크를 iOS 공유 창으로
     private var shareButton: some View {
         Button { share() } label: {
-            Text("Share".l10n).font(F.t(15, .semibold)).foregroundStyle(.black)
+            Text("Share".l10n).font(F.t(15, .semibold)).foregroundStyle(C.onAccent)
                 .frame(maxWidth: .infinity).frame(height: 48)
                 .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .contentShape(Rectangle())
@@ -298,7 +298,7 @@ struct DoublesStationSheet: View {
             }
         }
         .padding(.horizontal, 16)
-        .background(Color(hex: 0x141414).ignoresSafeArea())
+        .background(C.ad(0x141414).ignoresSafeArea())
         .onAppear {
             if !loaded { draft = plan; loaded = true }
         }
@@ -371,7 +371,7 @@ struct DoublesStationSheet: View {
                     Circle().fill(t.me ? DblColor.me : DblColor.partner).frame(width: 8, height: 8).opacity(isRest ? 0.6 : 1)
                     HStack(spacing: 6) {
                         Text(t.me ? "Me".l10n : draft.partnerShown).font(F.t(15, isRest ? .medium : .semibold)).lineLimit(1)
-                            .foregroundStyle(isRest ? C.text2 : .white)
+                            .foregroundStyle(isRest ? C.text2 : C.ink)
                         if isRest {
                             Text("Remainder".l10n).font(F.t(10, .semibold)).foregroundStyle(C.text3)
                                 .padding(.horizontal, 5).padding(.vertical, 1)
@@ -380,7 +380,7 @@ struct DoublesStationSheet: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     VStack(alignment: .trailing, spacing: 1) {
-                        Text(DoublesPlan.amountText(i, t.amount)).font(F.num(15)).foregroundStyle(isRest ? C.text2 : .white)
+                        Text(DoublesPlan.amountText(i, t.amount)).font(F.num(15)).foregroundStyle(isRest ? C.text2 : C.ink)
                         Text(DoublesPlan.num(starts[n]) + " → " + DoublesPlan.num(starts[n] + t.amount) + unit)
                             .font(F.num(11, .regular)).foregroundStyle(C.text3)
                     }
@@ -426,9 +426,9 @@ struct DoublesStationSheet: View {
             }
         } label: {
             Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(on ? Color.white : C.text3)
+                .foregroundStyle(on ? C.ink : C.text3)
                 .frame(width: 32, height: 32)
-                .background(Circle().fill(Color.white.opacity(on ? 0.12 : 0.05)))
+                .background(Circle().fill(C.ink.opacity(on ? 0.12 : 0.05)))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -446,10 +446,10 @@ struct DoublesShareCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark(size: 22)
-            Text("Our swap plan".l10n).font(F.t(28, .semibold)).foregroundStyle(.white)
+            Text("Our swap plan".l10n).font(F.t(28, .semibold)).foregroundStyle(Color.white)
                 .padding(.top, 18)
             Text(division.l10n + " · " + "Me".l10n + " & " + plan.partnerShown)
-                .font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
+                .font(F.t(13)).foregroundStyle(C.dText2).lineLimit(1)
                 .padding(.top, 4)
             VStack(spacing: 0) {
                 ForEach(0..<8, id: \.self) { i in
@@ -472,23 +472,23 @@ struct DoublesShareCard: View {
         let s: Station = Station.all[i]
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
-                Icon8(s.key, 16, C.accent)
-                Text(s.name.l10n).font(F.t(13, .semibold)).foregroundStyle(.white).lineLimit(1)
+                Icon8(s.key, 16, C.yellow)
+                Text(s.name.l10n).font(F.t(13, .semibold)).foregroundStyle(Color.white).lineLimit(1)
                 Spacer(minLength: 6)
-                Text(plan.isEdited(i) ? "Custom turns".l10n : DblText.chunkLabel(plan.chunk(i), i)).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1)
+                Text(plan.isEdited(i) ? "Custom turns".l10n : DblText.chunkLabel(plan.chunk(i), i)).font(F.t(11)).foregroundStyle(C.dText2).lineLimit(1)
             }
             Text(DblText.flow(plan, i)).font(F.num(13, .regular)).foregroundStyle(C.d1).lineLimit(1)
                 .minimumScaleFactor(0.7)
             DoublesBar(plan: plan, index: i, height: 5)
         }
         .padding(.vertical, 9)
-        .overlay(alignment: .bottom) { if i < 7 { Rectangle().fill(C.line).frame(height: 1) } }
+        .overlay(alignment: .bottom) { if i < 7 { Rectangle().fill(C.dLine).frame(height: 1) } }
     }
 
     private func legend(_ c: Color, _ t: String) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 2).fill(c).frame(width: 12, height: 6)
-            Text(t).font(F.t(11)).foregroundStyle(C.text2).lineLimit(1)
+            Text(t).font(F.t(11)).foregroundStyle(C.dText2).lineLimit(1)
         }
     }
 }

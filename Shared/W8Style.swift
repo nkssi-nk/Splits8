@@ -371,7 +371,7 @@ struct W8MenuTitle: View {
     let title: String
     var body: some View {
         Text(title.l10n)
-            .font(F.t(15, .semibold)).foregroundStyle(C.accent)
+            .font(F.t(15, .semibold)).foregroundStyle(C.yellow)
             .lineLimit(1).minimumScaleFactor(0.73)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)

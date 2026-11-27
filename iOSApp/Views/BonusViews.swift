@@ -157,7 +157,7 @@ struct BonusSheet: View {
                         Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(C.text2)
                             .frame(width: 32, height: 32)
-                            .background(Color.white.opacity(0.10), in: Circle())
+                            .background(C.ink.opacity(0.10), in: Circle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("bonus.close")
@@ -217,7 +217,7 @@ struct BonusSheet: View {
                 .font(F.t(17)).textInputAutocapitalization(.words).autocorrectionDisabled()
                 .submitLabel(.done)
                 .padding(.horizontal, 14).frame(height: 46)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(C.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityIdentifier("bonus.name")
         }
     }
@@ -246,10 +246,10 @@ struct BonusSheet: View {
                     let on: Bool = km == k
                     Button { km = k } label: {
                         Text(k > 0 ? "\(k)K" : "Free".l10n)
-                            .font(F.t(F.sub, .semibold)).foregroundStyle(on ? Color.black : Color.white)
+                            .font(F.t(F.sub, .semibold)).foregroundStyle(on ? C.onAccent : C.ink)
                             .lineLimit(1).minimumScaleFactor(0.8)
                             .frame(maxWidth: .infinity).frame(height: 40)
-                            .background(on ? C.accent : Color.white.opacity(0.10),
+                            .background(on ? C.accent : C.ink.opacity(0.10),
                                         in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .contentShape(Rectangle())
                     }
@@ -348,7 +348,7 @@ struct BonusSheet: View {
             TextField(hint.l10n, text: $task, axis: .vertical)
                 .font(F.t(15)).lineLimit(2...5)
                 .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(C.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityIdentifier("bonus.task")
         }
     }
@@ -412,7 +412,7 @@ struct BonusSheet: View {
                         Text(IntervalStep.typeName(st.type).l10n).font(F.t(15, .semibold))
                         Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(st.type == "fast" ? C.accent : .white)
+                    .foregroundStyle(st.type == "fast" ? C.accent : C.ink)
                 }
                 Spacer(minLength: 0)
                 Seg8(items: [("m", "Distance"), ("t", "Time")], selected: isDist ? "m" : "t",
@@ -445,7 +445,7 @@ struct BonusSheet: View {
             }
         }
         .padding(12)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(C.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func setStep(_ i: Int, _ f: (inout IntervalStep) -> Void) {
@@ -511,7 +511,7 @@ struct BonusSheet: View {
             }
         }
         .padding(12)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(C.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func setMove(_ i: Int, _ f: (inout StrengthMove) -> Void) {
@@ -523,11 +523,11 @@ struct BonusSheet: View {
 
     private func chip(_ t: String, on: Bool, _ act: @escaping () -> Void) -> some View {
         Button(action: act) {
-            Text(t).font(F.t(13, .semibold)).foregroundStyle(on ? Color.black : Color.white)
+            Text(t).font(F.t(13, .semibold)).foregroundStyle(on ? C.onAccent : C.ink)
                 .lineLimit(1).minimumScaleFactor(0.75)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity).frame(height: 36)
-                .background(on ? C.accent : Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(on ? C.accent : C.ink.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -578,14 +578,14 @@ struct MiniStepper: View {
         }
         .padding(.vertical, 8).padding(.horizontal, 6)
         .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(C.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func button(_ sym: String, _ act: @escaping () -> Void) -> some View {
         Button(action: act) {
-            Image(systemName: sym).font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+            Image(systemName: sym).font(.system(size: 11, weight: .bold)).foregroundStyle(C.ink)
                 .frame(width: 26, height: 26)
-                .background(Color.white.opacity(0.12), in: Circle())
+                .background(C.ink.opacity(0.12), in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

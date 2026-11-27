@@ -12,29 +12,62 @@ extension Color {
     }
 }
 
+/// 1.2.9 라이트 모드 — 아이폰 앱만 (워치 · 위젯 · 운동 중 화면 · 공유 그림은 늘 다크).
+/// Store 가 설정을 읽을 때 넣음. 바뀌면 앱 화면 전체를 다시 그림 (PhoneApp 의 .id)
+enum Appear {
+    static var light = false
+}
+
 enum C {
-    static let bg = Color.black
-    static let accent = Color(hex: 0xFFE600)
-    static let onAccent = Color.black
-    static let text = Color.white
-    static let text2 = Color(hex: 0x8E8E93)
-    static let text3 = Color(hex: 0x6E6E73)
+    private static var L: Bool { Appear.light }
+
+    static var bg: Color { L ? Color(hex: 0xF2F2F4) : .black }
+    /// 기본 글자 · 아이콘 색 (다크 = 흰색, 라이트 = 검정)
+    static var ink: Color { L ? .black : .white }
+    /// 강조색. 라이트는 흰 위젯과 같은 올리브
+    static var accent: Color { L ? Color(hex: 0x86752A) : Color(hex: 0xFFE600) }
+    /// 강조색 위 글자
+    static var onAccent: Color { L ? .white : .black }
+    /// ink 바탕 위 글자 (다크 = 검정, 라이트 = 흰색)
+    static var onInk: Color { L ? .white : .black }
+    static var text: Color { ink }
+    static var text2: Color { L ? Color(hex: 0x6E6E72) : Color(hex: 0x8E8E93) }
+    static var text3: Color { L ? Color(hex: 0x8E8E93) : Color(hex: 0x6E6E73) }
     static let good = Color(hex: 0x30D158)
     static let bad = Color(hex: 0xFF453A)
     static let hr = Color(hex: 0xFF453A)
 
     // 아이폰 카드
-    static let card = Color.white.opacity(0.06)
-    static let cardBorder = Color.white.opacity(0.08)
-    static let line = Color.white.opacity(0.08)
-    static let segTrack = Color.white.opacity(0.08)
-    static let segOn = Color(hex: 0x2C2C2E)
-    static let control = Color(hex: 0x2C2C2E)
-    static let btn1A = Color(hex: 0x1A1A1A)
-    static let chev = Color(hex: 0x48484C)
-    static let d1 = Color(hex: 0xD1D1D6)
-    static let aeb = Color(hex: 0xAEAEB2)
-    static let g3A = Color(hex: 0x3A3A3C)
+    static var card: Color { L ? .white : Color.white.opacity(0.06) }
+    static var cardBorder: Color { L ? Color.black.opacity(0.06) : Color.white.opacity(0.08) }
+    static var line: Color { L ? Color.black.opacity(0.08) : Color.white.opacity(0.08) }
+    static var segTrack: Color { L ? Color.black.opacity(0.06) : Color.white.opacity(0.08) }
+    static var segOn: Color { L ? .white : Color(hex: 0x2C2C2E) }
+    static var control: Color { L ? Color(hex: 0xE5E5EA) : Color(hex: 0x2C2C2E) }
+    static var btn1A: Color { L ? Color(hex: 0xE9E9EC) : Color(hex: 0x1A1A1A) }
+    static var chev: Color { L ? Color(hex: 0xC7C7CC) : Color(hex: 0x48484C) }
+    static var d1: Color { L ? Color(hex: 0x3A3A3C) : Color(hex: 0xD1D1D6) }
+    static var aeb: Color { L ? Color(hex: 0x6E6E72) : Color(hex: 0xAEAEB2) }
+    static var g3A: Color { L ? Color(hex: 0xD1D1D6) : Color(hex: 0x3A3A3C) }
+    /// 시트 바탕
+    static var sheet: Color { L ? Color(hex: 0xF2F2F4) : Color(hex: 0x1C1C1E) }
+
+    /// 다크 전용 화면 (운동 중 · 공유 그림 · 위젯 · 워치) 이 쓰는 고정 색
+    static let yellow = Color(hex: 0xFFE600)
+    static let dText2 = Color(hex: 0x8E8E93)
+    static let dText3 = Color(hex: 0x6E6E73)
+    static let dAeb = Color(hex: 0xAEAEB2)
+    static let dBtn1A = Color(hex: 0x1A1A1A)
+    static let dCard = Color.white.opacity(0.06)
+    static let dLine = Color.white.opacity(0.08)
+
+    /// 화면 코드에 직접 적힌 어두운 회색 → 라이트에서는 밝은 회색으로 (밝기를 뒤집음)
+    static func ad(_ hex: UInt32) -> Color {
+        guard L else { return Color(hex: hex) }
+        let l = Double(max((hex >> 16) & 0xFF, (hex >> 8) & 0xFF, hex & 0xFF))
+        let v = l <= 22 ? 242 + l / 22 * 13 : 255 - (l - 22) / 233 * 255
+        return Color(white: max(0, min(255, v)) / 255)
+    }
 
     // 워치 카드
     static let wCard = Color(hex: 0x151515)
@@ -103,13 +136,13 @@ struct Label8: View {
 struct Wordmark: View {
     var size: CGFloat
     var eightColor: Color = C.accent
-    var color: Color = .white
+    var color: Color = C.ink
     var tracking: CGFloat = -0.02      // 예전 호출과 호환용 (이미지에는 쓰지 않음)
     var weight: Font.Weight = .heavy   // 예전 호출과 호환용
 
     private var imageName: String {
         if color == Color.black { return "wordmark-black" }
-        if eightColor == C.accent { return "wordmark-yellow" }
+        if eightColor == C.accent || eightColor == C.yellow { return "wordmark-yellow" }
         return "wordmark-white"
     }
     /// 그림 너비에서 8 이 시작하는 자리 (원본 1677 가운데 1361 — S 와 8 사이 빈칸의 가운데)
@@ -118,7 +151,7 @@ struct Wordmark: View {
     var body: some View {
         let h: CGFloat = size * 0.83
         let w: CGFloat = h * 1677 / 331
-        if color == Color.black && eightColor == C.accent {
+        if color == Color.black && (eightColor == C.accent || eightColor == C.yellow) {
             // 검은 SPLITS + 노란 8: 두 그림을 8 앞에서 잘라 이어 붙임
             ZStack {
                 piece("wordmark-black", w, h)
@@ -157,16 +190,20 @@ struct Ambient: Equatable {
     /// 화면 배경 빛: 색은 설정의 테마(GlowTheme)를 따름. 기본은 노랑
     static func y(_ a: Double, _ rx: CGFloat, _ ry: CGFloat, _ cx: CGFloat, _ cy: CGFloat) -> Ambient {
         let t: GlowTheme = GlowTheme.current
+        // 1.2.9: 라이트 모드는 뒤쪽 빛을 끔
+        if Appear.light { return .none }
         return Ambient(hex: t.hex, alpha: min(1, a * t.gain), rx: rx, ry: ry, cx: cx, cy: cy)
     }
 }
 
 struct AmbientLayer: View {
     let a: Ambient
+    /// 공유 그림처럼 라이트 모드에서도 빛을 그려야 할 때
+    var always = false
     var body: some View {
         GeometryReader { g in
             let w = g.size.width, h = g.size.height
-            if a.alpha <= 0 {
+            if a.alpha <= 0 || (Appear.light && !always) {
                 Color.clear
             } else if a.linear {
                 LinearGradient(stops: [.init(color: Color(hex: a.hex, alpha: a.alpha), location: 0),
@@ -193,7 +230,7 @@ enum IconTint {
     case white, yellow, mute, dim, black
     var color: Color {
         switch self {
-        case .white: return .white
+        case .white: return C.ink
         case .yellow: return C.accent
         case .mute: return C.text2
         case .dim: return C.text3
@@ -206,8 +243,8 @@ enum IconTint {
 struct Icon8: View {
     let name: String
     var size: CGFloat
-    var color: Color = .white
-    init(_ name: String, _ size: CGFloat, _ color: Color = .white) {
+    var color: Color = C.ink
+    init(_ name: String, _ size: CGFloat, _ color: Color = C.ink) {
         self.name = name; self.size = size; self.color = color
     }
     init(_ name: String, _ size: CGFloat, tint: IconTint) {

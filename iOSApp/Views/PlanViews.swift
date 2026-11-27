@@ -65,7 +65,7 @@ struct PlanSheet: View {
             }
             .scrollIndicators(.hidden)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(C.ink)
         .tint(C.accent)
         .presentationDragIndicator(.visible)
     }

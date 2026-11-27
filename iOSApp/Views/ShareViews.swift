@@ -163,7 +163,7 @@ struct ShareCard: View {
 
     // 글자색 (시안 tc / acc / tcLine / pillBg)
     private var tc: Color { textBlack ? Color.black : Color.white }
-    private var acc: Color { textBlack ? Color.black : C.accent }
+    private var acc: Color { textBlack ? Color.black : C.yellow }
     private var tcLine: Color { textBlack ? Color.black.opacity(0.18) : Color.white.opacity(0.16) }
     private var pillBg: Color { textBlack ? Color.white.opacity(0.55) : Color.white.opacity(0.07) }
 
@@ -203,7 +203,7 @@ struct ShareCard: View {
 
     /// SPLITS8 워드마크 20. 검은 글자 모드여도 8 은 항상 노랑
     private func mark(black: Bool, shadow: Bool = false) -> some View {
-        Wordmark(size: 20, eightColor: C.accent,
+        Wordmark(size: 20, eightColor: C.yellow,
                  color: black ? Color.black : Color.white, tracking: -0.03)
             .shadow(color: shadow ? Color.black.opacity(0.5) : Color.clear, radius: 3, y: 1)
     }
@@ -213,7 +213,7 @@ struct ShareCard: View {
     private func glow(_ a: Double, rx: CGFloat, ry: CGFloat, cx: CGFloat, cy: CGFloat, themed: Bool = false) -> some View {
         let hex: UInt32 = themed ? glowTheme.hex : 0xFFE600
         let alpha: Double = themed ? min(1, a * glowTheme.gain) : a
-        return AmbientLayer(a: Ambient(hex: hex, alpha: alpha, rx: rx, ry: ry, cx: cx, cy: cy))
+        return AmbientLayer(a: Ambient(hex: hex, alpha: alpha, rx: rx, ry: ry, cx: cx, cy: cy), always: true)
     }
 
     /// 반투명 유리 (rgba 255 0.07 + inset 1px rgba 255 0.10)
@@ -231,7 +231,7 @@ struct ShareCard: View {
                         Image(systemName: "photo").font(F.t(24))
                         Text("Tap to choose a photo").font(F.t(13, .medium))
                     }
-                    .foregroundStyle(C.text2)
+                    .foregroundStyle(C.dText2)
                     // 10번: 가운데면 날짜 · 큰 시간과 겹침 → 위쪽 빈 사진 자리로 (안드로이드 세로 비율 −0.5 와 같음)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .modifier(QuarterUp())
@@ -279,7 +279,7 @@ struct ShareCard: View {
 
     /// Ticket · Block 용 노란 PB (fill 0.14, 링 0.5)
     private var yellowPB: some View {
-        pbPill(fill: C.accent.opacity(0.14), ring: C.accent.opacity(0.5), fg: C.accent)
+        pbPill(fill: C.yellow.opacity(0.14), ring: C.yellow.opacity(0.5), fg: C.yellow)
     }
 
     // MARK: Poster
@@ -735,13 +735,13 @@ struct ShareCard: View {
                     Text(d.partnerText).lineLimit(1)
                 }
             }
-            .font(F.t(12, .medium)).foregroundStyle(C.text2)
+            .font(F.t(12, .medium)).foregroundStyle(C.dText2)
             HStack(alignment: .bottom) {
                 big(d.isRun ? d.distance : d.total, post ? 48 : 56, track: -0.04)
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(d.isRun ? d.avgPace : d.vsValue).foregroundStyle(C.accent)
-                    Text(d.isRun ? d.total : "\(d.avgHR) BPM").foregroundStyle(d.isRun ? Color.white : C.text2)
+                    Text(d.isRun ? d.avgPace : d.vsValue).foregroundStyle(C.yellow)
+                    Text(d.isRun ? d.total : "\(d.avgHR) BPM").foregroundStyle(d.isRun ? Color.white : C.dText2)
                 }
                 .font(F.num(14, .semibold)).lineLimit(1).fixedSize()
             }
@@ -756,7 +756,7 @@ struct ShareCard: View {
                         Text("ROX \(d.rox)")
                     }
                 }
-                .font(F.num(8, .semibold)).tracking(0.1 * 8).foregroundStyle(C.text3).lineLimit(1)
+                .font(F.num(8, .semibold)).tracking(0.1 * 8).foregroundStyle(C.dText3).lineLimit(1)
             }
         }
         .padding(.top, 16).padding(.horizontal, 18).padding(.bottom, 18)
@@ -779,7 +779,7 @@ struct ShareCard: View {
             ForEach(d.seq.indices, id: \.self) { i in
                 let s = d.seq[i]
                 UnevenRoundedRectangle(topLeadingRadius: 2, topTrailingRadius: 2)
-                    .fill(s.run ? Color.white.opacity(0.18) : C.accent)
+                    .fill(s.run ? Color.white.opacity(0.18) : C.yellow)
                     .frame(maxWidth: .infinity)
                     .frame(height: max(2, stripH * CGFloat(s.t) / mx))
             }
@@ -817,7 +817,7 @@ struct ShareCard: View {
             }
             Spacer(minLength: 0)
             if hasNick {
-                Text(nickText).font(F.t(13, .semibold)).foregroundStyle(C.accent).lineLimit(1)
+                Text(nickText).font(F.t(13, .semibold)).foregroundStyle(C.yellow).lineLimit(1)
                     .padding(.top, 3)
             }
         }
@@ -831,9 +831,9 @@ struct ShareCard: View {
             HStack(spacing: 6) {
                 if d.isRun {
                     blockTile("TIME", d.total, color: .white)
-                    blockTile("AVG PACE", d.avgPace, color: C.accent)
+                    blockTile("AVG PACE", d.avgPace, color: C.yellow)
                 } else {
-                    blockTile(d.vsWord, d.vsValue, color: C.accent)
+                    blockTile(d.vsWord, d.vsValue, color: C.yellow)
                     blockTile("AVG HR", d.avgHR, color: .white)
                     if d.hasRox { blockTile("ROXZONE", d.rox, color: .white) }
                 }
@@ -883,7 +883,7 @@ struct ShareCard: View {
         let size: CGFloat = post ? 11 : 14
         let num: CGFloat = post ? 13 : 17
         return HStack(spacing: 8) {
-            Text(p.no).font(F.num(11, .semibold)).foregroundStyle(C.accent)
+            Text(p.no).font(F.num(11, .semibold)).foregroundStyle(C.yellow)
                 .frame(width: 20, alignment: .leading)
             Icon8(p.icon, 14, .white).opacity(0.9).frame(width: 16)
             nameCell(p, size: size, color: .white)
@@ -1151,7 +1151,7 @@ struct ShareView: View {
             preview
             if variant == "poster" { moveHint }
             Seg8(items: [("story", "Story 9:16"), ("post", "Post 4:5")], selected: ratio,
-                 fontSize: 13, track: Color(hex: 0x141414), tracking: 0.04 * 13) { k in
+                 fontSize: 13, track: C.ad(0x141414), tracking: 0.04 * 13) { k in
                 withAnimation(.easeInOut(duration: 0.2)) { ratio = k }
             }
             variantButtons
@@ -1319,7 +1319,7 @@ struct ShareView: View {
             Text(l.l10n).font(F.t(13, .semibold)).foregroundStyle(on ? C.accent : C.aeb)
                 .frame(maxWidth: .infinity).frame(height: 38)
                 .background(Color(hex: 0x111111), in: shape)
-                .overlay(shape.strokeBorder(on ? C.accent : Color(hex: 0x1C1C1C), lineWidth: on ? 1.5 : 1))
+                .overlay(shape.strokeBorder(on ? C.accent : C.ad(0x1C1C1C), lineWidth: on ? 1.5 : 1))
                 .contentShape(shape)
         }
         .buttonStyle(.plain)
@@ -1362,9 +1362,9 @@ struct ShareView: View {
                             Image(systemName: on ? "checkmark" : "plus").font(F.t(10, .bold))
                             Text(verbatim: it.1).font(F.t(13, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
                         }
-                        .foregroundStyle(on ? Color.black : C.text2)
+                        .foregroundStyle(on ? C.onAccent : C.text2)
                         .frame(maxWidth: .infinity).frame(height: 32)
-                        .background(on ? C.accent : Color(hex: 0x1C1C1C), in: Capsule())
+                        .background(on ? C.accent : C.ad(0x1C1C1C), in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("share.show.\(it.0)")
@@ -1374,7 +1374,7 @@ struct ShareView: View {
                 .lineLimit(1...3)
                 .font(F.t(15))
                 .padding(.vertical, 10).padding(.horizontal, 12)
-                .background(Color(hex: 0x1C1C1C), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(C.ad(0x1C1C1C), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .onChange(of: caption) { _, v in if v.count > 60 { caption = String(v.prefix(60)) } }
                 .accessibilityIdentifier("share.caption")
         }
@@ -1464,7 +1464,7 @@ struct ShareView: View {
             }
         }
         .padding(2)
-        .background(Color(hex: 0x141414), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(C.ad(0x141414), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     // Off / Light / Strong (Text color 와 같은 모양, 버튼 56×28)
@@ -1476,10 +1476,10 @@ struct ShareView: View {
                 let on: Bool = smoke == k
                 let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
                 Button { withAnimation(.easeOut(duration: 0.2)) { smoke = k } } label: {
-                    Text(items[i].1.l10n).font(F.t(13, .semibold)).foregroundStyle(Color.white)
+                    Text(items[i].1.l10n).font(F.t(13, .semibold)).foregroundStyle(C.ink)
                         .lineLimit(1).minimumScaleFactor(0.8)
                         .frame(width: 56, height: 28)
-                        .background(on ? Color.white.opacity(0.16) : Color.clear, in: shape)
+                        .background(on ? C.ink.opacity(0.16) : Color.clear, in: shape)
                         .contentShape(shape)
                 }
                 .buttonStyle(.plain)
@@ -1487,16 +1487,16 @@ struct ShareView: View {
             }
         }
         .padding(2)
-        .background(Color(hex: 0x141414), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(C.ad(0x141414), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     private func textColorButton(_ k: String, _ l: String) -> some View {
         let on = textColor == k
         let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
         return Button { textColor = k } label: {
-            Text(l.l10n).font(F.t(13, .semibold)).foregroundStyle(Color.white)
+            Text(l.l10n).font(F.t(13, .semibold)).foregroundStyle(C.ink)
                 .frame(width: 64, height: 28)
-                .background(on ? Color.white.opacity(0.16) : Color.clear, in: shape)
+                .background(on ? C.ink.opacity(0.16) : Color.clear, in: shape)
                 .contentShape(shape)
         }
         .buttonStyle(.plain)
@@ -1526,14 +1526,14 @@ struct ShareView: View {
     private var actionButtons: some View {
         HStack(spacing: 10) {
             Button { share() } label: {
-                Text("Share").font(F.t(15, .semibold)).foregroundStyle(.black)
+                Text("Share").font(F.t(15, .semibold)).foregroundStyle(C.onAccent)
                     .frame(maxWidth: .infinity).frame(height: 50)
                     .yellowFill(14)
             }
             .buttonStyle(Press())
             .accessibilityIdentifier("share.instagram")
             Button { save() } label: {
-                Text(saved ? "Saved" : "Save image").font(F.t(15, .semibold)).foregroundStyle(.white)
+                Text(saved ? "Saved" : "Save image").font(F.t(15, .semibold)).foregroundStyle(C.ink)
                     .frame(maxWidth: .infinity).frame(height: 50)
                     .background(C.btn1A, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

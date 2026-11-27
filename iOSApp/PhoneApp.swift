@@ -13,6 +13,8 @@ struct Splits8App: App {
             Router.shared.scr = .watchLive
         }
         if Demo.enabled && CommandLine.arguments.contains("--widgets") { Router.shared.scr = .widgets }
+        // 1.2.9 화면 확인: 라이트 모드로 찍기
+        if Demo.enabled && CommandLine.arguments.contains("--light") { Store.shared.settings.light = true }
         // 빌드 24 화면 확인: 새 가입 흐름 (닉네임 1 / 5 → 프로필 2~5 / 5)
         if Demo.enabled && CommandLine.arguments.contains("--nickflow") {
             Router.shared.profileDotOffset = 1
@@ -29,11 +31,12 @@ struct Splits8App: App {
     var body: some Scene {
         WindowGroup {
             LaunchGate {
-                PhoneRoot()
+                // 1.2.9 라이트 모드: 설정이 바뀌면 화면 전체를 다시 그림 (C 의 색이 모드를 따라 바뀜)
+                PhoneRoot().id(Store.shared.settings.light)
             }
             // 링크로 받은 트레이닝 (splits8://t?d=…)
             .onOpenURL { Router.shared.handle(url: $0) }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(Store.shared.settings.light ? .light : .dark)
             .tint(C.accent)
         }
     }
@@ -530,7 +533,7 @@ struct PhoneRoot: View {
     var body: some View {
         let theme: GlowTheme = Store.shared.settings.glow
         return ZStack {
-            Color.black.ignoresSafeArea()
+            C.bg.ignoresSafeArea()
             ZStack {
                 ForEach([r.scr], id: \.self) { s in
                     // 테마(배경 빛 색)가 바뀌면 다시 그려 서서히 바뀜
@@ -632,21 +635,21 @@ struct PhoneRoot: View {
         .sheet(isPresented: Binding(get: { r.kindPicker }, set: { r.kindPicker = $0 })) {
             KindPickerSheet()
                 .presentationDetents([.large])
-                .presentationBackground(Color(hex: 0x1C1C1E))
-                .preferredColorScheme(.dark)
+                .presentationBackground(C.ad(0x1C1C1E))
+                .preferredColorScheme(Appear.light ? .light : .dark)
         }
         .sheet(item: Binding(get: { r.bonus }, set: { r.bonus = $0 })) { req in
             BonusSheet(req: req)
                 .presentationDetents([.medium, .large])
-                .presentationBackground(Color(hex: 0x1C1C1E))
-                .preferredColorScheme(.dark)
+                .presentationBackground(C.ad(0x1C1C1E))
+                .preferredColorScheme(Appear.light ? .light : .dark)
         }
         .sheet(isPresented: Binding(get: { r.planRequest != nil }, set: { if !$0 { r.planRequest = nil } })) {
             if let req = r.planRequest {
                 PlanSheet(request: req)
                     .presentationDetents([.large])
-                    .presentationBackground(Color(hex: 0x1C1C1E))
-                    .preferredColorScheme(.dark)
+                    .presentationBackground(C.ad(0x1C1C1E))
+                    .preferredColorScheme(Appear.light ? .light : .dark)
             }
         }
         .sheet(item: Binding(get: { r.finish }, set: { r.finish = $0 }), onDismiss: askReviewAfterFinish) { rec in
@@ -654,8 +657,8 @@ struct PhoneRoot: View {
                 .onAppear { r.finishShown = rec }
                 .presentationDetents([.height(440), .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(Color(hex: 0x1C1C1E))
-                .preferredColorScheme(.dark)
+                .presentationBackground(C.ad(0x1C1C1E))
+                .preferredColorScheme(Appear.light ? .light : .dark)
         }
         .onChange(of: scenePhase) { _, p in
             if p == .active {
@@ -893,7 +896,7 @@ struct TopBar8: View {
                 }
                 .ignoresSafeArea(edges: .top)
             }
-            .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1) }
+            .overlay(alignment: .bottom) { Rectangle().fill(C.ink.opacity(0.06)).frame(height: 1) }
             Spacer(minLength: 0)
         }
     }
@@ -1014,13 +1017,13 @@ struct TabBar8: View {
             row
                 // 유리가 뒤 내용을 직접 비추게 둠 (밑에 흐림 판을 깔면 유리 느낌이 사라졌음 — 빌드 19)
                 .glassEffect(.regular.tint(Color(hex: 0x161616, alpha: 0.12)), in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+                .overlay(Capsule().strokeBorder(C.ink.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
         } else {
             row
                 .background(.ultraThinMaterial, in: Capsule())
                 .background(Color(hex: 0x161616, alpha: 0.25), in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+                .overlay(Capsule().strokeBorder(C.ink.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
         }
     }

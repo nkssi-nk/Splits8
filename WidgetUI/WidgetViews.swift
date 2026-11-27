@@ -17,7 +17,7 @@ struct WPal {
     var bg: Color
     var light: Bool
 
-    static let dark = WPal(fg: .white, sub: C.text2, dim: C.text3, accent: C.accent, glow: C.accent,
+    static let dark = WPal(fg: .white, sub: C.dText2, dim: C.dText3, accent: C.yellow, glow: C.yellow,
                            track: Color.white.opacity(0.12), bg: Color(hex: 0x0C0C0C), light: false)
     static let light = WPal(fg: .black, sub: Color(hex: 0x6E6E73), dim: Color(hex: 0xAEAEB2), accent: Color(hex: 0x8A7400),
                             glow: Color(hex: 0xFFE600), track: Color.black.opacity(0.10), bg: .white, light: true)
@@ -25,7 +25,7 @@ struct WPal {
     static func theme(_ hex: UInt32) -> WPal {
         var p = WPal.dark
         p.bg = Color(hex: blendHex(hex, 0x000000, 0.72))
-        p.accent = hex == 0xFFE600 ? C.accent : Color(hex: blendHex(hex, 0xFFFFFF, 0.25))
+        p.accent = hex == 0xFFE600 ? C.yellow : Color(hex: blendHex(hex, 0xFFFFFF, 0.25))
         p.glow = Color(hex: hex)
         p.track = Color.white.opacity(0.16)
         p.sub = Color.white.opacity(0.68)
@@ -607,9 +607,9 @@ struct LiveProgress: View {
             let x: CGFloat = g.size.width * min(1, max(0, f))
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.white.opacity(0.16)).frame(height: height)
-                Capsule().fill(C.accent).frame(width: max(height, x), height: height)
-                Circle().fill(C.accent).frame(width: height * 3, height: height * 3)
-                    .shadow(color: C.accent.opacity(0.9), radius: height * 2)
+                Capsule().fill(C.yellow).frame(width: max(height, x), height: height)
+                Circle().fill(C.yellow).frame(width: height * 3, height: height * 3)
+                    .shadow(color: C.yellow.opacity(0.9), radius: height * 2)
                     .offset(x: x - height * 1.5)
             }
             .frame(maxHeight: .infinity)

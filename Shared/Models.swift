@@ -980,6 +980,8 @@ struct Settings: Codable, Hashable {
 
     // 배경 빛 색 (설정 > Theme). 노랑이 기본 — 예전 저장 파일과 호환되도록 옵셔널, 노랑이면 비워 둠
     var themeOpt: String? = nil
+    /// 1.2.9 화면 모드 (설정 > Theme). nil = 다크(예전 그대로), "light" = 라이트. 아이폰 앱만 바뀜 (워치는 늘 다크)
+    var appearOpt: String? = nil
     /// 워치 운동을 아이폰에 같이 보여 주기 (빌드 22). nil = 켬 — Settings.mirror (LiveSync.swift)
     var mirrorOpt: Bool? = nil
     /// 63번: 아이폰 앱 안에서 고른 언어(ko / en). nil = 기기 언어를 따름 → 워치도 같은 언어로
@@ -1066,6 +1068,11 @@ struct Settings: Codable, Hashable {
     }
     /// 운동 중에 실제로 말할지
     var voiceActive: Bool { voiceOn && voiceLangOK }
+
+    var light: Bool {
+        get { appearOpt == "light" }
+        set { appearOpt = newValue ? "light" : nil }
+    }
 
     var glow: GlowTheme {
         get { themeOpt.flatMap { GlowTheme(rawValue: $0) } ?? .yellow }

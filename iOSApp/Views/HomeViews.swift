@@ -53,7 +53,7 @@ struct HomeView: View {
         let signed = store.signedIn, nick = store.settings.nickname ?? ""
         return HStack(spacing: 14) {
             Avatar8(size: 52, photo: store.photo, initial: signed ? String(nick.prefix(1)).uppercased() : "?",
-                    bg: signed ? C.accent : C.control, fg: signed ? .black : C.text2, fontSize: 20)
+                    bg: signed ? C.accent : C.control, fg: signed ? C.onAccent : C.text2, fontSize: 20)
                 .photoTap(store.photo.map { PhotoItem(image: $0, title: signed ? "@" + nick : "My profile".l10n, sub: store.div.name) })
                 .accessibilityIdentifier("home.photo")
             VStack(alignment: .leading, spacing: 2) {
@@ -232,8 +232,8 @@ struct HomeView: View {
             if n > 0 {
                 Button { r.friendsFrom = .home; r.go(.friends) } label: {
                     HStack(spacing: 6) {
-                        Text(n == 1 ? String(localized: "1 request") : String(localized: "\(n) requests")).font(F.t(13, .semibold)).foregroundStyle(.black).lineLimit(1)
-                        Chevron8(color: .black)
+                        Text(n == 1 ? String(localized: "1 request") : String(localized: "\(n) requests")).font(F.t(13, .semibold)).foregroundStyle(C.onAccent).lineLimit(1)
+                        Chevron8(color: C.onAccent)
                     }
                     .padding(.horizontal, 12).frame(height: 28)
                     .background(C.accent, in: Capsule())
@@ -415,7 +415,7 @@ struct HomeView: View {
 
     private func barShape(_ b: Bar, height: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: b.secs > 0 ? 4 : 1, style: .continuous)
-            .fill(b.secs > 0 ? b.color : Color.white.opacity(0.14))
+            .fill(b.secs > 0 ? b.color : C.ink.opacity(0.14))
             .frame(maxWidth: .infinity)
             .frame(height: height)
     }
@@ -580,7 +580,7 @@ struct HomeView: View {
             let line: Double = stage == 2 ? 0.20 : (stage == 3 ? 0.38 : 0.55)
             let glow: Double = stage == 2 ? 0 : (stage == 3 ? 0.14 : 0.24)
             shape
-                .fill(LinearGradient(stops: [.init(color: Color.white.opacity(0.05), location: from),
+                .fill(LinearGradient(stops: [.init(color: C.ink.opacity(0.05), location: from),
                                              .init(color: y.opacity(fill), location: 1)],
                                      startPoint: .leading, endPoint: .trailing))
                 .overlay(shape.strokeBorder(y.opacity(line), lineWidth: 1))

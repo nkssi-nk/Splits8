@@ -195,7 +195,7 @@ struct DetailView: View {
         .sheet(isPresented: $partnerSheet) {
             PartnerSheet(current: rec.partner) { nick in setPartner(rec, nick) }
                 .presentationDetents([.medium, .large])
-                .presentationBackground(Color(hex: 0x1C1C1E))
+                .presentationBackground(C.ad(0x1C1C1E))
         }
     }
 
@@ -231,7 +231,7 @@ struct DetailView: View {
             }
         }
         .padding(.vertical, 5).padding(.leading, 5).padding(.trailing, 10)
-        .background(Color.white.opacity(0.10), in: Capsule())
+        .background(C.ink.opacity(0.10), in: Capsule())
         .fixedSize()
         .padding(.top, 8)
     }
@@ -242,7 +242,7 @@ struct DetailView: View {
         return Button { partnerSheet = true } label: {
             HStack(spacing: 12) {
                 Text(nick == nil ? "Add partner" : "Partner").font(F.t(15))
-                    .foregroundStyle(nick == nil ? C.accent : Color.white)
+                    .foregroundStyle(nick == nil ? C.accent : C.ink)
                 Spacer(minLength: 8)
                 Text(shown).font(F.t(15)).foregroundStyle(C.text2).lineLimit(1)
             }
@@ -291,7 +291,7 @@ struct DetailView: View {
     private func header(_ rec: Record) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(rec.mode.name.l10n).font(F.t(11, .semibold)).foregroundStyle(.black)
+                Text(rec.mode.name.l10n).font(F.t(11, .semibold)).foregroundStyle(C.onAccent)
                     .padding(.vertical, 3).padding(.horizontal, 8)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Label8(Fm.wdmy.string(from: rec.date))
@@ -344,24 +344,24 @@ struct DetailView: View {
         } else if rec.mode == .training {
             // 64번: VS BEST 는 풀 시뮬 · 레이스에서만. 러닝은 거리, 그 외 트레이닝은 구간 수
             let second: DetailTile = kindTile(rec) ?? (rec.isRunKind
-                ? DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: .white, unitColor: C.text2,
+                ? DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: C.ink, unitColor: C.text2,
                              sub: rec.indoor == true ? "Indoor · est.".l10n : "")
-                : DetailTile(label: "SEGMENTS", value: "\(rec.mainSegs.count)", unit: "", color: .white, unitColor: .clear))
-            head = [DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear), second]
+                : DetailTile(label: "SEGMENTS", value: "\(rec.mainSegs.count)", unit: "", color: C.ink, unitColor: .clear))
+            head = [DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: C.ink, unitColor: .clear), second]
         } else {
             head = [
-                DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: .white, unitColor: .clear),
+                DetailTile(label: "TOTAL", value: Fm.t(rec.total), unit: "", color: C.ink, unitColor: .clear),
                 DetailTile(label: vs.word, value: vs.value.map(Fm.d) ?? "--:--", unit: "", color: deltaColor(vs.value), unitColor: .clear),
             ]
         }
         var more: [DetailTile] = [
-            DetailTile(label: "AVG HR", value: rec.avgHR > 0 ? "\(rec.avgHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
-            DetailTile(label: "MAX HR", value: rec.maxHR > 0 ? "\(rec.maxHR)" : "--", unit: "BPM", color: .white, unitColor: C.bad),
-            DetailTile(label: "CALORIES", value: grouped(rec.kcal), unit: "KCAL", color: .white, unitColor: C.text2),
+            DetailTile(label: "AVG HR", value: rec.avgHR > 0 ? "\(rec.avgHR)" : "--", unit: "BPM", color: C.ink, unitColor: C.bad),
+            DetailTile(label: "MAX HR", value: rec.maxHR > 0 ? "\(rec.maxHR)" : "--", unit: "BPM", color: C.ink, unitColor: C.bad),
+            DetailTile(label: "CALORIES", value: grouped(rec.kcal), unit: "KCAL", color: C.ink, unitColor: C.text2),
         ]
         // 18번: 타바타 · EMOM · AMRAP · 기능성은 러닝 페이스가 없음 (인터벌 러닝은 있음)
         if !rec.isNewKind || rec.kind == WKind.interval {
-            more.append(DetailTile(label: "RUN PACE", value: pace, unit: Units.paceUnit(imp), color: .white, unitColor: C.text2))
+            more.append(DetailTile(label: "RUN PACE", value: pace, unit: Units.paceUnit(imp), color: C.ink, unitColor: C.text2))
         }
         if rec.kind == WKind.interval, let fp = rec.fastPace {
             more.append(DetailTile(label: "FAST PACE", value: Fm.t(Units.pace(fp, imp)), unit: Units.paceUnit(imp), color: C.accent, unitColor: C.text2))
@@ -374,20 +374,20 @@ struct DetailView: View {
         let imp: Bool = store.settings.imperial
         switch rec.kind ?? "" {
         case WKind.interval:
-            return DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: .white,
+            return DetailTile(label: "DISTANCE", value: Units.dist(rec.runDistance, imp), unit: Units.distUnit(imp), color: C.ink,
                               unitColor: C.text2, sub: rec.indoor == true ? "Indoor · est.".l10n : "")
         case WKind.tabata:
-            return DetailTile(label: "ROUNDS", value: "\(rec.workRounds)", unit: "", color: .white, unitColor: .clear,
+            return DetailTile(label: "ROUNDS", value: "\(rec.workRounds)", unit: "", color: C.ink, unitColor: .clear,
                               sub: rec.complete == false ? "Ended early".l10n : "")
         case WKind.emom:
             let done: Int = rec.segs.filter { $0.work != nil }.count
-            return DetailTile(label: "ROUNDS", value: "\(rec.segs.count)", unit: "", color: .white, unitColor: .clear,
+            return DetailTile(label: "ROUNDS", value: "\(rec.segs.count)", unit: "", color: C.ink, unitColor: .clear,
                               sub: String(format: "%lld done".l10n, done))
         case WKind.amrap:
             let e: Int = rec.extra ?? 0
             return DetailTile(label: "ROUNDS", value: "\(rec.fullRounds)" + (e > 0 ? " +\(e)" : ""), unit: "", color: C.accent, unitColor: .clear)
         case WKind.strength:
-            return DetailTile(label: "VOLUME", value: grouped(Int(rec.volume.rounded())), unit: "KG", color: .white, unitColor: C.text2)
+            return DetailTile(label: "VOLUME", value: grouped(Int(rec.volume.rounded())), unit: "KG", color: C.ink, unitColor: C.text2)
         default:
             return nil
         }
@@ -398,13 +398,13 @@ struct DetailView: View {
         guard rec.mode == .training, rec.isRunKind else { return [] }
         var out: [DetailTile] = []
         if let c = rec.cadence {
-            out.append(DetailTile(label: "AVG CADENCE", value: "\(c)", unit: "SPM", color: .white, unitColor: C.text2))
+            out.append(DetailTile(label: "AVG CADENCE", value: "\(c)", unit: "SPM", color: C.ink, unitColor: C.text2))
         }
         if let s = rec.stride {
-            out.append(DetailTile(label: "STRIDE", value: String(format: "%.2f", s), unit: "M", color: .white, unitColor: C.text2))
+            out.append(DetailTile(label: "STRIDE", value: String(format: "%.2f", s), unit: "M", color: C.ink, unitColor: C.text2))
         }
         if let a = rec.ascent {
-            out.append(DetailTile(label: "ASCENT", value: "\(Int(a.rounded()))", unit: "M", color: .white, unitColor: C.text2))
+            out.append(DetailTile(label: "ASCENT", value: "\(Int(a.rounded()))", unit: "M", color: C.ink, unitColor: C.text2))
         }
         return out
     }
@@ -416,7 +416,7 @@ struct DetailView: View {
         return RunPB.distances.compactMap { d in
             guard let t = rec.bestEffort(d.m) else { return nil }
             let pb: Bool = pbs.contains(d.m)
-            return DetailTile(label: d.label, value: Fm.t(t), unit: pb ? "★ PB" : "", color: .white, unitColor: pb ? C.accent : .clear)
+            return DetailTile(label: d.label, value: Fm.t(t), unit: pb ? "★ PB" : "", color: C.ink, unitColor: pb ? C.accent : .clear)
         }
     }
 
@@ -425,11 +425,11 @@ struct DetailView: View {
     private func repTiles(_ rec: Record) -> [DetailTile] {
         rec.repSummaries.map { s in
             if s.icon == "wallBalls" {
-                return DetailTile(label: "WALL BALLS", value: "\(s.count)", unit: "REPS".l10n, color: .white, unitColor: C.text2,
+                return DetailTile(label: "WALL BALLS", value: "\(s.count)", unit: "REPS".l10n, color: C.ink, unitColor: C.text2,
                                   sub: "\(s.perMin) " + "/MIN".l10n)
             }
             return DetailTile(label: s.icon == "skiErg" ? "SKIERG" : "ROW", value: "\(s.perMin)", unit: "SPM".l10n,
-                              color: .white, unitColor: C.text2, sub: "\(s.count) " + "STROKES".l10n)
+                              color: C.ink, unitColor: C.text2, sub: "\(s.count) " + "STROKES".l10n)
         }
     }
 
@@ -486,7 +486,7 @@ struct DetailView: View {
         guard let g else { return AnyShapeStyle(C.cardBorder) }
         return AnyShapeStyle(LinearGradient(stops: [.init(color: Color(hex: g.hex1, alpha: 0.9), location: 0),
                                                     .init(color: Color(hex: g.hex2, alpha: 0.25), location: 0.45),
-                                                    .init(color: Color.white.opacity(0.08), location: 1)],
+                                                    .init(color: C.ink.opacity(0.08), location: 1)],
                                             startPoint: .topLeading, endPoint: .bottomTrailing))
     }
 
@@ -514,7 +514,7 @@ struct DetailView: View {
         }
         .padding(.top, 20).padding(.horizontal, 18).padding(.bottom, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(hex: 0x121210), in: shape)
+        .background(C.ad(0x121210), in: shape)
         .overlay(shape.strokeBorder(pftBorder(g), lineWidth: 1))
         // 빌드 26: 등급 색으로 은은하게 빛남 (Unranked 는 없음)
         .shadow(color: g.map { $0 == .unranked ? Color.clear : Color(hex: $0.hex1, alpha: 0.28) } ?? .clear, radius: 18)
@@ -528,10 +528,10 @@ struct DetailView: View {
     private var shareButton: some View {
         Button { r.go(.share) } label: {
             HStack(spacing: 8) {
-                Glyph("i_share", 18, .black)
+                Glyph("i_share", 18, C.onAccent)
                 Text("Share with photo").font(F.t(15, .semibold))
             }
-            .foregroundStyle(.black)
+            .foregroundStyle(C.onAccent)
             .frame(maxWidth: .infinity).frame(height: 52)
             .yellowFill(14)
         }
@@ -612,7 +612,7 @@ struct DetailView: View {
         HStack(alignment: .bottom, spacing: 2) {
             ForEach(0..<16, id: \.self) { i in
                 HStack(alignment: .bottom, spacing: 1) {
-                    Rectangle().fill(Color.white).frame(height: 44 * min(1, CGFloat(me[i]) / 340))
+                    Rectangle().fill(C.ink).frame(height: 44 * min(1, CGFloat(me[i]) / 340))
                     Rectangle().fill(C.g3A).frame(height: 44 * min(1, CGFloat(f.splits[i]) / 340))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -623,7 +623,7 @@ struct DetailView: View {
 
     private func friendLegend(_ name: String) -> some View {
         HStack(spacing: 14) {
-            HStack(spacing: 4) { Rectangle().fill(Color.white).frame(width: 8, height: 8); Text("Me") }
+            HStack(spacing: 4) { Rectangle().fill(C.ink).frame(width: 8, height: 8); Text("Me") }
             HStack(spacing: 4) { Rectangle().fill(C.g3A).frame(width: 8, height: 8); Text(name).lineLimit(1) }
             Spacer(minLength: 0)
             Text("Run 1 → Wall Balls").lineLimit(1)
@@ -695,7 +695,7 @@ struct DetailView: View {
                     let x: CGFloat = CGFloat(b) * w
                     p.move(to: CGPoint(x: x, y: 0))
                     p.addLine(to: CGPoint(x: x, y: h))
-                    ctx.stroke(p, with: .color(Color.white.opacity(0.14)), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                    ctx.stroke(p, with: .color(C.ink.opacity(0.14)), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
                 }
                 var line = Path()
                 for (i, q) in sample.enumerated() {
@@ -842,7 +842,7 @@ struct DetailView: View {
         return HStack(spacing: 12) {
             Icon8(s.icon, 24, tint: sk ? .dim : s.kind == .run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(F.t(15, .medium)).lineLimit(1).foregroundStyle(sk ? C.text2 : Color.white)
+                Text(title).font(F.t(15, .medium)).lineLimit(1).foregroundStyle(sk ? C.text2 : C.ink)
                 Text(sk ? Units.detail(s.detail, imp) : sub).font(F.num(11, .medium)).tracking(0.02 * 11)
                     .foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
             }
@@ -1133,14 +1133,14 @@ struct RouteMap: View {
                     .stroke(C.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
             }
             if let a = coords.first {
-                Annotation("", coordinate: a) { Circle().fill(Color.white).frame(width: 10, height: 10) }
+                Annotation("", coordinate: a) { Circle().fill(C.ink).frame(width: 10, height: 10) }
             }
             if let b = coords.last {
                 Annotation("", coordinate: b) { Circle().fill(C.accent).frame(width: 12, height: 12) }
             }
         }
         .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
-        .environment(\.colorScheme, .dark)
+        .environment(\.colorScheme, Appear.light ? .light : .dark)
         .overlay(alignment: .bottomLeading) { if chunks != nil { RouteSpeedLegend() } }
         .accessibilityIdentifier("detail.route")
     }

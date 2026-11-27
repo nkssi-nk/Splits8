@@ -81,7 +81,7 @@ private struct BenchCard: View {
         let f: CGFloat = CGFloat(min(1, abs(Double(d)) / Self.barCap))
         return GeometryReader { g in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.06))
+                Capsule().fill(C.ink.opacity(0.06))
                 Capsule().fill(color).frame(width: max(2, g.size.width * f))
             }
         }
@@ -123,9 +123,9 @@ private struct RankCard: View {
         VStack(spacing: 6) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(LinearGradient(colors: [C.accent, Color(hex: 0x6E6A3A), Color(hex: 0x2A2924)],
+                    Capsule().fill(LinearGradient(colors: [C.accent, Color(hex: 0x6E6A3A), C.ad(0x2A2924)],
                                                   startPoint: .leading, endPoint: .trailing))
-                    RoundedRectangle(cornerRadius: 3).fill(Color.white)
+                    RoundedRectangle(cornerRadius: 3).fill(C.ink)
                         .frame(width: 5, height: 18)
                         .offset(x: g.size.width * CGFloat(min(100, max(0, p))) / 100 - 2.5)
                 }

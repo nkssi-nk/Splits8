@@ -139,11 +139,11 @@ struct FinishSheet: View {
         let gold: Bool = c.tone == .celebrate
         return VStack(alignment: .leading, spacing: 0) {
             if let tag = c.tag { tagView(tag, tone: c.tone).padding(.bottom, 12) }
-            Text(c.line).font(F.t(F.title2, .semibold)).foregroundStyle(.white)
+            Text(c.line).font(F.t(F.title2, .semibold)).foregroundStyle(C.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("finish.line")
             Text(sub).font(F.t(F.foot)).foregroundStyle(C.text2).lineLimit(1).padding(.top, 4)
-            Text(Fm.t(rec.total)).font(F.num(46)).tracking(-0.02 * 46).foregroundStyle(gold ? Color(hex: 0xFFD54A) : .white)
+            Text(Fm.t(rec.total)).font(F.num(46)).tracking(-0.02 * 46).foregroundStyle(gold ? Color(hex: 0xFFD54A) : C.ink)
                 .lineLimit(1).minimumScaleFactor(0.6)
                 .padding(.top, 14)
             HStack(spacing: 8) {
@@ -161,7 +161,7 @@ struct FinishSheet: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { r.go(.share) }
                     }
                 } label: {
-                    Text(c.tone == .check ? "Check splits" : "Share").font(F.t(17, .semibold)).foregroundStyle(.black)
+                    Text(c.tone == .check ? "Check splits" : "Share").font(F.t(17, .semibold)).foregroundStyle(C.onAccent)
                         .frame(maxWidth: .infinity).frame(height: 52)
                         .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .contentShape(Rectangle())
@@ -169,9 +169,9 @@ struct FinishSheet: View {
                 .buttonStyle(Press())
                 .accessibilityIdentifier("finish.primary")
                 Button { dismiss() } label: {
-                    Text("Done").font(F.t(17, .semibold)).foregroundStyle(.white)
+                    Text("Done").font(F.t(17, .semibold)).foregroundStyle(C.ink)
                         .frame(maxWidth: .infinity).frame(height: 52)
-                        .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(C.ink.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(Press())
@@ -232,8 +232,8 @@ struct FinishSheet: View {
     }
 
     private func tagView(_ tag: String, tone: Cheer.Tone) -> some View {
-        let fill: Color = tone == .check ? C.bad.opacity(0.18) : tone == .celebrate ? Color(hex: 0xFFD54A) : Color.white.opacity(0.12)
-        let ink: Color = tone == .check ? C.bad : tone == .celebrate ? .black : .white
+        let fill: Color = tone == .check ? C.bad.opacity(0.18) : tone == .celebrate ? Color(hex: 0xFFD54A) : C.ink.opacity(0.12)
+        let ink: Color = tone == .check ? C.bad : tone == .celebrate ? .black : C.ink
         var text: String = tag == "CHECK" ? "Check".l10n : tag.l10n
         // 빌드 27: 러닝 기록의 PB 는 거리까지 ("★ 5K PB")
         if tag == "★ PB", rec.isRunKind, let pbl = store.runPBLabel(rec) { text = "★ " + pbl }

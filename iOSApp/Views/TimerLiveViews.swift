@@ -109,7 +109,7 @@ struct StrengthSetSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(ask.name.l10n).font(F.t(F.title3, .semibold)).lineLimit(1)
-                Text(String(format: "Set %lld done".l10n, ask.no)).font(F.t(15)).foregroundStyle(C.text2)
+                Text(String(format: "Set %lld done".l10n, ask.no)).font(F.t(15)).foregroundStyle(C.dText2)
             }
             NumStepper(label: "REPS DONE", value: Binding(get: { Double(reps) }, set: { reps = Int($0) }),
                        step: 1, range: 0...200, text: { "\(Int($0))" })
@@ -172,7 +172,7 @@ struct KindPickerSheet: View {
                     Spacer(minLength: 0)
                     Button { r.kindPicker = false } label: {
                         Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(C.text2)
+                            .foregroundStyle(C.dText2)
                             .frame(width: 32, height: 32)
                             .background(Color.white.opacity(0.10), in: Circle())
                     }
@@ -215,7 +215,7 @@ struct KindCard: View {
                     Chevron8()
                 }
                 Text(WKind.label(kind).l10n).font(F.t(17, .semibold)).lineLimit(1).minimumScaleFactor(0.8).padding(.top, 12)
-                Text(WKind.sub(kind).l10n).font(F.t(13)).foregroundStyle(C.text2)
+                Text(WKind.sub(kind).l10n).font(F.t(13)).foregroundStyle(C.dText2)
                     .lineLimit(2).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 3)
             }

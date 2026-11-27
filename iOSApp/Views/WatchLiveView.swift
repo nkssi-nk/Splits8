@@ -54,8 +54,8 @@ struct WatchLiveView: View {
 
     private var waiting: some View {
         VStack(spacing: 12) {
-            ProgressView().tint(C.accent)
-            Text("Connecting to Apple Watch…").font(F.t(15)).foregroundStyle(C.text2)
+            ProgressView().tint(C.yellow)
+            Text("Connecting to Apple Watch…").font(F.t(15)).foregroundStyle(C.dText2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -138,9 +138,9 @@ struct WatchLiveView: View {
     private var saving: some View {
         VStack(spacing: 14) {
             Spacer()
-            Image(systemName: "applewatch").font(.system(size: 44)).foregroundStyle(C.accent)
+            Image(systemName: "applewatch").font(.system(size: 44)).foregroundStyle(C.yellow)
             Text("Saving on Apple Watch…").font(F.t(17, .semibold))
-            Text("Your record will appear here in a moment.").font(F.t(14)).foregroundStyle(C.text2)
+            Text("Your record will appear here in a moment.").font(F.t(14)).foregroundStyle(C.dText2)
                 .multilineTextAlignment(.center)
             Spacer()
             GrayPill(title: "Home") { r.go(.home) }
@@ -159,7 +159,7 @@ struct LiveCol: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            Text(label.l10n).font(F.t(12, .semibold)).tracking(1).foregroundStyle(C.text3)
+            Text(label.l10n).font(F.t(12, .semibold)).tracking(1).foregroundStyle(C.dText3)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .frame(height: 16)
             Text(value).font(F.num(size)).tracking(-0.01 * size)

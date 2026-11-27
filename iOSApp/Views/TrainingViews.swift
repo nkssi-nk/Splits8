@@ -147,9 +147,10 @@ struct ProgramCard: View {
         .padding(.vertical, 16).padding(.horizontal, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
+            if Appear.light { shape.fill(C.card) }
             shape.fill(LinearGradient(stops: [.init(color: C.accent.opacity(0.15), location: 0),
-                                              .init(color: C.ink.opacity(0.07), location: 0.55),
-                                              .init(color: C.ink.opacity(0.05), location: 1)],
+                                              .init(color: C.ink.opacity(Appear.light ? 0.02 : 0.07), location: 0.55),
+                                              .init(color: C.ink.opacity(Appear.light ? 0.0 : 0.05), location: 1)],
                                       startPoint: .topLeading, endPoint: .bottomTrailing))
         }
         .overlay(shape.strokeBorder(C.accent.opacity(0.28), lineWidth: 1))
@@ -700,7 +701,7 @@ struct BuilderBar: View {
                 .background {
                     ZStack {
                         Rectangle().fill(.ultraThinMaterial)
-                        Rectangle().fill(Color.black.opacity(0.55))
+                        Rectangle().fill(C.bg.opacity(Appear.light ? 0.78 : 0.55))
                     }
                     .ignoresSafeArea(edges: .top)
                 }

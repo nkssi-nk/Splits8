@@ -554,7 +554,7 @@ struct PhoneRoot: View {
             // 1.2.7: 운동 중 화면(폰 · 워치 같이 보기)은 바탕색이 위까지 이어지게 빼 둠 (시안과 같게)
             if r.scr != .splash && r.scr != .phoneLive && r.scr != .watchLive {
                 GeometryReader { g in
-                    LinearGradient(stops: [.init(color: .black, location: 0.6), .init(color: .black.opacity(0), location: 1)],
+                    LinearGradient(stops: [.init(color: C.bg, location: 0.6), .init(color: C.bg.opacity(0), location: 1)],
                                    startPoint: .top, endPoint: .bottom)
                         .frame(height: g.safeAreaInsets.top)
                         .ignoresSafeArea(edges: .top)
@@ -892,7 +892,7 @@ struct TopBar8: View {
             .background {
                 ZStack {
                     Rectangle().fill(.ultraThinMaterial)
-                    Rectangle().fill(Color.black.opacity(0.55))
+                    Rectangle().fill(C.bg.opacity(Appear.light ? 0.78 : 0.55))
                 }
                 .ignoresSafeArea(edges: .top)
             }

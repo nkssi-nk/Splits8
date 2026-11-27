@@ -840,7 +840,7 @@ struct DetailView: View {
         // 운동 중에 건너뛴 구간(0초)은 되돌리면 0:00 기록이 남으므로 표시만 하는 구간에서만 되돌림
         let canMark: Bool = !rec.isNewKind && !rec.isRunKind && !rec.isHIIT && s.kind != .rox && !(sk && s.time == 0)
         return HStack(spacing: 12) {
-            Icon8(s.icon, 24, tint: sk ? .dim : s.kind == .run ? C.ink : .yellow)
+            Icon8(s.icon, 24, tint: sk ? .dim : s.kind == .run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(F.t(15, .medium)).lineLimit(1).foregroundStyle(sk ? C.text2 : C.ink)
                 Text(sk ? Units.detail(s.detail, imp) : sub).font(F.num(11, .medium)).tracking(0.02 * 11)

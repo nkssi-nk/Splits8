@@ -513,7 +513,7 @@ struct SetGoalsView: View {
         let st = Station.all[i / 2]
         let t = g.indices.contains(i) ? g[i] : 0
         return HStack(spacing: 12) {
-            Icon8(run ? "run" : st.key, 20, tint: run ? C.ink : .yellow)
+            Icon8(run ? "run" : st.key, 20, tint: run ? .white : .yellow)
             VStack(alignment: .leading, spacing: 0) {
                 Text(run ? "Run \(i / 2 + 1)" : st.name).font(F.t(15, .medium)).lineLimit(1)
                 Text(Units.detail(run ? "1KM" : st.detail(store.div), store.settings.imperial)).font(F.num(11, .regular)).foregroundStyle(C.text2).lineLimit(1)

@@ -710,4 +710,36 @@ final class ScreenshotTests: XCTestCase {
         app.swipeUp()
         shot("W1_widget_backgrounds")
     }
+
+    // MARK: 1.2.9 라이트 모드 (설정 > Theme > Appearance: Light)
+    func test11_light() {
+        launch(onboarded: true, extra: ["--light"])
+        shot("L1_home")
+        app.swipeUp()
+        shot("L1_home_bottom")
+        app.swipeDown(); app.swipeDown()
+        tab("Training")
+        shot("L2_training")
+        tab("Test")
+        shot("L3_full_simulation")
+        tab("Race")
+        shot("L4_race")
+        tab("Settings")
+        shot("L5_settings")
+        app.swipeUp()
+        shot("L5_settings_theme")
+        tab("Race")
+        app.swipeUp(); app.swipeUp()
+        tapContaining("vs goal")
+        shot("L6_detail_top")
+        app.swipeUp()
+        shot("L6_detail_charts")
+        app.swipeUp()
+        shot("L6_detail_splits")
+    }
+
+    func test12_light_widgets() {
+        launch(onboarded: true, extra: ["--light", "--widgets"])
+        shot("L7_widgets")
+    }
 }

@@ -38,7 +38,7 @@ struct Page8<Content: View>: View {
 struct PageSub: View {
     let text: String
     var body: some View {
-        Text(text.l10n).font(F.t(15)).foregroundStyle(C.text2).lineSpacing(15 * 0.45 - 3)
+        Text(text.l10n).font(F.t(15)).foregroundStyle(C.dText2).lineSpacing(15 * 0.45 - 3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -68,7 +68,7 @@ struct SplashView: View {
 
     private var bottomBlock: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("8 RUNS · 8 STATIONS").font(F.t(11, .semibold)).tracking(0.28 * 11).foregroundStyle(C.accent)
+            Text("8 RUNS · 8 STATIONS").font(F.t(11, .semibold)).tracking(0.28 * 11).foregroundStyle(C.yellow)
             Wordmark(size: 72)   // 로고 이미지 (시안 v4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text("Every run. Every station. Every second on your wrist.")
@@ -163,12 +163,12 @@ struct ObFrame<Content: View>: View {
             HStack(spacing: 6) {
                 ForEach(1...ObFrame<Content>.total, id: \.self) { n in
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(n == step ? C.accent : C.control)
+                        .fill(n == step ? C.yellow : C.control)
                         .frame(width: n == step ? 22 : 6, height: 6)
                 }
             }
             Spacer()
-            Text(verbatim: "\(step) / \(ObFrame<Content>.total)").font(F.t(13, .semibold)).tracking(0.1 * 13).foregroundStyle(C.text2).lineLimit(1)
+            Text(verbatim: "\(step) / \(ObFrame<Content>.total)").font(F.t(13, .semibold)).tracking(0.1 * 13).foregroundStyle(C.dText2).lineLimit(1)
         }
         .frame(height: 44)
     }
@@ -196,7 +196,7 @@ struct DivisionList: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(d.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white)
-                    Text(d.spec).font(F.num(13, .regular)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(d.spec).font(F.num(13, .regular)).foregroundStyle(C.dText2).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if on { Check8(size: checkSize) }
@@ -231,7 +231,7 @@ struct Onboarding2: View {
             Seg8(items: [("age", "By age"), ("manual", "Manual")], selected: s.hrMode) { store.settings.hrMode = $0 }
             inputCard
             HStack {
-                Text("Max heart rate").font(F.t(13)).foregroundStyle(C.text2)
+                Text("Max heart rate").font(F.t(13)).foregroundStyle(C.dText2)
                 Spacer()
                 Text("\(s.maxHR) BPM").font(F.num(15)).lineLimit(1)
             }
@@ -322,7 +322,7 @@ struct Onboarding3: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Restore from backup").font(F.t(17, .medium)).foregroundStyle(.white)
                     Text((restoreMessage ?? "Bring back your workout records (optional)").l10n)
-                        .font(F.t(13)).foregroundStyle(C.text2)
+                        .font(F.t(13)).foregroundStyle(C.dText2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -363,7 +363,7 @@ struct Onboarding3: View {
                 .background(granted ? C.good.opacity(0.15) : C.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name.l10n).font(F.t(17, .medium))
-                Text(sub.l10n).font(F.t(13)).foregroundStyle(C.text2)
+                Text(sub.l10n).font(F.t(13)).foregroundStyle(C.dText2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if granted { Check8(color: C.good, size: 20) }

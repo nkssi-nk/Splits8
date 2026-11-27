@@ -111,11 +111,11 @@ struct BadgeIcon: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(on ? AnyShapeStyle(LinearGradient(colors: [Color(hex: 0xFFE600), Color(hex: 0xFFB800)], startPoint: .top, endPoint: .bottom))
-                         : AnyShapeStyle(Color.white.opacity(0.06)))
-            Circle().strokeBorder(on ? Color.white.opacity(0.35) : Color.white.opacity(0.10), lineWidth: 1)
+                .fill(on ? AnyShapeStyle(LinearGradient(colors: [C.accent, Color(hex: 0xFFB800)], startPoint: .top, endPoint: .bottom))
+                         : AnyShapeStyle(C.ink.opacity(0.06)))
+            Circle().strokeBorder(on ? C.ink.opacity(0.35) : C.ink.opacity(0.10), lineWidth: 1)
             Image(systemName: b.icon).font(.system(size: size * 0.38, weight: .semibold))
-                .foregroundStyle(on ? Color.black : C.text3)
+                .foregroundStyle(on ? C.onAccent : C.text3)
         }
         .frame(width: size, height: size)
         .shadow(color: on ? C.accent.opacity(0.35) : .clear, radius: 8)
@@ -147,7 +147,7 @@ struct BadgesCard: View {
                                     VStack(spacing: 6) {
                                         BadgeIcon(b: b, on: got[b.id] != nil)
                                         Text(b.title.l10n).font(F.t(11, .medium))
-                                            .foregroundStyle(got[b.id] != nil ? .white : C.text3)
+                                            .foregroundStyle(got[b.id] != nil ? C.ink : C.text3)
                                             .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
                                             .frame(height: 28, alignment: .top)
                                     }
@@ -189,7 +189,7 @@ struct NewBadgesRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(badges.count == 1 ? "New badge".l10n : String(localized: "\(badges.count) new badges"))
                     .font(F.t(F.cap1, .bold)).tracking(0.06 * 12).foregroundStyle(C.accent)
-                Text(badges.map { $0.title.l10n }.joined(separator: " · ")).font(F.t(15, .semibold)).foregroundStyle(.white)
+                Text(badges.map { $0.title.l10n }.joined(separator: " · ")).font(F.t(15, .semibold)).foregroundStyle(C.ink)
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)

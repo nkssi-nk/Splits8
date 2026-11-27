@@ -1188,3 +1188,6 @@
 "PACE" = "페이스";
 "Watch" = "워치";
 "Avg %@" = "평균 %@";
+
+/* 1.2.9 라이트 모드 */
+"Light mode has no glow behind the screens." = "라이트 모드에서는 화면 뒤 빛이 없어요.";

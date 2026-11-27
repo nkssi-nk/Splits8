@@ -62,9 +62,9 @@ struct TrainingView: View {
             HStack(spacing: 0) {
                 Text("New training").font(F.t(17, .semibold)).tracking(-0.17)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Glyph("i_plus", 22, .black)
+                Glyph("i_plus", 22, C.onAccent)
             }
-            .foregroundStyle(.black)
+            .foregroundStyle(C.onAccent)
             .padding(.vertical, 16).padding(.horizontal, 18)
             .yellowFill(20)
         }
@@ -139,7 +139,7 @@ struct ProgramCard: View {
                     Text(openLine).font(F.t(13, .semibold)).foregroundStyle(C.d1).lineLimit(1)
                 }
                 .padding(.horizontal, 10).frame(height: 34)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(C.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             } else {
                 chips
             }
@@ -148,8 +148,8 @@ struct ProgramCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             shape.fill(LinearGradient(stops: [.init(color: C.accent.opacity(0.15), location: 0),
-                                              .init(color: Color.white.opacity(0.07), location: 0.55),
-                                              .init(color: Color.white.opacity(0.05), location: 1)],
+                                              .init(color: C.ink.opacity(0.07), location: 0.55),
+                                              .init(color: C.ink.opacity(0.05), location: 1)],
                                       startPoint: .topLeading, endPoint: .bottomTrailing))
         }
         .overlay(shape.strokeBorder(C.accent.opacity(0.28), lineWidth: 1))
@@ -192,7 +192,7 @@ struct ProgramCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             // "고르는 카드" 느낌: 노란 동그라미 안 ›
-            Glyph("i_chevR", 13, .black)
+            Glyph("i_chevR", 13, C.onAccent)
                 .frame(width: 30, height: 30)
                 .background(C.accent, in: Circle())
         }
@@ -212,7 +212,7 @@ struct ProgramCard: View {
         }
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity).frame(height: 34)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(C.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     /// 더 보기 칩: 접힌 상태 = 아래 겹꺾쇠 + 남은 개수("︾ 13"), 펼친 상태 = 위 겹꺾쇠만. 가는 실선 테두리.
@@ -228,7 +228,7 @@ struct ProgramCard: View {
             }
         }
         .frame(maxWidth: .infinity).frame(height: 34)
-        .overlay(shape.strokeBorder(Color.white.opacity(0.16), lineWidth: 1))
+        .overlay(shape.strokeBorder(C.ink.opacity(0.16), lineWidth: 1))
         .contentShape(Rectangle())
         .highPriorityGesture(TapGesture().onEnded { onMore() })
         .accessibilityElement(children: .ignore)
@@ -250,9 +250,9 @@ struct ShareTrainingButton: View {
                 Image(systemName: "link").font(.system(size: 13, weight: .semibold))
                 Text("Share link").font(F.t(14, .semibold)).lineLimit(1)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(C.ink)
             .padding(.horizontal, 14).frame(height: 36)
-            .background(Color.white.opacity(0.10), in: Capsule())
+            .background(C.ink.opacity(0.10), in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(Press(scale: 0.96))
@@ -433,7 +433,7 @@ struct BuilderView: View {
             LazyVGrid(columns: cols, spacing: 8) {
                 ForEach(Defaults.runs, id: \.self) { d in
                     Button { add(ProgItem(icon: "run", run: d), key: "run|" + d) } label: {
-                        Text(d).font(F.num(15)).foregroundStyle(.white)
+                        Text(d).font(F.num(15)).foregroundStyle(C.ink)
                             .frame(maxWidth: .infinity).frame(height: 46)
                             .card8(12)
                             .modifier(TapMark(count: count(run: d), flash: flashKey == "run|" + d, radius: 12))
@@ -507,7 +507,7 @@ struct BuilderView: View {
                     Icon8(s.key, 32, tint: .yellow)
                     Text(s.key == "farmersCarry" ? "Carry" : s.name).font(F.t(11, .semibold)).tracking(0.11)   // 버튼에서만 짧게
                         .multilineTextAlignment(.center).lineSpacing(1)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(C.ink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(6)
@@ -624,7 +624,7 @@ struct BuilderView: View {
     /// 빼기 원 (지름 20 중 원 r=10/24 → 16.7, #2A2A2A + 빨간 −)
     private var removeIcon: some View {
         ZStack {
-            Circle().fill(Color(hex: 0x2A2A2A)).frame(width: 16.7, height: 16.7)
+            Circle().fill(C.ad(0x2A2A2A)).frame(width: 16.7, height: 16.7)
             Capsule().fill(C.bad).frame(width: 6.7, height: 1.85)
         }
         .frame(width: 20, height: 20)
@@ -704,7 +704,7 @@ struct BuilderBar: View {
                     }
                     .ignoresSafeArea(edges: .top)
                 }
-                .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1) }
+                .overlay(alignment: .bottom) { Rectangle().fill(C.ink.opacity(0.06)).frame(height: 1) }
             Spacer(minLength: 0)
         }
     }
@@ -750,7 +750,7 @@ struct FlagPill: View {
             .foregroundStyle(C.text2)
             .padding(.horizontal, 7)
             .frame(height: 20)
-            .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .background(C.ink.opacity(0.10), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .fixedSize()
     }
 }
@@ -779,7 +779,7 @@ struct TileTap: ButtonStyle {
         configuration.label
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.07 : 0))
+                    .fill(C.ink.opacity(configuration.isPressed ? 0.07 : 0))
                     .allowsHitTesting(false)
             }
             .scaleEffect(configuration.isPressed ? 0.95 : 1)
@@ -802,7 +802,7 @@ struct TapMark: ViewModifier {
             }
             .overlay(alignment: .topTrailing) {
                 if count > 0 {
-                    Text("\(count)").font(F.num(12, .bold)).foregroundStyle(.black)
+                    Text("\(count)").font(F.num(12, .bold)).foregroundStyle(C.onAccent)
                         .padding(.horizontal, 5)
                         .frame(minWidth: 18, minHeight: 18)
                         .background(C.accent, in: Capsule())

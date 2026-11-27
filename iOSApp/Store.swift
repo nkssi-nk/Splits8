@@ -13,6 +13,7 @@ final class Store: NSObject, WCSessionDelegate {
     var settings = Settings() {
         didSet {
             GlowTheme.current = settings.glow
+            Appear.light = settings.light
             persist("settings")
             // 디비전을 바꾸면 서버 프로필에도 알림 (다른 기기에 로그인했을 때 같은 디비전이 되게)
             if !loading, !Demo.enabled, oldValue.division != settings.division, signedIn { Task { await syncProfile() } }
@@ -103,6 +104,7 @@ final class Store: NSObject, WCSessionDelegate {
         }
         if sb.session == nil && settings.nickname != nil && !Demo.friendsOn { settings.nickname = nil }   // 세션이 없으면 로그아웃 상태
         GlowTheme.current = settings.glow
+        Appear.light = settings.light
         loading = false
         // 빌드 19 까지는 디비전을 바꿔도 서버에 알리지 않았음 → 이 기기의 디비전을 한 번 올려 둠
         // (안 그러면 다른 기기에 로그인할 때 서버의 옛 디비전이 내려와 덮어씀)

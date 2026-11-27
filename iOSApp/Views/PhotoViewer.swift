@@ -58,9 +58,9 @@ struct PhotoViewer: View {
                         Spacer()
                         Button { close() } label: {
                             Image(systemName: "xmark").font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(C.ink)
                                 .frame(width: 36, height: 36)
-                                .background(Color.white.opacity(0.14), in: Circle())
+                                .background(C.ink.opacity(0.14), in: Circle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("photo.close")
@@ -81,7 +81,7 @@ struct PhotoViewer: View {
             AsyncImage(url: u) { ph in
                 switch ph {
                 case .success(let img): img.resizable().scaledToFill()
-                default: ZStack { C.control; ProgressView().tint(.white) }
+                default: ZStack { C.control; ProgressView().tint(C.ink) }
                 }
             }
         } else {

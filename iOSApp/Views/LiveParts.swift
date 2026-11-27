@@ -496,7 +496,7 @@ struct LiveButtons: View {
 
     var body: some View {
         let mainFill: Color = tone.dark ? Color.black.opacity(0.69) : Color.white.opacity(0.8)
-        let mainInk: Color = tone.dark ? C.accent : Color(hex: 0x1E78FA)
+        let mainInk: Color = tone.dark ? C.yellow : Color(hex: 0x1E78FA)
         ZStack {
             if let nextTitle {
                 Button(action: onNext) {
@@ -612,7 +612,7 @@ struct LiveSegmentList: View {
         let sk: Bool = d && skipped.contains(i)
         let diff: Int? = (d && !sk && s.target > 0) ? mySplit(i) - s.target : nil
         let time: String = sk ? "Skipped".l10n : d ? Fm.t(mySplit(i)) : c ? Fm.t(segEl) : (s.target > 0 ? Fm.t(s.target) : "–")
-        let curInk: Color = tone.dark ? C.accent : Color(hex: 0x1E78FA)
+        let curInk: Color = tone.dark ? C.yellow : Color(hex: 0x1E78FA)
         let nameColor: Color = c ? curInk : d ? tone.sub : tone.ink
         let timeColor: Color = c ? curInk : d ? tone.ink : tone.sub
         return HStack(spacing: 10) {

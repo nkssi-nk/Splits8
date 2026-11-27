@@ -13,7 +13,7 @@ struct OfficialCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text("OFFICIAL").font(F.t(10, .bold)).foregroundStyle(.black)
+                Text("OFFICIAL").font(F.t(10, .bold)).foregroundStyle(C.onAccent)
                     .padding(.vertical, 2).padding(.horizontal, 7)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Text(verbatim: "\(o.event) · \(o.division.l10n)").font(F.t(13)).foregroundStyle(C.text2).lineLimit(1)
@@ -70,7 +70,7 @@ struct OfficialEntrySection: View {
         .sheet(isPresented: $sheet) {
             OfficialImportView(ev: ev)
                 .presentationDetents([.large])
-                .presentationBackground(Color(hex: 0x141414))
+                .presentationBackground(C.ad(0x141414))
         }
     }
 }
@@ -108,7 +108,7 @@ struct OfficialImportView: View {
                             Image(systemName: "photo").font(.system(size: 15, weight: .semibold))
                             Text(readOnce ? "Choose another screenshot" : "Choose screenshot").font(F.t(16, .semibold))
                         }
-                        .foregroundStyle(.black)
+                        .foregroundStyle(C.onAccent)
                         .frame(maxWidth: .infinity).frame(height: 48)
                         .background(C.accent, in: Capsule())
                     }

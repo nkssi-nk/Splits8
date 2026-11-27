@@ -45,7 +45,7 @@ struct KindDetailSection: View {
         return HStack(spacing: 12) {
             Icon8(s.icon, 22, tint: rest ? .mute : .yellow)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title(s)).font(F.t(15, .medium)).foregroundStyle(fast ? C.accent : .white).lineLimit(1)
+                Text(title(s)).font(F.t(15, .medium)).foregroundStyle(fast ? C.accent : C.ink).lineLimit(1)
                 Text(sub(s, imp: imp)).font(F.num(11, .medium)).foregroundStyle(C.text2).lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -126,9 +126,9 @@ struct KindDetailSection: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             act()
         }) {
-            Image(systemName: sym).font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+            Image(systemName: sym).font(.system(size: 14, weight: .bold)).foregroundStyle(C.ink)
                 .frame(width: 36, height: 36)
-                .background(Color.white.opacity(0.12), in: Circle())
+                .background(C.ink.opacity(0.12), in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

@@ -104,9 +104,9 @@ struct NoticeBanner: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 8) {
-                Text(text).font(F.t(15, .semibold)).foregroundStyle(.black).lineLimit(1).minimumScaleFactor(0.8)
+                Text(text).font(F.t(15, .semibold)).foregroundStyle(C.onAccent).lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 4)
-                Chevron8(color: .black)
+                Chevron8(color: C.onAccent)
             }
             .padding(.horizontal, 16).frame(height: 44)
             .background(C.accent, in: Capsule())
@@ -209,7 +209,7 @@ struct UpdateBanner: View {
     var body: some View {
         HStack(spacing: 10) {
             Text("A new version is available (\(version))")
-                .font(F.t(14, .semibold)).foregroundStyle(.black)
+                .font(F.t(14, .semibold)).foregroundStyle(C.onAccent)
                 .lineLimit(2).minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button {
@@ -224,7 +224,7 @@ struct UpdateBanner: View {
             Button {
                 r.dismissUpdate()
             } label: {
-                Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.black)
+                Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(C.onAccent)
                     .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }
@@ -264,7 +264,7 @@ struct HideUndoBanner: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text("Hidden").font(F.t(15, .semibold)).foregroundStyle(.white).lineLimit(1)
+            Text("Hidden").font(F.t(15, .semibold)).foregroundStyle(C.ink).lineLimit(1)
             Spacer(minLength: 4)
             Button(action: onUndo) {
                 Text("Undo").font(F.t(15, .semibold)).foregroundStyle(C.accent)

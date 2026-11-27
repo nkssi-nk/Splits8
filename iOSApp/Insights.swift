@@ -620,7 +620,7 @@ struct InsightsCard: View {
                 HStack(alignment: .top, spacing: 12) {
                     badge(x.mark)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(Insights.styled(x.text)).font(F.t(15)).foregroundStyle(.white)
+                        Text(Insights.styled(x.text)).font(F.t(15)).foregroundStyle(C.ink)
                             .fixedSize(horizontal: false, vertical: true)
                         if let t = x.tip {
                             Text(t).font(F.t(13)).foregroundStyle(C.text2).fixedSize(horizontal: false, vertical: true)

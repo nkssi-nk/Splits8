@@ -40,7 +40,7 @@ struct TestSeg: View {
         let on: Bool = selected == key
         return Button { onSelect(key) } label: {
             Text(label.l10n).font(F.t(15, .semibold)).lineLimit(1)
-                .foregroundStyle(on ? Color.black : C.text2)
+                .foregroundStyle(on ? C.onAccent : C.text2)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(on ? C.accent : Color.clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .contentShape(Rectangle())
@@ -160,7 +160,7 @@ struct PFTView: View {
         .sheet(isPresented: $info) {
             PFTInfoSheet()
                 .presentationDetents([.large])
-                .presentationBackground(Color(hex: 0x1C1C1E))
+                .presentationBackground(C.ad(0x1C1C1E))
                 .preferredColorScheme(.dark)
         }
     }
@@ -348,7 +348,7 @@ struct PFTScale: View {
                 }
                 .clipShape(Capsule())
                 if total != nil {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous).fill(Color.white)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous).fill(C.ink)
                         .frame(width: 4, height: 18)
                         .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous).stroke(Color.black, lineWidth: 2))
                         .offset(x: markerX)

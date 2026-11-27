@@ -43,7 +43,7 @@ struct SectionText: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(Self.shown(text)).font(F.t(F.sub, .semibold)).foregroundStyle(.white).lineLimit(1)
+        Text(Self.shown(text)).font(F.t(F.sub, .semibold)).foregroundStyle(C.ink).lineLimit(1)
             .minimumScaleFactor(0.85)
     }
 
@@ -82,8 +82,8 @@ struct SectionLabel: View {
 struct Glyph: View {
     let name: String
     var size: CGFloat
-    var color: Color = .white
-    init(_ name: String, _ size: CGFloat, _ color: Color = .white) { self.name = name; self.size = size; self.color = color }
+    var color: Color = C.ink
+    init(_ name: String, _ size: CGFloat, _ color: Color = C.ink) { self.name = name; self.size = size; self.color = color }
     var body: some View {
         Image(name).renderingMode(.template).resizable().interpolation(.high).scaledToFit()
             .frame(width: size, height: size).foregroundStyle(color)
@@ -179,8 +179,8 @@ struct YellowGlass<S: InsettableShape>: ViewModifier {
                                                        Color(red: 1, green: 214 / 255, blue: 0, opacity: 0.80)],
                                               startPoint: .top, endPoint: .bottom))
                     // 위 1px 하이라이트 · 아래 1px 그늘
-                    shape.strokeBorder(LinearGradient(stops: [.init(color: .white.opacity(0.6), location: 0),
-                                                              .init(color: .white.opacity(0), location: 0.12),
+                    shape.strokeBorder(LinearGradient(stops: [.init(color: C.ink.opacity(0.6), location: 0),
+                                                              .init(color: C.ink.opacity(0), location: 0.12),
                                                               .init(color: .black.opacity(0), location: 0.88),
                                                               .init(color: .black.opacity(0.10), location: 1)],
                                                       startPoint: .top, endPoint: .bottom), lineWidth: 1)
@@ -194,7 +194,7 @@ struct YellowGlass<S: InsettableShape>: ViewModifier {
 extension View {
     /// 노란 유리 바탕 (둥근 사각형). on=false 면 회색 비활성 바탕
     @ViewBuilder
-    func yellowFill(_ radius: CGFloat, on: Bool = true, off: Color = Color.white.opacity(0.12)) -> some View {
+    func yellowFill(_ radius: CGFloat, on: Bool = true, off: Color = C.ink.opacity(0.12)) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         if on { self.modifier(YellowGlass(shape: shape)) }
         else { self.background(off, in: shape).contentShape(shape) }
@@ -214,7 +214,7 @@ struct YellowButton<L: View>: View {
         Button(action: action) {
             label
                 .font(F.t(17, .semibold))
-                .foregroundStyle(enabled ? Color.black : C.text3)
+                .foregroundStyle(enabled ? C.onAccent : C.text3)
                 .frame(maxWidth: .infinity).frame(height: height)
                 .yellowFill(radius, on: enabled)
         }
@@ -229,7 +229,7 @@ struct YellowPill: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title.l10n).font(F.t(13, .semibold)).foregroundStyle(.black)
+            Text(title.l10n).font(F.t(13, .semibold)).foregroundStyle(C.onAccent)
                 .padding(.horizontal, 14).frame(height: 34)
                 .yellowCapsule()
         }
@@ -246,12 +246,12 @@ struct GrayPill: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                if let icon { Glyph(icon, 13, .white) }
+                if let icon { Glyph(icon, 13, C.ink) }
                 Text(title.l10n).font(F.t(13, .semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(C.ink)
             .padding(.horizontal, 14).frame(height: 34)
-            .background(Color.white.opacity(0.10), in: Capsule())
+            .background(C.ink.opacity(0.10), in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(Press(scale: 0.96))
@@ -288,7 +288,7 @@ struct Seg8: View {
                 let k = items[i].0, l = items[i].1
                 Button { onSelect(k) } label: {
                     Text(l.l10n).font(F.t(fontSize, .semibold)).tracking(tracking).lineLimit(1)
-                        .foregroundStyle(selected == k ? Color.white : C.text2)
+                        .foregroundStyle(selected == k ? C.ink : C.text2)
                         .padding(.horizontal, minWidth > 0 ? 12 : 0)
                         .frame(minWidth: minWidth > 0 ? minWidth : nil, maxWidth: minWidth > 0 ? nil : .infinity)
                         .frame(height: height)
@@ -315,7 +315,7 @@ struct Pills8: View {
                 let k = items[i].0, l = items[i].1
                 Button { onSelect(k) } label: {
                     Text(l.l10n).font(F.t(11, .semibold))
-                        .foregroundStyle(selected == k ? Color.white : C.text2)
+                        .foregroundStyle(selected == k ? C.ink : C.text2)
                         .padding(.horizontal, 9).frame(height: 24)
                         .background(selected == k ? C.segOn : Color.clear, in: RoundedRectangle(cornerRadius: 6))
                 }
@@ -335,7 +335,7 @@ struct Toggle8: View {
         let k = h - 4
         ZStack(alignment: .leading) {
             Capsule().fill(on ? C.accent : C.control)
-            Circle().fill(on ? Color.black : Color.white).frame(width: k, height: k)
+            Circle().fill(on ? C.onAccent : Color.white).frame(width: k, height: k)
                 .shadow(color: .black.opacity(0.3), radius: 2, y: 2)
                 .offset(x: on ? w - k - 2 : 2)
         }
@@ -368,7 +368,7 @@ struct Stepper8: View {
     }
     private func sq(_ t: String, _ a: @escaping () -> Void) -> some View {
         Button(action: a) {
-            Text(t).font(F.t(17)).foregroundStyle(.white)
+            Text(t).font(F.t(17)).foregroundStyle(C.ink)
                 .frame(width: button, height: button)
                 .background(C.btn1A, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
                 .contentShape(Rectangle())
@@ -417,7 +417,7 @@ struct Avatar8: View {
     var photo: UIImage? = nil
     var initial: String
     var bg: Color = C.control
-    var fg: Color = .white
+    var fg: Color = C.ink
     var fontSize: CGFloat? = nil
     var body: some View {
         ZStack {
@@ -551,7 +551,7 @@ struct FoldChips<Content: View>: View {
                 .frame(width: 10, height: 11)
                 .frame(width: toggleW, height: height)
                 .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.16), lineWidth: 1))
+                    .strokeBorder(C.ink.opacity(0.16), lineWidth: 1))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -569,7 +569,7 @@ struct Field8: View {
     var body: some View {
         TextField("", text: $text, prompt: Text(placeholder.l10n).foregroundColor(C.text3))
             .font(F.t(size))
-            .foregroundStyle(.white)
+            .foregroundStyle(C.ink)
             .padding(.vertical, vPad).padding(.horizontal, 16)
             .card8(14)
     }
@@ -585,13 +585,13 @@ struct SearchField8: View {
             if let prefix { Text(prefix).font(F.t(17)).foregroundStyle(C.text2) }
             else { Glyph("i_search", 16, C.text2) }
             TextField("", text: $text, prompt: Text(placeholder.l10n).foregroundColor(C.text3))
-                .font(F.t(17)).foregroundStyle(.white)
+                .font(F.t(17)).foregroundStyle(C.ink)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.search)
                 .padding(.vertical, 11)
         }
         .padding(.horizontal, 12)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(C.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -638,7 +638,7 @@ struct SwipeDelete<Content: View>: View {
                         Image(systemName: "trash").font(.system(size: 17, weight: .semibold))
                         Text("Delete").font(F.t(12, .semibold))
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(C.ink)
                     .frame(width: max(reveal, -offset))
                     .frame(maxHeight: .infinity)
                     .background(C.bad)
@@ -861,7 +861,7 @@ struct BorderLight: ViewModifier {
             [.init(color: light.opacity(0), location: at),
              .init(color: light.opacity(0.55), location: at + 0.16),
              .init(color: light, location: at + 0.255),
-             .init(color: Color.white, location: at + 0.285),
+             .init(color: C.ink, location: at + 0.285),
              .init(color: light.opacity(0), location: at + 0.30)]
         }
         let head: [Gradient.Stop] = [.init(color: light.opacity(0), location: 0)]
@@ -903,7 +903,7 @@ extension PFTGrade {
     var borderStyle: AnyShapeStyle {
         AnyShapeStyle(LinearGradient(stops: [.init(color: Color(hex: hex1, alpha: 0.9), location: 0),
                                              .init(color: Color(hex: hex2, alpha: 0.25), location: 0.45),
-                                             .init(color: Color.white.opacity(0.08), location: 1)],
+                                             .init(color: C.ink.opacity(0.08), location: 1)],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
     }
 }
@@ -946,7 +946,7 @@ struct GlowSwatches: View {
             Circle().fill(Color(hex: t.hex))
                 .frame(width: size, height: size)
                 .padding(4)
-                .overlay(Circle().strokeBorder(on ? Color.white : Color.white.opacity(0.14), lineWidth: on ? 2 : 1))
+                .overlay(Circle().strokeBorder(on ? C.ink : C.ink.opacity(0.14), lineWidth: on ? 2 : 1))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -1002,7 +1002,7 @@ struct PagedCard<Row: View>: View {
     private func pager(_ p: Int, _ pages: Int) -> some View {
         HStack(spacing: 22) {
             arrow("chevron.left", on: p > 0, id: "pager.prev") { page = p - 1 }
-            (Text(verbatim: "\(p + 1)").foregroundColor(.white).fontWeight(.semibold)
+            (Text(verbatim: "\(p + 1)").foregroundColor(C.ink).fontWeight(.semibold)
                 + Text(verbatim: " / \(pages)").foregroundColor(C.text2))
                 .font(F.num(14, .regular)).lineLimit(1)
                 .frame(minWidth: 52)
@@ -1015,9 +1015,9 @@ struct PagedCard<Row: View>: View {
     private func arrow(_ name: String, on: Bool, id: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: name).font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(on ? C.accent : Color(hex: 0x4A4A4A))
+                .foregroundStyle(on ? C.accent : C.ad(0x4A4A4A))
                 .frame(width: 34, height: 34)
-                .background(Color.white.opacity(on ? 0.08 : 0.04), in: Circle())
+                .background(C.ink.opacity(on ? 0.08 : 0.04), in: Circle())
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }

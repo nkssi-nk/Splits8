@@ -944,7 +944,7 @@ struct PhoneLiveView: View {
     /// 인터벌 러닝: 목표 페이스보다 빠르면 초록, 느리면 빨강
     private func paceColor(_ now: Date) -> Color {
         let sp: Double = eng.speedNow(now)
-        guard let tp = eng.cur.tp, sp > 0.5 else { return C.text2 }
+        guard let tp = eng.cur.tp, sp > 0.5 else { return C.dText2 }
         return Int(1000 / sp) <= tp ? C.good : C.bad
     }
 
@@ -984,11 +984,11 @@ struct PhoneLiveView: View {
             Color.black.ignoresSafeArea()      // 뒤의 준비 화면이 비치지 않게 완전히 가림
             VStack(spacing: 14) {
                 Text(verbatim: "\(n)")
-                    .font(F.num(160, .bold)).foregroundStyle(C.accent)
+                    .font(F.num(160, .bold)).foregroundStyle(C.yellow)
                     .contentTransition(.numericText(countsDown: true))
                     .animation(.snappy(duration: 0.25), value: n)
                     .accessibilityIdentifier("phone.count")
-                Text("Tap to cancel").font(F.t(15)).foregroundStyle(C.text2)
+                Text("Tap to cancel").font(F.t(15)).foregroundStyle(C.dText2)
             }
         }
         .contentShape(Rectangle())
@@ -1164,10 +1164,10 @@ struct PhoneSegmentList: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("SEGMENTS").font(F.t(13, .semibold)).tracking(1).foregroundStyle(C.accent)
-            Text("\(min(idx + 1, seq.count))/\(seq.count)").font(F.num(13, .regular)).foregroundStyle(C.text2)
+            Text("SEGMENTS").font(F.t(13, .semibold)).tracking(1).foregroundStyle(C.yellow)
+            Text("\(min(idx + 1, seq.count))/\(seq.count)").font(F.num(13, .regular)).foregroundStyle(C.dText2)
             Spacer(minLength: 0)
-            Text(word.l10n).font(F.t(12, .semibold)).tracking(0.8).foregroundStyle(C.text2)
+            Text(word.l10n).font(F.t(12, .semibold)).tracking(0.8).foregroundStyle(C.dText2)
         }
         .padding(.horizontal, 6)
     }
@@ -1179,8 +1179,8 @@ struct PhoneSegmentList: View {
         let c: Bool = i == idx
         let r: Bool = s.kind == .rox
         let tint: IconTint = c ? .black : d ? .dim : r ? .mute : .white
-        let nameColor: Color = c ? Color.black : d ? C.text2 : Color.white
-        let timeColor: Color = c ? Color.black : d ? Color.white : C.text3
+        let nameColor: Color = c ? Color.black : d ? C.dText2 : Color.white
+        let timeColor: Color = c ? Color.black : d ? Color.white : C.dText3
         let sk: Bool = d && skipped.contains(i)
         let diff: Int? = (d && !sk && s.target > 0) ? mySplit(i) - s.target : nil
         let time: String = sk ? "Skipped".l10n : d ? Fm.t(mySplit(i)) : c ? Fm.t(segEl) : (s.target > 0 ? Fm.t(s.target) : "–")
@@ -1196,11 +1196,11 @@ struct PhoneSegmentList: View {
                 Icon8("i_check", 11, C.good)
             }
             Text(time).font(sk ? F.t(14, .medium) : F.num(16, .medium))
-                .foregroundStyle(sk ? C.text3 : timeColor).lineLimit(1).minimumScaleFactor(0.8)
+                .foregroundStyle(sk ? C.dText3 : timeColor).lineLimit(1).minimumScaleFactor(0.8)
                 .frame(minWidth: 58, alignment: .trailing)
         }
         .padding(.vertical, 9).padding(.horizontal, 12)
-        .background(c ? C.accent : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(c ? C.yellow : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

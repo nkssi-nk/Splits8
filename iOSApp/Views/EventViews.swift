@@ -50,7 +50,7 @@ struct SetEventView: View {
     private var findCard: some View {
         Button { r.go(.findEvent) } label: {
             HStack(spacing: 12) {
-                Glyph("i_searchB", 18, .black)
+                Glyph("i_searchB", 18, C.onAccent)
                     .frame(width: 36, height: 36)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
@@ -100,9 +100,9 @@ struct SetEventView: View {
             Text(t.l10n).font(F.t(17))
             Spacer()
             Button(action: a) {
-                Text(value).font(F.num(17, .regular)).foregroundStyle(open ? C.accent : Color.white).lineLimit(1)
+                Text(value).font(F.num(17, .regular)).foregroundStyle(open ? C.accent : C.ink).lineLimit(1)
                     .padding(.horizontal, 12).frame(height: 34)
-                    .background(open ? Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.16) : Color.white.opacity(0.08),
+                    .background(open ? Color(red: 1, green: 230 / 255, blue: 0, opacity: 0.16) : C.ink.opacity(0.08),
                                 in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -166,7 +166,7 @@ struct SetEventView: View {
         let on = cal.isDate(dt, inSameDayAs: ev.date)
         let isT = cal.isDate(dt, inSameDayAs: today)
         let past = dt < today
-        let fg: Color = on ? Color.black : (past ? C.chev : (isT ? C.accent : Color.white))
+        let fg: Color = on ? C.onAccent : (past ? C.chev : (isT ? C.accent : C.ink))
         return Button {
             if !past { set { $0.date = dt; $0.laps = nil }; pick = nil }
         } label: {
@@ -240,9 +240,9 @@ struct SetEventView: View {
     /// 40 높이 · radius 10 · 17/600
     private func cell(_ t: String, on: Bool, _ a: @escaping () -> Void) -> some View {
         Button(action: a) {
-            Text(t).font(F.num(17)).foregroundStyle(on ? Color.black : Color.white)
+            Text(t).font(F.num(17)).foregroundStyle(on ? C.onAccent : C.ink)
                 .frame(maxWidth: .infinity).frame(height: 40)
-                .background(on ? C.accent : Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(on ? C.accent : C.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -290,9 +290,9 @@ struct FindEventView: View {
             ForEach(EventItem.regions.indices, id: \.self) { i in
                 let k = EventItem.regions[i].0, l = EventItem.regions[i].1
                 Button { region = k } label: {
-                    Text(l.l10n).font(F.t(13, .semibold)).foregroundStyle(region == k ? Color.black : Color.white)
+                    Text(l.l10n).font(F.t(13, .semibold)).foregroundStyle(region == k ? C.onAccent : C.ink)
                         .padding(.horizontal, 14).frame(height: 32)
-                        .background(region == k ? C.accent : Color.white.opacity(0.08), in: Capsule())
+                        .background(region == k ? C.accent : C.ink.opacity(0.08), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("ev.region." + k)

@@ -224,7 +224,7 @@ struct SetCalibView: View {
             Note8(text: "Wear the watch on the wrist that moves. You can redo it or go back to default anytime.")
 
             Button { start() } label: {
-                Text((sent ? "Sent to watch" : "Start on watch").l10n).font(F.t(17, .semibold)).foregroundStyle(.black)
+                Text((sent ? "Sent to watch" : "Start on watch").l10n).font(F.t(17, .semibold)).foregroundStyle(C.onAccent)
                     .frame(maxWidth: .infinity).frame(height: 52)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .contentShape(Rectangle())
@@ -262,7 +262,7 @@ struct SetCalibView: View {
 
     private func step(_ n: Int, _ t: String, last: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Text("\(n)").font(F.t(13, .bold)).foregroundStyle(.black)
+            Text("\(n)").font(F.t(13, .bold)).foregroundStyle(C.onAccent)
                 .frame(width: 24, height: 24).background(C.accent, in: Circle())
             Text(t.l10n).font(F.t(15)).fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)

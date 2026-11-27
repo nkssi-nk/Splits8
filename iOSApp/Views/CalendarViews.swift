@@ -222,7 +222,7 @@ struct HistoryCalendar: View {
         } label: {
             VStack(spacing: 2) {
                 Text("\(day)").font(F.t(15, isSel ? .semibold : .regular)).monospacedDigit()
-                    .foregroundStyle(isSel ? Color.black : Color.white)
+                    .foregroundStyle(isSel ? C.onAccent : C.ink)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(isSel ? C.accent : (raceDay ? Self.raceColor.opacity(0.22) : Color.clear)))
                     .overlay {

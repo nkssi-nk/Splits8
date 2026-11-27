@@ -267,7 +267,7 @@ struct ProfileSetupView: View {
         .overlay(alignment: .bottom) {
             if toast {
                 Text("No problem! You can fill this in anytime from Settings › Profile.")
-                    .font(F.t(14, .semibold)).foregroundStyle(.black)
+                    .font(F.t(14, .semibold)).foregroundStyle(C.onAccent)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 18).padding(.vertical, 12)
                     .background(C.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -395,7 +395,7 @@ struct ProfileSetupView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "sparkles").font(.system(size: 15, weight: .semibold)).foregroundStyle(C.accent)
                 Text("First race? We recommend Doubles (Open) — you share the work with a partner.")
-                    .font(F.t(14, .medium)).foregroundStyle(.white)
+                    .font(F.t(14, .medium)).foregroundStyle(C.ink)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(14)
@@ -428,9 +428,9 @@ struct ProfileSetupView: View {
             if key != "dblX" { sex = Self.sexOf(key) }
         } label: {
             HStack(spacing: 10) {
-                Text(d.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white)
+                Text(d.name).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(C.ink)
                 if rec {
-                    Text("RECOMMENDED").font(F.t(10, .bold)).tracking(0.5).foregroundStyle(.black)
+                    Text("RECOMMENDED").font(F.t(10, .bold)).tracking(0.5).foregroundStyle(C.onAccent)
                         .padding(.horizontal, 7).frame(height: 20)
                         .background(C.accent, in: Capsule())
                 }
@@ -503,7 +503,7 @@ struct ProfileSetupView: View {
     private func choiceRow(_ title: String, on: Bool, last: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Text(title.l10n).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(.white)
+                Text(title.l10n).font(F.t(17, on ? .semibold : .regular)).foregroundStyle(C.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if on { Check8(size: 20) }
             }
